@@ -7,6 +7,7 @@ on:
     paths:
       - 'packages/admin-client/**'
       - 'packages/admin-server/**'
+      - '.github/workflows/deploy-admin-all.yml'
   workflow_dispatch:
 
 jobs:
@@ -41,21 +42,18 @@ jobs:
 
       - name: Upload server artifacts to EC2
         run: |
-          # Create temp directory on EC2
-          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ~/admin-server-new'
+          # Create deployment directory on EC2
+          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ~/admin-server'
           
           # Upload built server bundle (self-contained)
           scp -i ~/.ssh/deploy_key -r packages/admin-server/dist \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/admin-server-new/
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/admin-server/
 
       - name: Upload client artifacts to EC2
         run: |
-          # Create temp directory on EC2
-          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ~/admin-client-new'
-          
-          # Upload built client files
+          # Upload built client files directly to nginx
           scp -i ~/.ssh/deploy_key -r packages/admin-client/dist/* \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/admin-client-new/
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/admin-client-dist/
 
       - name: Deploy to EC2
         run: |
@@ -65,20 +63,18 @@ jobs:
             
             # Backend deployment
             echo "📦 Deploying backend..."
-            cd /home/ec2-user/Nowgai-Admin/server
-            rm -rf dist
-            cp -r ~/admin-server-new/* .
+            cd ~/admin-server
             # Restart PM2 with built file
-            pm2 restart admin-server || pm2 start dist/index.js --name admin-server
+            pm2 restart admin-server || pm2 start dist/index.js --name admin-server --cwd ~/admin-server
             
             # Frontend deployment
             echo "🎨 Deploying frontend..."
             sudo rm -rf /var/www/html/*
-            sudo cp -r ~/admin-client-new/* /var/www/html/
+            sudo cp -r ~/admin-client-dist/* /var/www/html/
             sudo chown -R nginx:nginx /var/www/html
             
             # Cleanup
-            rm -rf ~/admin-server-new ~/admin-client-new
+            rm -rf ~/admin-client-dist
             
             pm2 save
             echo "✅ Deployment complete!"
