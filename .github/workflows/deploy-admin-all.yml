@@ -1,0 +1,92 @@
+name: Deploy Admin Stack
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/admin-client/**'
+      - 'packages/admin-server/**'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy to EC2
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build admin-server
+        run: bun run build:admin-server
+
+      - name: Build admin-client
+        run: bun run build:admin-client
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Upload server artifacts to EC2
+        run: |
+          # Create temp directory on EC2
+          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ~/admin-server-new'
+          
+          # Upload built server bundle (self-contained)
+          scp -i ~/.ssh/deploy_key -r packages/admin-server/dist \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/admin-server-new/
+
+      - name: Upload client artifacts to EC2
+        run: |
+          # Create temp directory on EC2
+          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ~/admin-client-new'
+          
+          # Upload built client files
+          scp -i ~/.ssh/deploy_key -r packages/admin-client/dist/* \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/admin-client-new/
+
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            echo "🚀 Starting deployment..."
+            
+            # Backend deployment
+            echo "📦 Deploying backend..."
+            cd /home/ec2-user/Nowgai-Admin/server
+            rm -rf dist
+            cp -r ~/admin-server-new/* .
+            # Restart PM2 with built file
+            pm2 restart admin-server || pm2 start dist/index.js --name admin-server
+            
+            # Frontend deployment
+            echo "🎨 Deploying frontend..."
+            sudo rm -rf /var/www/html/*
+            sudo cp -r ~/admin-client-new/* /var/www/html/
+            sudo chown -R nginx:nginx /var/www/html
+            
+            # Cleanup
+            rm -rf ~/admin-server-new ~/admin-client-new
+            
+            pm2 save
+            echo "✅ Deployment complete!"
+          EOF
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed"
+          fi
