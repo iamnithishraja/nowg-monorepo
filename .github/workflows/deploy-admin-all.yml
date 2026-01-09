@@ -28,6 +28,8 @@ jobs:
         run: bun run build:admin-server
 
       - name: Build admin-client
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: bun run build:admin-client
 
       - name: Configure SSH
