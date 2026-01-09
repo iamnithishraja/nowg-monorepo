@@ -1,0 +1,33 @@
+{
+  "name": "@nowgai/admin-server",
+  "version": "1.0.0",
+  "description": "Admin server for Nowgai",
+  "main": "index.ts",
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "bun run --watch index.ts",
+    "build": "bun build index.ts --outdir=dist --target=node",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+    "dependencies": {
+    "@types/cookie-parser": "^1.4.7",
+    "@types/dotenv": "^8.2.3",
+    "@types/express": "^5.0.6",
+    "@types/mongoose": "^5.11.97",
+    "@types/pdfkit": "^0.17.4",
+    "better-auth": "^1.4.5",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "mongodb": "^7.0.0",
+    "mongoose": "^9.0.0",
+    "pdfkit": "^0.17.2",
+    "resend": "^6.5.2",
+    "stripe": "^17.3.1",
+    "razorpay": "^2.9.2",
+    "typescript": "^5.9.3"
+  }
+}

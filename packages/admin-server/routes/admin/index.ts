@@ -1,0 +1,48 @@
+import { Router } from "express";
+import usersRouter from "./users";
+import userDetailRouter from "./user-detail";
+import updateRoleRouter from "./update-role";
+import dashboardRouter from "./dashboard";
+import tokenUsageRouter from "./token-usage";
+import walletRouter from "./wallet";
+import transactionsRouter from "./transactions";
+import teamsRouter from "./teams";
+import envConfigsRouter from "./env-configs";
+import organizationsRouter from "./organizations";
+import orgWalletsRouter from "./org-wallets";
+import projectsRouter from "./projects";
+import projectWalletsRouter from "./project-wallets";
+import userProjectWalletsRouter from "./user-project-wallets";
+import projectMembersRouter from "./project-members";
+import meRouter from "./me";
+import ledgerRouter from "./ledger";
+import analyticsRouter from "./analytics";
+import paymentSettingsRouter from "../paymentSettings";
+import fundRequestsRouter from "./fund-requests";
+import markupRouter from "./markup";
+
+const router = Router();
+
+router.use("/users", usersRouter);
+router.use("/user-detail", userDetailRouter);
+router.use("/update-role", updateRoleRouter);
+router.use("/dashboard", dashboardRouter);
+router.use("/token-usage", tokenUsageRouter);
+router.use("/wallet", walletRouter);
+router.use("/transactions", transactionsRouter);
+router.use("/teams", teamsRouter);
+router.use("/env-configs", envConfigsRouter);
+router.use("/organizations", organizationsRouter);
+router.use("/org-wallets", orgWalletsRouter);
+router.use("/projects", projectsRouter);
+router.use("/project-wallets", projectWalletsRouter);
+router.use("/user-project-wallets", userProjectWalletsRouter);
+router.use("/me", meRouter);
+router.use("/ledger", ledgerRouter);
+router.use("/analytics", analyticsRouter);
+router.use("/payment-settings", paymentSettingsRouter);
+router.use("/fund-requests", fundRequestsRouter);
+router.use("/markup", markupRouter);
+router.use("/", projectMembersRouter);
+
+export default router;

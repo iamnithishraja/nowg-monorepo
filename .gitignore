@@ -1,0 +1,17 @@
+.DS_Store
+node_modules/
+
+# React Router
+.react-router/
+build/
+dist/
+
+.env
+.env.local
+.env.*.local
+
+# Bun
+bun.lockb
+
+# Package specific
+packages/web/app/lib/extracted-ui/

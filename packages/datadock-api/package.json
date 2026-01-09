@@ -1,0 +1,39 @@
+{
+  "name": "@nowgai/datadock-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir=dist --target=node",
+    "start": "bun run dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "supabase",
+    "baas",
+    "neon",
+    "postgres",
+    "api-gateway"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "A Supabase-like Backend as a Service with Neon DB provisioning",
+  "dependencies": {
+    "@hono/node-server": "^1.19.7",
+    "@neondatabase/serverless": "^1.0.2",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.2.3",
+    "hono": "^4.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.0.2",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.0.3",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

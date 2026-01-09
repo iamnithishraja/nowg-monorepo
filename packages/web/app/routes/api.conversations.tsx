@@ -1,0 +1,614 @@
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { ChatService } from "~/lib/chatService";
+import { auth } from "~/lib/auth";
+import { extractNowgaiActions } from "~/utils/workspaceApi";
+import { createClientFileStorageService } from "~/lib/clientFileStorage";
+import { EnhancedChatPersistence } from "~/lib/enhancedPersistence";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  try {
+    // Get authenticated user session
+    const authInstance = await auth;
+    const session = await authInstance.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const userId = session.user.id;
+    const url = new URL(request.url);
+    const conversationId = url.searchParams.get("conversationId");
+    const chatService = new ChatService();
+
+    // If conversationId is provided, get specific conversation with messages
+    if (conversationId) {
+      const conversation = await chatService.getConversation(
+        conversationId,
+        userId
+      );
+      if (!conversation) {
+        return new Response(
+          JSON.stringify({ error: "Conversation not found" }),
+          {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Use the populated messages from the conversation instead of fetching separately
+      const messages = conversation.messages || [];
+
+      // Sort messages by timestamp to ensure proper order
+      const sortedMessages = messages.sort(
+        (a: any, b: any) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      // Convert Mongoose document to plain object
+      const conversationObj = conversation.toObject();
+
+      const responseData = {
+        conversation: {
+          ...conversationObj,
+          deploymentUrl: (conversationObj as any).deploymentUrl || null,
+          adminProjectId: (conversationObj as any).adminProjectId || null,
+        },
+        messages: sortedMessages.map((msg: any) => ({
+          id: msg._id.toString(),
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+          model: msg.model,
+          // Files are now populated via virtual field from File model
+          files:
+            msg.files && msg.files.length > 0
+              ? msg.files.map((f: any) => ({
+                  id: f._id ? f._id.toString() : f.id,
+                  name: f.name,
+                  type: f.type,
+                  size: f.size,
+                  uploadedAt: f.uploadedAt,
+                  base64Data: f.base64Data, // Include file content for persistence
+                }))
+              : undefined,
+        })),
+      };
+
+      return new Response(JSON.stringify(responseData), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Otherwise, get all user conversations (personal + team)
+    const { personal, team } = await chatService.getUserConversations(userId);
+
+    // Format personal conversations
+    const personalFormatted = personal.map((conv) => ({
+      id: conv._id.toString(),
+      title: conv.title,
+      model: conv.model,
+      createdAt: conv.createdAt,
+      updatedAt: conv.updatedAt,
+      lastMessageAt: conv.updatedAt, // Use updatedAt as lastMessageAt
+      messageCount: conv.messages?.length || 0,
+      deploymentUrl: (conv as any).deploymentUrl || null,
+      adminProjectId: (conv as any).adminProjectId || null,
+      teamId: null,
+      teamName: null,
+      projectType: "personal",
+    }));
+
+    // Format team conversations with team info
+    const teamFormatted = team.map((conv: any) => ({
+      id: conv._id.toString(),
+      title: conv.title,
+      model: conv.model,
+      createdAt: conv.createdAt,
+      updatedAt: conv.updatedAt,
+      lastMessageAt: conv.updatedAt,
+      messageCount: conv.messages?.length || 0,
+      deploymentUrl: (conv as any).deploymentUrl || null,
+      adminProjectId: (conv as any).adminProjectId || null,
+      teamId: conv.teamId?._id?.toString() || conv.teamId?.toString() || null,
+      teamName: conv.teamId?.name || null,
+      projectType: "team",
+    }));
+
+    // Get unique teams
+    const uniqueTeamsMap = new Map<string, { id: string; name: string }>();
+    teamFormatted.forEach((c) => {
+      if (c.teamId && c.teamName && !uniqueTeamsMap.has(c.teamId)) {
+        uniqueTeamsMap.set(c.teamId, { id: c.teamId, name: c.teamName });
+      }
+    });
+    const uniqueTeams = Array.from(uniqueTeamsMap.values());
+
+    return new Response(
+      JSON.stringify({
+        conversations: [...personalFormatted, ...teamFormatted],
+        teams: uniqueTeams,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    console.error("Conversations API error:", error);
+    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  try {
+    // Get authenticated user session
+    const authInstance = await auth;
+    const session = await authInstance.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const userId = session.user.id;
+    const requestBody = await request.json();
+
+    const {
+      action: actionType,
+      conversationId,
+      title,
+      model,
+      firstMessage,
+      clientRequestId,
+      message,
+      messageId,
+      messageContent,
+      filesMap,
+      uploadedFiles,
+    } = requestBody;
+
+    const chatService = new ChatService();
+
+    switch (actionType) {
+      case "create":
+        if (!model) {
+          return new Response(
+            JSON.stringify({
+              error: "Model is required for creating conversation",
+            }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        const newConversationId = await chatService.createConversation(
+          userId,
+          model,
+          firstMessage || title,
+          filesMap || {}
+        );
+
+        // If firstMessage is provided, save it as the first user message
+        if (firstMessage) {
+          const messageId = await chatService.addMessage(newConversationId, {
+            role: "user",
+            content: firstMessage,
+            clientRequestId: clientRequestId,
+          } as any);
+
+          // If there are uploaded files (images), save them to the File model
+          if (
+            uploadedFiles &&
+            Array.isArray(uploadedFiles) &&
+            uploadedFiles.length > 0
+          ) {
+            try {
+              const { FileService } = await import("~/lib/fileService");
+              const fileService = new FileService();
+
+              // Filter only image files
+              const imageFiles = uploadedFiles.filter(
+                (f: any) => f.type && f.type.startsWith("image/")
+              );
+
+              if (imageFiles.length > 0) {
+                await fileService.addFiles(
+                  messageId,
+                  newConversationId,
+                  imageFiles.map((f: any) => ({
+                    name: f.name,
+                    type: f.type,
+                    size: f.size,
+                    base64Data: f.base64Data,
+                  }))
+                );
+              }
+            } catch (fileError) {
+              console.error("Error saving files to database:", fileError);
+              // Don't fail the conversation creation if file upload fails
+            }
+          }
+        }
+
+        if (filesMap && Object.keys(filesMap).length > 0) {
+          // Update conversation with filesMap
+          try {
+            await chatService.updateConversationFiles(
+              newConversationId,
+              filesMap
+            );
+          } catch (error) {
+            console.error("Error updating conversation with files:", error);
+          }
+        }
+
+        const newConversation = await chatService.getConversation(
+          newConversationId,
+          userId
+        );
+
+        return new Response(
+          JSON.stringify({
+            conversationId: newConversation!._id.toString(),
+            conversation: {
+              id: newConversation!._id.toString(),
+              title: newConversation!.title,
+              model: newConversation!.model,
+              createdAt: newConversation!.createdAt,
+              updatedAt: newConversation!.updatedAt,
+            },
+          }),
+          {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+      case "updateTitle":
+        if (!conversationId || !title) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId and title are required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verify ownership
+        const conversation = await chatService.getConversation(
+          conversationId,
+          userId
+        );
+        if (!conversation) {
+          return new Response(
+            JSON.stringify({ error: "Conversation not found" }),
+            {
+              status: 404,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        await chatService.updateConversationTitle(conversationId, title);
+
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+
+      case "delete":
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          await chatService.deleteConversation(conversationId, userId);
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (error) {
+          console.error("Error deleting conversation:", error);
+          return new Response(
+            JSON.stringify({
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to delete conversation",
+            }),
+            {
+              status: 404,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+      case "addMessage":
+        if (!conversationId || !message) {
+          return new Response(
+            JSON.stringify({
+              error: "ConversationId and message are required",
+            }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verify ownership
+        const conversationForMessage = await chatService.getConversation(
+          conversationId,
+          userId
+        );
+        if (!conversationForMessage) {
+          return new Response(
+            JSON.stringify({ error: "Conversation not found" }),
+            {
+              status: 404,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        const newMessageId = await chatService.addMessage(
+          conversationId,
+          message
+        );
+
+        return new Response(
+          JSON.stringify({ success: true, messageId: newMessageId }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+      case "revert":
+        if (!conversationId || !messageId) {
+          return new Response(
+            JSON.stringify({
+              error: "ConversationId and messageId are required",
+            }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verify ownership
+        const conversationForRevert = await chatService.getConversation(
+          conversationId,
+          userId
+        );
+        if (!conversationForRevert) {
+          return new Response(
+            JSON.stringify({ error: "Conversation not found" }),
+            {
+              status: 404,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Get all messages to find the target message
+        const allMessages = await chatService.getMessages(conversationId);
+
+        // Find the target message by matching content since frontend and backend IDs don't match
+        const targetMessageIndex = allMessages.findIndex((msg: any) => {
+          // Try to match by ID first
+          const dbId = msg._id?.toString();
+          const frontendId = msg.id?.toString();
+          if (dbId === messageId || frontendId === messageId) {
+            return true;
+          }
+
+          // If ID doesn't match, try to find by role and content
+          if (msg.role === "user" && msg.content && messageContent) {
+            // Match by exact content or similar content
+            const dbContent = msg.content.trim().toLowerCase();
+            const frontendContent = messageContent.trim().toLowerCase();
+
+            // Exact match
+            if (dbContent === frontendContent) {
+              return true;
+            }
+
+            // Similar match (for cases where content might be slightly different)
+            if (
+              dbContent.includes(frontendContent) ||
+              frontendContent.includes(dbContent)
+            ) {
+              return true;
+            }
+          }
+
+          return false;
+        });
+
+        if (targetMessageIndex === -1) {
+          return new Response(JSON.stringify({ error: "Message not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        // 🔍 SMART REVERT: Handle template + application code scenario
+        // Find the next AI message after the target user message
+        let nextAIMessageIndex = -1;
+        for (let i = targetMessageIndex + 1; i < allMessages.length; i++) {
+          if (allMessages[i].role === "assistant") {
+            nextAIMessageIndex = i;
+            break;
+          }
+        }
+
+        // 🔍 Check if the first AI message is just a template (no application code)
+        let startDeleteIndex;
+        if (nextAIMessageIndex !== -1) {
+          const firstAIMessage = allMessages[nextAIMessageIndex];
+          const isTemplateOnly =
+            firstAIMessage.content.includes(
+              "Nowgai is initializing your project"
+            ) &&
+            firstAIMessage.content.includes("vite-react-typescript-starter");
+
+          if (isTemplateOnly) {
+            // Look for the next AI message that contains actual application code
+            let applicationAIMessageIndex = -1;
+            for (let i = nextAIMessageIndex + 1; i < allMessages.length; i++) {
+              if (allMessages[i].role === "assistant") {
+                const content = allMessages[i].content;
+                // Check if this message contains application-specific code (not just template)
+                const hasApplicationCode =
+                  content.includes("components/") ||
+                  content.includes("utils/") ||
+                  content.includes("I'll help you") ||
+                  content.includes("Let's implement") ||
+                  content.includes("The game is now ready") ||
+                  content.includes("game components") ||
+                  content.includes("game logic") ||
+                  content.includes("interface ") ||
+                  content.includes("const ") ||
+                  content.includes("function ") ||
+                  content.includes("export ") ||
+                  content.includes("import ") ||
+                  content.includes("className=") ||
+                  content.includes("useState") ||
+                  content.includes("useEffect");
+
+                if (hasApplicationCode) {
+                  applicationAIMessageIndex = i;
+                  break;
+                }
+              }
+            }
+
+            // If we found application code, keep both template and application messages
+            if (applicationAIMessageIndex !== -1) {
+              startDeleteIndex = applicationAIMessageIndex + 1;
+            } else {
+              startDeleteIndex = nextAIMessageIndex + 1;
+            }
+          } else {
+            startDeleteIndex = nextAIMessageIndex + 1;
+          }
+        } else {
+          startDeleteIndex = targetMessageIndex + 1;
+        }
+        const messagesToDelete = allMessages.slice(startDeleteIndex);
+
+        // Calculate total tokens from messages to be deleted before deleting
+        let totalTokensToAdd = 0;
+        for (const msg of messagesToDelete) {
+          if (msg.role === "assistant" && msg.tokensUsed) {
+            totalTokensToAdd += msg.tokensUsed;
+          }
+        }
+
+        // Add tokens to conversation's additionalTokensUsed before deleting messages
+        if (totalTokensToAdd > 0) {
+          await chatService.addAdditionalTokens(
+            conversationId,
+            totalTokensToAdd
+          );
+        }
+
+        // Delete messages from database
+        for (const msg of messagesToDelete) {
+          await chatService.deleteMessage(msg._id.toString());
+        }
+
+        // ✅ Update conversation's messages array to remove deleted message references
+        const messagesToKeep = allMessages.slice(0, startDeleteIndex);
+        const remainingMessageIds = messagesToKeep.map((msg) => msg._id);
+
+        await chatService.updateConversationMessages(
+          conversationId,
+          remainingMessageIds
+        );
+
+        // Get updated messages after deletion
+        const updatedMessages = await chatService.getMessages(conversationId);
+
+        // ✅ Rebuild artifact state from surviving messages
+        let artifactState: Record<string, string> = {}; // filePath -> content
+        let shellCommands: string[] = [];
+
+        for (const msg of messagesToKeep) {
+          if (
+            msg.role === "assistant" &&
+            msg.content.includes("<nowgaiAction")
+          ) {
+            const actions = extractNowgaiActions(msg.content);
+            for (const action of actions) {
+              if (action.type === "file" && action.filePath) {
+                artifactState[action.filePath] = action.content;
+              } else if (action.type === "shell") {
+                shellCommands.push(action.content);
+              }
+            }
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            messages: updatedMessages,
+            deletedCount: messagesToDelete.length,
+            artifacts: {
+              files: Object.keys(artifactState),
+              shellCommands,
+              fileContents: artifactState,
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+      default:
+        return new Response(JSON.stringify({ error: "Invalid action" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+    }
+  } catch (error) {
+    console.error("Conversations action error:", error);
+    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
