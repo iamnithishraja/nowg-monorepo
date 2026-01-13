@@ -93,7 +93,16 @@ export function useChatHandlers({
         // Handle specific error cases
         if (error instanceof Error) {
           const errorAny = error as any;
-          if (
+          // Check if this is an abort error
+          if (error.name === "AbortError") {
+            // Check if user intentionally cancelled (stop button)
+            if (chat.userCancelledRef?.current) {
+              chat.setError("Chat aborted.");
+              chat.userCancelledRef.current = false;
+            }
+            // Otherwise it's cleanup/unmount - don't show error
+            return;
+          } else if (
             error.message.includes("Insufficient balance") ||
             error.message.includes("Payment Required") ||
             error.message.includes("spending limit") ||

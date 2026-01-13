@@ -851,7 +851,9 @@ export default function ChatPanel({
               </div>
               <div className="flex-1">
                 <div className="bg-destructive/20 border border-destructive/20 p-3 rounded-lg">
-                  <div className="text-sm text-destructive">Error: {error}</div>
+                  <div className="text-sm text-destructive">
+                    {error === "Chat aborted." ? error : `Error: ${error}`}
+                  </div>
                 </div>
               </div>
             </div>

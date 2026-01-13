@@ -13,6 +13,7 @@ export function useWorkspaceChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const userCancelledRef = useRef(false);
   const processedFiles = useRef(new Set<string>());
 
   // Track which assistant message is currently being streamed to
@@ -282,8 +283,8 @@ export function useWorkspaceChat() {
                 ? "Modified"
                 : "Created"
               : fileData.status === "modified"
-              ? "Modifying"
-              : "Creating";
+                ? "Modifying"
+                : "Creating";
             return `${prefix} ${action} ${file}`;
           })
           .join("\n");
@@ -333,6 +334,7 @@ export function useWorkspaceChat() {
     enableFigmaMCP?: boolean
   ) => {
     abortControllerRef.current = new AbortController();
+    userCancelledRef.current = false;
 
     // Only send design scheme for first message, but as a separate parameter
     const userMessages = messages.filter((m) => m.role === "user");
@@ -413,6 +415,7 @@ export function useWorkspaceChat() {
   };
 
   const interruptGeneration = () => {
+    userCancelledRef.current = true;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -695,8 +698,8 @@ export function useWorkspaceChat() {
                     ? "Modified"
                     : "Created"
                   : file.status === "modified"
-                  ? "Modifying"
-                  : "Creating";
+                    ? "Modifying"
+                    : "Creating";
                 return `${prefix} ${action} ${file.name}`;
               })
               .join("\n");
@@ -768,5 +771,6 @@ export function useWorkspaceChat() {
     cleanup,
     interruptGeneration,
     resetFileIndicators,
+    userCancelledRef,
   };
 }

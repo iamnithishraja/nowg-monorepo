@@ -21,9 +21,9 @@ import {
 import {
   Card,
   CardContent,
-  CardHeader,
+    CardHeader,
   CardTitle,
-  CardDescription,
+CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,11 +40,11 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
+DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
+  } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { client } from "@/lib/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -224,9 +224,6 @@ export default function OrganizationView() {
     role: string;
   } | null>(null);
   const [isSearchingUser, setIsSearchingUser] = useState(false);
-  const [selectedPaymentProvider, setSelectedPaymentProvider] = useState<
-    "stripe" | "razorpay" | "payu" | null | ""
-  >("");
 
   // Get organization ID from user's organizationId (for ORG_ADMIN)
   // For now, we'll fetch the first organization (which should be theirs)
@@ -267,53 +264,6 @@ export default function OrganizationView() {
         };
       }>(`/api/admin/org-wallets/${organization?.id}`),
     enabled: !!organization?.id,
-  });
-
-  // Fetch payment provider
-  const { data: paymentProviderData } = useQuery<{
-    success: boolean;
-    paymentProvider: "stripe" | "razorpay" | "payu" | null;
-  }>({
-    queryKey: ["/api/admin/organizations", organization?.id, "payment-provider"],
-    queryFn: () =>
-      client.get<{
-        success: boolean;
-        paymentProvider: "stripe" | "razorpay" | "payu" | null;
-      }>(`/api/admin/organizations/${organization?.id}/payment-provider`),
-    enabled: !!organization?.id,
-  });
-
-  // Update payment provider mutation
-  const updatePaymentProviderMutation = useMutation({
-    mutationFn: async (provider: "stripe" | "razorpay" | "payu" | null) => {
-      return await client.put<{
-        success: boolean;
-        message: string;
-        paymentProvider: "stripe" | "razorpay" | "payu" | null;
-      }>(`/api/admin/organizations/${organization?.id}/payment-provider`, {
-        paymentProvider: provider,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/admin/organizations", organization?.id, "payment-provider"],
-      });
-      toast({
-        title: "Payment Provider Updated",
-        description: "Payment provider has been updated successfully.",
-      });
-      setSelectedPaymentProvider("");
-    },
-    onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description:
-          error?.response?.data?.message ||
-          error?.message ||
-          "Failed to update payment provider",
-      });
-    },
   });
 
   // Search user mutation
@@ -811,81 +761,6 @@ export default function OrganizationView() {
               <Button onClick={() => setAddCreditsDialogOpen(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Credits
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Payment Provider Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Payment Provider
-            </CardTitle>
-            <CardDescription>
-              Select the payment provider for your organization. If not set, the
-              system default will be used.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="payment-provider">Payment Provider</Label>
-              <Select
-                value={
-                  selectedPaymentProvider ||
-                  paymentProviderData?.paymentProvider ||
-                  ""
-                }
-                onValueChange={(value) => {
-                  if (value === "none") {
-                    setSelectedPaymentProvider(null);
-                  } else {
-                    setSelectedPaymentProvider(
-                      value as "stripe" | "razorpay" | "payu"
-                    );
-                  }
-                }}
-              >
-                <SelectTrigger id="payment-provider" className="w-full">
-                  <SelectValue placeholder="Select payment provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Use System Default</SelectItem>
-                  <SelectItem value="stripe">Stripe</SelectItem>
-                  <SelectItem value="razorpay">Razorpay</SelectItem>
-                  <SelectItem value="payu">PayU</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {paymentProviderData?.paymentProvider
-                  ? `Current: ${paymentProviderData.paymentProvider.charAt(0).toUpperCase() + paymentProviderData.paymentProvider.slice(1)}`
-                  : "Current: System Default"}
-              </p>
-            </div>
-
-            <div className="pt-4 border-t">
-              <Button
-                onClick={() => {
-                  const currentProvider = paymentProviderData?.paymentProvider ?? null;
-                  const newProvider =
-                    selectedPaymentProvider === ""
-                      ? currentProvider
-                      : selectedPaymentProvider;
-                  if (newProvider !== currentProvider) {
-                    updatePaymentProviderMutation.mutate(newProvider ?? null);
-                  }
-                }}
-                disabled={
-                  updatePaymentProviderMutation.isPending ||
-                  selectedPaymentProvider === "" ||
-                  selectedPaymentProvider === paymentProviderData?.paymentProvider
-                }
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {updatePaymentProviderMutation.isPending
-                  ? "Saving..."
-                  : "Save Payment Provider"}
               </Button>
             </div>
           </CardContent>
