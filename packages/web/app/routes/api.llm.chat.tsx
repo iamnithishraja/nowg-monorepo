@@ -9,6 +9,7 @@ import { scrapeWebsite } from "~/lib/clone/scraper";
 import { createSummary } from "~/lib/create-summary";
 import { EnhancedLLMContextProcessor } from "~/lib/enhancedContextOptimization";
 import { EnhancedMessageParser } from "~/lib/enhancedMessageParser";
+import { getEnv } from "~/lib/env";
 import { getEnvWithDefault } from "~/lib/env";
 import { figmaMCPPool } from "~/lib/figma-mcp-client";
 import {
@@ -818,6 +819,10 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           }
 
           // Use Vercel AI SDK for proper text streaming
+          const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
+          if (!openRouterApiKey) {
+            throw new Error("OPENROUTER_API_KEY is not set");
+          }
           const result = await streamText({
             system: systemPrompt,
             messages:
