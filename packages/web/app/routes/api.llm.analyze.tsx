@@ -1,10 +1,11 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { generateText } from "ai";
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { selectContext, createFilesContext } from "~/lib/select-context";
 import { createSummary } from "~/lib/create-summary";
 import { ChatService } from "~/lib/chatService";
 import { auth } from "~/lib/auth";
+import { getEnv } from "~/lib/env";
 
 // Analysis-only system prompt that explicitly prevents file operations
 const getAnalysisSystemPrompt = () => `
@@ -170,6 +171,11 @@ Provide a comprehensive analysis without creating or modifying any files.`;
     console.log("[Analysis API] Processing analysis request");
 
     // 4) Generate analysis response (non-streaming for simplicity)
+    const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
+    if (!openRouterApiKey) {
+      throw new Error("OPENROUTER_API_KEY is not set");
+    }
+    const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
     const result = await generateText({
       system: systemPrompt,
       prompt: userPrompt,

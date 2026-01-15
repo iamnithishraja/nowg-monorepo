@@ -1,6 +1,7 @@
 import { generateText } from "ai";
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { FileMap } from "~/utils/constants";
+import { getEnv } from "~/lib/env";
 
 export type UIMessage = {
   role: "user" | "assistant" | "system";
@@ -101,6 +102,14 @@ ${textMessages}
 ---
 Please provide a summary of the chat till now using the exact structure above. If additional context is provided, align terminology and priorities with it without inventing new facts.`;
 
+  const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
+  if (!openRouterApiKey) {
+    throw new Error("OPENROUTER_API_KEY is not set");
+  }
+
+  // Create a configured OpenRouter provider instance with the API key from getEnv
+  const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
+
   const resp = await generateText({
     system,
     prompt,
@@ -109,4 +118,3 @@ Please provide a summary of the chat till now using the exact structure above. I
 
   return resp.text || "";
 }
-

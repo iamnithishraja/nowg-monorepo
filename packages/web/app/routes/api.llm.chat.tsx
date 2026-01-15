@@ -1,4 +1,4 @@
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { streamText } from "ai";
 import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
@@ -498,8 +498,8 @@ export async function action({ request }: ActionFunctionArgs) {
         conversationDoc.adminProjectId instanceof mongoose.Types.ObjectId
           ? conversationDoc.adminProjectId.toString()
           : typeof conversationDoc.adminProjectId === "string"
-          ? conversationDoc.adminProjectId
-          : conversationDoc.adminProjectId._id?.toString();
+            ? conversationDoc.adminProjectId
+            : conversationDoc.adminProjectId._id?.toString();
 
       // Get project to access organizationId
       try {
@@ -823,6 +823,7 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           if (!openRouterApiKey) {
             throw new Error("OPENROUTER_API_KEY is not set");
           }
+          const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
           const result = await streamText({
             system: systemPrompt,
             messages:

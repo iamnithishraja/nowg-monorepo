@@ -1,5 +1,6 @@
 import { generateText } from "ai";
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { getEnv } from "~/lib/env";
 
 export type CloneReport = {
   url: string;
@@ -69,6 +70,11 @@ ${input.assetUrls.slice(0, 50).join("\n")}
 
 Produce the JSON now, matching the schema exactly.`;
 
+  const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
+  if (!openRouterApiKey) {
+    throw new Error("OPENROUTER_API_KEY is not set");
+  }
+  const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
   const resp = await generateText({ system, prompt, model: openrouter(model) });
   return resp.text || "";
 }

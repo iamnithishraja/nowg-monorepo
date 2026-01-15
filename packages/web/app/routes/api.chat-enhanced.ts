@@ -1,13 +1,13 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { generateText, streamText } from "ai";
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { selectContext, createFilesContext } from "~/lib/select-context";
 import { createSummary } from "~/lib/create-summary";
 import { getSystemPrompt, CONTINUE_PROMPT } from "~/lib/prompt";
 import { ChatService } from "~/lib/chatService";
 import { auth } from "~/lib/auth";
 import { executeSQL } from "~/lib/supabaseManager";
-import { getEnvWithDefault } from "~/lib/env";
+import { getEnv, getEnvWithDefault } from "~/lib/env";
 import { createClientFileStorageService } from "~/lib/clientFileStorage";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -246,6 +246,11 @@ ${summary}
           }
 
           // Use streamText for true streaming
+          const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
+          if (!openRouterApiKey) {
+            throw new Error("OPENROUTER_API_KEY is not set");
+          }
+          const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
           const result = await streamText({
             system: systemPrompt,
             prompt: buildUserPrompt(false),

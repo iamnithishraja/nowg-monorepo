@@ -1,5 +1,6 @@
 import { generateText } from "ai";
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { getEnv } from "~/lib/env";
 
 export interface FileMap {
   [path: string]:
@@ -89,6 +90,11 @@ export class EnhancedLLMContextProcessor {
 
     try {
       // Use LLM to select relevant files
+      const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
+      if (!openRouterApiKey) {
+        throw new Error("OPENROUTER_API_KEY is not set");
+      }
+      const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
       const response = await generateText({
         system: `
           You are a software engineer. You have access to the following files:
