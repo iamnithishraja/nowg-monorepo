@@ -3,8 +3,6 @@
  * Similar to bolt.new's approach - uses LLM to select relevant files
  */
 
-import { generateText } from "ai";
-import { openrouter } from "@openrouter/ai-sdk-provider";
 import type { FileMap } from "~/utils/constants";
 import {
   EnhancedLLMContextProcessor,

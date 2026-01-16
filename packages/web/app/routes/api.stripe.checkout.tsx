@@ -61,9 +61,6 @@ export async function action({ request }: ActionFunctionArgs) {
         },
         successUrl: `${betterAuthUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}&provider={PROVIDER}`,
         cancelUrl: `${betterAuthUrl}/recharge?cancelled=true`,
-        description: `$${creditAmount.toFixed(
-          2
-        )} in AI credits (80% of $${amount.toFixed(2)} payment)`,
         productName: "Nowgai Credits",
       },
       null // User wallets don't have organization context

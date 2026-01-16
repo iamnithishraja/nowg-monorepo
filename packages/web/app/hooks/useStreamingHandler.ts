@@ -160,6 +160,10 @@ export function useStreamingHandler() {
           }
         }
       }
+    } catch (error) {
+      // Re-throw all errors to be handled by parent error handlers
+      // AbortErrors will be properly handled based on their reason
+      throw error;
     } finally {
       // Ensure reader is properly closed
       try {

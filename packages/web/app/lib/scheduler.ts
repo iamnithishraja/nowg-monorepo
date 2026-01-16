@@ -14,11 +14,10 @@ let neonBillingTask: cron.ScheduledTask | null = null;
 export async function initializeScheduler(): Promise<void> {
   // Prevent multiple initializations
   if (isSchedulerInitialized) {
-    console.log("[Scheduler] Already initialized, skipping...");
     return;
   }
 
-  console.log("[Scheduler] Initializing scheduled jobs...");
+  
 
   // Ensure database connection and env vars are loaded
   try {
@@ -48,18 +47,9 @@ export async function initializeScheduler(): Promise<void> {
     neonBillingTask = cron.schedule(
       "0 * * * *",
       async () => {
-        console.log(
-          `[Scheduler] Running Neon billing job at ${new Date().toISOString()}`
-        );
+        
         try {
           const result = await runHourlyBillingJob();
-          console.log(
-            `[Scheduler] Neon billing job completed: processed=${
-              result.processedCount
-            }, billed=${
-              result.billedCount
-            }, amount=$${result.totalBilledAmount.toFixed(4)}`
-          );
           if (result.errors.length > 0) {
             console.warn(
               `[Scheduler] Neon billing job had ${result.errors.length} errors:`,
@@ -81,11 +71,10 @@ export async function initializeScheduler(): Promise<void> {
       : enableNeonBilling !== "true"
       ? `ENABLE_NEON_BILLING=${enableNeonBilling} (expected "true")`
       : "unknown";
-    console.log(`[Scheduler] ⚠️ Neon billing not configured (${reason})`);
+    
   }
 
   isSchedulerInitialized = true;
-  console.log("[Scheduler] ✅ Initialization complete");
 }
 
 /**
@@ -93,7 +82,7 @@ export async function initializeScheduler(): Promise<void> {
  * Call this on graceful shutdown
  */
 export function stopScheduler(): void {
-  console.log("[Scheduler] Stopping scheduled jobs...");
+  
 
   if (neonBillingTask) {
     neonBillingTask.stop();
@@ -101,7 +90,6 @@ export function stopScheduler(): void {
   }
 
   isSchedulerInitialized = false;
-  console.log("[Scheduler] All jobs stopped");
 }
 
 /**

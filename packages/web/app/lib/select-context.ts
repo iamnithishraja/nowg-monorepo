@@ -1,7 +1,8 @@
 import { generateText } from "ai";
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import ignore from "ignore";
 import { IGNORE_PATTERNS, type FileMap, WORK_DIR } from "~/utils/constants";
+import { getEnv } from "~/lib/env";
 
 // Types kept minimal to match current UI usage
 export type UIMessage = {
@@ -162,6 +163,11 @@ CRITICAL RULES:
 * Maximum of ${bufferLimit} files can be included.
 `;
 
+  const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
+  if (!openRouterApiKey) {
+    throw new Error("OPENROUTER_API_KEY is not set");
+  }
+  const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
   const resp = await generateText({
     system,
     prompt,

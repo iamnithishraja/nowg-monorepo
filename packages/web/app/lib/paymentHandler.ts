@@ -82,17 +82,25 @@ async function createStripeCheckout(
 ): Promise<PaymentCheckoutResult> {
   const chargeAmount = Math.ceil(params.amount * 100); // Convert to cents
 
+  const productData: {
+    name: string;
+    description?: string;
+  } = {
+    name: params.productName || "Nowgai Credits",
+  };
+
+  // Only include description if provided and not empty
+  if (params.description && params.description.trim() !== "") {
+    productData.description = params.description;
+  }
+
   const checkoutSession = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
     line_items: [
       {
         price_data: {
           currency: params.currency || "usd",
-          product_data: {
-            name: params.productName || "Nowgai Credits",
-            description:
-              params.description || `$${params.amount.toFixed(2)} payment`,
-          },
+          product_data: productData,
           unit_amount: chargeAmount,
         },
         quantity: 1,

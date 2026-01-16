@@ -1,4 +1,4 @@
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { streamText } from "ai";
 import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
@@ -9,6 +9,7 @@ import { scrapeWebsite } from "~/lib/clone/scraper";
 import { createSummary } from "~/lib/create-summary";
 import { EnhancedLLMContextProcessor } from "~/lib/enhancedContextOptimization";
 import { EnhancedMessageParser } from "~/lib/enhancedMessageParser";
+import { getEnv } from "~/lib/env";
 import { getEnvWithDefault } from "~/lib/env";
 import { figmaMCPPool } from "~/lib/figma-mcp-client";
 import {
@@ -497,8 +498,8 @@ export async function action({ request }: ActionFunctionArgs) {
         conversationDoc.adminProjectId instanceof mongoose.Types.ObjectId
           ? conversationDoc.adminProjectId.toString()
           : typeof conversationDoc.adminProjectId === "string"
-          ? conversationDoc.adminProjectId
-          : conversationDoc.adminProjectId._id?.toString();
+            ? conversationDoc.adminProjectId
+            : conversationDoc.adminProjectId._id?.toString();
 
       // Get project to access organizationId
       try {
@@ -818,6 +819,11 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           }
 
           // Use Vercel AI SDK for proper text streaming
+          const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
+          if (!openRouterApiKey) {
+            throw new Error("OPENROUTER_API_KEY is not set");
+          }
+          const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
           const result = await streamText({
             system: systemPrompt,
             messages:
