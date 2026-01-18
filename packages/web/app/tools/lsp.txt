@@ -1,0 +1,24 @@
+Provides code intelligence features for analyzing code in the WebContainer filesystem.
+
+This tool offers basic Language Server Protocol (LSP) -like operations for code navigation and analysis. Since WebContainer runs in the browser, this uses direct file analysis rather than actual LSP servers.
+
+Supported operations:
+- documentSymbol: Get all symbols (functions, classes, interfaces, variables, types) in a file
+- findReferences: Find all references to a symbol name across the project
+- goToDefinition: Find where a symbol is defined
+- hover: Get basic information about a symbol at a position
+
+Parameters:
+- operation (required): The operation to perform (documentSymbol, findReferences, goToDefinition, hover)
+- filePath (required): The path to the file to operate on (relative to project root)
+- line (optional): The line number (1-based). Required for goToDefinition and hover operations.
+- character (optional): The character offset (1-based). Required for goToDefinition and hover operations.
+- symbolName (optional): The symbol name to search for. Required for findReferences.
+
+Examples:
+- Get all symbols in a file: { operation: "documentSymbol", filePath: "src/App.tsx" }
+- Find references to a function: { operation: "findReferences", filePath: "src/utils.ts", symbolName: "formatDate" }
+- Go to definition: { operation: "goToDefinition", filePath: "src/App.tsx", line: 10, character: 15 }
+- Get hover info: { operation: "hover", filePath: "src/App.tsx", line: 10, character: 15 }
+
+Note: This provides basic code intelligence through file analysis. For full LSP support with advanced features like type checking, use an IDE or local development environment.

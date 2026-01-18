@@ -1,5 +1,11 @@
 import { Tool } from "./tool";
 import { ReadTool } from "./read";
+import { GrepTool } from "./grep";
+import { BashTool } from "./bash";
+import { LspTool } from "./lsp";
+import { ListTool } from "./ls";
+import { GlobTool } from "./glob";
+import { BatchTool } from "./batch";
 
 /**
  * ToolRegistry - Central registry for all available tools
@@ -26,6 +32,12 @@ export namespace ToolRegistry {
   /** Built-in tools that are always available */
   const builtInTools: Tool.Info[] = [
     ReadTool,
+    GrepTool,
+    BashTool,
+    LspTool,
+    ListTool,
+    GlobTool,
+    BatchTool,
   ];
 
   // Initialize with built-in tools

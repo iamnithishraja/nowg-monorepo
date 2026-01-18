@@ -1,0 +1,40 @@
+Executes multiple independent tool calls concurrently to reduce latency.
+
+Payload Format (JSON array):
+[
+  {"tool": "read", "parameters": {"filePath": "src/index.ts"}},
+  {"tool": "grep", "parameters": {"pattern": "function", "include": "*.ts"}},
+  {"tool": "glob", "parameters": {"pattern": "**/*.tsx"}}
+]
+
+Parameters:
+- tool_calls (required): Array of tool calls to execute in parallel
+  - tool: The name of the tool to execute
+  - parameters: Parameters for the tool
+
+Notes:
+- 1–10 tool calls per batch (additional calls will be rejected)
+- All calls start in parallel; ordering is NOT guaranteed
+- Partial failures do not stop other tool calls
+- Do NOT nest batch tools (batch within batch)
+
+Good Use Cases:
+- Read multiple files at once
+- Combine grep + glob + read operations
+- Execute multiple independent operations
+- Search across different directories simultaneously
+
+When NOT to Use:
+- Operations that depend on prior tool output (e.g., read then edit same file)
+- Ordered mutations where sequence matters
+- Single tool calls (no benefit from batching)
+
+Available tools for batching:
+- read: Read file contents
+- grep: Search file contents with regex
+- glob: Find files by pattern
+- list: List directory contents
+- lsp: Code intelligence operations
+- bash: Execute shell commands
+
+Batching tool calls provides 2–5x efficiency gain and better user experience.

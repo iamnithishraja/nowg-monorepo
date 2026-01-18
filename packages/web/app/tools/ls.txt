@@ -1,0 +1,18 @@
+Lists files and directories in a tree-like structure within the WebContainer filesystem.
+
+Usage:
+- Shows the file hierarchy of a directory with proper indentation
+- Automatically ignores common directories (node_modules, .git, dist, etc.)
+- Returns up to 100 files for performance
+- Useful for understanding the structure of a project or directory
+
+Parameters:
+- path (optional): The directory path to list (relative to project root). Defaults to the project root.
+- ignore (optional): Additional glob patterns to ignore (e.g., ["*.log", "temp/"])
+
+Output format:
+- Directories are shown with a trailing `/`
+- Files are indented under their parent directory
+- Results are sorted alphabetically
+
+Note: For finding specific files by pattern, use the Glob tool instead. For searching file contents, use the Grep tool.

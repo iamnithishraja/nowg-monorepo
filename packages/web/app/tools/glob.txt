@@ -1,0 +1,23 @@
+Fast file pattern matching tool for the WebContainer filesystem.
+
+Usage:
+- Finds files matching glob patterns like "**/*.js" or "src/**/*.ts"
+- Returns matching file paths sorted by modification time (most recent first)
+- Supports common glob syntax including wildcards and brace expansion
+- Returns up to 100 matches for performance
+
+Parameters:
+- pattern (required): The glob pattern to match files against
+  - `*` matches any characters in a file/directory name
+  - `**` matches any number of directories
+  - `*.{ts,tsx}` matches files with .ts or .tsx extensions
+- path (optional): The directory to search in (relative to project root). Defaults to project root.
+
+Examples:
+- Find all TypeScript files: "**/*.ts"
+- Find all test files: "**/*.test.{ts,js}"
+- Find files in src: "src/**/*"
+- Find package.json files: "**/package.json"
+- Find React components: "**/*.tsx"
+
+Note: Results are automatically sorted by modification time. For searching file contents, use the Grep tool instead.

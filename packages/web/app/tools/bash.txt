@@ -1,0 +1,42 @@
+Executes a shell command in the WebContainer environment with optional timeout.
+
+All commands run in the project directory by default. Use the `workdir` parameter if you need to run a command in a different directory. AVOID using `cd <directory> && <command>` patterns - use `workdir` instead.
+
+IMPORTANT: This tool is for terminal operations like npm, node, git (limited), etc. Note that WebContainer runs in a browser environment, so system-level commands may not be available.
+
+Before executing the command, please follow these steps:
+
+1. Directory Verification:
+   - If the command will create new directories or files, first verify the parent directory exists
+   - For example, before running "mkdir foo/bar", first check that "foo" exists
+
+2. Command Execution:
+   - Quote file paths that contain spaces with double quotes
+   - Execute the command and capture output
+   - Commands have a default timeout of 30 seconds
+
+Usage notes:
+  - The command argument is required
+  - You can specify an optional timeout in milliseconds (default: 30000ms)
+  - Provide a clear, concise description of what this command does in 5-10 words
+  - Output will be truncated if it exceeds limits
+
+WebContainer-specific notes:
+  - WebContainer provides a Node.js runtime environment in the browser
+  - Available commands: npm, npx, node, and common shell utilities
+  - System commands (like docker, sudo, etc.) are NOT available
+  - Network access is limited to WebContainer's proxy
+  - File operations work within the virtual filesystem
+
+Examples of supported commands:
+  - npm install
+  - npm run dev
+  - node script.js
+  - npx create-react-app myapp
+  - cat package.json
+  - ls -la src/
+
+Examples of unsupported commands:
+  - docker, sudo, systemctl
+  - apt-get, brew
+  - curl to external URLs (unless proxied)

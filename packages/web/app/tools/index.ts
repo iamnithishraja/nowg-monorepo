@@ -35,6 +35,12 @@ export {
 
 // Individual tools
 export { ReadTool } from "./read";
+export { GrepTool } from "./grep";
+export { BashTool } from "./bash";
+export { LspTool } from "./lsp";
+export { ListTool } from "./ls";
+export { GlobTool } from "./glob";
+export { BatchTool } from "./batch";
 
 // Re-export types for convenience
 export type { Tool as ToolTypes } from "./tool";

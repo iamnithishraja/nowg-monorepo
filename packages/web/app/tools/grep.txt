@@ -1,0 +1,17 @@
+Searches file contents using regular expressions in the WebContainer filesystem.
+
+Usage:
+- Fast content search that works with any project size
+- Searches file contents using regular expressions
+- Supports full regex syntax (e.g., "log.*Error", "function\\s+\\w+", etc.)
+- Filter files by pattern with the include parameter (e.g., "*.js", "*.{ts,tsx}")
+- Returns file paths and line numbers with matches, sorted by modification time
+- Use this tool when you need to find files containing specific patterns
+- By default searches from the project root, but you can specify a subdirectory with the path parameter
+
+Parameters:
+- pattern (required): The regex pattern to search for in file contents
+- path (optional): The directory to search in, relative to project root. Defaults to "."
+- include (optional): File pattern to include in the search (e.g., "*.js", "*.{ts,tsx}")
+
+Note: This tool searches within the WebContainer virtual filesystem. Results are limited to 100 matches for performance. Use a more specific path or pattern if you need to narrow down results.
