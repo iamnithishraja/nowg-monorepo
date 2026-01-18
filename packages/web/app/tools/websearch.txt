@@ -1,0 +1,10 @@
+Search the web using Exa AI - performs real-time web searches and can scrape content from specific URLs. Provides up-to-date information for current events and recent data.
+
+Usage:
+- Provide a search query to find relevant web results
+- Supports configurable result counts (default: 8)
+- Search types: "auto" (balanced, default), "fast" (quick results), "deep" (comprehensive search)
+- Live crawling modes: "fallback" (backup if cached unavailable) or "preferred" (prioritize live crawling)
+- Configurable context length for optimal LLM integration (default: 10000 characters)
+- Returns relevant content from the most relevant websites
+- Use this tool for accessing information beyond knowledge cutoff

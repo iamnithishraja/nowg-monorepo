@@ -1,0 +1,12 @@
+Fetches content from a specified URL. Takes a URL and optional format as input, fetches the URL content, and converts to the requested format (markdown by default).
+
+Usage:
+- The URL must be a fully-formed valid URL starting with http:// or https://
+- Format options: "markdown" (default), "text", or "html"
+- Markdown format converts HTML to readable markdown
+- Text format extracts plain text from HTML, removing scripts and styles
+- HTML format returns the raw HTML content
+- Results may be summarized if the content is very large
+- Default timeout is 30 seconds (max 120 seconds)
+
+Note: This tool performs real network requests via the WebContainer environment. Use this tool when you need to retrieve and analyze web content.

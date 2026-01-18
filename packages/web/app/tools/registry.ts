@@ -9,6 +9,9 @@ import { BatchTool } from "./batch";
 import { EditTool } from "./edit";
 import { WriteTool } from "./write";
 import { MultiEditTool } from "./multiedit";
+import { WebFetchTool } from "./webfetch";
+import { WebSearchTool } from "./websearch";
+import { CodeSearchTool } from "./codesearch";
 
 /**
  * ToolRegistry - Central registry for all available tools
@@ -44,6 +47,9 @@ export namespace ToolRegistry {
     EditTool,
     WriteTool,
     MultiEditTool,
+    WebFetchTool,
+    WebSearchTool,
+    CodeSearchTool,
   ];
 
   // Initialize with built-in tools

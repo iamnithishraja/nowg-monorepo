@@ -41,6 +41,12 @@ export { LspTool } from "./lsp";
 export { ListTool } from "./ls";
 export { GlobTool } from "./glob";
 export { BatchTool } from "./batch";
+export { EditTool } from "./edit";
+export { WriteTool } from "./write";
+export { MultiEditTool } from "./multiedit";
+export { WebFetchTool } from "./webfetch";
+export { WebSearchTool } from "./websearch";
+export { CodeSearchTool } from "./codesearch";
 
 // Re-export types for convenience
 export type { Tool as ToolTypes } from "./tool";
