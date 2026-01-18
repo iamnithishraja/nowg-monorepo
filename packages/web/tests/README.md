@@ -20,7 +20,10 @@ tests/
     ├── lsp.test.ts       # LspTool tests
     ├── ls.test.ts        # ListTool tests
     ├── glob.test.ts      # GlobTool tests
-    └── batch.test.ts     # BatchTool tests
+    ├── batch.test.ts     # BatchTool tests
+    ├── edit.test.ts      # EditTool tests
+    ├── write.test.ts     # WriteTool tests
+    └── multiedit.test.ts # MultiEditTool tests
 ```
 
 ## Writing Tests
@@ -61,8 +64,11 @@ WebContainerProvider.resetInstance();
 | **ListTool** | 18 | Directory listing, tree structure, ignore patterns |
 | **GlobTool** | 21 | Glob pattern matching, brace expansion, file discovery |
 | **BatchTool** | 17 | Parallel tool execution, partial failures, batch limits |
+| **EditTool** | 22 | String replacement, fuzzy matching, file creation, replaceAll |
+| **WriteTool** | 18 | File writing, directory creation, overwriting, diff generation |
+| **MultiEditTool** | 24 | Sequential edits, atomic operations, file creation |
 
-**Total: 155 tests**
+**Total: 219 tests**
 
 ### Infrastructure
 

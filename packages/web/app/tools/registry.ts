@@ -6,6 +6,9 @@ import { LspTool } from "./lsp";
 import { ListTool } from "./ls";
 import { GlobTool } from "./glob";
 import { BatchTool } from "./batch";
+import { EditTool } from "./edit";
+import { WriteTool } from "./write";
+import { MultiEditTool } from "./multiedit";
 
 /**
  * ToolRegistry - Central registry for all available tools
@@ -38,6 +41,9 @@ export namespace ToolRegistry {
     ListTool,
     GlobTool,
     BatchTool,
+    EditTool,
+    WriteTool,
+    MultiEditTool,
   ];
 
   // Initialize with built-in tools
