@@ -1,0 +1,15 @@
+Reads a file from the WebContainer virtual filesystem. You can access any file in the project workspace using this tool.
+
+Usage:
+- The filePath parameter should be relative to the project root (e.g., "src/App.tsx", "package.json")
+- You can also use absolute paths starting with "/" which are relative to the project working directory
+- By default, it reads up to 2000 lines starting from the beginning of the file
+- You can optionally specify a line offset and limit (especially handy for long files)
+- Any lines longer than 2000 characters will be truncated
+- Results are returned with line numbers starting at 1
+- You have the capability to call multiple tools in a single response. It is always better to speculatively read multiple files as a batch.
+- If you read a file that exists but has empty contents, an appropriate message will be returned.
+- You can read image files using this tool.
+- Binary files (executables, archives, etc.) cannot be read and will return an error.
+
+Note: This tool reads from the WebContainer filesystem, which is a virtual in-browser environment. Files are isolated to the current project workspace.
