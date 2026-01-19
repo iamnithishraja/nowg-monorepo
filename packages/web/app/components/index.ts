@@ -31,3 +31,4 @@ export { GitHubRepositoryButton } from "./GitHubRepositoryButton";
 export { CreateProjectModal } from "./CreateProjectModal";
 export { ToolExecutionChecklist } from "./ToolExecutionChecklist";
 export { FileCreationChecklist } from "./FileCreationChecklist";
+export { AgentModal } from "./AgentModal";

@@ -101,6 +101,7 @@ export default [
   route("/api/auth/user", "routes/api.auth.user.tsx"),
   route("/api/auth/*", "routes/api.auth.$.tsx"),
   route("/api/llm/chat", "routes/api.llm.chat.tsx"),
+  route("/api/agent", "routes/api.agent.tsx"),
   route("/api/templates/select", "routes/api.templates.select.tsx"),
   route("/api/enhancer", "routes/api.enhancer.tsx"),
   route("/api/supabase/provision", "routes/api.supabase.provision.tsx"),

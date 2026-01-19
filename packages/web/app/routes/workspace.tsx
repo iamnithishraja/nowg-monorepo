@@ -15,7 +15,7 @@ import { useLocation } from "react-router";
 import { usePreventBrowserDragDrop } from "../hooks/usePreventBrowserDragDrop";
 import { useFileHandling } from "../hooks/useFileHandling";
 import type { DesignScheme } from "../types/design-scheme";
-import { InsufficientBalanceModal, ProjectSidebar } from "../components";
+import { InsufficientBalanceModal, ProjectSidebar, AgentModal } from "../components";
 import GitHubImportModal from "../components/GitHubImportModal";
 import FigmaImportModal from "../components/FigmaImportModal";
 import { ColorSchemeDialog } from "../components/ui/ColorSchemeDialog";
@@ -92,6 +92,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
   const [showGitHubModal, setShowGitHubModal] = useState(false);
   const [showFigmaModal, setShowFigmaModal] = useState(false);
   const [showDatabaseDialog, setShowDatabaseDialog] = useState(false);
+  const [showAgentModal, setShowAgentModal] = useState(false);
   const [selectedDbProvider, setSelectedDbProvider] =
     useState<DbProvider | null>(null);
   const [isProvisioningNeon, setIsProvisioningNeon] = useState(false);
@@ -837,6 +838,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     onTabChange={controller.setActiveTab}
                     previewUrl={controller.previewUrl}
                     onVersionSelect={controller.handleVersionSelect}
+                    onAgentClick={() => setShowAgentModal(true)}
                   />
 
                   {/* Right Panel Content */}
@@ -891,6 +893,13 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
         isOpen={showFigmaModal}
         onClose={() => setShowFigmaModal(false)}
         selectedModel={controller.selectedModel}
+      />
+
+      {/* Agent Modal */}
+      <AgentModal
+        isOpen={showAgentModal}
+        onClose={() => setShowAgentModal(false)}
+        templateFiles={controller.templateFilesState}
       />
 
       {/* Color Scheme Dialog */}

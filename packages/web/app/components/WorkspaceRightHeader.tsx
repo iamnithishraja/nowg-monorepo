@@ -35,6 +35,7 @@ import {
   Lightning,
   ChatCircle,
   GithubLogo,
+  Robot,
 } from "@phosphor-icons/react";
 
 // Vercel Logo SVG
@@ -107,6 +108,7 @@ interface WorkspaceRightHeaderProps {
   onTabChange: (tab: TabType) => void;
   previewUrl?: string | null;
   onVersionSelect?: (versionId: string) => void;
+  onAgentClick?: () => void;
 }
 
 export function WorkspaceRightHeader({
@@ -118,6 +120,7 @@ export function WorkspaceRightHeader({
   onTabChange,
   previewUrl,
   onVersionSelect,
+  onAgentClick,
 }: WorkspaceRightHeaderProps) {
   const navigate = useNavigate();
   const [user, setUser] = useState<any | null>(null);
@@ -474,8 +477,18 @@ export function WorkspaceRightHeader({
           </div>
         </div>
 
-        {/* Right: Deploy, Share, Avatar */}
+        {/* Right: Agent, Deploy, Share, Avatar */}
         <div className="flex items-center gap-2">
+          {/* Agent Button */}
+          <Button
+            onClick={onAgentClick}
+            variant="outline"
+            className="h-8 gap-1.5 px-3 rounded-lg text-xs font-medium bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/20 text-purple-400"
+          >
+            <Robot className="w-4 h-4" />
+            Agent
+          </Button>
+
           {/* Deploy Button - purple with dropdown arrow */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
