@@ -1,5 +1,6 @@
 import { WebContainer } from "@webcontainer/api";
 import { WORK_DIR, WORK_DIR_NAME } from "../utils/constants";
+import { connectWebContainerToProvider, disconnectWebContainerFromProvider } from "../tools/webcontainer-provider";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - Vite raw import for bundling inspector script content
 import inspectorScriptRaw from "../inspector-script.js?raw";
@@ -71,7 +72,10 @@ async function ensureWebContainerBooted(): Promise<WebContainer> {
       await container.mount({});
       webContainer = container;
       updateContext();
-      console.log("[WebContainer] ✅ WebContainer booted");
+      
+      // Connect to WebContainerProvider for tool execution
+      connectWebContainerToProvider(container);
+      console.log("[WebContainer] ✅ WebContainer booted and connected to provider");
 
       // Set up event listeners
       container.on("server-ready", (port, url) => {

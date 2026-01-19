@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import type { Tool } from "../tools/tool";
 
 interface MCPToolEvent {
   name: string;
@@ -10,6 +11,36 @@ interface MCPToolEvent {
 interface FigmaScreenshotEvent {
   imageData: string;
   mimeType: string;
+}
+
+/**
+ * Tool call event from the backend requesting frontend tool execution
+ */
+export interface ToolCallEvent {
+  /** Unique ID for this tool call */
+  id: string;
+  /** Tool name to execute */
+  name: string;
+  /** Tool arguments */
+  args: Record<string, unknown>;
+  /** Session ID for context */
+  sessionId?: string;
+  /** Message ID for context */
+  messageId?: string;
+}
+
+/**
+ * Tool result to be sent back to the backend
+ */
+export interface ToolCallResult {
+  /** Tool call ID this result corresponds to */
+  toolCallId: string;
+  /** Tool name that was executed */
+  name: string;
+  /** Whether execution was successful */
+  success: boolean;
+  /** Tool result or error message */
+  result: Tool.Result | { error: string };
 }
 
 interface StreamingHandlerOptions {
@@ -29,6 +60,10 @@ interface StreamingHandlerOptions {
   onMCPToolStart?: (tool: MCPToolEvent) => Promise<void> | void;
   onMCPToolResult?: (tool: MCPToolEvent) => Promise<void> | void;
   onFigmaScreenshot?: (data: FigmaScreenshotEvent) => Promise<void> | void;
+  // Optional hooks for frontend tool execution
+  onToolCall?: (toolCall: ToolCallEvent) => Promise<ToolCallResult>;
+  onToolCallStart?: (toolCall: ToolCallEvent) => void;
+  onToolCallComplete?: (result: ToolCallResult) => void;
 }
 
 export function useStreamingHandler() {
@@ -135,6 +170,32 @@ export function useStreamingHandler() {
                       imageData: data.imageData,
                       mimeType: data.mimeType,
                     });
+                  }
+                  break;
+
+                case "tool_call":
+                  // Frontend tool execution requested by backend
+                  if (options.onToolCall) {
+                    const toolCall: ToolCallEvent = {
+                      id: data.id,
+                      name: data.name,
+                      args: data.args || {},
+                      sessionId: data.sessionId,
+                      messageId: data.messageId,
+                    };
+                    
+                    // Notify start
+                    if (options.onToolCallStart) {
+                      options.onToolCallStart(toolCall);
+                    }
+                    
+                    // Execute the tool
+                    const result = await options.onToolCall(toolCall);
+                    
+                    // Notify completion
+                    if (options.onToolCallComplete) {
+                      options.onToolCallComplete(result);
+                    }
                   }
                   break;
 

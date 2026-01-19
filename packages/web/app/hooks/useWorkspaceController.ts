@@ -5,6 +5,7 @@ import { useWebContainer } from "./useWebContainer";
 import { useWorkspaceChat } from "./useWorkspaceChat";
 import { useWorkspaceFiles } from "./useWorkspaceFiles";
 import { useStreamingHandler } from "./useStreamingHandler";
+import { useToolExecution } from "./useToolExecution";
 import type { Message } from "../types/chat";
 import { WORK_DIR } from "../utils/constants";
 import type { FileMap } from "../utils/constants";
@@ -169,6 +170,7 @@ export function useWorkspaceController(
   } = useWebContainer() as any;
   const chat = useWorkspaceChat();
   const files = useWorkspaceFiles();
+  const toolExecution = useToolExecution();
   const [isRestoringVersion, setIsRestoringVersion] = useState(false);
 
   // Track the streaming conversation ID (since state updates are async)
@@ -804,6 +806,27 @@ conversationId
           }
         } catch {}
       },
+      // Tool execution handlers for frontend tools
+      onToolCall: toolExecution.executeToolCall,
+      onToolCallStart: (toolCall) => {
+        try {
+          const { appendTerminalLine } = useWorkspaceStore.getState() as any;
+          appendTerminalLine(`🔧 Executing tool: ${toolCall.name}`);
+        } catch {}
+      },
+      onToolCallComplete: (result) => {
+        try {
+          const { appendTerminalLine } = useWorkspaceStore.getState() as any;
+          if (result.success) {
+            appendTerminalLine(`✅ Tool ${result.name} completed`);
+          } else {
+            const errorMsg = !result.success && 'error' in result.result 
+              ? (result.result as { error: string }).error 
+              : 'Unknown error';
+            appendTerminalLine(`❌ Tool ${result.name} failed: ${errorMsg}`);
+          }
+        } catch {}
+      },
       onMessageComplete: (content: string) => {
         // Extract and set project title FIRST
         const artifactMatch = content.match(
@@ -1424,5 +1447,11 @@ conversationId
     // file upload state
     uploadedFiles,
     setUploadedFiles,
+
+    // tool execution state
+    toolExecutionStatuses: toolExecution.getAllStatuses(),
+    isExecutingTools: toolExecution.isExecuting,
+    availableTools: toolExecution.getAvailableTools(),
+    hasToolSupport: toolExecution.hasToolSupport(),
   };
 }
