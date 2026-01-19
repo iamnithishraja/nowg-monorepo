@@ -24,6 +24,10 @@ export namespace SystemPrompt {
     customInstructions?: string;
     /** User's message - used to auto-load referenced files */
     userMessage?: string;
+    /** Current working directory for hierarchical rule search */
+    cwd?: string;
+    /** Global rules from outside WebContainer (like ~/.config/opencode/AGENTS.md) */
+    globalRules?: AgentContext.GlobalRulesConfig;
   }
 
   /**
@@ -33,9 +37,10 @@ export namespace SystemPrompt {
    * 1. Agent-specific prompt
    * 2. Environment info
    * 3. Project file tree
-   * 4. Project rules (AGENTS.md, CLAUDE.md)
-   * 5. Auto-loaded file contents from @file references
-   * 6. Custom instructions
+   * 4. Project rules (AGENTS.md, CLAUDE.md) - with hierarchical search
+   * 5. Global rules (from outside WebContainer)
+   * 6. Auto-loaded file contents from @file references
+   * 7. Custom instructions
    */
   export function build(options: Options = {}): string[] {
     const parts: string[] = [];
@@ -43,12 +48,14 @@ export namespace SystemPrompt {
     // 1. Main agent prompt
     parts.push(agentPrompt(options.agent));
 
-    // 2. Build context (includes file tree, rules, referenced files)
+    // 2. Build context (includes file tree, rules with hierarchical search, referenced files)
     if (options.files && Object.keys(options.files).length > 0) {
       const context = AgentContext.build({
         files: options.files,
         fileTree: options.fileTree,
         userMessage: options.userMessage,
+        cwd: options.cwd,
+        globalRules: options.globalRules,
       });
 
       // Add formatted context to system prompt
@@ -195,7 +202,11 @@ When the user mentions files with @filename syntax, those files have been automa
 
 # Project Rules
 
-If the project contains an AGENTS.md, CLAUDE.md, or CONTEXT.md file, its contents will be included in the <project_instructions> section. Follow these project-specific instructions as they define the conventions and patterns for this codebase.
+Project rule files (AGENTS.md, CLAUDE.md, CONTEXT.md) are searched hierarchically from your current directory up to the project root. More deeply nested rule files take precedence over parent directories. Their contents will be included in the <project_instructions> section.
+
+Global rule files (from ~/.config/opencode/AGENTS.md or ~/.claude/CLAUDE.md) may also be included in the <global_instructions> section. Project-specific instructions take precedence over global instructions when they conflict.
+
+Follow these instructions as they define the conventions and patterns for this codebase.
 
 # Tools
 

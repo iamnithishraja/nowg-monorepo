@@ -71,7 +71,8 @@ export interface AgentRuntime {
  * - System prompt building with full context
  * - Tool resolution
  * - Auto-loading @file references from userMessage
- * - Loading project rules (AGENTS.md, CLAUDE.md)
+ * - Hierarchical project rules search (AGENTS.md, CLAUDE.md)
+ * - Global rules support
  */
 export async function createAgentRuntime(options: {
   agentName?: string;
@@ -82,6 +83,10 @@ export async function createAgentRuntime(options: {
   messageID: string;
   /** User's message - used for @file reference auto-loading */
   userMessage?: string;
+  /** Current working directory for hierarchical rule search */
+  cwd?: string;
+  /** Global rules from outside WebContainer */
+  globalRules?: import("./context").AgentContext.GlobalRulesConfig;
 }): Promise<AgentRuntime> {
   const { Agent } = await import("./agent");
   const { SystemPrompt } = await import("./system");
@@ -95,7 +100,8 @@ export async function createAgentRuntime(options: {
   // Build system prompt with full context including:
   // - Environment info
   // - File tree
-  // - Project rules (AGENTS.md, CLAUDE.md)
+  // - Project rules (hierarchical search from cwd to root)
+  // - Global rules (from outside WebContainer)
   // - Auto-loaded @file references
   const systemPrompt = SystemPrompt.build({
     agent,
@@ -103,6 +109,8 @@ export async function createAgentRuntime(options: {
     fileTree: options.fileTree,
     customInstructions: options.customInstructions,
     userMessage: options.userMessage,
+    cwd: options.cwd,
+    globalRules: options.globalRules,
   });
 
   // Resolve tools

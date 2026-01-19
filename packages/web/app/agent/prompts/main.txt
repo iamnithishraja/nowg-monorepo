@@ -42,6 +42,14 @@ For these tasks:
 4. Implement the changes using appropriate tools
 5. Verify your changes work (run tests, lint, etc.)
 
+# Project Rules
+
+Project rule files (AGENTS.md, CLAUDE.md, CONTEXT.md) are searched hierarchically from your current directory up to the project root. More deeply nested rule files take precedence over parent directories. Their contents will be included in the <project_instructions> section.
+
+Global rule files (from ~/.config/opencode/AGENTS.md or ~/.claude/CLAUDE.md) may also be included in the <global_instructions> section. Project-specific instructions take precedence over global instructions when they conflict.
+
+Follow these instructions as they define the conventions and patterns for this codebase.
+
 # Code style
 
 - Use 2 spaces for code indentation

@@ -37,6 +37,19 @@ export namespace AgentContext {
   export interface ProjectRules {
     path: string;
     content: string;
+    source: "local" | "global";
+  }
+
+  /**
+   * Global rules configuration (passed from outside WebContainer)
+   */
+  export interface GlobalRulesConfig {
+    /** Global AGENTS.md content (e.g., from ~/.config/opencode/AGENTS.md) */
+    agentsMd?: string;
+    /** Global CLAUDE.md content (e.g., from ~/.claude/CLAUDE.md) */
+    claudeMd?: string;
+    /** Custom instruction URLs or content */
+    customInstructions?: string[];
   }
 
   /**
@@ -44,7 +57,8 @@ export namespace AgentContext {
    */
   export interface Context {
     files: ContextFile[];
-    rules?: ProjectRules;
+    /** Multiple rules from hierarchical search + global */
+    rules: ProjectRules[];
     fileTree: string;
     workDir: string;
     platform: string;
@@ -209,32 +223,145 @@ export namespace AgentContext {
   }
 
   /**
-   * Find project rule file (AGENTS.md, CLAUDE.md, etc.)
+   * Get all directory paths from a file path
+   * e.g., "src/components/Button.tsx" -> ["src/components", "src", ""]
    */
-  export function findRuleFile(files: FileMap): ProjectRules | null {
-    for (const ruleName of RULE_FILES) {
-      // Check root level
-      const paths = [
-        ruleName,
-        `/${ruleName}`,
-        `${WORK_DIR}/${ruleName}`,
-      ];
-      
-      for (const path of paths) {
-        const entry = files[path];
-        if (entry && entry.type === "file") {
-          const file = entry as File;
-          if (!file.isBinary && file.content) {
-            return {
-              path: ruleName,
-              content: file.content.slice(0, MAX_FILE_SIZE),
-            };
+  function getParentDirectories(filePath: string): string[] {
+    const normalized = normalizePath(filePath);
+    const parts = normalized.split("/").filter(Boolean);
+    const dirs: string[] = [];
+    
+    // Build paths from deepest to root
+    for (let i = parts.length - 1; i >= 0; i--) {
+      dirs.push(parts.slice(0, i).join("/"));
+    }
+    
+    return dirs;
+  }
+
+  /**
+   * Get the deepest directory that contains files in the FileMap
+   * This represents the "current working directory" equivalent
+   */
+  function getDeepestDirectory(files: FileMap): string {
+    let deepest = "";
+    let maxDepth = 0;
+    
+    for (const filePath of Object.keys(files)) {
+      const normalized = normalizePath(filePath);
+      const parts = normalized.split("/").filter(Boolean);
+      if (parts.length > maxDepth) {
+        maxDepth = parts.length;
+        deepest = parts.slice(0, -1).join("/");
+      }
+    }
+    
+    return deepest;
+  }
+
+  /**
+   * Find project rule files with hierarchical search (like opencode)
+   * 
+   * Searches from the deepest directory up to root for rule files.
+   * More deeply nested rule files take precedence.
+   */
+  export function findRuleFiles(
+    files: FileMap,
+    options?: {
+      /** Starting directory for search (defaults to deepest dir in FileMap) */
+      cwd?: string;
+      /** Global rules passed from outside WebContainer */
+      globalRules?: GlobalRulesConfig;
+    }
+  ): ProjectRules[] {
+    const foundRules: ProjectRules[] = [];
+    const seenPaths = new Set<string>();
+    
+    // Determine starting directory
+    const cwd = options?.cwd || getDeepestDirectory(files);
+    const directories = getParentDirectories(cwd + "/dummy");
+    
+    // Add root as well
+    if (!directories.includes("")) {
+      directories.push("");
+    }
+    
+    // Search hierarchically from cwd up to root
+    // More deeply nested files are found first (higher priority)
+    for (const dir of directories) {
+      for (const ruleName of RULE_FILES) {
+        const relativePath = dir ? `${dir}/${ruleName}` : ruleName;
+        
+        // Try different path formats
+        const pathsToTry = [
+          relativePath,
+          `/${relativePath}`,
+          `${WORK_DIR}/${relativePath}`,
+        ];
+        
+        for (const tryPath of pathsToTry) {
+          if (seenPaths.has(tryPath)) continue;
+          
+          const entry = files[tryPath];
+          if (entry && entry.type === "file") {
+            const file = entry as File;
+            if (!file.isBinary && file.content) {
+              seenPaths.add(tryPath);
+              foundRules.push({
+                path: relativePath,
+                content: file.content.slice(0, MAX_FILE_SIZE),
+                source: "local",
+              });
+              // Only take the first matching rule file per directory
+              // (e.g., if AGENTS.md exists, don't also load CLAUDE.md from same dir)
+              break;
+            }
           }
         }
       }
     }
     
-    return null;
+    // Add global rules (passed from outside WebContainer)
+    if (options?.globalRules) {
+      const { agentsMd, claudeMd, customInstructions } = options.globalRules;
+      
+      if (agentsMd) {
+        foundRules.push({
+          path: "~/.config/opencode/AGENTS.md",
+          content: agentsMd.slice(0, MAX_FILE_SIZE),
+          source: "global",
+        });
+      }
+      
+      if (claudeMd) {
+        foundRules.push({
+          path: "~/.claude/CLAUDE.md",
+          content: claudeMd.slice(0, MAX_FILE_SIZE),
+          source: "global",
+        });
+      }
+      
+      if (customInstructions) {
+        for (const instruction of customInstructions) {
+          foundRules.push({
+            path: "custom-instruction",
+            content: instruction.slice(0, MAX_FILE_SIZE),
+            source: "global",
+          });
+        }
+      }
+    }
+    
+    return foundRules;
+  }
+
+  /**
+   * @deprecated Use findRuleFiles for hierarchical search
+   * Find project rule file (AGENTS.md, CLAUDE.md, etc.) - root only
+   */
+  export function findRuleFile(files: FileMap): ProjectRules | null {
+    const rules = findRuleFiles(files);
+    return rules.length > 0 ? rules[0] : null;
   }
 
   /**
@@ -377,21 +504,29 @@ export namespace AgentContext {
 
   /**
    * Build complete context for the agent
+   * 
+   * Now supports:
+   * - Hierarchical search for rule files (like opencode)
+   * - Global rules passed from outside WebContainer
    */
   export function build(options: {
     files: FileMap;
     fileTree?: FileNode;
     userMessage?: string;
+    /** Current working directory for hierarchical search */
+    cwd?: string;
+    /** Global rules from outside WebContainer */
+    globalRules?: GlobalRulesConfig;
   }): Context {
-    const { files, fileTree, userMessage } = options;
+    const { files, fileTree, userMessage, cwd, globalRules } = options;
     
     // Load files referenced in user message
     const referencedFiles = userMessage 
       ? loadReferencedFiles(userMessage, files)
       : [];
     
-    // Find project rules
-    const rules = findRuleFile(files);
+    // Find project rules with hierarchical search + global rules
+    const rules = findRuleFiles(files, { cwd, globalRules });
     
     // Build file tree
     const tree = fileTree 
@@ -400,7 +535,7 @@ export namespace AgentContext {
     
     return {
       files: referencedFiles,
-      rules: rules || undefined,
+      rules,
       fileTree: tree,
       workDir: WORK_DIR,
       platform: "webcontainer",
@@ -433,14 +568,44 @@ export namespace AgentContext {
       ].join("\n"));
     }
     
-    // Project rules (AGENTS.md, etc.)
-    if (context.rules) {
+    // Project rules (AGENTS.md, etc.) - now supports multiple from hierarchical search
+    // Local rules are listed first (more specific), then global rules
+    const localRules = context.rules.filter(r => r.source === "local");
+    const globalRules = context.rules.filter(r => r.source === "global");
+    
+    if (localRules.length > 0) {
+      const rulesContent = localRules.map((rule) => {
+        return [
+          `Instructions from: ${rule.path}`,
+          ``,
+          rule.content,
+        ].join("\n");
+      });
+      
       parts.push([
         `<project_instructions>`,
-        `Instructions from: ${context.rules.path}`,
+        `The following project-specific instructions were found (more deeply nested files take precedence):`,
         ``,
-        context.rules.content,
+        rulesContent.join("\n\n---\n\n"),
         `</project_instructions>`,
+      ].join("\n"));
+    }
+    
+    if (globalRules.length > 0) {
+      const rulesContent = globalRules.map((rule) => {
+        return [
+          `Instructions from: ${rule.path}`,
+          ``,
+          rule.content,
+        ].join("\n");
+      });
+      
+      parts.push([
+        `<global_instructions>`,
+        `The following global instructions apply (project instructions take precedence if conflicting):`,
+        ``,
+        rulesContent.join("\n\n---\n\n"),
+        `</global_instructions>`,
       ].join("\n"));
     }
     
