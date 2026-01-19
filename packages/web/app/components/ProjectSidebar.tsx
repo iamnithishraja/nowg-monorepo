@@ -423,7 +423,7 @@ export function ProjectSidebar({
         )}
 
         {/* Navigation */}
-        <ScrollArea className="flex-1 px-3 space-y-1">
+        <ScrollArea className="flex-1 min-h-0 px-3 space-y-1">
           {/* Primary Navigation */}
           <Link
             to="/home"
