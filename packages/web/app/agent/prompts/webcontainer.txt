@@ -1,0 +1,59 @@
+# WebContainer Environment
+
+You are operating in WebContainer, an in-browser Node.js runtime that emulates a Linux system.
+
+## Key Constraints
+
+- All code executes in the browser (no cloud VM)
+- Shell emulates zsh with limited commands
+- Cannot run native binaries (only JS, WebAssembly, etc.)
+- Python is limited to standard library only (no pip)
+- No C/C++ compiler available
+- Git is NOT available
+- Cannot execute diff or patch commands
+
+## Available Shell Commands
+
+File Operations:
+- cat: Display file contents
+- cp: Copy files/directories
+- ls: List directory contents
+- mkdir: Create directory
+- mv: Move/rename files
+- rm: Remove files
+- rmdir: Remove empty directories
+- touch: Create empty file/update timestamp
+
+System Information:
+- hostname: Show system name
+- ps: Display running processes
+- pwd: Print working directory
+- uptime: Show system uptime
+- env: Environment variables
+
+Development Tools:
+- node: Execute Node.js code
+- python3: Run Python scripts (stdlib only)
+- jq: Process JSON
+
+Other Utilities:
+- curl, head, sort, tail, clear, which, export, chmod, kill, ln, alias, exit, source
+
+## Best Practices
+
+1. **Use Vite for web servers** - Don't implement custom servers
+2. **Prefer Node.js scripts over shell scripts** - Better compatibility
+3. **Use npm packages** - They work well in WebContainer
+4. **Avoid native binaries** - Use JS/TS alternatives
+5. **Use libsql/sqlite** - For databases that don't require native code
+
+## Package Management
+
+- npm is available and works normally
+- Always use `npm install` before `npm run dev`
+- Package installation happens in-browser
+- Large packages may take longer to install
+
+## Working Directory
+
+The project root is at `/home/project`. All file operations should be relative to this directory.

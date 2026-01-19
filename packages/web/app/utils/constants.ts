@@ -81,6 +81,17 @@ type Dirent = File | Folder;
 
 export type FileMap = Record<string, Dirent | undefined>;
 
+/**
+ * File tree node for representing directory structure
+ */
+export interface FileNode {
+  name?: string;
+  children?: Record<string, FileNode>;
+  file?: {
+    contents: string;
+  };
+}
+
 export const IGNORE_PATTERNS = [
   'node_modules/**',
   '.git/**',
