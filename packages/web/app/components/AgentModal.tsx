@@ -206,7 +206,9 @@ export function AgentModal({ isOpen, onClose, templateFiles }: AgentModalProps) 
     currentToolCalls,
     error,
     step,
+    awaitingAcknowledgement,
     sendMessage,
+    acknowledge,
     stop,
     clearHistory,
     clearError,
@@ -218,6 +220,15 @@ export function AgentModal({ isOpen, onClose, templateFiles }: AgentModalProps) 
     },
     onComplete: (message) => {
       console.log("[AgentModal] Agent complete callback:", message.id);
+    },
+    onAwaitingAcknowledgement: (ackTools, results) => {
+      console.log("[AgentModal] Action tools executed, auto-acknowledging:", ackTools.length, "| Results:", results.length);
+      // Auto-acknowledge immediately with the results passed directly
+      // This avoids relying on async state updates
+      setTimeout(() => {
+        console.log("[AgentModal] Auto-acknowledging now with", results.length, "results");
+        acknowledge(results);
+      }, 100);
     },
   });
   

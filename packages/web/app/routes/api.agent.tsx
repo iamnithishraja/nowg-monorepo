@@ -265,13 +265,20 @@ export async function action({ request }: ActionFunctionArgs) {
 
           // If we have tool results from client, add them to continue the loop
           if (toolResults && toolResults.length > 0) {
+            console.log("[Agent API] Processing", toolResults.length, "tool results");
             // Add tool results as individual tool messages
             // AI SDK expects tool messages with tool-result content array format
+            // The output field must be an object, not a string
             for (const tr of toolResults) {
               const toolResultContent = tr.result.success 
                 ? tr.result.output 
                 : `Error: ${tr.result.error || "Tool execution failed"}`;
               
+              console.log("[Agent API] Creating tool message for:", tr.toolName, "| Success:", tr.result.success, "| Content length:", toolResultContent.length);
+              
+              // AI SDK expects output to be an object, not a string
+              // Based on the error: "expected object, received string" at path ["content",0,"output"]
+              // Try wrapping in an object - different SDKs use different property names
               const toolMessage: CoreMessage = {
                 role: "tool",
                 content: [
@@ -279,10 +286,25 @@ export async function action({ request }: ActionFunctionArgs) {
                     type: "tool-result",
                     toolCallId: tr.toolCallId,
                     toolName: tr.toolName,
-                    output: toolResultContent as any, // AI SDK expects LanguageModelV2ToolResultOutput
-                  },
+                    // Wrap string result in an object - try { result: string } format
+                    output: {
+                      result: toolResultContent,
+                    } as any,
+                  } as any,
                 ],
               };
+              console.log("[Agent API] Tool message structure:", JSON.stringify({
+                role: toolMessage.role,
+                contentType: Array.isArray(toolMessage.content) ? "array" : typeof toolMessage.content,
+                contentLength: Array.isArray(toolMessage.content) ? toolMessage.content.length : 0,
+                firstContentItem: Array.isArray(toolMessage.content) && toolMessage.content[0] ? {
+                  type: (toolMessage.content[0] as any).type,
+                  toolCallId: (toolMessage.content[0] as any).toolCallId,
+                  toolName: (toolMessage.content[0] as any).toolName,
+                  outputType: typeof (toolMessage.content[0] as any).output,
+                  outputKeys: (toolMessage.content[0] as any).output ? Object.keys((toolMessage.content[0] as any).output) : [],
+                } : null,
+              }, null, 2));
               messages.push(toolMessage);
             }
           }
@@ -304,6 +326,15 @@ export async function action({ request }: ActionFunctionArgs) {
           }> = [];
 
           console.log("[Agent API] Starting LLM stream with model:", model);
+          console.log("[Agent API] Messages being sent to LLM:", JSON.stringify(messages.map(m => ({
+            role: m.role,
+            contentType: typeof m.content === "string" ? "string" : Array.isArray(m.content) ? `array[${m.content.length}]` : "other",
+            contentPreview: typeof m.content === "string" 
+              ? m.content.substring(0, 100)
+              : Array.isArray(m.content) && m.content.length > 0
+                ? JSON.stringify(m.content[0]).substring(0, 200)
+                : "N/A"
+          })), null, 2));
           
           // Collect tool calls as they're generated
           const collectedToolCalls: Array<{
@@ -313,7 +344,9 @@ export async function action({ request }: ActionFunctionArgs) {
           }> = [];
           
           // Stream the response (single step - tools run client-side)
-          const result = streamText({
+          let result;
+          try {
+            result = streamText({
             model: openrouter(model),
             system: systemPrompt,
             messages,
@@ -333,6 +366,11 @@ export async function action({ request }: ActionFunctionArgs) {
               }
             },
           });
+          } catch (streamError) {
+            console.error("[Agent API] Error creating streamText:", streamError);
+            console.error("[Agent API] Messages that caused error:", JSON.stringify(messages, null, 2));
+            throw streamError;
+          }
 
           // Stream text deltas
           let deltaCount = 0;

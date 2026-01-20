@@ -85,9 +85,9 @@ export interface UseAgentChatOptions {
   onError?: (error: string) => void;
   /** 
    * Callback when action tools need acknowledgement before continuing.
-   * Called with the completed action tool calls.
+   * Called with the completed action tool calls and the results that need to be acknowledged.
    */
-  onAwaitingAcknowledgement?: (ackTools: AgentToolCall[]) => void;
+  onAwaitingAcknowledgement?: (ackTools: AgentToolCall[], results: ToolResultPayload[]) => void;
 }
 
 /**
@@ -457,15 +457,25 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   /**
    * Continue the agent loop after acknowledgement
    * Call this after action tools are acknowledged by the user
+   * @param results Optional tool results to use instead of state.pendingAckResults
    */
-  const acknowledge = useCallback(async () => {
-    if (!state.awaitingAcknowledgement || state.pendingAckResults.length === 0) {
+  const acknowledge = useCallback(async (results?: ToolResultPayload[]) => {
+    const pendingResults = results || state.pendingAckResults;
+    const isAwaiting = results ? true : state.awaitingAcknowledgement;
+    
+    console.log("[useAgentChat] acknowledge called | Awaiting:", isAwaiting, "| Pending results:", pendingResults.length, "| Using provided results:", !!results);
+    if (!isAwaiting || pendingResults.length === 0) {
+      console.log("[useAgentChat] Cannot acknowledge - not awaiting or no pending results");
       return;
     }
 
     const abortSignal = abortControllerRef.current?.signal;
-    if (!abortSignal || abortSignal.aborted) return;
+    if (!abortSignal || abortSignal.aborted) {
+      console.log("[useAgentChat] Cannot acknowledge - abort signal invalid");
+      return;
+    }
 
+    console.log("[useAgentChat] Sending acknowledgement with", pendingResults.length, "tool results");
     // Clear awaiting state
     setState((prev) => ({
       ...prev,
@@ -477,13 +487,13 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     }));
 
     const currentMessages = state.continuationMessages;
-    const pendingResults = state.pendingAckResults;
     let currentStep = state.step;
     let allToolCalls: AgentToolCall[] = [...state.currentToolCalls];
     let finalText = state.currentText;
 
     try {
       // Send acknowledgement request with tool results
+      console.log("[useAgentChat] Sending acknowledgement request to /api/agent");
       const response = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -502,6 +512,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         }),
         signal: abortSignal,
       });
+
+      console.log("[useAgentChat] Acknowledgement response status:", response.status);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -535,7 +547,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             isStreaming: false,
           }));
 
-          onAwaitingAcknowledgement?.(ackExecutedTools);
+          // Pass results to callback so acknowledge can use them immediately
+          onAwaitingAcknowledgement?.(ackExecutedTools, results);
           return;
         }
 
@@ -717,7 +730,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             isStreaming: false,
           }));
 
-          onAwaitingAcknowledgement?.(ackExecutedTools);
+          // Pass results to callback so acknowledge can use them immediately
+          onAwaitingAcknowledgement?.(ackExecutedTools, results);
           return;
         }
 
@@ -869,7 +883,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             isStreaming: false,
           }));
 
-          onAwaitingAcknowledgement?.(ackExecutedTools);
+          // Pass results to callback so acknowledge can use them immediately
+          onAwaitingAcknowledgement?.(ackExecutedTools, results);
           return;
         }
 
