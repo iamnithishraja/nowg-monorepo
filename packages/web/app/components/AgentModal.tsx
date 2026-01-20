@@ -213,7 +213,23 @@ export function AgentModal({ isOpen, onClose, templateFiles }: AgentModalProps) 
   } = useAgentChat({
     files: filesMap,
     maxSteps: 15,
+    onError: (errorMsg) => {
+      console.error("[AgentModal] Agent error callback:", errorMsg);
+    },
+    onComplete: (message) => {
+      console.log("[AgentModal] Agent complete callback:", message.id);
+    },
   });
+  
+  // Log state changes for debugging
+  useEffect(() => {
+    if (error) {
+      console.error("[AgentModal] Error state:", error);
+    }
+    if (isLoading || isStreaming) {
+      console.log("[AgentModal] Loading state - isLoading:", isLoading, "isStreaming:", isStreaming, "step:", step);
+    }
+  }, [error, isLoading, isStreaming, step]);
   
   // Auto-scroll to bottom
   useEffect(() => {
@@ -229,11 +245,20 @@ export function AgentModal({ isOpen, onClose, templateFiles }: AgentModalProps) 
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading) {
+      console.log("[AgentModal] Submit prevented - empty input or loading");
+      return;
+    }
     
     const prompt = input.trim();
+    console.log("[AgentModal] Submitting prompt:", prompt.substring(0, 100));
     setInput("");
-    await sendMessage(prompt);
+    try {
+      await sendMessage(prompt);
+      console.log("[AgentModal] Message sent successfully");
+    } catch (error) {
+      console.error("[AgentModal] Error sending message:", error);
+    }
   };
   
   const handleKeyDown = (e: React.KeyboardEvent) => {

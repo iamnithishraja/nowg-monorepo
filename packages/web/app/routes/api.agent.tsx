@@ -115,6 +115,8 @@ interface AgentRequest {
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
+    console.log("[Agent API] Request received");
+    
     // Authenticate user
     const authInstance = await auth;
     const session = await authInstance.api.getSession({
@@ -122,6 +124,7 @@ export async function action({ request }: ActionFunctionArgs) {
     });
 
     if (!session) {
+      console.error("[Agent API] Authentication failed");
       return new Response(
         JSON.stringify({ error: "Authentication required" }),
         { status: 401, headers: { "Content-Type": "application/json" } }
@@ -144,9 +147,11 @@ export async function action({ request }: ActionFunctionArgs) {
     } = body;
 
     const requestType = body.requestType || "prompt";
+    console.log("[Agent API] Request type:", requestType, "| Step:", currentStep, "| Prompt:", prompt?.substring(0, 100));
 
     // Validate request based on type
     if (requestType === "prompt" && !prompt && inputMessages.length === 0) {
+      console.error("[Agent API] Validation failed: prompt or messages required");
       return new Response(
         JSON.stringify({ error: "prompt or messages required for prompt request" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -155,6 +160,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     if ((requestType === "tool_results" || requestType === "acknowledgement") && 
         (!toolResults || toolResults.length === 0)) {
+      console.error("[Agent API] Validation failed: toolResults required");
       return new Response(
         JSON.stringify({ error: "toolResults required for tool_results/acknowledgement request" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -163,6 +169,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Check step limit
     if (currentStep >= maxSteps) {
+      console.warn("[Agent API] Max steps reached:", currentStep, ">=", maxSteps);
       return new Response(
         JSON.stringify({ error: `Max steps (${maxSteps}) reached` }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -172,20 +179,23 @@ export async function action({ request }: ActionFunctionArgs) {
     // Get API key
     const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
     if (!openRouterApiKey) {
+      console.error("[Agent API] OPENROUTER_API_KEY not configured");
       return new Response(
         JSON.stringify({ error: "OPENROUTER_API_KEY not configured" }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
+    
+    console.log("[Agent API] Starting stream processing");
 
     // Create streaming response
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         const sendChunk = (data: any) => {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
-          );
+          const chunk = `data: ${JSON.stringify(data)}\n\n`;
+          console.log("[Agent API] Sending chunk:", data.type, "| Size:", chunk.length, "bytes");
+          controller.enqueue(encoder.encode(chunk));
         };
 
         try {
@@ -195,9 +205,11 @@ export async function action({ request }: ActionFunctionArgs) {
           const stepCount = currentStep + 1;
 
           sendChunk({ type: "session_start", sessionId, messageId, step: stepCount });
+          console.log("[Agent API] Session started:", sessionId, "| Message:", messageId, "| Step:", stepCount);
 
           // Get the agent
           const agent = Agent.get(agentName) || Agent.defaultAgent();
+          console.log("[Agent API] Using agent:", agentName, "| Agent found:", !!agent);
 
           // Build system prompt
           const systemParts = SystemPrompt.build({
@@ -208,6 +220,7 @@ export async function action({ request }: ActionFunctionArgs) {
             userMessage: prompt,
           });
           const systemPrompt = systemParts.join("\n\n");
+          console.log("[Agent API] System prompt built:", systemPrompt.length, "chars |", systemParts.length, "parts");
 
           // Resolve tools for the agent (for schema only, execution happens client-side)
           const tools = AgentTools.resolve(agent, {
@@ -215,28 +228,62 @@ export async function action({ request }: ActionFunctionArgs) {
             messageID: messageId,
             agent,
           });
+          console.log("[Agent API] Tools resolved:", Object.keys(tools || {}).length, "tools");
 
           // Build messages array
-          const messages: CoreMessage[] = [...inputMessages];
+          // Convert inputMessages to proper CoreMessage format, filtering out invalid formats
+          const messages: CoreMessage[] = [];
+          
+          // Process input messages and convert to proper format
+          for (const msg of inputMessages) {
+            // Skip assistant messages with tool-call content arrays (UI format)
+            // These will be reconstructed from tool results
+            if (msg.role === "assistant" && Array.isArray(msg.content)) {
+              const hasToolCalls = msg.content.some((item: any) => item.type === "tool-call");
+              if (hasToolCalls) {
+                // Extract text content if any, skip the tool calls (they'll be reconstructed)
+                const textItem = msg.content.find((item: any) => item.type === "text");
+                if (textItem && "text" in textItem) {
+                  messages.push({ role: "assistant", content: textItem.text });
+                }
+                // Don't push the tool-call version, it will be reconstructed
+                continue;
+              }
+            }
+            
+            // For other messages, ensure content is in correct format
+            if (msg.role === "tool" && Array.isArray(msg.content)) {
+              // Tool messages should have tool-result format - keep as is if already correct
+              messages.push(msg);
+            } else if (typeof msg.content === "string" || Array.isArray(msg.content)) {
+              // Valid format - user messages with string content, or properly formatted messages
+              messages.push(msg);
+            } else {
+              console.warn("[Agent API] Skipping message with invalid format:", msg);
+            }
+          }
 
           // If we have tool results from client, add them to continue the loop
           if (toolResults && toolResults.length > 0) {
             // Add tool results as individual tool messages
+            // AI SDK expects tool messages with tool-result content array format
             for (const tr of toolResults) {
-              const toolMessage = {
-                role: "tool" as const,
+              const toolResultContent = tr.result.success 
+                ? tr.result.output 
+                : `Error: ${tr.result.error || "Tool execution failed"}`;
+              
+              const toolMessage: CoreMessage = {
+                role: "tool",
                 content: [
                   {
-                    type: "tool-result" as const,
+                    type: "tool-result",
                     toolCallId: tr.toolCallId,
                     toolName: tr.toolName,
-                    result: tr.result.success 
-                      ? tr.result.output 
-                      : `Error: ${tr.result.error || "Tool execution failed"}`,
+                    output: toolResultContent as any, // AI SDK expects LanguageModelV2ToolResultOutput
                   },
                 ],
               };
-              messages.push(toolMessage as any);
+              messages.push(toolMessage);
             }
           }
           
@@ -244,6 +291,8 @@ export async function action({ request }: ActionFunctionArgs) {
           if (prompt && currentStep === 0) {
             messages.push({ role: "user", content: prompt });
           }
+          console.log("[Agent API] Messages prepared:", messages.length, "messages");
+          console.log("[Agent API] Message roles:", messages.map(m => ({ role: m.role, contentType: typeof m.content === "string" ? "string" : Array.isArray(m.content) ? "array" : "other" })));
 
           // Create OpenRouter client
           const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
@@ -254,49 +303,101 @@ export async function action({ request }: ActionFunctionArgs) {
             args: unknown;
           }> = [];
 
+          console.log("[Agent API] Starting LLM stream with model:", model);
+          
+          // Collect tool calls as they're generated
+          const collectedToolCalls: Array<{
+            toolCallId: string;
+            toolName: string;
+            args: any;
+          }> = [];
+          
           // Stream the response (single step - tools run client-side)
           const result = streamText({
             model: openrouter(model),
             system: systemPrompt,
             messages,
             tools,
+            onStepFinish: async (step: any) => {
+              // Capture tool calls from each step
+              const stepToolCalls = step.toolCalls || [];
+              console.log("[Agent API] Step finished, tool calls:", stepToolCalls.length);
+              for (const toolCall of stepToolCalls) {
+                const args = toolCall.args || (toolCall as any).input || {};
+                collectedToolCalls.push({
+                  toolCallId: toolCall.toolCallId || toolCall.id,
+                  toolName: toolCall.toolName || toolCall.name,
+                  args,
+                });
+                console.log("[Agent API] Collected tool call:", toolCall.toolName || toolCall.name);
+              }
+            },
           });
 
-          // Collect tool calls as they stream
-          const toolCallsMap = new Map<string, { name: string; args: any }>();
-
           // Stream text deltas
-          for await (const delta of result.textStream) {
-            fullText += delta;
-            sendChunk({
-              type: "text_delta",
-              delta,
-            });
+          let deltaCount = 0;
+          try {
+            for await (const delta of result.textStream) {
+              fullText += delta;
+              deltaCount++;
+              sendChunk({
+                type: "text_delta",
+                delta,
+              });
+            }
+            console.log("[Agent API] Text streaming complete:", deltaCount, "deltas |", fullText.length, "chars");
+          } catch (streamError) {
+            console.error("[Agent API] Error during text streaming:", streamError);
+            throw streamError;
           }
 
-          // Get final result with tool calls
-          const responseToolCalls = await result.toolCalls || [];
-          console.log("responseToolCalls", responseToolCalls);
+          // Get tool calls - try both the collected ones and the result property
+          let responseToolCalls: any[] = [];
+          try {
+            // Use collected tool calls first (from onStepFinish)
+            if (collectedToolCalls.length > 0) {
+              responseToolCalls = collectedToolCalls;
+              console.log("[Agent API] Using collected tool calls:", responseToolCalls.length);
+            } else {
+              // Fallback to result.toolCalls if available
+              const resultToolCalls = await result.toolCalls || [];
+              responseToolCalls = Array.isArray(resultToolCalls) ? resultToolCalls : [];
+              console.log("[Agent API] Using result.toolCalls:", responseToolCalls.length);
+            }
+            
+            if (responseToolCalls.length > 0) {
+              console.log("[Agent API] Tool call names:", responseToolCalls.map(tc => tc.toolName || tc.name));
+            }
+          } catch (toolCallsError) {
+            console.error("[Agent API] Error getting tool calls:", toolCallsError);
+            // Use collected tool calls as fallback
+            responseToolCalls = collectedToolCalls;
+            console.log("[Agent API] Using collected tool calls as fallback:", responseToolCalls.length);
+          }
           // Process tool calls and categorize them
           const autoTools: typeof pendingToolCalls = [];
           const ackTools: typeof pendingToolCalls = [];
           
           for (const toolCall of responseToolCalls) {
-            const args = (toolCall as any).args || {};
-            const category = getToolCategory(toolCall.toolName);
+            const toolName = toolCall.toolName || toolCall.name;
+            const toolCallId = toolCall.toolCallId || toolCall.id;
+            const args = toolCall.args || {};
+            const category = getToolCategory(toolName);
+            
+            console.log("[Agent API] Processing tool call:", toolName, "| Category:", category);
             
             sendChunk({
               type: "tool_call",
-              id: toolCall.toolCallId,
-              name: toolCall.toolName,
+              id: toolCallId,
+              name: toolName,
               args,
               step: stepCount,
               category, // "auto" or "ack"
             });
 
             const toolCallInfo = {
-              id: toolCall.toolCallId,
-              name: toolCall.toolName,
+              id: toolCallId,
+              name: toolName,
               args,
             };
             
@@ -310,7 +411,13 @@ export async function action({ request }: ActionFunctionArgs) {
           }
 
           // Get usage info
-          const usage = await result.usage;
+          let usage;
+          try {
+            usage = await result.usage;
+            console.log("[Agent API] Usage info:", usage);
+          } catch (usageError) {
+            console.error("[Agent API] Error getting usage:", usageError);
+          }
 
           // Send step complete
           sendChunk({
@@ -318,9 +425,12 @@ export async function action({ request }: ActionFunctionArgs) {
             step: stepCount,
             hasToolCalls: pendingToolCalls.length > 0,
           });
+          console.log("[Agent API] Step complete:", stepCount, "| Tool calls:", pendingToolCalls.length);
 
           // If there are pending tool calls, tell client to execute and send results back
           if (pendingToolCalls.length > 0) {
+            console.log("[Agent API] Sending awaiting_tool_results event | Pending:", pendingToolCalls.length, "| Ack:", ackTools.length, "| Auto:", autoTools.length);
+            
             // Need to include the assistant message with tool calls for continuation
             // Build content array with proper types
             const assistantContent: Array<any> = [];
@@ -345,7 +455,7 @@ export async function action({ request }: ActionFunctionArgs) {
             const hasAckTools = ackTools.length > 0;
             const hasAutoTools = autoTools.length > 0;
 
-            sendChunk({
+            const awaitingEvent = {
               type: "awaiting_tool_results",
               toolCalls: pendingToolCalls,
               // Categorized tool lists for frontend to handle differently
@@ -358,8 +468,13 @@ export async function action({ request }: ActionFunctionArgs) {
               sessionId,
               // Send messages back so client can continue the conversation
               messages: [...messages, assistantMessageWithToolCalls],
-            });
+            };
+            
+            console.log("[Agent API] Awaiting event payload:", JSON.stringify(awaitingEvent, null, 2).substring(0, 500));
+            sendChunk(awaitingEvent);
+            console.log("[Agent API] awaiting_tool_results event sent");
           } else {
+            console.log("[Agent API] No tool calls, sending complete event");
             // No tool calls, we're done
             sendChunk({
               type: "complete",
@@ -377,8 +492,14 @@ export async function action({ request }: ActionFunctionArgs) {
           }
 
           sendChunk({ type: "done" });
+          console.log("[Agent API] Stream completed successfully");
         } catch (error) {
-          console.error("[Agent API] Error:", error);
+          console.error("[Agent API] Error in stream processing:", error);
+          if (error instanceof Error) {
+            console.error("[Agent API] Error stack:", error.stack);
+            console.error("[Agent API] Error name:", error.name);
+            console.error("[Agent API] Error message:", error.message);
+          }
           sendChunk({
             type: "error",
             error: error instanceof Error ? error.message : String(error),
@@ -389,17 +510,26 @@ export async function action({ request }: ActionFunctionArgs) {
       },
     });
 
+    console.log("[Agent API] Returning streaming response");
     return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        "X-Accel-Buffering": "no", // Disable buffering for nginx
       },
     });
   } catch (error) {
     console.error("[Agent API] Fatal error:", error);
+    if (error instanceof Error) {
+      console.error("[Agent API] Fatal error stack:", error.stack);
+      console.error("[Agent API] Fatal error name:", error.name);
+    }
     return new Response(
-      JSON.stringify({ error: "Internal Server Error" }),
+      JSON.stringify({ 
+        error: "Internal Server Error",
+        details: error instanceof Error ? error.message : String(error)
+      }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
