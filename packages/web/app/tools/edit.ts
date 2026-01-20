@@ -656,20 +656,25 @@ export const EditTool = Tool.define<
       };
     }
 
-    // Check if file exists
-    let stat;
+    // Check if path is a directory (WebContainer doesn't have stat, so we try readdir)
     try {
-      stat = await (webcontainer.fs as any).stat(fullPath);
+      await webcontainer.fs.readdir(fullPath);
+      // If readdir succeeds, it's a directory
+      throw new Error(`Path is a directory, not a file: ${params.filePath}`);
+    } catch (e) {
+      if ((e as Error).message.includes("is a directory")) {
+        throw e;
+      }
+      // Not a directory, continue
+    }
+
+    // Read existing content - this will throw if file doesn't exist
+    let bytes: Uint8Array;
+    try {
+      bytes = await webcontainer.fs.readFile(fullPath);
     } catch {
       throw new Error(`File not found: ${params.filePath}`);
     }
-
-    if (stat.isDirectory()) {
-      throw new Error(`Path is a directory, not a file: ${params.filePath}`);
-    }
-
-    // Read existing content
-    const bytes = await webcontainer.fs.readFile(fullPath);
     contentOld = new TextDecoder().decode(bytes);
 
     // Perform replacement

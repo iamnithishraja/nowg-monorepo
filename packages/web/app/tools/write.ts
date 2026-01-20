@@ -153,20 +153,25 @@ export const WriteTool = Tool.define<
     let contentOld = "";
     let existed = false;
 
-    // Check if file exists and read its content
+    // Check if path is a directory (WebContainer doesn't have stat, so we try readdir)
     try {
-      const stat = await (webcontainer.fs as any).stat(fullPath);
-      if (stat.isDirectory()) {
-        throw new Error(`Cannot write to directory: ${params.filePath}`);
-      }
-      const bytes = await webcontainer.fs.readFile(fullPath);
-      contentOld = new TextDecoder().decode(bytes);
-      existed = true;
+      await webcontainer.fs.readdir(fullPath);
+      // If readdir succeeds, it's a directory
+      throw new Error(`Cannot write to directory: ${params.filePath}`);
     } catch (e) {
       if ((e as Error).message.includes("Cannot write to directory")) {
         throw e;
       }
-      // File doesn't exist, which is fine
+      // Not a directory, continue
+    }
+
+    // Try to read existing content
+    try {
+      const bytes = await webcontainer.fs.readFile(fullPath);
+      contentOld = new TextDecoder().decode(bytes);
+      existed = true;
+    } catch {
+      // File doesn't exist, which is fine for write
     }
 
     // Create parent directories if needed

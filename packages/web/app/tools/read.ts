@@ -195,11 +195,64 @@ export const ReadTool = Tool.define<
     const fullPath = getFullPath(params.filePath);
     const title = normalizePath(params.filePath);
 
-    // Check if file exists
-    let stat;
+    // WebContainer doesn't have stat(), so we check if it's a directory first using readdir
+    // If readdir succeeds, it's a directory; if it fails, try reading as a file
     try {
-      stat = await (webcontainer.fs as any).stat(fullPath);
-    } catch {
+      await webcontainer.fs.readdir(fullPath);
+      // If we get here, it's a directory
+      throw new Error(
+        `Cannot read directory: ${params.filePath}. Use the appropriate directory listing tool instead.`
+      );
+    } catch (dirError) {
+      // Not a directory or doesn't exist - this is expected for files
+      const errorMsg = (dirError as Error).message;
+      if (errorMsg.includes("Cannot read directory")) {
+        throw dirError;
+      }
+      // Continue to try reading as a file
+    }
+
+    // Check for binary files by extension
+    if (isBinaryExtension(params.filePath)) {
+      throw new Error(`Cannot read binary file: ${params.filePath}`);
+    }
+
+    // Handle image files
+    const imageMime = getImageMime(params.filePath);
+    if (imageMime) {
+      try {
+        const bytes = await webcontainer.fs.readFile(fullPath);
+        const base64 = uint8ArrayToBase64(bytes);
+        const msg = "Image read successfully";
+
+        return {
+          title,
+          output: msg,
+          metadata: {
+            preview: msg,
+            truncated: false,
+          },
+          attachments: [
+            {
+              id: generateId(),
+              sessionID: ctx.sessionID,
+              messageID: ctx.messageID,
+              type: "file",
+              mime: imageMime,
+              url: `data:${imageMime};base64,${base64}`,
+            },
+          ],
+        };
+      } catch (e) {
+        throw new Error(`Image file not found: ${params.filePath}`);
+      }
+    }
+
+    // Read file content
+    let content: Uint8Array | string;
+    try {
+      content = await webcontainer.fs.readFile(fullPath);
+    } catch (e) {
       // File doesn't exist - try to provide suggestions
       const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
       const base = fullPath.substring(fullPath.lastIndexOf("/") + 1);
@@ -221,60 +274,13 @@ export const ReadTool = Tool.define<
               .join("\n")}`
           );
         }
-      } catch (e) {
-        if ((e as Error).message.includes("Did you mean")) {
-          throw e;
+      } catch (suggestionError) {
+        if ((suggestionError as Error).message.includes("Did you mean")) {
+          throw suggestionError;
         }
       }
 
       throw new Error(`File not found: ${params.filePath}`);
-    }
-
-    // Check if it's a directory
-    if (stat.isDirectory()) {
-      throw new Error(
-        `Cannot read directory: ${params.filePath}. Use the appropriate directory listing tool instead.`
-      );
-    }
-
-    // Check for binary files by extension
-    if (isBinaryExtension(params.filePath)) {
-      throw new Error(`Cannot read binary file: ${params.filePath}`);
-    }
-
-    // Handle image files
-    const imageMime = getImageMime(params.filePath);
-    if (imageMime) {
-      const bytes = await webcontainer.fs.readFile(fullPath);
-      const base64 = uint8ArrayToBase64(bytes);
-      const msg = "Image read successfully";
-
-      return {
-        title,
-        output: msg,
-        metadata: {
-          preview: msg,
-          truncated: false,
-        },
-        attachments: [
-          {
-            id: generateId(),
-            sessionID: ctx.sessionID,
-            messageID: ctx.messageID,
-            type: "file",
-            mime: imageMime,
-            url: `data:${imageMime};base64,${base64}`,
-          },
-        ],
-      };
-    }
-
-    // Read file content
-    let content: Uint8Array | string;
-    try {
-      content = await webcontainer.fs.readFile(fullPath);
-    } catch (e) {
-      throw new Error(`Failed to read file: ${params.filePath}. ${e}`);
     }
 
     // Handle Uint8Array content

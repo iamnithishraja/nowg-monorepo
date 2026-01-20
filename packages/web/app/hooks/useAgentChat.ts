@@ -87,7 +87,12 @@ export interface UseAgentChatOptions {
    * Callback when action tools need acknowledgement before continuing.
    * Called with the completed action tool calls and the results that need to be acknowledged.
    */
-  onAwaitingAcknowledgement?: (ackTools: AgentToolCall[], results: ToolResultPayload[]) => void;
+  onAwaitingAcknowledgement?: (
+    ackTools: AgentToolCall[],
+    results: ToolResultPayload[],
+    messages: CoreMessage[],
+    step: number
+  ) => void;
 }
 
 /**
@@ -459,7 +464,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
    * Call this after action tools are acknowledged by the user
    * @param results Optional tool results to use instead of state.pendingAckResults
    */
-  const acknowledge = useCallback(async (results?: ToolResultPayload[]) => {
+  const acknowledge = useCallback(
+async (
+results?: ToolResultPayload[],
+      messages?: CoreMessage[],
+      step?: number
+) => {
     const pendingResults = results || state.pendingAckResults;
     const isAwaiting = results ? true : state.awaitingAcknowledgement;
     
@@ -486,8 +496,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       currentToolCalls: [],
     }));
 
-    const currentMessages = state.continuationMessages;
-    let currentStep = state.step;
+    const currentMessages = messages || state.continuationMessages;
+    let currentStep = step !== undefined ? step : state.step;
     let allToolCalls: AgentToolCall[] = [...state.currentToolCalls];
     let finalText = state.currentText;
 
@@ -548,7 +558,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           }));
 
           // Pass results to callback so acknowledge can use them immediately
-          onAwaitingAcknowledgement?.(ackExecutedTools, results);
+            onAwaitingAcknowledgement?.(
+              ackExecutedTools,
+              results,
+              result.messages,
+              currentStep
+            );
           return;
         }
 
@@ -731,7 +746,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           }));
 
           // Pass results to callback so acknowledge can use them immediately
-          onAwaitingAcknowledgement?.(ackExecutedTools, results);
+          onAwaitingAcknowledgement?.(
+            ackExecutedTools,
+            results,
+            result.messages,
+            step
+          );
           return;
         }
 
@@ -884,7 +904,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           }));
 
           // Pass results to callback so acknowledge can use them immediately
-          onAwaitingAcknowledgement?.(ackExecutedTools, results);
+          onAwaitingAcknowledgement?.(
+            ackExecutedTools,
+            results,
+            result.messages,
+            currentStep
+          );
           return;
         }
 

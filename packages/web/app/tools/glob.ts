@@ -172,15 +172,8 @@ async function findMatchingFiles(
         await findMatchingFiles(fs, fullPath, relativeTo, pattern, matches);
       } else if (entry.isFile()) {
         if (matchesGlob(relativePath, pattern)) {
-          // Try to get modification time
-          let mtime = 0;
-          try {
-            const stat = await fs.stat(fullPath);
-            mtime = stat.mtimeMs || Date.now();
-          } catch {
-            mtime = 0;
-          }
-          matches.push({ path: relativePath, mtime });
+          // WebContainer doesn't have stat, so we can't get mtime
+          matches.push({ path: relativePath, mtime: Date.now() });
         }
       }
     }
@@ -233,14 +226,10 @@ export const GlobTool = Tool.define<
     const relativePath = normalizePath(params.path || ".");
     const title = relativePath || ".";
 
-    // Verify directory exists
+    // Verify directory exists (WebContainer doesn't have stat, so we use readdir)
     try {
-      const stat = await (webcontainer.fs as any).stat(searchPath);
-      if (!stat.isDirectory()) {
-        throw new Error(`Not a directory: ${params.path || "."}`);
-      }
-    } catch (e) {
-      if ((e as Error).message.includes("Not a directory")) throw e;
+      await webcontainer.fs.readdir(searchPath);
+    } catch {
       throw new Error(`Directory not found: ${params.path || "."}`);
     }
 

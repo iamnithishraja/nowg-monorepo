@@ -539,15 +539,14 @@ export const LspTool = Tool.define<
     const relativePath = normalizePath(params.filePath);
     const title = `${params.operation} ${relativePath}${params.line ? `:${params.line}` : ""}${params.character ? `:${params.character}` : ""}`;
 
-    // Check if file exists
+    // Check if path is a directory (WebContainer doesn't have stat, so we try readdir)
     try {
-      const stat = await (webcontainer.fs as any).stat(fullPath);
-      if (stat.isDirectory()) {
-        throw new Error(`Cannot analyze directory: ${params.filePath}`);
-      }
+      await webcontainer.fs.readdir(fullPath);
+      // If readdir succeeds, it's a directory
+      throw new Error(`Cannot analyze directory: ${params.filePath}`);
     } catch (e) {
       if ((e as Error).message.includes("Cannot analyze")) throw e;
-      throw new Error(`File not found: ${params.filePath}`);
+      // Not a directory, continue - file existence will be checked when reading
     }
 
     // Read file content

@@ -280,18 +280,8 @@ export async function action({ request }: ActionFunctionArgs) {
               // Based on the error: "expected object, received string" at path ["content",0,"output"]
               // Try wrapping in an object - different SDKs use different property names
               const toolMessage: CoreMessage = {
-                role: "tool",
-                content: [
-                  {
-                    type: "tool-result",
-                    toolCallId: tr.toolCallId,
-                    toolName: tr.toolName,
-                    // Wrap string result in an object - try { result: string } format
-                    output: {
-                      result: toolResultContent,
-                    } as any,
-                  } as any,
-                ],
+                role: "user",
+                content: `Tool ${tr.toolName} result:\n\n${toolResultContent}`,
               };
               console.log("[Agent API] Tool message structure:", JSON.stringify({
                 role: toolMessage.role,

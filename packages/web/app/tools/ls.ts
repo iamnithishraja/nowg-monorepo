@@ -254,14 +254,11 @@ export const ListTool = Tool.define<
     const relativePath = normalizePath(params.path || ".");
     const title = relativePath || ".";
 
-    // Verify directory exists
+    // Verify directory exists by trying to read it
+    // WebContainer doesn't have stat(), so we use readdir to check if it's a valid directory
     try {
-      const stat = await (webcontainer.fs as any).stat(searchPath);
-      if (!stat.isDirectory()) {
-        throw new Error(`Not a directory: ${params.path || "."}`);
-      }
-    } catch (e) {
-      if ((e as Error).message.includes("Not a directory")) throw e;
+      await webcontainer.fs.readdir(searchPath);
+    } catch {
       throw new Error(`Directory not found: ${params.path || "."}`);
     }
 
