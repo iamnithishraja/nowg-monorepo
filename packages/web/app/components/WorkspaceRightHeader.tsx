@@ -538,21 +538,21 @@ export function WorkspaceRightHeader({
                     <SupabaseIcon className="w-4 h-4" />
                     Deploy to Supabase
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/[0.08]" />
-                  <DropdownMenuItem
-                    onClick={handleOpenGitHubDialog}
-                    className="gap-2 cursor-pointer"
-                    disabled={!conversationId}
-                  >
-                    <GithubLogo className="w-4 h-4" />
-                    {hasRepository
-                      ? isSynced
-                        ? "Repository Synced"
-                        : "Sync Changes"
-                      : "Create Repository"}
-                  </DropdownMenuItem>
                 </>
               )}
+              <DropdownMenuSeparator className="bg-white/[0.08]" />
+              <DropdownMenuItem
+                onClick={handleOpenGitHubDialog}
+                className="gap-2 cursor-pointer"
+                disabled={!conversationId}
+              >
+                <GithubLogo className="w-4 h-4" />
+                {hasRepository
+                  ? isSynced
+                    ? "Repository Synced"
+                    : "Sync Changes"
+                  : "Create Repository"}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
