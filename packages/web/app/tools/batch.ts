@@ -165,32 +165,35 @@ export const BatchTool = Tool.define<
     const successfulCalls = results.filter((r) => r.success).length;
     const failedCalls = results.length - successfulCalls;
 
-    // Build output message
+    // Build output message - MUST include actual tool outputs for LLM to use them
     const outputLines: string[] = [];
 
+    // Summary line
     if (failedCalls > 0) {
       outputLines.push(
         `Executed ${successfulCalls}/${results.length} tools successfully. ${failedCalls} failed.`
       );
-      outputLines.push("");
-
-      // Show failures
-      const failures = results.filter((r) => !r.success);
-      outputLines.push("Failed calls:");
-      for (const failure of failures) {
-        outputLines.push(`  - ${failure.tool}: ${failure.error}`);
-      }
     } else {
       outputLines.push(`All ${successfulCalls} tools executed successfully.`);
     }
-
-    // Show execution times
     outputLines.push("");
-    outputLines.push("Execution times:");
-    for (const result of results) {
-      const status = result.success ? "✓" : "✗";
-      outputLines.push(`  ${status} ${result.tool}: ${result.duration}ms`);
+
+    // Include actual tool outputs - this is CRITICAL for the LLM to see results
+    outputLines.push("=== Tool Results ===");
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      outputLines.push("");
+      outputLines.push(`--- ${result.tool} (${i + 1}/${results.length}) ---`);
+      
+      if (result.success && result.result) {
+        // Include the actual output from the tool
+        outputLines.push(result.result.output);
+      } else {
+        outputLines.push(`Error: ${result.error || "Unknown error"}`);
+      }
     }
+    outputLines.push("");
+    outputLines.push("=== End Tool Results ===");
 
     // Collect all attachments from successful calls
     const attachments = results

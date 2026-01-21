@@ -185,19 +185,24 @@ export const MultiEditTool = Tool.define<
     let currentContent = "";
     let created = false;
 
-    // Check if file exists and read its content
+    // Check if path is a directory (WebContainer doesn't have stat, so we try readdir)
     try {
-      const stat = await (webcontainer.fs as any).stat(fullPath);
-      if (stat.isDirectory()) {
-        throw new Error(`Cannot edit directory: ${params.filePath}`);
-      }
-      const bytes = await webcontainer.fs.readFile(fullPath);
-      contentOriginal = new TextDecoder().decode(bytes);
-      currentContent = contentOriginal;
+      await webcontainer.fs.readdir(fullPath);
+      // If readdir succeeds, it's a directory
+      throw new Error(`Cannot edit directory: ${params.filePath}`);
     } catch (e) {
       if ((e as Error).message.includes("Cannot edit directory")) {
         throw e;
       }
+      // Not a directory, continue
+    }
+
+    // Try to read existing content
+    try {
+      const bytes = await webcontainer.fs.readFile(fullPath);
+      contentOriginal = new TextDecoder().decode(bytes);
+      currentContent = contentOriginal;
+    } catch {
       // File doesn't exist - check if first edit is creating it
       if (params.edits[0].oldString !== "") {
         throw new Error(`File not found: ${params.filePath}`);
@@ -264,8 +269,21 @@ export const MultiEditTool = Tool.define<
 
         prevContent = currentContent;
       } catch (error) {
+        // Provide detailed error context for debugging
+        const oldStringPreview = edit.oldString.substring(0, 100).replace(/\n/g, "\\n");
+        const contentPreview = currentContent.substring(0, 200).replace(/\n/g, "\\n");
+        const errorMsg = (error as Error).message;
+        
+        // Check if the error is already detailed (from edit.ts replace function)
+        if (errorMsg.includes("Hint:")) {
+          throw new Error(`Edit ${i + 1} failed: ${errorMsg}`);
+        }
+        
         throw new Error(
-          `Edit ${i + 1} failed: ${(error as Error).message}`
+          `Edit ${i + 1} failed: ${errorMsg}. ` +
+          `oldString preview: "${oldStringPreview}...". ` +
+          `Current content starts with: "${contentPreview}...". ` +
+          `This may happen if a previous edit changed content that this edit depends on.`
         );
       }
     }
