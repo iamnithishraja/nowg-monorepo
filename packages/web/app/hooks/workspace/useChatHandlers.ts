@@ -262,6 +262,70 @@ export function useChatHandlers({
                             chat.setCurrentToolCalls([...allToolCalls.filter(tc => currentToolCalls.some(ctc => ctc.id === tc.id))]);
                           }
 
+                          // If this is a file-writing tool (edit, write, multiedit), update UI files state
+                          if (["edit", "write", "multiedit"].includes(toolCall.name)) {
+                            try {
+                              const { WebContainerProvider } = await import("../../tools/webcontainer-provider");
+                              const { WORK_DIR } = await import("../../utils/constants");
+                              const container = WebContainerProvider.getInstance().getContainerSync();
+                              if (container) {
+                                // Handle multiedit (can modify multiple files)
+                                if (toolCall.name === "multiedit") {
+                                  const filePath = toolCall.args?.filePath;
+                                  if (filePath) {
+                                    try {
+                                      // Normalize path for WebContainer
+                                      let normalizedPath = filePath;
+                                      if (!normalizedPath.startsWith("/")) {
+                                        normalizedPath = `/${normalizedPath}`;
+                                      }
+                                      if (!normalizedPath.startsWith(WORK_DIR)) {
+                                        normalizedPath = `${WORK_DIR}${normalizedPath.startsWith("/") ? "" : "/"}${normalizedPath}`;
+                                      }
+                                      
+                                      // Read the updated file from WebContainer
+                                      const bytes = await container.fs.readFile(normalizedPath);
+                                      const content = new TextDecoder().decode(bytes);
+                                      
+                                      // Update UI files state
+                                      files.updateFileInState(filePath, content, isMountedRef);
+                                      console.log("[ChatHandler] Updated UI files state for multiedit:", filePath);
+                                    } catch (readError) {
+                                      console.warn("[ChatHandler] Could not read file to update UI state:", filePath, readError);
+                                    }
+                                  }
+                                } else {
+                                  // Handle edit and write (single file)
+                                  const filePath = toolCall.args?.filePath || toolCall.args?.path;
+                                  if (filePath) {
+                                    try {
+                                      // Normalize path for WebContainer (same as tools do)
+                                      let normalizedPath = filePath;
+                                      if (!normalizedPath.startsWith("/")) {
+                                        normalizedPath = `/${normalizedPath}`;
+                                      }
+                                      if (!normalizedPath.startsWith(WORK_DIR)) {
+                                        normalizedPath = `${WORK_DIR}${normalizedPath.startsWith("/") ? "" : "/"}${normalizedPath}`;
+                                      }
+                                      
+                                      // Read the updated file from WebContainer
+                                      const bytes = await container.fs.readFile(normalizedPath);
+                                      const content = new TextDecoder().decode(bytes);
+                                      
+                                      // Update UI files state (use original filePath, not normalized)
+                                      files.updateFileInState(filePath, content, isMountedRef);
+                                      console.log("[ChatHandler] Updated UI files state for:", toolCall.name, filePath);
+                                    } catch (readError) {
+                                      console.warn("[ChatHandler] Could not read file to update UI state:", filePath, readError);
+                                    }
+                                  }
+                                }
+                              }
+                            } catch (updateError) {
+                              console.warn("[ChatHandler] Failed to update UI files state:", updateError);
+                            }
+                          }
+
                           // Tool.Result has { title, output, metadata }
                           const output = result && typeof result === 'object' && 'output' in result 
                             ? result.output 
