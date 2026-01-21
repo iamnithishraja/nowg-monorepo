@@ -570,13 +570,27 @@ export class ChatService {
         .lean();
 
       if (!chat) {
+        // Chat doesn't exist, return empty array
+        console.log(`[ChatService] Chat ${chatId} not found, returning empty array`);
         return [];
       }
 
-      const messages = ((chat as any).messages || []) as any[];
+      // Ensure messages is an array (defensive check)
+      const messages = Array.isArray((chat as any).messages) 
+        ? ((chat as any).messages || []) 
+        : [];
+
+      // Filter out any null/undefined messages that might have been populated incorrectly
+      const validMessages = messages.filter((msg: any) => msg && msg._id);
+
+      // If chat has no messages, return empty array (don't fall back to conversation messages)
+      if (validMessages.length === 0) {
+        console.log(`[ChatService] Chat ${chatId} has no messages, returning empty array`);
+        return [];
+      }
 
       // Sort messages by timestamp
-      const sortedMessages = messages.sort(
+      const sortedMessages = validMessages.sort(
         (a: any, b: any) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );

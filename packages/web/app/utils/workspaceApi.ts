@@ -29,7 +29,7 @@ export const loadConversation = async (
   let url = `/api/conversations?conversationId=${conversationId}`;
   
   // If chatId is provided, load messages for that specific chat
-  if (chatId !== null && chatId !== undefined) {
+  if (chatId !== null && chatId !== undefined && chatId !== "null" && chatId !== "undefined") {
     const response = await fetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -45,9 +45,12 @@ export const loadConversation = async (
     }
 
     const data = await response.json();
+    // Ensure we always return an array - empty chats should show empty, not fall back to conversation messages
+    const chatMessages = Array.isArray(data.messages) ? data.messages : [];
+    
     return {
       conversation: { id: conversationId }, // Minimal conversation data
-      messages: data.messages || [],
+      messages: chatMessages, // Always return chat messages, even if empty
     };
   }
 

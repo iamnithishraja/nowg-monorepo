@@ -640,6 +640,7 @@ export function useWorkspaceInit({
   const initialSendRef = useRef(false);
   const isInitializingRef = useRef(false);
   const lastConversationIdRef = useRef<string | null>(null);
+  const lastChatIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const initializeWorkspace = async () => {
@@ -654,6 +655,10 @@ export function useWorkspaceInit({
           urlConversationId !== null &&
           previousConversationId === urlConversationId;
 
+        // Get current chatId
+        const currentChatId = searchParams?.get("chatId") || null;
+        const isChatChange = lastChatIdRef.current !== currentChatId && isSameConversation;
+
         // Reset initialization flag if conversation changed
         if (previousConversationId !== urlConversationId) {
           isInitializingRef.current = false;
@@ -662,9 +667,10 @@ export function useWorkspaceInit({
         // Update BOTH the ref (for component-level) and module-level variable
         lastConversationIdRef.current = urlConversationId;
         lastActiveConversationId = urlConversationId;
+        lastChatIdRef.current = currentChatId;
 
-        // Prevent multiple initializations for the same conversation
-        if (isInitializingRef.current) {
+        // Prevent multiple initializations for the same conversation (unless chat changed)
+        if (isInitializingRef.current && !isChatChange) {
           return;
         }
 
@@ -775,7 +781,12 @@ export function useWorkspaceInit({
               const data = await loadConversation(urlConversationId, chatId);
               setSelectedModel(data.conversation?.model || selectedModel);
               setConversationTitle(data.conversation?.title || conversationTitle);
-              const uiMessages = convertToUIMessages(data.messages || []);
+              
+              // Ensure messages is always an array - empty chats should show empty, not conversation messages
+              const messages = Array.isArray(data.messages) ? data.messages : [];
+              const uiMessages = convertToUIMessages(messages);
+              
+              // Always set messages, even if empty (this ensures empty chats show empty, not cached messages)
               chat.setMessages(uiMessages);
 
               // Skip file restoration if returning to same conversation with WebContainer still running
@@ -884,7 +895,42 @@ export function useWorkspaceInit({
     };
 
     initializeWorkspace();
-  }, [urlConversationId, initialPrompt]);
+  }, [urlConversationId, initialPrompt, searchParams?.get("chatId")]);
+
+  // Separate effect to reload messages when chatId changes (but conversation stays the same)
+  useEffect(() => {
+    // Only reload if conversationId exists and we're not handling initial prompt
+    if (!urlConversationId || initialPrompt) return;
+    
+    const chatId = searchParams?.get("chatId") || null;
+    
+    // Skip if this is the initial load (handled by main effect)
+    // Only reload if chatId actually changed
+    if (lastChatIdRef.current === chatId) return;
+    
+    const reloadChatMessages = async () => {
+      try {
+        // Clear messages first to prevent showing old messages
+        chat.setMessages([]);
+        
+        const data = await loadConversation(urlConversationId, chatId);
+        
+        // Ensure messages is always an array - empty chats should show empty
+        const messages = Array.isArray(data.messages) ? data.messages : [];
+        const uiMessages = convertToUIMessages(messages);
+        
+        // Always set messages, even if empty (this ensures empty chats show empty)
+        chat.setMessages(uiMessages);
+        
+        // Update the ref to track current chatId
+        lastChatIdRef.current = chatId;
+      } catch (error) {
+        console.error("Failed to reload chat messages:", error);
+      }
+    };
+
+    reloadChatMessages();
+  }, [searchParams?.get("chatId"), urlConversationId, initialPrompt, loadConversation, convertToUIMessages, chat]); // Watch chatId changes
 
   return null;
 }

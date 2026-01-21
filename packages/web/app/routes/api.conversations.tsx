@@ -824,7 +824,12 @@ export async function action({ request }: ActionFunctionArgs) {
             requestBody.chatId,
             userId
           );
-          return new Response(JSON.stringify({ success: true, messages }), {
+          
+          // Ensure we always return an array, even if chat has no messages
+          // Never fall back to conversation messages - empty chats should show empty
+          const chatMessages = Array.isArray(messages) ? messages : [];
+          
+          return new Response(JSON.stringify({ success: true, messages: chatMessages }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
