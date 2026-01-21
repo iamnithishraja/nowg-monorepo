@@ -311,41 +311,91 @@ export const IndentationFlexibleReplacer: Replacer = function* (content, find) {
   }
 };
 
-export const EscapeNormalizedReplacer: Replacer = function* (content, find) {
-  const unescapeString = (str: string): string => {
-    return str.replace(
-      /\\(n|t|r|'|"|`|\\|\n|\$)/g,
-      (match, capturedChar) => {
-        switch (capturedChar) {
-          case "n":
-            return "\n";
-          case "t":
-            return "\t";
-          case "r":
-            return "\r";
-          case "'":
-            return "'";
-          case '"':
-            return '"';
-          case "`":
-            return "`";
-          case "\\":
-            return "\\";
-          case "\n":
-            return "\n";
-          case "$":
-            return "$";
-          default:
-            return match;
-        }
+/**
+ * Unescape common escape sequences in a string
+ */
+function unescapeString(str: string): string {
+  return str.replace(
+    /\\(n|t|r|'|"|`|\\|\n|\$|\/)/g,
+    (match, capturedChar) => {
+      switch (capturedChar) {
+        case "n":
+          return "\n";
+        case "t":
+          return "\t";
+        case "r":
+          return "\r";
+        case "'":
+          return "'";
+        case '"':
+          return '"';
+        case "`":
+          return "`";
+        case "\\":
+          return "\\";
+        case "\n":
+          return "\n";
+        case "$":
+          return "$";
+        case "/":
+          return "/";
+        default:
+          return match;
       }
-    );
-  };
+    }
+  );
+}
 
+/**
+ * Escape special characters to their escape sequences
+ */
+function escapeString(str: string): string {
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/\t/g, "\\t")
+    .replace(/\r/g, "\\r")
+    .replace(/"/g, '\\"')
+    .replace(/'/g, "\\'");
+}
+
+/**
+ * Normalize a string by removing common escape sequence variations
+ * This helps match strings that differ only in how they're escaped
+ */
+function normalizeEscapes(str: string): string {
+  return str
+    // Normalize escaped slashes
+    .replace(/\\\//g, "/")
+    // Normalize double-escaped backslashes
+    .replace(/\\\\/g, "\\")
+    // Normalize escaped quotes
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    // Normalize escaped newlines (literal \n as two chars) to actual newline
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t")
+    .replace(/\\r/g, "\r");
+}
+
+export const EscapeNormalizedReplacer: Replacer = function* (content, find) {
   const unescapedFind = unescapeString(find);
 
+  // Try direct match with unescaped find
   if (content.includes(unescapedFind)) {
     yield unescapedFind;
+  }
+
+  // Try matching with normalized escapes
+  const normalizedFind = normalizeEscapes(find);
+  if (normalizedFind !== find && content.includes(normalizedFind)) {
+    yield normalizedFind;
+  }
+
+  // Try the reverse - maybe the LLM sent actual chars but file has escaped
+  const escapedFind = escapeString(find);
+  if (escapedFind !== find && content.includes(escapedFind)) {
+    yield escapedFind;
   }
 
   const lines = content.split("\n");
@@ -357,6 +407,17 @@ export const EscapeNormalizedReplacer: Replacer = function* (content, find) {
 
     if (unescapedBlock === unescapedFind) {
       yield block;
+    }
+  }
+
+  // Also try with normalized escapes on multi-line blocks
+  if (normalizedFind !== find) {
+    const normalizedFindLines = normalizedFind.split("\n");
+    for (let i = 0; i <= lines.length - normalizedFindLines.length; i++) {
+      const block = lines.slice(i, i + normalizedFindLines.length).join("\n");
+      if (block === normalizedFind) {
+        yield block;
+      }
     }
   }
 };
@@ -450,6 +511,337 @@ export const ContextAwareReplacer: Replacer = function* (content, find) {
 };
 
 /**
+ * JSONEscapeReplacer - handles escape sequences that come from JSON parsing
+ * 
+ * When the LLM generates a tool call, the oldString goes through JSON parsing.
+ * Sometimes the LLM double-escapes things or uses different escape formats.
+ * This replacer tries multiple interpretations of the escape sequences.
+ */
+export const JSONEscapeReplacer: Replacer = function* (content, find) {
+  // Check for potential JSON escape issues
+  
+  // Case 1: LLM sent \\n (literal backslash-n) but meant \n (newline)
+  if (find.includes("\\n") || find.includes("\\t") || find.includes("\\r")) {
+    const interpreted = find
+      .replace(/\\n/g, "\n")
+      .replace(/\\t/g, "\t")
+      .replace(/\\r/g, "\r");
+    
+    if (interpreted !== find && content.includes(interpreted)) {
+      yield interpreted;
+    }
+  }
+  
+  // Case 2: LLM sent actual newlines but file has \n literals (rare but possible)
+  if (find.includes("\n") || find.includes("\t")) {
+    const escaped = find
+      .replace(/\n/g, "\\n")
+      .replace(/\t/g, "\\t")
+      .replace(/\r/g, "\\r");
+    
+    if (escaped !== find && content.includes(escaped)) {
+      yield escaped;
+    }
+  }
+  
+  // Case 3: Handle escaped quotes - LLM might send \" but file has "
+  if (find.includes('\\"') || find.includes("\\'")) {
+    const unquoted = find
+      .replace(/\\"/g, '"')
+      .replace(/\\'/g, "'");
+    
+    if (unquoted !== find && content.includes(unquoted)) {
+      yield unquoted;
+    }
+  }
+  
+  // Case 4: Handle escaped slashes - LLM might send \/ but file has /
+  if (find.includes("\\/")) {
+    const unslashed = find.replace(/\\\//g, "/");
+    if (unslashed !== find && content.includes(unslashed)) {
+      yield unslashed;
+    }
+  }
+  
+  // Case 5: Handle double-escaped backslashes - \\\\ becomes \\
+  if (find.includes("\\\\")) {
+    const singleSlash = find.replace(/\\\\/g, "\\");
+    if (singleSlash !== find && content.includes(singleSlash)) {
+      yield singleSlash;
+    }
+  }
+  
+  // Case 6: Try full JSON unescape - parse as if it were a JSON string
+  try {
+    // Wrap in quotes and parse as JSON to get fully unescaped string
+    const jsonUnescaped = JSON.parse(`"${find.replace(/"/g, '\\"')}"`);
+    if (jsonUnescaped !== find && content.includes(jsonUnescaped)) {
+      yield jsonUnescaped;
+    }
+  } catch {
+    // JSON parse failed, skip this variant
+  }
+  
+  // Multi-line variants
+  const contentLines = content.split("\n");
+  const findLines = find.split("\n");
+  
+  if (findLines.length > 1) {
+    // Try matching each line with escape normalization
+    for (let i = 0; i <= contentLines.length - findLines.length; i++) {
+      let allMatch = true;
+      
+      for (let j = 0; j < findLines.length; j++) {
+        const contentLine = contentLines[i + j];
+        const findLine = findLines[j];
+        
+        // Try various normalizations
+        const normalizedFind = normalizeEscapes(findLine);
+        if (contentLine !== findLine && contentLine !== normalizedFind) {
+          allMatch = false;
+          break;
+        }
+      }
+      
+      if (allMatch) {
+        yield contentLines.slice(i, i + findLines.length).join("\n");
+      }
+    }
+  }
+};
+
+/**
+ * LineNumberStrippingReplacer - handles cases where LLM accidentally includes
+ * line number prefixes from the Read tool output (format: "00001| content")
+ * 
+ * This replacer strips line number prefixes from the search string and tries
+ * to match against the actual file content.
+ */
+export const LineNumberStrippingReplacer: Replacer = function* (content, find) {
+  // Pattern for line number prefix: optional spaces, 1-6 digits, pipe, optional space
+  const lineNumberPattern = /^\s*\d{1,6}\|\s?/;
+  
+  const findLines = find.split("\n");
+  let hasLineNumbers = false;
+  
+  // Check if any lines have line number prefixes
+  for (const line of findLines) {
+    if (lineNumberPattern.test(line)) {
+      hasLineNumbers = true;
+      break;
+    }
+  }
+  
+  if (!hasLineNumbers) {
+    return;
+  }
+  
+  // Strip line numbers from all lines
+  const strippedLines = findLines.map(line => line.replace(lineNumberPattern, ""));
+  const strippedFind = strippedLines.join("\n");
+  
+  // Try exact match with stripped content
+  if (content.includes(strippedFind)) {
+    yield strippedFind;
+  }
+  
+  // Also try line-by-line matching for multi-line blocks
+  if (strippedLines.length > 1) {
+    const contentLines = content.split("\n");
+    
+    for (let i = 0; i <= contentLines.length - strippedLines.length; i++) {
+      let matches = true;
+      
+      for (let j = 0; j < strippedLines.length; j++) {
+        if (contentLines[i + j] !== strippedLines[j]) {
+          matches = false;
+          break;
+        }
+      }
+      
+      if (matches) {
+        yield contentLines.slice(i, i + strippedLines.length).join("\n");
+      }
+    }
+  }
+};
+
+/**
+ * FuzzyLineReplacer - for cases where the LLM's oldString is close but not exact
+ * Uses similarity scoring to find the best matching block in the file
+ */
+export const FuzzyLineReplacer: Replacer = function* (content, find) {
+  const findLines = find.split("\n").filter(l => l.trim().length > 0);
+  if (findLines.length < 2) {
+    return;
+  }
+  
+  const contentLines = content.split("\n");
+  const SIMILARITY_THRESHOLD = 0.85; // Require 85% similarity
+  
+  // Helper to calculate line similarity
+  const lineSimilarity = (a: string, b: string): number => {
+    const aTrim = a.trim();
+    const bTrim = b.trim();
+    if (aTrim === bTrim) return 1.0;
+    if (aTrim.length === 0 || bTrim.length === 0) return 0;
+    
+    const maxLen = Math.max(aTrim.length, bTrim.length);
+    const distance = levenshtein(aTrim, bTrim);
+    return 1 - distance / maxLen;
+  };
+  
+  let bestMatch: { start: number; end: number; score: number } | null = null;
+  
+  // Slide a window over content lines
+  for (let i = 0; i <= contentLines.length - findLines.length; i++) {
+    let totalScore = 0;
+    let validLines = 0;
+    
+    for (let j = 0; j < findLines.length; j++) {
+      const findLine = findLines[j].trim();
+      const contentLine = contentLines[i + j].trim();
+      
+      // Skip empty lines in scoring
+      if (findLine.length === 0 && contentLine.length === 0) {
+        continue;
+      }
+      
+      validLines++;
+      totalScore += lineSimilarity(findLine, contentLine);
+    }
+    
+    if (validLines === 0) continue;
+    
+    const avgScore = totalScore / validLines;
+    
+    if (avgScore >= SIMILARITY_THRESHOLD) {
+      if (!bestMatch || avgScore > bestMatch.score) {
+        bestMatch = { start: i, end: i + findLines.length, score: avgScore };
+      }
+    }
+  }
+  
+  if (bestMatch && bestMatch.score >= SIMILARITY_THRESHOLD) {
+    yield contentLines.slice(bestMatch.start, bestMatch.end).join("\n");
+  }
+};
+
+/**
+ * WhitespaceAgnosticBlockReplacer - matches blocks ignoring all whitespace differences
+ * 
+ * This is for cases where the LLM's oldString differs only in indentation or
+ * whitespace from the actual file content. It compares trimmed lines and
+ * returns the actual file content with original whitespace preserved.
+ */
+export const WhitespaceAgnosticBlockReplacer: Replacer = function* (content, find) {
+  const findLines = find.split("\n");
+  const contentLines = content.split("\n");
+  
+  // Need at least 2 lines to be a meaningful block
+  if (findLines.length < 2) {
+    return;
+  }
+  
+  // Get trimmed versions for comparison
+  const findLinesTrimmed = findLines.map(l => l.trim());
+  
+  // Remove empty lines from start and end of find for matching
+  let findStart = 0;
+  let findEnd = findLinesTrimmed.length;
+  while (findStart < findEnd && findLinesTrimmed[findStart] === "") findStart++;
+  while (findEnd > findStart && findLinesTrimmed[findEnd - 1] === "") findEnd--;
+  
+  const effectiveFindLines = findLinesTrimmed.slice(findStart, findEnd);
+  if (effectiveFindLines.length < 1) return;
+  
+  // Search for matching blocks in content
+  for (let i = 0; i <= contentLines.length - effectiveFindLines.length; i++) {
+    let matches = true;
+    let matchEndOffset = 0;
+    
+    // Try to match each find line to content lines
+    for (let j = 0; j < effectiveFindLines.length; j++) {
+      const findTrimmed = effectiveFindLines[j];
+      const contentTrimmed = contentLines[i + j]?.trim() || "";
+      
+      // Compare trimmed content - ignore empty lines in find if they don't match
+      if (findTrimmed === "") {
+        // Empty line in find - skip if content line is also empty or whitespace-only
+        if (contentTrimmed !== "") {
+          // If find has an empty line but content doesn't, try skipping
+          // This handles cases where LLM added/removed blank lines
+          matches = false;
+          break;
+        }
+      } else if (findTrimmed !== contentTrimmed) {
+        matches = false;
+        break;
+      }
+      matchEndOffset = j;
+    }
+    
+    if (matches) {
+      // Found a match - yield the original content with preserved whitespace
+      yield contentLines.slice(i, i + matchEndOffset + 1).join("\n");
+    }
+  }
+  
+  // Also try a more lenient match that ignores all internal whitespace
+  const normalizeAllWhitespace = (s: string) => s.replace(/\s+/g, ' ').trim();
+  const findNormalized = normalizeAllWhitespace(find);
+  
+  // Try matching larger blocks with normalized whitespace
+  for (let windowSize = findLines.length + 2; windowSize >= Math.max(2, findLines.length - 2); windowSize--) {
+    for (let i = 0; i <= contentLines.length - windowSize; i++) {
+      const block = contentLines.slice(i, i + windowSize).join("\n");
+      const blockNormalized = normalizeAllWhitespace(block);
+      
+      if (blockNormalized === findNormalized) {
+        yield block;
+      }
+    }
+  }
+};
+
+/**
+ * IndentationAgnosticReplacer - matches content ignoring indentation level
+ * 
+ * Compares content after removing leading whitespace from each line,
+ * preserving the original content's indentation when returning the match.
+ */
+export const IndentationAgnosticReplacer: Replacer = function* (content, find) {
+  const findLines = find.split("\n");
+  const contentLines = content.split("\n");
+  
+  if (findLines.length < 1) return;
+  
+  // Get the content of each line without leading whitespace
+  const getLineContent = (line: string) => line.trimStart();
+  
+  const findContents = findLines.map(getLineContent);
+  
+  // Search for matching sequence in content
+  for (let i = 0; i <= contentLines.length - findLines.length; i++) {
+    let matches = true;
+    
+    for (let j = 0; j < findLines.length; j++) {
+      const findContent = findContents[j];
+      const contentContent = getLineContent(contentLines[i + j]);
+      
+      if (findContent !== contentContent) {
+        matches = false;
+        break;
+      }
+    }
+    
+    if (matches) {
+      yield contentLines.slice(i, i + findLines.length).join("\n");
+    }
+  }
+};
+
+/**
  * Replace oldString with newString in content using various matching strategies
  */
 export function replace(
@@ -466,13 +858,18 @@ export function replace(
 
   for (const replacer of [
     SimpleReplacer,
+    JSONEscapeReplacer,              // Handle JSON/escape sequence issues early
+    LineNumberStrippingReplacer,     // Handle Read tool output line numbers
     LineTrimmedReplacer,
+    IndentationAgnosticReplacer,     // Match ignoring indentation level differences
+    WhitespaceAgnosticBlockReplacer, // Match blocks ignoring all whitespace
     BlockAnchorReplacer,
     WhitespaceNormalizedReplacer,
     IndentationFlexibleReplacer,
     EscapeNormalizedReplacer,
     TrimmedBoundaryReplacer,
     ContextAwareReplacer,
+    FuzzyLineReplacer,               // Fuzzy matching as fallback
     MultiOccurrenceReplacer,
   ]) {
     for (const search of replacer(content, oldString)) {
@@ -493,7 +890,40 @@ export function replace(
   }
 
   if (notFound) {
-    throw new Error("oldString not found in content");
+    // Generate helpful debug info
+    const oldLines = oldString.split("\n");
+    const contentLines = content.split("\n");
+    
+    // Check for common issues
+    const hasLineNumbers = oldLines.some(l => /^\s*\d{1,6}\|\s?/.test(l));
+    const firstOldLine = oldLines[0]?.trim() || "";
+    const matchingFirstLines = contentLines.filter(l => l.trim() === firstOldLine);
+    
+    let hint = "";
+    if (hasLineNumbers) {
+      hint = " Hint: oldString contains line number prefixes (e.g., '00001|'). The Read tool adds these - remove them from oldString.";
+    } else if (matchingFirstLines.length > 0 && oldLines.length > 1) {
+      hint = ` Hint: First line '${firstOldLine.substring(0, 40)}...' was found ${matchingFirstLines.length} time(s), but the full block doesn't match. Check whitespace/indentation.`;
+    } else if (firstOldLine.length > 0) {
+      // Try to find similar lines
+      const similarities = contentLines
+        .map((line, idx) => ({ 
+          idx, 
+          line: line.trim(),
+          similarity: firstOldLine.length > 0 && line.trim().length > 0
+            ? 1 - levenshtein(line.trim(), firstOldLine) / Math.max(line.trim().length, firstOldLine.length)
+            : 0
+        }))
+        .filter(s => s.similarity > 0.6)
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 2);
+      
+      if (similarities.length > 0) {
+        hint = ` Hint: Similar content found at line ${similarities[0].idx + 1}: '${similarities[0].line.substring(0, 50)}...' (${Math.round(similarities[0].similarity * 100)}% match)`;
+      }
+    }
+    
+    throw new Error(`oldString not found in content.${hint}`);
   }
   throw new Error(
     "Found multiple matches for oldString. Provide more surrounding lines in oldString to identify the correct match."

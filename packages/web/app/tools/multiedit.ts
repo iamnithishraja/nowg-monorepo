@@ -269,8 +269,21 @@ export const MultiEditTool = Tool.define<
 
         prevContent = currentContent;
       } catch (error) {
+        // Provide detailed error context for debugging
+        const oldStringPreview = edit.oldString.substring(0, 100).replace(/\n/g, "\\n");
+        const contentPreview = currentContent.substring(0, 200).replace(/\n/g, "\\n");
+        const errorMsg = (error as Error).message;
+        
+        // Check if the error is already detailed (from edit.ts replace function)
+        if (errorMsg.includes("Hint:")) {
+          throw new Error(`Edit ${i + 1} failed: ${errorMsg}`);
+        }
+        
         throw new Error(
-          `Edit ${i + 1} failed: ${(error as Error).message}`
+          `Edit ${i + 1} failed: ${errorMsg}. ` +
+          `oldString preview: "${oldStringPreview}...". ` +
+          `Current content starts with: "${contentPreview}...". ` +
+          `This may happen if a previous edit changed content that this edit depends on.`
         );
       }
     }

@@ -135,7 +135,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const {
       prompt,
       messages: inputMessages = [],
-      model = "anthropic/claude-3.5-sonnet",
+      model = "anthropic/claude-4.5-sonnet",
       agent: agentName = "build",
       files,
       fileTree,
@@ -236,17 +236,34 @@ export async function action({ request }: ActionFunctionArgs) {
           
           // Process input messages and convert to proper format
           for (const msg of inputMessages) {
-            // Skip assistant messages with tool-call content arrays (UI format)
-            // These will be reconstructed from tool results
+            // Handle assistant messages with tool calls
             if (msg.role === "assistant" && Array.isArray(msg.content)) {
               const hasToolCalls = msg.content.some((item: any) => item.type === "tool-call");
               if (hasToolCalls) {
-                // Extract text content if any, skip the tool calls (they'll be reconstructed)
+                // Extract text content and tool call info for the assistant message
                 const textItem = msg.content.find((item: any) => item.type === "text");
-                if (textItem && "text" in textItem) {
-                  messages.push({ role: "assistant", content: textItem.text });
+                const toolCallItems = msg.content.filter((item: any) => item.type === "tool-call");
+                
+                // Build a text representation of what the assistant did
+                // This helps the LLM understand the context of tool results
+                let assistantText = textItem && "text" in textItem ? textItem.text : "";
+                
+                // Add tool call information so LLM knows what tools were called
+                if (toolCallItems.length > 0) {
+                  const toolCallsDesc = toolCallItems.map((tc: any) => 
+                    `- Called tool "${tc.toolName}" (ID: ${tc.toolCallId})`
+                  ).join("\n");
+                  
+                  if (assistantText) {
+                    assistantText += "\n\n[Tool calls made:]\n" + toolCallsDesc;
+                  } else {
+                    assistantText = "[Tool calls made:]\n" + toolCallsDesc;
+                  }
                 }
-                // Don't push the tool-call version, it will be reconstructed
+                
+                if (assistantText) {
+                  messages.push({ role: "assistant", content: assistantText });
+                }
                 continue;
               }
             }
@@ -266,37 +283,37 @@ export async function action({ request }: ActionFunctionArgs) {
           // If we have tool results from client, add them to continue the loop
           if (toolResults && toolResults.length > 0) {
             console.log("[Agent API] Processing", toolResults.length, "tool results");
-            // Add tool results as individual tool messages
-            // AI SDK expects tool messages with tool-result content array format
-            // The output field must be an object, not a string
+            
+            // Build a single combined tool results message for the LLM
+            // This format works better with OpenRouter and various model providers
+            // Each tool result is clearly labeled with its tool call ID and name
+            const toolResultsParts: string[] = [];
+            
             for (const tr of toolResults) {
               const toolResultContent = tr.result.success 
                 ? tr.result.output 
                 : `Error: ${tr.result.error || "Tool execution failed"}`;
               
-              console.log("[Agent API] Creating tool message for:", tr.toolName, "| Success:", tr.result.success, "| Content length:", toolResultContent.length);
+              console.log("[Agent API] Creating tool result for:", tr.toolName, "| ID:", tr.toolCallId, "| Success:", tr.result.success, "| Content length:", toolResultContent.length);
               
-              // AI SDK expects output to be an object, not a string
-              // Based on the error: "expected object, received string" at path ["content",0,"output"]
-              // Try wrapping in an object - different SDKs use different property names
-              const toolMessage: CoreMessage = {
-                role: "user",
-                content: `Tool ${tr.toolName} result:\n\n${toolResultContent}`,
-              };
-              console.log("[Agent API] Tool message structure:", JSON.stringify({
-                role: toolMessage.role,
-                contentType: Array.isArray(toolMessage.content) ? "array" : typeof toolMessage.content,
-                contentLength: Array.isArray(toolMessage.content) ? toolMessage.content.length : 0,
-                firstContentItem: Array.isArray(toolMessage.content) && toolMessage.content[0] ? {
-                  type: (toolMessage.content[0] as any).type,
-                  toolCallId: (toolMessage.content[0] as any).toolCallId,
-                  toolName: (toolMessage.content[0] as any).toolName,
-                  outputType: typeof (toolMessage.content[0] as any).output,
-                  outputKeys: (toolMessage.content[0] as any).output ? Object.keys((toolMessage.content[0] as any).output) : [],
-                } : null,
-              }, null, 2));
-              messages.push(toolMessage);
+              // Format each tool result with clear identification
+              toolResultsParts.push(
+                `=== Tool Result: ${tr.toolName} (ID: ${tr.toolCallId}) ===\n` +
+                `Status: ${tr.result.success ? "Success" : "Error"}\n\n` +
+                toolResultContent
+              );
             }
+            
+            // Combine all tool results into a single user message
+            // This ensures the LLM sees all results together and can properly
+            // associate them with the tool calls it made
+            const combinedToolResults: CoreMessage = {
+              role: "user",
+              content: toolResultsParts.join("\n\n" + "=".repeat(50) + "\n\n"),
+            };
+            
+            console.log("[Agent API] Combined tool results message | Parts:", toolResultsParts.length, "| Total length:", (combinedToolResults.content as string).length);
+            messages.push(combinedToolResults);
           }
           
           // Add the current prompt as user message (only on first call)

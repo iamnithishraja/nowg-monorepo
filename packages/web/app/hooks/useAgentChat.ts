@@ -129,7 +129,7 @@ interface ToolResultPayload {
  */
 export function useAgentChat(options: UseAgentChatOptions = {}) {
   const {
-    model = "anthropic/claude-3.5-sonnet",
+    model = "anthropic/claude-4.5-sonnet",
     agent = "build",
     files,
     fileTree,
