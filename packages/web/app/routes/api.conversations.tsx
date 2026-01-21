@@ -455,9 +455,35 @@ export async function action({ request }: ActionFunctionArgs) {
           );
         }
 
+        // Handle message format: can be a string (legacy) or an object
+        let messageObj: any;
+        if (typeof message === "string") {
+          // Legacy format: just a string, assume it's a user message
+          messageObj = {
+            role: "user",
+            content: message,
+          };
+        } else {
+          // New format: object with role and content
+          messageObj = message;
+        }
+
+        // Validate message object
+        if (!messageObj.role || !messageObj.content) {
+          return new Response(
+            JSON.stringify({
+              error: "Message must have 'role' and 'content' fields",
+            }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
         const newMessageId = await chatService.addMessage(
           conversationId,
-          message
+          messageObj
         );
 
         return new Response(

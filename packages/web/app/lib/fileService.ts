@@ -24,13 +24,17 @@ export class FileService {
     try {
       await this.ensureConnection();
 
-      // Get conversation to retrieve userId
-      const conversation = await Conversation.findById(conversationId);
+      // Get conversation to retrieve userId and projectId
+      const conversation = await Conversation.findById(conversationId).select("userId adminProjectId");
       if (!conversation) {
         throw new Error("Conversation not found");
       }
 
       const userId = conversation.userId;
+      const projectId = conversation.adminProjectId
+        ? conversation.adminProjectId.toString()
+        : undefined;
+
       const r2Files: Array<{
         name: string;
         type: string;
@@ -62,7 +66,8 @@ export class FileService {
           conversationId,
           fileBuffer,
           file.name,
-          file.type
+          file.type,
+          projectId
         );
 
         if (uploadResult.success && uploadResult.url) {

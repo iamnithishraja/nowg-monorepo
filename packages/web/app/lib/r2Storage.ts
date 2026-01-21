@@ -3,14 +3,16 @@ import { getEnvWithDefault } from "./env";
 
 /**
  * Upload file to R2 bucket
- * Structure: users/{userId}/conversations/{conversationId}/files/{filename}
+ * Structure: users/{userId}/projects/{projectId}/conversations/{conversationId}/files/{filename}
+ * If projectId is not provided, uses: users/{userId}/conversations/{conversationId}/files/{filename}
  */
 export async function uploadFileToR2(
   userId: string,
   conversationId: string,
   fileData: Buffer,
   fileName: string,
-  contentType: string
+  contentType: string,
+  projectId?: string
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     // Get R2 configuration
@@ -29,7 +31,11 @@ export async function uploadFileToR2(
     const timestamp = Date.now();
     const randomId = crypto.randomBytes(8).toString("hex");
     const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_").substring(0, 100);
-    const objectKey = `users/${userId}/conversations/${conversationId}/files/${timestamp}-${randomId}-${sanitizedName}`;
+    
+    // Build object key with project structure if projectId is provided
+    const objectKey = projectId
+      ? `users/${userId}/projects/${projectId}/conversations/${conversationId}/files/${timestamp}-${randomId}-${sanitizedName}`
+      : `users/${userId}/conversations/${conversationId}/files/${timestamp}-${randomId}-${sanitizedName}`;
 
     // Upload to R2 using S3-compatible API
     const uploadResult = await uploadToR2({
