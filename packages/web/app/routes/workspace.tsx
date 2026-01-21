@@ -764,17 +764,39 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                             conversationId: controller.conversationId,
                           }),
                         });
-                        if (response.ok) {
-                          const data = await response.json();
+                        
+                        let data;
+                        try {
+                          data = await response.json();
+                        } catch (jsonError) {
+                          console.error("Error parsing JSON response:", jsonError);
+                          const text = await response.text();
+                          console.error("Response text:", text);
+                          alert(`Failed to create chat: Invalid response from server (${response.status})`);
+                          return;
+                        }
+                        
+                        if (!response.ok) {
+                          console.error("Error creating chat:", data.error || data.message || "Unknown error");
+                          alert(`Failed to create chat: ${data.error || data.message || `Server error (${response.status})`}`);
+                          return;
+                        }
+                        
+                        if (data.success && data.chatId) {
                           // Navigate to the new chat with chatId query parameter
                           const newSearchParams = new URLSearchParams(searchParams);
-                          newSearchParams.set("chatId", data.chatIndex);
+                          newSearchParams.set("chatId", data.chatId);
                           setSearchParams(newSearchParams);
                           // Reload to load the new chat messages
                           window.location.reload();
+                        } else {
+                          console.error("Unexpected response format:", data);
+                          alert("Failed to create chat: Invalid response format");
                         }
                       } catch (error) {
                         console.error("Error creating new chat:", error);
+                        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                        alert(`Network error: ${errorMessage}`);
                       }
                     }}
                     currentChatId={currentChatId}

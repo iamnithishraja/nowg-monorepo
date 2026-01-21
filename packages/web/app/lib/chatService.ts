@@ -1,6 +1,7 @@
 import type { Message } from "../types/chat";
 import Conversation from "../models/conversationModel";
 import Messages from "../models/messageModel";
+import Chat from "../models/chatModel";
 import { connectToDatabase } from "./mongo";
 import { ProfileService } from "./profileService";
 import { FileService } from "./fileService";
@@ -425,69 +426,107 @@ export class ChatService {
     try {
       await this.ensureConnection();
 
+      // Validate conversationId format
+      if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
+        throw new Error("Invalid conversation ID format");
+      }
+
+      // Ensure Chat model is registered
+      const ChatModel = mongoose.models.Chat || Chat;
+      if (!ChatModel) {
+        throw new Error("Chat model not available");
+      }
+
       // Verify ownership using the same logic as getConversation
       const conversation = await this.getConversation(conversationId, userId);
       if (!conversation) {
         throw new Error("Conversation not found or unauthorized");
       }
 
-      const chatTitle = title || `Chat ${(conversation.chats?.length || 0) + 1}`;
+      // Count existing chats to generate title
+      const conversationObjectId = new mongoose.Types.ObjectId(conversationId);
+      const existingChatsCount = await ChatModel.countDocuments({ 
+        conversationId: conversationObjectId 
+      });
+      const chatTitle = title || `Chat ${existingChatsCount + 1}`;
 
-      // Add new chat to conversation
-      const newChat = {
+      // Create new chat document
+      const newChat = new ChatModel({
+        conversationId: conversationObjectId,
         title: chatTitle,
         messages: [],
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-
-      await Conversation.findByIdAndUpdate(conversationId, {
-        $push: { chats: newChat },
-        $set: { updatedAt: new Date() },
       });
 
-      // Return the chat index (we'll use this to identify the chat)
-      const updatedConversation = await Conversation.findById(conversationId);
-      const chatIndex = (updatedConversation?.chats?.length || 1) - 1;
-      return chatIndex.toString();
+      const savedChat = await newChat.save();
+
+      // Add chat reference to conversation (ensure chats array exists)
+      const updateResult = await Conversation.findByIdAndUpdate(
+        conversationId,
+        {
+          $push: { chats: savedChat._id },
+          $set: { updatedAt: new Date() },
+        },
+        { new: true }
+      );
+
+      if (!updateResult) {
+        // If update failed, clean up the chat we just created
+        await ChatModel.findByIdAndDelete(savedChat._id);
+        throw new Error("Failed to update conversation with new chat");
+      }
+
+      // Return the chat ID
+      return savedChat._id.toString();
     } catch (error) {
       console.error("Error creating chat:", error);
-      throw error;
+      // Re-throw with more context if it's not already an Error
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Failed to create chat: ${String(error)}`);
     }
   }
 
   // Add message to a specific chat
   async addMessageToChat(
     conversationId: string,
-    chatIndex: number,
-    message: Omit<Message, "id">
+    chatId: string,
+    message: Omit<Message, "id">,
+    userId: string
   ): Promise<string> {
     try {
       await this.ensureConnection();
 
+      // Verify access using the same logic as getConversation
+      const conversationAccess = await this.getConversation(conversationId, userId);
+      if (!conversationAccess) {
+        throw new Error("Conversation not found or unauthorized");
+      }
+
+      // Validate chatId is a valid ObjectId
+      if (!chatId || chatId === "undefined" || chatId === "null" || !mongoose.Types.ObjectId.isValid(chatId)) {
+        throw new Error("Invalid chatId");
+      }
+
+      // Verify chat belongs to conversation
+      const chat = await Chat.findOne({
+        _id: new mongoose.Types.ObjectId(chatId),
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+      });
+
+      if (!chat) {
+        throw new Error("Chat not found or doesn't belong to conversation");
+      }
+
       // First add the message normally
       const messageId = await this.addMessage(conversationId, message);
 
-      // Then add it to the specific chat
-      const conversation = await Conversation.findById(conversationId);
-      if (!conversation) {
-        throw new Error("Conversation not found");
-      }
-
-      if (!conversation.chats || !conversation.chats[chatIndex]) {
-        throw new Error("Chat not found");
-      }
-
-      // Update the specific chat
-      const chat = conversation.chats[chatIndex];
-      chat.messages.push(messageId as any);
-      chat.updatedAt = new Date();
-
-      await Conversation.findByIdAndUpdate(conversationId, {
-        $set: {
-          [`chats.${chatIndex}`]: chat,
-          updatedAt: new Date(),
-        },
+      // Add message reference to chat
+      await Chat.findByIdAndUpdate(chatId, {
+        $push: { messages: messageId },
+        $set: { updatedAt: new Date() },
       });
 
       return messageId;
@@ -500,38 +539,41 @@ export class ChatService {
   // Get messages for a specific chat
   async getChatMessages(
     conversationId: string,
-    chatIndex: number,
+    chatId: string,
     userId: string
   ): Promise<Message[]> {
     try {
       await this.ensureConnection();
 
-      const conversation = await Conversation.findById(conversationId)
+      // Validate chatId is a valid ObjectId
+      if (!chatId || chatId === "undefined" || chatId === "null" || !mongoose.Types.ObjectId.isValid(chatId)) {
+        throw new Error("Invalid chatId");
+      }
+
+      // Verify access using the same logic as getConversation
+      const conversationAccess = await this.getConversation(conversationId, userId);
+      if (!conversationAccess) {
+        throw new Error("Conversation not found or unauthorized");
+      }
+
+      // Get chat and populate messages
+      const chat = await Chat.findOne({
+        _id: new mongoose.Types.ObjectId(chatId),
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+      })
         .populate({
-          path: "chats",
+          path: "messages",
           populate: {
-            path: "messages",
-            populate: {
-              path: "r2Files",
-            },
+            path: "r2Files",
           },
         })
         .lean();
 
-      if (!conversation) {
-        throw new Error("Conversation not found");
-      }
-
-      if (conversation.userId !== userId) {
-        throw new Error("Unauthorized");
-      }
-
-      if (!conversation.chats || !conversation.chats[chatIndex]) {
+      if (!chat) {
         return [];
       }
 
-      const chat = conversation.chats[chatIndex] as any;
-      const messages = chat.messages || [];
+      const messages = ((chat as any).messages || []) as any[];
 
       // Sort messages by timestamp
       const sortedMessages = messages.sort(
@@ -565,23 +607,25 @@ export class ChatService {
   async getConversationChats(
     conversationId: string,
     userId: string
-  ): Promise<Array<{ id: number; title: string; messageCount: number; createdAt: Date; updatedAt: Date }>> {
+  ): Promise<Array<{ id: string; title: string; messageCount: number; createdAt: Date; updatedAt: Date }>> {
     try {
       await this.ensureConnection();
 
-      const conversation = await Conversation.findById(conversationId).lean();
-
-      if (!conversation) {
-        throw new Error("Conversation not found");
+      // Verify access using the same logic as getConversation
+      const conversationAccess = await this.getConversation(conversationId, userId);
+      if (!conversationAccess) {
+        throw new Error("Conversation not found or unauthorized");
       }
 
-      if (conversation.userId !== userId) {
-        throw new Error("Unauthorized");
-      }
+      // Get all chats for this conversation
+      const chats = await Chat.find({ 
+        conversationId: new mongoose.Types.ObjectId(conversationId) 
+      })
+        .select("title messages createdAt updatedAt")
+        .lean();
 
-      const chats = conversation.chats || [];
-      return chats.map((chat: any, index: number) => ({
-        id: index,
+      return chats.map((chat: any) => ({
+        id: chat._id.toString(),
         title: chat.title,
         messageCount: chat.messages?.length || 0,
         createdAt: chat.createdAt,

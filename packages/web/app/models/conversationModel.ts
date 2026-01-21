@@ -27,28 +27,12 @@ const conversationSchema = new mongoose.Schema({
       ref: "Message",
     },
   ],
-  // Chats array structure: each chat has a title and messages
+  // Reference to chats (separate Chat model)
   // This allows organizing messages into different chat threads within a conversation
   chats: [
     {
-      title: {
-        type: String,
-        required: true,
-      },
-      messages: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Message",
-        },
-      ],
-      createdAt: {
-        type: Date,
-        default: Date.now,
-      },
-      updatedAt: {
-        type: Date,
-        default: Date.now,
-      },
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Chat",
     },
   ],
   // Track tokens from reverted messages

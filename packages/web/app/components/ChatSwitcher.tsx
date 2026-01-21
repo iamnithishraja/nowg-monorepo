@@ -8,7 +8,7 @@ import {
 } from "./ui/dropdown-menu";
 
 interface Chat {
-  id: number;
+  id: string;
   title: string;
   messageCount: number;
   createdAt: Date;
@@ -57,7 +57,7 @@ export function ChatSwitcher({
   }, [conversationId]);
 
   const currentChat = currentChatId
-    ? chats.find((c) => c.id.toString() === currentChatId)
+    ? chats.find((c) => c.id === currentChatId)
     : null;
   const currentTitle = currentChat?.title || "Main Chat";
 
@@ -106,9 +106,9 @@ export function ChatSwitcher({
             {chats.map((chat) => (
               <DropdownMenuItem
                 key={chat.id}
-                onClick={() => onChatChange(chat.id.toString())}
+                onClick={() => onChatChange(chat.id)}
                 className={`gap-2 cursor-pointer ${
-                  currentChatId === chat.id.toString() ? "bg-primary/10" : ""
+                  currentChatId === chat.id ? "bg-primary/10" : ""
                 }`}
               >
                 <MessageSquare className="w-4 h-4" />

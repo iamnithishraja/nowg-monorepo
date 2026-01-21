@@ -36,7 +36,7 @@ export const loadConversation = async (
       body: JSON.stringify({
         action: "getChatMessages",
         conversationId,
-        chatIndex: parseInt(chatId, 10),
+        chatId: chatId,
       }),
     });
 
