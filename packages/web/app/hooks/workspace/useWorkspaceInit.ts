@@ -679,6 +679,8 @@ export function useWorkspaceInit({
         // Clear any existing messages to prevent duplicates
         chat.setMessages([]);
 
+        // Only kill processes when switching to a DIFFERENT conversation
+        // When switching between chats in the same conversation, preserve WebContainer state and preview
         if (!isSameConversation) {
           // Clear terminal when switching conversations
           const { clearTerminal, setIsTerminalRunning } =
@@ -692,6 +694,10 @@ export function useWorkspaceInit({
           } catch (error) {
             // Ignore
           }
+        } else if (isChatChange) {
+          // When switching between chats in the same conversation, preserve WebContainer state
+          // Don't kill processes or clear terminal - keep the preview running
+          console.log("[useWorkspaceInit] Switching chats, preserving WebContainer state and preview");
         }
 
         if (urlConversationId) {
@@ -791,8 +797,11 @@ export function useWorkspaceInit({
 
               // If viewing a chat (chatId is present), skip file restoration
               // Chats are for conversation only, not for file operations
+              // BUT: Preserve WebContainer state and preview URL so tools can still work
               if (chatId) {
                 // Just load messages, don't restore files or clone anything
+                // But preserve the existing WebContainer and preview state
+                // This allows tools to work in chats while keeping the preview running
                 setHasHandledInitialPrompt(true);
               } else {
                 // Only restore files for main conversation (not chats)

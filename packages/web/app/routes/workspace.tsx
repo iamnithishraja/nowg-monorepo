@@ -784,11 +784,12 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                         
                         if (data.success && data.chatId) {
                           // Navigate to the new chat with chatId query parameter
+                          // Use setSearchParams instead of reload to preserve WebContainer state and preview
                           const newSearchParams = new URLSearchParams(searchParams);
                           newSearchParams.set("chatId", data.chatId);
                           setSearchParams(newSearchParams);
-                          // Reload to load the new chat messages
-                          window.location.reload();
+                          // No reload needed - React Router will handle the navigation
+                          // The useWorkspaceInit hook will detect the chatId change and load chat messages
                         } else {
                           console.error("Unexpected response format:", data);
                           alert("Failed to create chat: Invalid response format");
@@ -796,7 +797,13 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       } catch (error) {
                         console.error("Error creating new chat:", error);
                         const errorMessage = error instanceof Error ? error.message : "Unknown error";
-                        alert(`Network error: ${errorMessage}`);
+                        // Only show error if it's not a network error (network errors might be transient)
+                        if (!errorMessage.includes("network") && !errorMessage.includes("Network")) {
+                          alert(`Failed to create chat: ${errorMessage}`);
+                        } else {
+                          // For network errors, try to create chat again silently or just navigate
+                          console.warn("Network error during chat creation, but continuing...");
+                        }
                       }
                     }}
                     currentChatId={currentChatId}

@@ -204,6 +204,29 @@ export function useChatHandlers({
                     
                     console.log("[ChatHandler] Tools to execute:", allToolsToExecute.length);
                     
+                    // Ensure WebContainer is available before executing tools
+                    // WebContainer is booted when runWebContainer is called, but in chats we might not have files
+                    // So we need to ensure it's booted. We can do this by calling runWebContainer with empty files
+                    try {
+                      const { runWebContainer } = await import("../../lib/webcontainer");
+                      const { WebContainerProvider } = await import("../../tools/webcontainer-provider");
+                      
+                      // Check if WebContainer is already available
+                      let container = WebContainerProvider.getInstance().getContainerSync();
+                      if (!container) {
+                        // Boot WebContainer by running with empty files (this will boot but not write anything)
+                        console.log("[ChatHandler] Booting WebContainer for tool execution");
+                        await runWebContainer([]);
+                        // Wait a bit for container to be set
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        container = WebContainerProvider.getInstance().getContainerSync();
+                      }
+                      console.log("[ChatHandler] WebContainer available:", !!container);
+                    } catch (wcError) {
+                      console.error("[ChatHandler] Failed to ensure WebContainer:", wcError);
+                      // Continue anyway - some tools might not need WebContainer
+                    }
+                    
                     // Execute all tools
                     const toolResults = [];
                     for (const toolCall of allToolsToExecute) {
@@ -239,14 +262,22 @@ export function useChatHandlers({
                             chat.setCurrentToolCalls([...allToolCalls.filter(tc => currentToolCalls.some(ctc => ctc.id === tc.id))]);
                           }
 
+                          // Tool.Result has { title, output, metadata }
+                          const output = result && typeof result === 'object' && 'output' in result 
+                            ? result.output 
+                            : typeof result === 'string' 
+                              ? result 
+                              : JSON.stringify(result);
+                          
                           toolResults.push({
                             toolCallId: toolCall.id,
                             toolName: toolCall.name,
                             result: {
                               success: true,
-                              output: result?.output || result || "",
+                              output: output || "",
                             },
                           });
+                          console.log("[ChatHandler] Tool result prepared:", toolCall.name, "| Output length:", output?.length || 0);
                         } else {
                           console.error("[ChatHandler] Tool not found:", toolCall.name);
                         }
@@ -276,7 +307,9 @@ export function useChatHandlers({
 
                     // Continue agent loop with tool results
                     if (toolResults.length > 0 && currentStep < 10) {
-                      console.log("[ChatHandler] Continuing agent loop with", toolResults.length, "tool results");
+                      console.log("[ChatHandler] Continuing agent loop with", toolResults.length, "tool results | Step:", data.step || currentStep, "| Messages:", messagesForContinuation.length);
+                      console.log("[ChatHandler] Tool results summary:", toolResults.map(tr => ({ name: tr.toolName, success: tr.result.success, outputLength: tr.result.output?.length || 0 })));
+                      
                       const continuationResponse = await fetch("/api/agent", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -295,18 +328,23 @@ export function useChatHandlers({
                         signal: abortController.signal,
                       });
 
+                      console.log("[ChatHandler] Continuation response status:", continuationResponse.status);
                       if (!continuationResponse.ok) {
-                        throw new Error(`Agent continuation error: ${continuationResponse.status}`);
+                        const errorText = await continuationResponse.text().catch(() => "Unknown error");
+                        console.error("[ChatHandler] Continuation error:", continuationResponse.status, errorText);
+                        throw new Error(`Agent continuation error: ${continuationResponse.status} - ${errorText}`);
                       }
 
                       // Recursively process the continuation stream
+                      console.log("[ChatHandler] Processing continuation stream");
                       const continuationResult = await processAgentStream(continuationResponse, currentSessionId, (data.step || currentStep) + 1);
                       assistantText += continuationResult.text;
                       allToolCalls = [...allToolCalls, ...continuationResult.toolCalls];
+                      console.log("[ChatHandler] Continuation complete | Total text:", assistantText.length, "| Total tool calls:", allToolCalls.length);
                       return { text: assistantText, toolCalls: allToolCalls };
                     } else {
                       // No tools to execute or max steps reached - return current state
-                      console.log("[ChatHandler] No continuation needed, returning current state");
+                      console.log("[ChatHandler] No continuation needed | Tool results:", toolResults.length, "| Step:", currentStep, "| Max steps:", currentStep >= 10);
                       return { text: assistantText, toolCalls: allToolCalls };
                     }
                   } else if (data.type === "complete") {
