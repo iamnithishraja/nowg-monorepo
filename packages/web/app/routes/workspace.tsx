@@ -11,7 +11,7 @@ import { WorkspaceRightHeader } from "../components/WorkspaceRightHeader";
 import { useWorkspaceController } from "../hooks/useWorkspaceController";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useEffect, useState, useRef } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { usePreventBrowserDragDrop } from "../hooks/usePreventBrowserDragDrop";
 import { useFileHandling } from "../hooks/useFileHandling";
 import type { DesignScheme } from "../types/design-scheme";
@@ -86,6 +86,8 @@ export function meta({}: Route.MetaArgs) {
 export default function Workspace({ loaderData }: Route.ComponentProps) {
   const user = loaderData?.user;
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentChatId = searchParams.get("chatId");
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
   const [errorData, setErrorData] = useState<any>(null);
@@ -748,7 +750,44 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
               <ResizablePanel defaultSize={28} minSize={22} maxSize={40}>
                 <div className="flex flex-col h-full min-h-0 max-h-full bg-canvas py-2">
                   {/* Left Panel Header */}
-                  <WorkspaceLeftHeader chatTitle={getChatTitle()} />
+                  <WorkspaceLeftHeader 
+                    chatTitle={getChatTitle()} 
+                    conversationId={controller.conversationId || undefined}
+                    onCreateNewChat={async () => {
+                      if (!controller.conversationId) return;
+                      try {
+                        const response = await fetch("/api/conversations", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            action: "createChat",
+                            conversationId: controller.conversationId,
+                          }),
+                        });
+                        if (response.ok) {
+                          const data = await response.json();
+                          // Navigate to the new chat with chatId query parameter
+                          const newSearchParams = new URLSearchParams(searchParams);
+                          newSearchParams.set("chatId", data.chatIndex);
+                          setSearchParams(newSearchParams);
+                          // Reload to load the new chat messages
+                          window.location.reload();
+                        }
+                      } catch (error) {
+                        console.error("Error creating new chat:", error);
+                      }
+                    }}
+                    currentChatId={currentChatId}
+                    onChatChange={(chatId) => {
+                      const newSearchParams = new URLSearchParams(searchParams);
+                      if (chatId !== null) {
+                        newSearchParams.set("chatId", chatId.toString());
+                      } else {
+                        newSearchParams.delete("chatId");
+                      }
+                      setSearchParams(newSearchParams);
+                    }}
+                  />
 
                   {/* Chat Messages */}
                   <div className="flex-1 min-h-0 overflow-auto modern-scrollbar">

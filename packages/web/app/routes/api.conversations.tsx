@@ -699,6 +699,97 @@ export async function action({ request }: ActionFunctionArgs) {
           }
         );
 
+      case "createChat":
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          const chatIndex = await chatService.createChat(
+            conversationId,
+            userId,
+            requestBody.title
+          );
+          return new Response(JSON.stringify({ success: true, chatIndex }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (error: any) {
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to create chat",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+      case "getChats":
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          const chats = await chatService.getConversationChats(
+            conversationId,
+            userId
+          );
+          return new Response(JSON.stringify({ success: true, chats }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (error: any) {
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to get chats",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+      case "getChatMessages":
+        if (!conversationId || requestBody.chatIndex === undefined) {
+          return new Response(
+            JSON.stringify({
+              error: "ConversationId and chatIndex are required",
+            }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          const messages = await chatService.getChatMessages(
+            conversationId,
+            requestBody.chatIndex,
+            userId
+          );
+          return new Response(JSON.stringify({ success: true, messages }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (error: any) {
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to get chat messages",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
       default:
         return new Response(JSON.stringify({ error: "Invalid action" }), {
           status: 400,

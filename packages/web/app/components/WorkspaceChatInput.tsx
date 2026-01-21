@@ -584,6 +584,38 @@ export function WorkspaceChatInput({
 
             {/* Bottom Bar with Buttons */}
             <div className="absolute bottom-0 left-0 right-0 h-11 px-3 flex items-center gap-2">
+              {/* Model Selector - Always visible */}
+              {selectedModel && onModelChange && (
+                <Select
+                  value={selectedModel}
+                  onValueChange={(value) => {
+                    if (onModelChange) {
+                      onModelChange(value);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-auto min-w-[140px] bg-muted/50 border border-border/60 text-foreground text-xs hover:bg-muted hover:border-primary/30 transition-all">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background/80 border border-primary/30">
+                    {OPENROUTER_MODELS.map((model) => (
+                      <SelectItem
+                        key={model.id}
+                        value={model.id}
+                        className="text-foreground hover:bg-primary/20"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm">{model.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {model.provider}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              
               {/* Upload Button */}
               <Button
                 onClick={handleFileSelect}

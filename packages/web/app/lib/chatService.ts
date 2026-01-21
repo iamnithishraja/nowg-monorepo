@@ -416,6 +416,183 @@ export class ChatService {
     }
   }
 
+  // Create a new chat within a conversation
+  async createChat(
+    conversationId: string,
+    userId: string,
+    title?: string
+  ): Promise<string> {
+    try {
+      await this.ensureConnection();
+
+      // Verify ownership using the same logic as getConversation
+      const conversation = await this.getConversation(conversationId, userId);
+      if (!conversation) {
+        throw new Error("Conversation not found or unauthorized");
+      }
+
+      const chatTitle = title || `Chat ${(conversation.chats?.length || 0) + 1}`;
+
+      // Add new chat to conversation
+      const newChat = {
+        title: chatTitle,
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      await Conversation.findByIdAndUpdate(conversationId, {
+        $push: { chats: newChat },
+        $set: { updatedAt: new Date() },
+      });
+
+      // Return the chat index (we'll use this to identify the chat)
+      const updatedConversation = await Conversation.findById(conversationId);
+      const chatIndex = (updatedConversation?.chats?.length || 1) - 1;
+      return chatIndex.toString();
+    } catch (error) {
+      console.error("Error creating chat:", error);
+      throw error;
+    }
+  }
+
+  // Add message to a specific chat
+  async addMessageToChat(
+    conversationId: string,
+    chatIndex: number,
+    message: Omit<Message, "id">
+  ): Promise<string> {
+    try {
+      await this.ensureConnection();
+
+      // First add the message normally
+      const messageId = await this.addMessage(conversationId, message);
+
+      // Then add it to the specific chat
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+
+      if (!conversation.chats || !conversation.chats[chatIndex]) {
+        throw new Error("Chat not found");
+      }
+
+      // Update the specific chat
+      const chat = conversation.chats[chatIndex];
+      chat.messages.push(messageId as any);
+      chat.updatedAt = new Date();
+
+      await Conversation.findByIdAndUpdate(conversationId, {
+        $set: {
+          [`chats.${chatIndex}`]: chat,
+          updatedAt: new Date(),
+        },
+      });
+
+      return messageId;
+    } catch (error) {
+      console.error("Error adding message to chat:", error);
+      throw error;
+    }
+  }
+
+  // Get messages for a specific chat
+  async getChatMessages(
+    conversationId: string,
+    chatIndex: number,
+    userId: string
+  ): Promise<Message[]> {
+    try {
+      await this.ensureConnection();
+
+      const conversation = await Conversation.findById(conversationId)
+        .populate({
+          path: "chats",
+          populate: {
+            path: "messages",
+            populate: {
+              path: "r2Files",
+            },
+          },
+        })
+        .lean();
+
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+
+      if (conversation.userId !== userId) {
+        throw new Error("Unauthorized");
+      }
+
+      if (!conversation.chats || !conversation.chats[chatIndex]) {
+        return [];
+      }
+
+      const chat = conversation.chats[chatIndex] as any;
+      const messages = chat.messages || [];
+
+      // Sort messages by timestamp
+      const sortedMessages = messages.sort(
+        (a: any, b: any) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      return sortedMessages.map((msg: any) => ({
+        id: msg._id.toString(),
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        model: msg.model,
+        toolCalls: msg.toolCalls,
+        files: msg.r2Files?.map((f: any) => ({
+          id: f.url || f._id?.toString(),
+          name: f.name,
+          type: f.type,
+          size: f.size,
+          url: f.url,
+          uploadedAt: f.uploadedAt,
+        })),
+      }));
+    } catch (error) {
+      console.error("Error getting chat messages:", error);
+      throw error;
+    }
+  }
+
+  // Get all chats for a conversation
+  async getConversationChats(
+    conversationId: string,
+    userId: string
+  ): Promise<Array<{ id: number; title: string; messageCount: number; createdAt: Date; updatedAt: Date }>> {
+    try {
+      await this.ensureConnection();
+
+      const conversation = await Conversation.findById(conversationId).lean();
+
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+
+      if (conversation.userId !== userId) {
+        throw new Error("Unauthorized");
+      }
+
+      const chats = conversation.chats || [];
+      return chats.map((chat: any, index: number) => ({
+        id: index,
+        title: chat.title,
+        messageCount: chat.messages?.length || 0,
+        createdAt: chat.createdAt,
+        updatedAt: chat.updatedAt,
+      }));
+    } catch (error) {
+      console.error("Error getting conversation chats:", error);
+      throw error;
+    }
+  }
+
   // Get messages for a conversation
   async getMessages(conversationId: string, limit = 100, offset = 0) {
     try {

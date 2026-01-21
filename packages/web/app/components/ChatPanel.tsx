@@ -1,6 +1,6 @@
 import { useRef, useEffect, Fragment, useState } from "react";
 import type React from "react";
-import { Bot, Loader2, RotateCcw, FileText, Download, X, Clock } from "lucide-react";
+import { Bot, Loader2, RotateCcw, FileText, Download, X, Clock, Check, ChevronDown, ChevronRight, XCircle } from "lucide-react";
 import SelectedElementCard from "./SelectedElementCard";
 import { cn } from "../lib/utils";
 import type { Message } from "../types/chat";
@@ -8,6 +8,116 @@ import { Button } from "./ui/button";
 import { FileCreationChecklist } from "./FileCreationChecklist";
 import { createClientFileStorageService } from "../lib/clientFileStorage";
 import { MessageModelSelector } from "./MessageModelSelector";
+import { 
+  FileCode, 
+  Terminal, 
+  GitBranch, 
+  Package, 
+  Wrench,
+  File,
+  FolderOpen
+} from "lucide-react";
+
+// Tool call status colors
+function getStatusColor(status: string) {
+  switch (status) {
+    case "completed": return "text-green-400 bg-green-500/10 border-green-500/20";
+    case "executing": return "text-blue-400 bg-blue-500/10 border-blue-500/20";
+    case "error": return "text-red-400 bg-red-500/10 border-red-500/20";
+    default: return "text-gray-400 bg-gray-500/10 border-gray-500/20";
+  }
+}
+
+// Get icon for tool name
+function getToolIcon(name: string) {
+  const iconMap: Record<string, React.ReactNode> = {
+    edit: <FileCode className="w-4 h-4" />,
+    multiedit: <FileCode className="w-4 h-4" />,
+    write: <FileCode className="w-4 h-4" />,
+    read: <File className="w-4 h-4" />,
+    shell: <Terminal className="w-4 h-4" />,
+    git: <GitBranch className="w-4 h-4" />,
+    install: <Package className="w-4 h-4" />,
+    mkdir: <FolderOpen className="w-4 h-4" />,
+  };
+  return iconMap[name] || <Wrench className="w-4 h-4" />;
+}
+
+// Tool call item component
+function ToolCallItem({ toolCall }: { toolCall: any }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const isFileEdit = toolCall.name === "edit" || toolCall.name === "multiedit" || toolCall.name === "write";
+  const filePath = toolCall.args?.filePath || toolCall.args?.file_path || null;
+  
+  return (
+    <div className="border border-border/30 rounded-xl overflow-hidden bg-surface-2/50">
+      <div
+        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-surface-3/30 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className={`flex items-center justify-center w-6 h-6 rounded-lg border ${getStatusColor(toolCall.status)}`}>
+          {toolCall.status === "executing" ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : toolCall.status === "completed" ? (
+            <Check className="w-3 h-3" />
+          ) : toolCall.status === "error" ? (
+            <XCircle className="w-3 h-3" />
+          ) : (
+            <div className="w-2 h-2 rounded-full bg-current" />
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {getToolIcon(toolCall.name)}
+          <span className="font-mono text-sm text-foreground">{toolCall.name}</span>
+        </div>
+        
+        {filePath && (
+          <span className="text-xs text-muted-foreground truncate max-w-[150px]" title={filePath}>
+            {filePath}
+          </span>
+        )}
+        
+        {toolCall.endTime && toolCall.startTime && (
+          <span className="text-[10px] text-muted-foreground ml-auto mr-2">
+            {toolCall.endTime - toolCall.startTime}ms
+          </span>
+        )}
+        
+        {isExpanded ? (
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        )}
+      </div>
+      
+      {isExpanded && (
+        <div className="border-t border-border/20 px-3 py-2.5 space-y-2">
+          <div>
+            <div className="text-[10px] uppercase text-muted-foreground mb-1">Arguments</div>
+            <pre className="text-xs font-mono bg-surface-1/80 rounded-lg p-2 overflow-x-auto max-h-32">
+              {JSON.stringify(toolCall.args, null, 2)}
+            </pre>
+          </div>
+          
+          {toolCall.result && (
+            <div>
+              <div className="text-[10px] uppercase text-muted-foreground mb-1">Result</div>
+              <pre className="text-xs font-mono bg-surface-1/80 rounded-lg p-2 overflow-x-auto max-h-48">
+                {toolCall.result?.output 
+                  ? (toolCall.result.output.substring(0, 1000) + (toolCall.result.output.length > 1000 ? '...' : ''))
+                  : toolCall.result?.error
+                    ? toolCall.result.error
+                    : JSON.stringify(toolCall.result, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Format timestamp for messages
 const formatMessageTime = (timestamp?: string | Date) => {
@@ -763,7 +873,7 @@ export default function ChatPanel({
                       )}
                     <div className="max-w-[90%]">
                       {/* User message card - dark container */}
-                      <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-4">
+                      <div className="bg-[#1a1a1a] border border-white/8 rounded-2xl p-4">
                         {/* Display uploaded files */}
                         {message.files && message.files.length > 0 && (
                           <div className="mb-3 flex flex-wrap gap-2">
@@ -805,6 +915,19 @@ export default function ChatPanel({
                         />
                       </div>
                     )}
+                    
+                    {/* Tool calls display */}
+                    {(message as any).toolCalls && (message as any).toolCalls.length > 0 && (
+                      <div className="w-full space-y-2 mt-2">
+                        <div className="text-[10px] uppercase text-muted-foreground flex items-center gap-2">
+                          Tool Calls
+                        </div>
+                        {(message as any).toolCalls.map((tc: any) => (
+                          <ToolCallItem key={tc.id} toolCall={tc} />
+                        ))}
+                      </div>
+                    )}
+                    
                     {/* Render segments in order */}
                     {segments.map((segment, idx) => (
                       <div key={`segment-${idx}`}>

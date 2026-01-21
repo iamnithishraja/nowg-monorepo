@@ -22,10 +22,37 @@ export const createConversation = async (
   return data.conversationId;
 };
 
-export const loadConversation = async (conversationId: string) => {
-  const response = await fetch(
-    `/api/conversations?conversationId=${conversationId}`
-  );
+export const loadConversation = async (
+  conversationId: string,
+  chatId?: string | null
+) => {
+  let url = `/api/conversations?conversationId=${conversationId}`;
+  
+  // If chatId is provided, load messages for that specific chat
+  if (chatId !== null && chatId !== undefined) {
+    const response = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "getChatMessages",
+        conversationId,
+        chatIndex: parseInt(chatId, 10),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load chat messages: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      conversation: { id: conversationId }, // Minimal conversation data
+      messages: data.messages || [],
+    };
+  }
+
+  // Otherwise, load all conversation messages
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load conversation: ${response.status}`);

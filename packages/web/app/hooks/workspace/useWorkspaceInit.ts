@@ -58,7 +58,7 @@ interface InitDeps {
     displayMessage?: string
   ) => Promise<void>;
   createConversation: (title: string, model: string) => Promise<string>;
-  loadConversation: (id: string) => Promise<any>;
+  loadConversation: (id: string, chatId?: string | null) => Promise<any>;
   updateConversationUrl: (
     newConversationId: string,
     searchParams: URLSearchParams,
@@ -694,9 +694,10 @@ export function useWorkspaceInit({
           // First, try to load the existing conversation to get its title and messages
           let conversationData: any = null;
           try {
-            conversationData = await loadConversation(urlConversationId);
-            setSelectedModel(conversationData.conversation.model);
-            setConversationTitle(conversationData.conversation.title);
+            const chatId = searchParams?.get("chatId") || null;
+            conversationData = await loadConversation(urlConversationId, chatId);
+            setSelectedModel(conversationData.conversation?.model || selectedModel);
+            setConversationTitle(conversationData.conversation?.title || null);
           } catch (error) {
             // Failed to load existing conversation, will create new one
           }
@@ -769,10 +770,12 @@ export function useWorkspaceInit({
             }
           } else if (!initialPrompt) {
             try {
-              const data = await loadConversation(urlConversationId);
-              setSelectedModel(data.conversation.model);
-              setConversationTitle(data.conversation.title);
-              const uiMessages = convertToUIMessages(data.messages);
+              // Get chatId from searchParams if available
+              const chatId = searchParams?.get("chatId") || null;
+              const data = await loadConversation(urlConversationId, chatId);
+              setSelectedModel(data.conversation?.model || selectedModel);
+              setConversationTitle(data.conversation?.title || conversationTitle);
+              const uiMessages = convertToUIMessages(data.messages || []);
               chat.setMessages(uiMessages);
 
               // Skip file restoration if returning to same conversation with WebContainer still running
