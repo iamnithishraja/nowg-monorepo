@@ -160,6 +160,7 @@ export class ChatService {
         _id: conversationId,
       }).populate({
         path: "messages",
+        match: { chatId: null }, // Only get messages that don't belong to a chat (main conversation messages)
         options: { sort: { timestamp: 1 } },
         populate: {
           path: "files",
@@ -489,7 +490,7 @@ export class ChatService {
     }
   }
 
-  // Add message to a specific chat
+  // Add message to a specific chat (NOT to conversation)
   async addMessageToChat(
     conversationId: string,
     chatId: string,
@@ -520,16 +521,111 @@ export class ChatService {
         throw new Error("Chat not found or doesn't belong to conversation");
       }
 
-      // First add the message normally
-      const messageId = await this.addMessage(conversationId, message);
+      // Get the conversation to retrieve the model
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
 
-      // Add message reference to chat
+      // Allow model to be specified for any message (user or assistant)
+      const modelToUse =
+        message.model ||
+        (message.role === "assistant" ? conversation.model : undefined);
+      
+      const tokensUsed =
+        message.role === "assistant" ? message.tokensUsed || 0 : undefined;
+      const inputTokens =
+        message.role === "assistant"
+          ? (message as any).inputTokens || undefined
+          : undefined;
+      const outputTokens =
+        message.role === "assistant"
+          ? (message as any).outputTokens || undefined
+          : undefined;
+
+      // Extract tool calls if present (for assistant messages)
+      const toolCalls = (message as any).toolCalls || undefined;
+      
+      // Create message with chatId set - this marks it as a chat message, not conversation message
+      const messageDoc = new Messages({
+        conversationId,
+        chatId: new mongoose.Types.ObjectId(chatId), // Set chatId to mark this as a chat message
+        role: message.role,
+        content: message.content,
+        timestamp: new Date(),
+        clientRequestId: (message as any).clientRequestId || undefined,
+        model: modelToUse,
+        tokensUsed: tokensUsed,
+        inputTokens: inputTokens,
+        outputTokens: outputTokens,
+        files: [], // Initialize empty files array (legacy)
+        r2Files: [], // Initialize empty R2 files array
+        toolCalls: toolCalls ? toolCalls.map((tc: any) => ({
+          id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
+          name: tc.name || tc.toolName,
+          args: tc.args || {},
+          status: tc.status || "completed",
+          result: tc.result,
+          startTime: tc.startTime,
+          endTime: tc.endTime,
+          category: tc.category,
+        })) : undefined,
+      });
+
+      const result = await messageDoc.save();
+
+      // Automatically extract files from message content and store in R2 (for assistant messages)
+      if (message.role === "assistant" && message.content) {
+        try {
+          const { extractAndStoreFilesFromMessage } = await import("./extractAndStoreFiles");
+          const uploadedFiles = await extractAndStoreFilesFromMessage(
+            result._id.toString(),
+            conversationId,
+            conversation.userId,
+            message.content,
+            message.role
+          );
+
+          // Update message with R2 file references
+          if (uploadedFiles.length > 0) {
+            await Messages.findByIdAndUpdate(result._id, {
+              $set: { r2Files: uploadedFiles },
+            });
+          }
+        } catch (fileExtractionError) {
+          console.error(
+            "[ChatService] Error extracting and storing files:",
+            fileExtractionError
+          );
+        }
+      }
+
+      // Add message reference to chat (but NOT to conversation.messages)
       await Chat.findByIdAndUpdate(chatId, {
-        $push: { messages: messageId },
+        $push: { messages: result._id },
         $set: { updatedAt: new Date() },
       });
 
-      return messageId;
+      // Update conversation updatedAt but DON'T add to conversation.messages
+      await Conversation.findByIdAndUpdate(conversationId, {
+        $set: { updatedAt: new Date() },
+      });
+
+      // Update user profile with message data
+      try {
+        const profileService = new ProfileService();
+        await profileService.updateOnMessage(conversation.userId, {
+          role: message.role,
+          model: modelToUse,
+          tokensUsed: tokensUsed,
+          inputTokens: inputTokens,
+          outputTokens: outputTokens,
+        });
+      } catch (profileError) {
+        console.error("[ChatService] Error updating profile:", profileError);
+      }
+
+      return result._id.toString();
     } catch (error) {
       console.error("Error adding message to chat:", error);
       throw error;
@@ -656,7 +752,11 @@ export class ChatService {
     try {
       await this.ensureConnection();
 
-      const messages = await Messages.find({ conversationId })
+      // Only get messages that don't belong to a chat (main conversation messages)
+      const messages = await Messages.find({ 
+        conversationId,
+        chatId: null, // Exclude chat messages
+      })
         .sort({ timestamp: 1 })
         .skip(offset)
         .limit(limit)

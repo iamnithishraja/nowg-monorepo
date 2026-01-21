@@ -222,6 +222,13 @@ export async function action({ request }: ActionFunctionArgs) {
       messageContent,
       filesMap,
       uploadedFiles,
+      // Chat creation with agent functionality
+      prompt,
+      agent,
+      files,
+      fileTree,
+      customInstructions,
+      maxSteps,
     } = requestBody;
 
     const chatService = new ChatService();
@@ -725,11 +732,13 @@ export async function action({ request }: ActionFunctionArgs) {
         }
 
         try {
+          // Just create an empty chat - no automatic agent functionality
           const chatId = await chatService.createChat(
             conversationId,
             userId,
-            requestBody.title
+            title
           );
+
           return new Response(JSON.stringify({ success: true, chatId }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

@@ -780,7 +780,7 @@ export function useWorkspaceInit({
               const chatId = searchParams?.get("chatId") || null;
               const data = await loadConversation(urlConversationId, chatId);
               setSelectedModel(data.conversation?.model || selectedModel);
-              setConversationTitle(data.conversation?.title || conversationTitle);
+              setConversationTitle(data.conversation?.title || null);
               
               // Ensure messages is always an array - empty chats should show empty, not conversation messages
               const messages = Array.isArray(data.messages) ? data.messages : [];
@@ -789,51 +789,59 @@ export function useWorkspaceInit({
               // Always set messages, even if empty (this ensures empty chats show empty, not cached messages)
               chat.setMessages(uiMessages);
 
-              // Skip file restoration if returning to same conversation with WebContainer still running
-              // This keeps the dev server alive and avoids re-running npm install
-
-              const hasActivePreview = !!getPreviewUrl();
-
-              if (isSameConversation && hasActivePreview) {
-                // Just restore UI state from the files we already have
-                // The WebContainer still has all the files and dev server running
-              } else if (uiMessages && uiMessages.length > 0) {
-                // Restore files - try snapshot first (fast), fall back to message reconstruction (slow)
-                // Add a small delay to prevent layout shift
-                await new Promise((resolve) => setTimeout(resolve, 100));
-                try {
-                  // Set loading state to prevent layout shift
-                  const { setIsReconstructingFiles } =
-                    useWorkspaceStore.getState() as any;
-                  setIsReconstructingFiles(true);
-
-                  // Try fast path (IndexedDB snapshot) first, falls back to message reconstruction
-                  await restoreFilesFromSnapshot(
-                    urlConversationId,
-                    uiMessages,
-                    files,
-                    saveFile,
-                    runLinear
-                  );
-
-                  setIsReconstructingFiles(false);
-                } catch (reconstructError) {
-                  console.error(
-                    "Failed to reconstruct files:",
-                    reconstructError
-                  );
-                  const { setIsReconstructingFiles } =
-                    useWorkspaceStore.getState() as any;
-                  setIsReconstructingFiles(false);
-                  // Don't fail the entire conversation load if file reconstruction fails
-                }
-              }
-
-              // If conversation has no messages, allow initial prompt handler to run
-              if (uiMessages && uiMessages.length === 0) {
-                setHasHandledInitialPrompt(false);
-              } else {
+              // If viewing a chat (chatId is present), skip file restoration
+              // Chats are for conversation only, not for file operations
+              if (chatId) {
+                // Just load messages, don't restore files or clone anything
                 setHasHandledInitialPrompt(true);
+              } else {
+                // Only restore files for main conversation (not chats)
+                // Skip file restoration if returning to same conversation with WebContainer still running
+                // This keeps the dev server alive and avoids re-running npm install
+
+                const hasActivePreview = !!getPreviewUrl();
+
+                if (isSameConversation && hasActivePreview) {
+                  // Just restore UI state from the files we already have
+                  // The WebContainer still has all the files and dev server running
+                } else if (uiMessages && uiMessages.length > 0) {
+                  // Restore files - try snapshot first (fast), fall back to message reconstruction (slow)
+                  // Add a small delay to prevent layout shift
+                  await new Promise((resolve) => setTimeout(resolve, 100));
+                  try {
+                    // Set loading state to prevent layout shift
+                    const { setIsReconstructingFiles } =
+                      useWorkspaceStore.getState() as any;
+                    setIsReconstructingFiles(true);
+
+                    // Try fast path (IndexedDB snapshot) first, falls back to message reconstruction
+                    await restoreFilesFromSnapshot(
+                      urlConversationId,
+                      uiMessages,
+                      files,
+                      saveFile,
+                      runLinear
+                    );
+
+                    setIsReconstructingFiles(false);
+                  } catch (reconstructError) {
+                    console.error(
+                      "Failed to reconstruct files:",
+                      reconstructError
+                    );
+                    const { setIsReconstructingFiles } =
+                      useWorkspaceStore.getState() as any;
+                    setIsReconstructingFiles(false);
+                    // Don't fail the entire conversation load if file reconstruction fails
+                  }
+                }
+
+                // If conversation has no messages, allow initial prompt handler to run
+                if (uiMessages && uiMessages.length === 0) {
+                  setHasHandledInitialPrompt(false);
+                } else {
+                  setHasHandledInitialPrompt(true);
+                }
               }
             } catch (loadError) {
               console.error("Failed to load conversation:", loadError);
@@ -921,6 +929,9 @@ export function useWorkspaceInit({
         
         // Always set messages, even if empty (this ensures empty chats show empty)
         chat.setMessages(uiMessages);
+        
+        // When switching chats, don't restore files - chats are conversation-only
+        // The main conversation files remain in WebContainer
         
         // Update the ref to track current chatId
         lastChatIdRef.current = chatId;

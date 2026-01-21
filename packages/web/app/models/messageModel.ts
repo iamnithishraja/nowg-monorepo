@@ -6,6 +6,13 @@ const messageSchema = new mongoose.Schema({
     ref: "Conversation",
     required: true,
   },
+  // Optional reference to Chat - if set, this message belongs to a chat, not the main conversation
+  chatId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Chat",
+    default: null,
+    index: true,
+  },
   // Optional idempotency key provided by client to avoid duplicates
   clientRequestId: { type: String, index: true },
   role: {
