@@ -763,6 +763,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       onRevert={controller.handleRevert}
                       selectedElementInfo={selectedElementInfo}
                       onInspectorEnable={() => setSelectedElementInfo(null)}
+                      conversationId={controller.conversationId || undefined}
                     />
                   </div>
                   {/* Bottom Section with Balance and Input */}

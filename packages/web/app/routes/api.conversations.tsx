@@ -68,9 +68,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
           content: msg.content,
           timestamp: msg.timestamp,
           model: msg.model,
-          // Files are now populated via virtual field from File model
+          // Tool calls for assistant messages
+          toolCalls: msg.toolCalls && msg.toolCalls.length > 0
+            ? msg.toolCalls.map((tc: any) => ({
+                id: tc.id,
+                name: tc.name,
+                args: tc.args,
+                status: tc.status,
+                result: tc.result,
+                startTime: tc.startTime,
+                endTime: tc.endTime,
+                category: tc.category,
+              }))
+            : undefined,
+          // R2 files (preferred)
           files:
-            msg.files && msg.files.length > 0
+            msg.r2Files && msg.r2Files.length > 0
+              ? msg.r2Files.map((f: any) => ({
+                  id: f.url || f._id?.toString(),
+                  name: f.name,
+                  type: f.type,
+                  size: f.size,
+                  url: f.url,
+                  uploadedAt: f.uploadedAt,
+                }))
+              : // Fallback to legacy files
+              msg.files && msg.files.length > 0
               ? msg.files.map((f: any) => ({
                   id: f._id ? f._id.toString() : f.id,
                   name: f.name,
@@ -318,6 +341,58 @@ export async function action({ request }: ActionFunctionArgs) {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
+
+      case "updateMessageModel":
+        if (!conversationId || !messageId || !model) {
+          return new Response(
+            JSON.stringify({
+              error: "ConversationId, messageId, and model are required",
+            }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verify ownership
+        const conversationForModelUpdate = await chatService.getConversation(
+          conversationId,
+          userId
+        );
+        if (!conversationForModelUpdate) {
+          return new Response(
+            JSON.stringify({ error: "Conversation not found" }),
+            {
+              status: 404,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          await chatService.updateMessageModel(
+            messageId,
+            conversationId,
+            userId,
+            model
+          );
+
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (error: any) {
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to update message model",
+            }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
 
       case "delete":
         if (!conversationId) {

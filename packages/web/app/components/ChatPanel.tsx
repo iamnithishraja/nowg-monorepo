@@ -7,6 +7,7 @@ import type { Message } from "../types/chat";
 import { Button } from "./ui/button";
 import { FileCreationChecklist } from "./FileCreationChecklist";
 import { createClientFileStorageService } from "../lib/clientFileStorage";
+import { MessageModelSelector } from "./MessageModelSelector";
 
 // Format timestamp for messages
 const formatMessageTime = (timestamp?: string | Date) => {
@@ -47,6 +48,7 @@ interface ChatPanelProps {
   onRevert?: (messageId: string) => void;
   selectedElementInfo?: any | null;
   onInspectorEnable?: () => void;
+  conversationId?: string;
 }
 
 export default function ChatPanel({
@@ -57,6 +59,7 @@ export default function ChatPanel({
   onRevert,
   selectedElementInfo,
   onInspectorEnable,
+  conversationId,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [fileDataMap, setFileDataMap] = useState<Map<string, string>>(
@@ -791,6 +794,17 @@ export default function ChatPanel({
                 {/* Assistant message - clean text with file changes */}
                 {message.role === "assistant" && segments.length > 0 && (
                   <div className="w-full max-w-full space-y-4">
+                    {/* Model selector for assistant messages */}
+                    {conversationId && (message as any).model && (
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MessageModelSelector
+                          messageId={message.id}
+                          conversationId={conversationId}
+                          currentModel={(message as any).model}
+                          size="sm"
+                        />
+                      </div>
+                    )}
                     {/* Render segments in order */}
                     {segments.map((segment, idx) => (
                       <div key={`segment-${idx}`}>

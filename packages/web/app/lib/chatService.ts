@@ -309,11 +309,13 @@ export class ChatService {
         }
       }
 
-      // Only assistant messages need the model field and tokens
+      // Allow model to be specified for any message (user or assistant)
+      // For assistant messages, fallback to conversation model if not specified
+      // For user messages, store the model if provided (useful for tracking which model was requested)
       const modelToUse =
-        message.role === "assistant"
-          ? message.model || conversation.model
-          : undefined;
+        message.model ||
+        (message.role === "assistant" ? conversation.model : undefined);
+      
       const tokensUsed =
         message.role === "assistant" ? message.tokensUsed || 0 : undefined;
       const inputTokens =
@@ -325,6 +327,9 @@ export class ChatService {
           ? (message as any).outputTokens || undefined
           : undefined;
 
+      // Extract tool calls if present (for assistant messages)
+      const toolCalls = (message as any).toolCalls || undefined;
+      
       const messageDoc = new Messages({
         conversationId,
         role: message.role,
@@ -335,7 +340,18 @@ export class ChatService {
         tokensUsed: tokensUsed,
         inputTokens: inputTokens,
         outputTokens: outputTokens,
-        files: [], // Initialize empty files array
+        files: [], // Initialize empty files array (legacy)
+        r2Files: [], // Initialize empty R2 files array
+        toolCalls: toolCalls ? toolCalls.map((tc: any) => ({
+          id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
+          name: tc.name || tc.toolName,
+          args: tc.args || {},
+          status: tc.status || "completed",
+          result: tc.result,
+          startTime: tc.startTime,
+          endTime: tc.endTime,
+          category: tc.category,
+        })) : undefined,
       });
 
       const result = await messageDoc.save();
@@ -379,7 +395,8 @@ export class ChatService {
         .sort({ timestamp: 1 })
         .skip(offset)
         .limit(limit)
-        .populate("files"); // Populate files using the virtual field
+        .populate("files"); // Populate legacy files using the virtual field
+      // Note: r2Files and toolCalls are embedded, no need to populate
 
       return messages;
     } catch (error) {
@@ -424,6 +441,53 @@ export class ChatService {
       });
     } catch (error) {
       console.error("Error updating conversation messages:", error);
+      throw error;
+    }
+  }
+
+  // Update a message's model
+  async updateMessageModel(
+    messageId: string,
+    conversationId: string,
+    userId: string,
+    model: string
+  ): Promise<void> {
+    try {
+      await this.ensureConnection();
+
+      // Verify conversation ownership
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+      if (conversation.userId !== userId) {
+        throw new Error("Unauthorized: You don't own this conversation");
+      }
+
+      // Verify message belongs to conversation
+      const message = await Messages.findById(messageId);
+      if (!message) {
+        throw new Error("Message not found");
+      }
+      if (message.conversationId.toString() !== conversationId) {
+        throw new Error("Message does not belong to this conversation");
+      }
+
+      // Update the message model
+      await Messages.findByIdAndUpdate(messageId, {
+        $set: {
+          model,
+        },
+      });
+
+      // Update conversation updatedAt
+      await Conversation.findByIdAndUpdate(conversationId, {
+        $set: {
+          updatedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error("Error updating message model:", error);
       throw error;
     }
   }

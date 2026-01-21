@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useAgentChat, type AgentToolCall, type AgentMessage } from "../hooks/useAgentChat";
 import type { FileMap } from "../utils/constants";
+import { MessageModelSelector } from "./MessageModelSelector";
 
 interface TemplateFile {
   name: string;
@@ -31,6 +32,7 @@ interface AgentModalProps {
   isOpen: boolean;
   onClose: () => void;
   templateFiles?: TemplateFile[];
+  conversationId?: string;
 }
 
 /**
@@ -145,11 +147,17 @@ function ToolCallItem({ toolCall }: { toolCall: AgentToolCall }) {
 /**
  * Message component
  */
-function MessageItem({ message }: { message: AgentMessage }) {
+function MessageItem({ 
+  message, 
+  conversationId 
+}: { 
+  message: AgentMessage;
+  conversationId?: string;
+}) {
   const isUser = message.role === "user";
   
   return (
-    <div className={`flex flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}>
+    <div className={`group flex flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}>
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-3 ${
           isUser
@@ -159,6 +167,18 @@ function MessageItem({ message }: { message: AgentMessage }) {
       >
         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
       </div>
+      
+      {/* Model selector for assistant messages */}
+      {!isUser && conversationId && (message as any).model && (
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+          <MessageModelSelector
+            messageId={message.id}
+            conversationId={conversationId}
+            currentModel={(message as any).model}
+            size="sm"
+          />
+        </div>
+      )}
       
       {/* Tool calls for assistant messages */}
       {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
@@ -179,7 +199,7 @@ function MessageItem({ message }: { message: AgentMessage }) {
  * A modal interface for interacting with the AI agent.
  * Shows tool calls, file edits, and streaming responses in real-time.
  */
-export function AgentModal({ isOpen, onClose, templateFiles }: AgentModalProps) {
+export function AgentModal({ isOpen, onClose, templateFiles, conversationId }: AgentModalProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -356,7 +376,7 @@ export function AgentModal({ isOpen, onClose, templateFiles }: AgentModalProps) 
           
           {/* Messages */}
           {messages.map((message) => (
-            <MessageItem key={message.id} message={message} />
+            <MessageItem key={message.id} message={message} conversationId={conversationId} />
           ))}
           
           {/* Streaming content */}
