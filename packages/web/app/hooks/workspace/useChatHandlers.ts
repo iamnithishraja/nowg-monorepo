@@ -6,6 +6,7 @@ interface ChatDeps {
   chat: any;
   files: any;
   conversationId: string | null;
+  chatId?: string | null; // Add chatId to detect when we're in a chat
   selectedModel: string;
   setInput: (v: string) => void;
   hasHandledInitialPrompt: boolean;
@@ -26,6 +27,7 @@ export function useChatHandlers({
   chat,
   files,
   conversationId,
+  chatId,
   selectedModel,
   setInput,
   hasHandledInitialPrompt,
@@ -61,6 +63,314 @@ export function useChatHandlers({
       setInput("");
       chat.addMessage(userMessage, isMountedRef);
 
+      // If we're in a chat (chatId present), use agent API for tool calls
+      if (chatId && conversationId) {
+        try {
+          // Store user message in chat
+          await fetch("/api/chat/" + chatId + "?conversationId=" + conversationId, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "addMessage",
+              message: {
+                role: "user",
+                content: messageContent,
+              },
+            }),
+          });
+
+          chat.setIsLoading(true);
+          chat.setIsStreaming(true);
+          chat.setError(null);
+          chat.beginAssistantMessage(isMountedRef);
+
+          // Use agent API for chats - this enables tool calls
+          const effectiveModel = selectedModel || OPENROUTER_MODELS[0].id;
+          const abortController = new AbortController();
+          
+          const response = await fetch("/api/agent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requestType: "prompt",
+              prompt: messageContent,
+              model: effectiveModel,
+              agent: "build",
+              files: files.filesMap || {},
+              fileTree: files.fileTree,
+              maxSteps: 10,
+            }),
+            signal: abortController.signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Agent API error: ${response.status}`);
+          }
+
+          // Process agent stream with multi-step loop support
+          const processAgentStream = async (response: Response, sessionId?: string, currentStep = 0): Promise<{ text: string; toolCalls: any[] }> => {
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+            let assistantText = "";
+            let allToolCalls: any[] = [];
+            let currentToolCalls: any[] = [];
+            let currentSessionId = sessionId;
+            let messagesForContinuation: any[] = [];
+
+            if (!reader) {
+              throw new Error("No response stream");
+            }
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split("\n");
+
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  
+                  if (data.type === "session_start") {
+                    currentSessionId = data.sessionId;
+                  } else if (data.type === "text_delta") {
+                    assistantText += data.delta;
+                    chat.updateLastAssistantMessage(assistantText, isMountedRef);
+                  } else if (data.type === "tool_call") {
+                    const toolCall = {
+                      id: data.id,
+                      name: data.name,
+                      args: data.args,
+                      status: "pending" as const,
+                      category: data.category,
+                      startTime: Date.now(),
+                    };
+                    currentToolCalls.push(toolCall);
+                    allToolCalls.push(toolCall);
+                    chat.setCurrentToolCalls([...currentToolCalls]);
+                  } else if (data.type === "awaiting_tool_results") {
+                    // Update tool calls from event if provided
+                    if (data.toolCalls && Array.isArray(data.toolCalls)) {
+                      for (const tc of data.toolCalls) {
+                        const existing = allToolCalls.find(t => t.id === tc.id);
+                        if (!existing) {
+                          const toolCall = {
+                            id: tc.id,
+                            name: tc.name,
+                            args: tc.args || {},
+                            status: "pending" as const,
+                            category: tc.category || "auto",
+                            startTime: Date.now(),
+                          };
+                          allToolCalls.push(toolCall);
+                          currentToolCalls.push(toolCall);
+                        }
+                      }
+                      chat.setCurrentToolCalls([...currentToolCalls]);
+                    }
+
+                    messagesForContinuation = data.messages || [];
+                    const autoTools = data.autoTools || [];
+                    const ackTools = data.ackTools || [];
+                    const allToolsToExecute = [...autoTools, ...ackTools];
+                    
+                    // Finish reading current stream before continuing
+                    // (read remaining chunks until done)
+                    let remainingDone = false;
+                    while (!remainingDone) {
+                      const { done: streamDone, value: streamValue } = await reader.read();
+                      if (streamDone) {
+                        remainingDone = true;
+                        break;
+                      }
+                      const remainingChunk = decoder.decode(streamValue, { stream: true });
+                      const remainingLines = remainingChunk.split("\n");
+                      for (const remainingLine of remainingLines) {
+                        if (remainingLine.startsWith("data: ")) {
+                          try {
+                            const remainingData = JSON.parse(remainingLine.slice(6));
+                            if (remainingData.type === "complete") {
+                              remainingDone = true;
+                              assistantText = assistantText || remainingData.text || "";
+                            }
+                          } catch {}
+                        }
+                      }
+                    }
+                    
+                    // Execute all tools
+                    const toolResults = [];
+                    for (const toolCall of allToolsToExecute) {
+                      try {
+                        const { ToolRegistry } = await import("../../tools/registry");
+                        const tool = ToolRegistry.get(toolCall.name);
+                        if (tool) {
+                          const toolCallIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
+                          if (toolCallIndex >= 0) {
+                            allToolCalls[toolCallIndex] = {
+                              ...allToolCalls[toolCallIndex],
+                              status: "executing" as const,
+                            };
+                            chat.setCurrentToolCalls([...allToolCalls.filter(tc => currentToolCalls.some(ctc => ctc.id === tc.id))]);
+                          }
+
+                          const result = await tool.execute(toolCall.args, {
+                            sessionID: currentSessionId || "chat-session",
+                            messageID: `msg-${Date.now()}`,
+                            metadata: () => {},
+                          });
+                          
+                          const executedIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
+                          if (executedIndex >= 0) {
+                            allToolCalls[executedIndex] = {
+                              ...allToolCalls[executedIndex],
+                              status: "completed" as const,
+                              result,
+                              endTime: Date.now(),
+                            };
+                            chat.setCurrentToolCalls([...allToolCalls.filter(tc => currentToolCalls.some(ctc => ctc.id === tc.id))]);
+                          }
+
+                          toolResults.push({
+                            toolCallId: toolCall.id,
+                            toolName: toolCall.name,
+                            result: {
+                              success: true,
+                              output: result?.output || result || "",
+                            },
+                          });
+                        }
+                      } catch (toolError) {
+                        console.error("Tool execution error:", toolError);
+                        const errorIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
+                        if (errorIndex >= 0) {
+                          allToolCalls[errorIndex] = {
+                            ...allToolCalls[errorIndex],
+                            status: "error" as const,
+                            result: { error: toolError instanceof Error ? toolError.message : String(toolError) },
+                            endTime: Date.now(),
+                          };
+                          chat.setCurrentToolCalls([...allToolCalls.filter(tc => currentToolCalls.some(ctc => ctc.id === tc.id))]);
+                        }
+
+                        toolResults.push({
+                          toolCallId: toolCall.id,
+                          toolName: toolCall.name,
+                          result: {
+                            success: false,
+                            error: toolError instanceof Error ? toolError.message : String(toolError),
+                          },
+                        });
+                      }
+                    }
+
+                    // Continue agent loop with tool results
+                    if (toolResults.length > 0 && currentStep < 10) {
+                      const continuationResponse = await fetch("/api/agent", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          requestType: "tool_results",
+                          toolResults,
+                          sessionId: currentSessionId,
+                          currentStep: data.step || currentStep,
+                          messages: messagesForContinuation,
+                          model: effectiveModel,
+                          agent: "build",
+                          files: files.filesMap || {},
+                          fileTree: files.fileTree,
+                          maxSteps: 10,
+                        }),
+                        signal: abortController.signal,
+                      });
+
+                      if (!continuationResponse.ok) {
+                        throw new Error(`Agent continuation error: ${continuationResponse.status}`);
+                      }
+
+                      // Recursively process the continuation stream
+                      const continuationResult = await processAgentStream(continuationResponse, currentSessionId, (data.step || currentStep) + 1);
+                      assistantText += continuationResult.text;
+                      allToolCalls = [...allToolCalls, ...continuationResult.toolCalls];
+                      return { text: assistantText, toolCalls: allToolCalls };
+                    }
+                  } else if (data.type === "complete") {
+                    // Agent finished
+                    assistantText = assistantText || data.text || "";
+                    return { text: assistantText, toolCalls: allToolCalls };
+                  }
+                } catch (parseError) {
+                  // Ignore parse errors
+                }
+              }
+            }
+
+            return { text: assistantText, toolCalls: allToolCalls };
+          };
+
+          const result = await processAgentStream(response);
+          
+          // Store assistant message with tool calls
+          const assistantMessage = {
+            role: "assistant",
+            content: result.text,
+            model: effectiveModel,
+            toolCalls: result.toolCalls.map(tc => ({
+              id: tc.id,
+              name: tc.name,
+              args: tc.args,
+              status: tc.status,
+              result: tc.result,
+              startTime: tc.startTime,
+              endTime: tc.endTime,
+              category: tc.category,
+            })),
+          };
+
+          // Update the last assistant message with final content and tool calls
+          const lastMessage = chat.messages[chat.messages.length - 1];
+          if (lastMessage && lastMessage.role === "assistant") {
+            chat.setMessages(prev => prev.map(msg => 
+              msg.id === lastMessage.id 
+                ? { ...msg, content: result.text, toolCalls: result.toolCalls }
+                : msg
+            ));
+          }
+
+          // Store in chat
+          await fetch("/api/chat/" + chatId + "?conversationId=" + conversationId, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "addMessage",
+              message: assistantMessage,
+            }),
+          });
+
+          chat.setIsLoading(false);
+          chat.setIsStreaming(false);
+          chat.setCurrentToolCalls([]);
+
+          return;
+        } catch (error) {
+          console.error("Agent chat error:", error);
+          if (error instanceof Error) {
+            chat.setError(error.message);
+          } else {
+            chat.setError("An error occurred");
+          }
+          chat.setIsStreaming(false);
+          chat.setIsLoading(false);
+          return;
+        } finally {
+          sendingRef.current = false;
+        }
+      }
+
+      // Regular conversation flow (not a chat)
       chat.setIsLoading(true);
       chat.setIsStreaming(true);
       chat.setError(null);
@@ -137,6 +447,7 @@ export function useChatHandlers({
       chat,
       files,
       conversationId,
+      chatId,
       selectedModel,
       setInput,
       isMountedRef,

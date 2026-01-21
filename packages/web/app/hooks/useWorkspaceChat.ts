@@ -12,6 +12,7 @@ export function useWorkspaceChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentToolCalls, setCurrentToolCalls] = useState<any[]>([]); // Tool calls for current assistant message
   const abortControllerRef = useRef<AbortController | null>(null);
   const userCancelledRef = useRef(false);
   const processedFiles = useRef(new Set<string>());

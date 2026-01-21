@@ -159,6 +159,7 @@ interface ChatPanelProps {
   selectedElementInfo?: any | null;
   onInspectorEnable?: () => void;
   conversationId?: string;
+  currentToolCalls?: any[]; // Tool calls for current streaming message
 }
 
 export default function ChatPanel({
@@ -170,6 +171,7 @@ export default function ChatPanel({
   selectedElementInfo,
   onInspectorEnable,
   conversationId,
+  currentToolCalls = [],
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [fileDataMap, setFileDataMap] = useState<Map<string, string>>(
@@ -967,6 +969,17 @@ export default function ChatPanel({
                 <Loader2 className="w-4 h-4 animate-spin text-foreground" />
               </div>
               <div className="flex-1">
+                {/* Show current tool calls while streaming */}
+                {currentToolCalls && currentToolCalls.length > 0 && (
+                  <div className="w-full space-y-2 mb-4">
+                    <div className="text-[10px] uppercase text-muted-foreground flex items-center gap-2">
+                      Tool Calls
+                    </div>
+                    {currentToolCalls.map((tc: any) => (
+                      <ToolCallItem key={tc.id} toolCall={tc} />
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm font-medium text-foreground">
                     {isProcessingTemplate ? "Loading Template" : "Processing"}

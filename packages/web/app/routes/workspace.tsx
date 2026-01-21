@@ -825,6 +825,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       selectedElementInfo={selectedElementInfo}
                       onInspectorEnable={() => setSelectedElementInfo(null)}
                       conversationId={controller.conversationId || undefined}
+                      currentToolCalls={(controller as any).currentToolCalls || []}
                     />
                   </div>
                   {/* Bottom Section with Balance and Input */}
