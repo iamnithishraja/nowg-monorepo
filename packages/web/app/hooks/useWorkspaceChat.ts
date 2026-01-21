@@ -761,6 +761,8 @@ export function useWorkspaceChat() {
     setIsStreaming,
     error,
     setError,
+    currentToolCalls,
+    setCurrentToolCalls,
     addMessage,
     beginAssistantMessage,
     updateLastAssistantMessage,

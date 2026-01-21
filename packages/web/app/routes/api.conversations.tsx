@@ -194,6 +194,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     const userId = session.user.id;
+    const url = new URL(request.url);
     
     // Parse request body with error handling
     let requestBody;
@@ -212,7 +213,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const {
       action: actionType,
-      conversationId,
+      conversationId: bodyConversationId,
       title,
       model,
       firstMessage,
@@ -230,6 +231,9 @@ export async function action({ request }: ActionFunctionArgs) {
       customInstructions,
       maxSteps,
     } = requestBody;
+
+    // Get conversationId from URL params or request body (URL takes precedence for consistency)
+    const conversationId = url.searchParams.get("conversationId") || bodyConversationId;
 
     const chatService = new ChatService();
 
@@ -846,6 +850,86 @@ export async function action({ request }: ActionFunctionArgs) {
           return new Response(
             JSON.stringify({
               error: error.message || "Failed to get chat messages",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+      case "addChatMessage":
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        if (!requestBody.chatId) {
+          return new Response(
+            JSON.stringify({ error: "ChatId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        if (!requestBody.message) {
+          return new Response(
+            JSON.stringify({ error: "Message is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          // Handle message format: can be a string (legacy) or an object
+          let messageObj: any;
+          if (typeof requestBody.message === "string") {
+            messageObj = {
+              role: "user",
+              content: requestBody.message,
+            };
+          } else {
+            messageObj = requestBody.message;
+          }
+
+          // Validate message object
+          if (!messageObj.role || !messageObj.content) {
+            return new Response(
+              JSON.stringify({
+                error: "Message must have 'role' and 'content' fields",
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          const messageId = await chatService.addMessageToChat(
+            conversationId,
+            requestBody.chatId,
+            messageObj,
+            userId
+          );
+
+          return new Response(
+            JSON.stringify({ success: true, messageId }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        } catch (error: any) {
+          console.error("Error adding chat message:", error);
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to add chat message",
             }),
             { status: 400, headers: { "Content-Type": "application/json" } }
           );

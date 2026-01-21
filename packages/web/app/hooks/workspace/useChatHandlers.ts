@@ -61,23 +61,36 @@ export function useChatHandlers({
       };
 
       setInput("");
-      chat.addMessage(userMessage, isMountedRef);
 
       // If we're in a chat (chatId present), use agent API for tool calls
       if (chatId && conversationId) {
         try {
-          // Store user message in chat
-          await fetch("/api/chat/" + chatId + "?conversationId=" + conversationId, {
+          // Import utilities once for this function scope
+          const { loadConversation, convertToUIMessages } = await import("../../utils/workspaceApi");
+          
+          // Store user message in chat first
+          const userMessageResponse = await fetch("/api/conversations?conversationId=" + conversationId, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              action: "addMessage",
+              action: "addChatMessage",
+              chatId: chatId,
               message: {
                 role: "user",
                 content: messageContent,
               },
             }),
           });
+
+          if (!userMessageResponse.ok) {
+            const errorData = await userMessageResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || `Failed to store user message: ${userMessageResponse.status}`);
+          }
+
+          // Reload chat messages to update UI (this ensures messages are isolated to this chat)
+          const chatData = await loadConversation(conversationId, chatId);
+          const uiMessages = convertToUIMessages(chatData.messages || []);
+          chat.setMessages(uiMessages);
 
           chat.setIsLoading(true);
           chat.setIsStreaming(true);
@@ -88,6 +101,7 @@ export function useChatHandlers({
           const effectiveModel = selectedModel || OPENROUTER_MODELS[0].id;
           const abortController = new AbortController();
           
+          console.log("[ChatHandler] Sending request to agent API");
           const response = await fetch("/api/agent", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -103,12 +117,16 @@ export function useChatHandlers({
             signal: abortController.signal,
           });
 
+          console.log("[ChatHandler] Agent API response status:", response.status);
           if (!response.ok) {
-            throw new Error(`Agent API error: ${response.status}`);
+            const errorText = await response.text().catch(() => "Unknown error");
+            console.error("[ChatHandler] Agent API error:", response.status, errorText);
+            throw new Error(`Agent API error: ${response.status} - ${errorText}`);
           }
 
           // Process agent stream with multi-step loop support
           const processAgentStream = async (response: Response, sessionId?: string, currentStep = 0): Promise<{ text: string; toolCalls: any[] }> => {
+            console.log("[ChatHandler] Starting to process agent stream, step:", currentStep);
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
             let assistantText = "";
@@ -123,7 +141,10 @@ export function useChatHandlers({
 
             while (true) {
               const { done, value } = await reader.read();
-              if (done) break;
+              if (done) {
+                console.log("[ChatHandler] Stream done, step:", currentStep, "| Text length:", assistantText.length, "| Tool calls:", allToolCalls.length);
+                break;
+              }
 
               const chunk = decoder.decode(value, { stream: true });
               const lines = chunk.split("\n");
@@ -133,9 +154,11 @@ export function useChatHandlers({
 
                 try {
                   const data = JSON.parse(line.slice(6));
+                  console.log("[ChatHandler] Stream event:", data.type, "| Step:", currentStep);
                   
                   if (data.type === "session_start") {
                     currentSessionId = data.sessionId;
+                    console.log("[ChatHandler] Session started:", currentSessionId);
                   } else if (data.type === "text_delta") {
                     assistantText += data.delta;
                     chat.updateLastAssistantMessage(assistantText, isMountedRef);
@@ -151,7 +174,9 @@ export function useChatHandlers({
                     currentToolCalls.push(toolCall);
                     allToolCalls.push(toolCall);
                     chat.setCurrentToolCalls([...currentToolCalls]);
+                    console.log("[ChatHandler] Tool call received:", toolCall.name);
                   } else if (data.type === "awaiting_tool_results") {
+                    console.log("[ChatHandler] Awaiting tool results | Ack:", data.ackTools?.length || 0, "| Auto:", data.autoTools?.length || 0);
                     // Update tool calls from event if provided
                     if (data.toolCalls && Array.isArray(data.toolCalls)) {
                       for (const tc of data.toolCalls) {
@@ -177,34 +202,13 @@ export function useChatHandlers({
                     const ackTools = data.ackTools || [];
                     const allToolsToExecute = [...autoTools, ...ackTools];
                     
-                    // Finish reading current stream before continuing
-                    // (read remaining chunks until done)
-                    let remainingDone = false;
-                    while (!remainingDone) {
-                      const { done: streamDone, value: streamValue } = await reader.read();
-                      if (streamDone) {
-                        remainingDone = true;
-                        break;
-                      }
-                      const remainingChunk = decoder.decode(streamValue, { stream: true });
-                      const remainingLines = remainingChunk.split("\n");
-                      for (const remainingLine of remainingLines) {
-                        if (remainingLine.startsWith("data: ")) {
-                          try {
-                            const remainingData = JSON.parse(remainingLine.slice(6));
-                            if (remainingData.type === "complete") {
-                              remainingDone = true;
-                              assistantText = assistantText || remainingData.text || "";
-                            }
-                          } catch {}
-                        }
-                      }
-                    }
+                    console.log("[ChatHandler] Tools to execute:", allToolsToExecute.length);
                     
                     // Execute all tools
                     const toolResults = [];
                     for (const toolCall of allToolsToExecute) {
                       try {
+                        console.log("[ChatHandler] Executing tool:", toolCall.name);
                         const { ToolRegistry } = await import("../../tools/registry");
                         const tool = ToolRegistry.get(toolCall.name);
                         if (tool) {
@@ -223,6 +227,7 @@ export function useChatHandlers({
                             metadata: () => {},
                           });
                           
+                          console.log("[ChatHandler] Tool executed successfully:", toolCall.name);
                           const executedIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
                           if (executedIndex >= 0) {
                             allToolCalls[executedIndex] = {
@@ -242,9 +247,11 @@ export function useChatHandlers({
                               output: result?.output || result || "",
                             },
                           });
+                        } else {
+                          console.error("[ChatHandler] Tool not found:", toolCall.name);
                         }
                       } catch (toolError) {
-                        console.error("Tool execution error:", toolError);
+                        console.error("[ChatHandler] Tool execution error:", toolError);
                         const errorIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
                         if (errorIndex >= 0) {
                           allToolCalls[errorIndex] = {
@@ -269,6 +276,7 @@ export function useChatHandlers({
 
                     // Continue agent loop with tool results
                     if (toolResults.length > 0 && currentStep < 10) {
+                      console.log("[ChatHandler] Continuing agent loop with", toolResults.length, "tool results");
                       const continuationResponse = await fetch("/api/agent", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -296,9 +304,14 @@ export function useChatHandlers({
                       assistantText += continuationResult.text;
                       allToolCalls = [...allToolCalls, ...continuationResult.toolCalls];
                       return { text: assistantText, toolCalls: allToolCalls };
+                    } else {
+                      // No tools to execute or max steps reached - return current state
+                      console.log("[ChatHandler] No continuation needed, returning current state");
+                      return { text: assistantText, toolCalls: allToolCalls };
                     }
                   } else if (data.type === "complete") {
                     // Agent finished
+                    console.log("[ChatHandler] Stream complete | Text:", assistantText.length, "chars | Tool calls:", allToolCalls.length);
                     assistantText = assistantText || data.text || "";
                     return { text: assistantText, toolCalls: allToolCalls };
                   }
@@ -308,10 +321,13 @@ export function useChatHandlers({
               }
             }
 
+            console.log("[ChatHandler] Stream ended without complete event | Text:", assistantText.length, "chars | Tool calls:", allToolCalls.length);
             return { text: assistantText, toolCalls: allToolCalls };
           };
 
+          console.log("[ChatHandler] Starting agent stream processing");
           const result = await processAgentStream(response);
+          console.log("[ChatHandler] Agent stream processing complete | Text:", result.text.length, "chars | Tool calls:", result.toolCalls.length);
           
           // Store assistant message with tool calls
           const assistantMessage = {
@@ -340,15 +356,27 @@ export function useChatHandlers({
             ));
           }
 
-          // Store in chat
-          await fetch("/api/chat/" + chatId + "?conversationId=" + conversationId, {
+          // Store assistant message in chat
+          const assistantMessageResponse = await fetch("/api/conversations?conversationId=" + conversationId, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              action: "addMessage",
+              action: "addChatMessage",
+              chatId: chatId,
               message: assistantMessage,
             }),
           });
+
+          if (!assistantMessageResponse.ok) {
+            const errorData = await assistantMessageResponse.json().catch(() => ({}));
+            console.error("Failed to store assistant message:", errorData);
+            // Don't throw - we still want to show the message in UI even if storage fails
+          }
+
+          // Reload chat messages to ensure UI matches database (this ensures messages are isolated)
+          const finalChatData = await loadConversation(conversationId, chatId);
+          const finalUiMessages = convertToUIMessages(finalChatData.messages || []);
+          chat.setMessages(finalUiMessages);
 
           chat.setIsLoading(false);
           chat.setIsStreaming(false);
