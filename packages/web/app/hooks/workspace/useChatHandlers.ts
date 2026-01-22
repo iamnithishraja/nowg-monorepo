@@ -21,6 +21,7 @@ interface ChatDeps {
   onInsufficientBalance?: (errorData?: any) => void;
   figmaUrl?: string;
   enableFigmaMCP?: boolean;
+  chatMode?: "build" | "ask";
 }
 
 export function useChatHandlers({
@@ -39,6 +40,7 @@ export function useChatHandlers({
   onInsufficientBalance,
   figmaUrl,
   enableFigmaMCP,
+  chatMode = "build",
 }: ChatDeps) {
   const sendingRef = useRef(false);
 
@@ -101,7 +103,10 @@ export function useChatHandlers({
           const effectiveModel = selectedModel || OPENROUTER_MODELS[0].id;
           const abortController = new AbortController();
           
-          console.log("[ChatHandler] Sending request to agent API");
+          // Use "general" agent for ask mode, "build" for build mode
+          const agentName = chatMode === "ask" ? "general" : "build";
+          
+          console.log("[ChatHandler] Sending request to agent API | Mode:", chatMode, "| Agent:", agentName);
           const response = await fetch("/api/agent", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -109,7 +114,7 @@ export function useChatHandlers({
               requestType: "prompt",
               prompt: messageContent,
               model: effectiveModel,
-              agent: "build",
+              agent: agentName,
               files: files.filesMap || {},
               fileTree: files.fileTree,
               maxSteps: 10,
@@ -384,7 +389,7 @@ export function useChatHandlers({
                           currentStep: data.step || currentStep,
                           messages: messagesForContinuation,
                           model: effectiveModel,
-                          agent: "build",
+                          agent: agentName,
                           files: files.filesMap || {},
                           fileTree: files.fileTree,
                           maxSteps: 10,

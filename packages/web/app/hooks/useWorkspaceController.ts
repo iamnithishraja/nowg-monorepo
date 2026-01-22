@@ -918,6 +918,7 @@ conversationId
 
   // Get chatId from search params
   const chatId = searchParams.get("chatId");
+  const chatMode = useWorkspaceStore((s) => s.chatMode);
 
   const { handleSend: baseHandleSend } = useChatHandlers({
     chat,
@@ -935,6 +936,7 @@ conversationId
     onInsufficientBalance,
     figmaUrl,
     enableFigmaMCP,
+    chatMode,
   });
 
   const handleSend = async (messageContent: string) => {

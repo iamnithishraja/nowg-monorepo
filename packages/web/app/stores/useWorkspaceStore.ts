@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 export type TabType = "files" | "preview";
+export type ChatMode = "build" | "ask";
 
 interface WorkspaceState {
   selectedModel: string;
@@ -17,6 +18,8 @@ interface WorkspaceState {
   // terminal state
   terminalLines: string[];
   isTerminalRunning: boolean;
+  // chat mode
+  chatMode: ChatMode;
   setSelectedModel: (model: string) => void;
   setConversationId: (id: string | null) => void;
   setConversationTitle: (title: string | null) => void;
@@ -30,6 +33,7 @@ interface WorkspaceState {
   clearTerminal: () => void;
   setIsTerminalRunning: (v: boolean) => void;
   setIsEditActive: (v: boolean) => void;
+  setChatMode: (mode: ChatMode) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -45,6 +49,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   isEditActive: false,
   terminalLines: [],
   isTerminalRunning: false,
+  chatMode: "build",
   setSelectedModel: (model) => set({ selectedModel: model }),
   setConversationId: (id) => set({ conversationId: id }),
   setConversationTitle: (title) => set({ conversationTitle: title }),
@@ -59,6 +64,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   clearTerminal: () => set({ terminalLines: [] }),
   setIsTerminalRunning: (v) => set({ isTerminalRunning: v }),
   setIsEditActive: (v) => set({ isEditActive: v }),
+  setChatMode: (mode) => set({ chatMode: mode }),
 }));
 
 
