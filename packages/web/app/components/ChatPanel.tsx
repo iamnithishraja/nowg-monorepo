@@ -1,6 +1,6 @@
 import { useRef, useEffect, Fragment, useState } from "react";
 import type React from "react";
-import { Bot, Loader2, RotateCcw, FileText, Download, X, Clock, Check, ChevronDown, ChevronRight, XCircle } from "lucide-react";
+import { Bot, Loader2, RotateCcw, Download, X, Clock, Check, ChevronDown, ChevronRight, XCircle } from "lucide-react";
 import SelectedElementCard from "./SelectedElementCard";
 import { cn } from "../lib/utils";
 import type { Message } from "../types/chat";
@@ -15,7 +15,9 @@ import {
   Package, 
   Wrench,
   File,
-  FolderOpen
+  FolderOpen,
+  FileText,
+  Atom
 } from "lucide-react";
 
 // Tool call status colors
@@ -43,12 +45,146 @@ function getToolIcon(name: string) {
   return iconMap[name] || <Wrench className="w-4 h-4" />;
 }
 
+// Get user-friendly description for tool name
+function getToolDescription(name: string, args?: any): string {
+  const filePath = args?.filePath || args?.file_path || args?.path;
+  const fileName = filePath ? filePath.split("/").pop() || filePath : null;
+  
+  const descriptions: Record<string, string> = {
+    edit: fileName ? `Editing ${fileName}` : "Editing file",
+    multiedit: fileName ? `Editing ${fileName}` : "Editing files",
+    write: fileName ? `Creating ${fileName}` : "Creating file",
+    read: fileName ? `Reading ${fileName}` : "Reading file",
+    shell: args?.command ? `Running: ${args.command}` : "Running command",
+    git: "Working with Git",
+    install: args?.package ? `Installing ${args.package}` : "Installing packages",
+    mkdir: args?.path ? `Creating folder: ${args.path}` : "Creating folder",
+  };
+  
+  return descriptions[name] || "Working...";
+}
+
+// Get file icon for file changes display
+function getFileIconForChanges(name: string) {
+  const lower = name.toLowerCase();
+  const ext = lower.includes(".") ? lower.split(".").pop() || "" : "";
+  
+  // React for JSX/TSX
+  if (ext === "jsx" || ext === "tsx") {
+    return <Atom className="w-4 h-4 shrink-0" style={{ color: "#61DAFB" }} />;
+  }
+  
+  // Code files
+  if (["js", "ts", "mjs", "cjs", "py", "rb", "go", "rs", "java", "kt", "c", "cpp", "h", "hpp", "cs", "php", "swift", "r", "scala", "dart", "lua", "pl", "vim", "ex", "exs", "erl", "hrl", "clj", "cljs", "cljc", "elm", "fs", "fsx", "ml", "mli", "hs", "lhs"].includes(ext)) {
+    return <FileCode className="w-4 h-4 shrink-0" />;
+  }
+  
+  // HTML/CSS
+  if (["html", "htm", "css", "scss", "sass", "less", "styl"].includes(ext)) {
+    return <FileCode className="w-4 h-4 shrink-0" />;
+  }
+  
+  // Markdown/Text
+  if (["md", "mdx", "txt"].includes(ext)) {
+    return <FileText className="w-4 h-4 shrink-0" />;
+  }
+  
+  // Default
+  return <FileCode className="w-4 h-4 shrink-0" />;
+}
+
+// Extract file changes from tool calls
+function extractFileChanges(toolCalls: any[]): Array<{ name: string; status: "modified" | "created" }> {
+  const fileChanges = new Map<string, "modified" | "created">();
+  
+  for (const toolCall of toolCalls) {
+    // Include completed tool calls and also executing ones (for streaming)
+    if (toolCall.status === "completed" || toolCall.status === "executing") {
+      if (toolCall.name === "edit" || toolCall.name === "multiedit") {
+        const filePath = toolCall.args?.filePath || toolCall.args?.file_path;
+        if (filePath) {
+          fileChanges.set(filePath, "modified");
+        }
+      } else if (toolCall.name === "write") {
+        const filePath = toolCall.args?.filePath || toolCall.args?.path;
+        if (filePath) {
+          // Check if file already exists (would be modified) or is new (created)
+          // For now, assume write is creating a new file unless we have better info
+          fileChanges.set(filePath, "created");
+        }
+      }
+    }
+  }
+  
+  return Array.from(fileChanges.entries()).map(([name, status]) => ({ name, status }));
+}
+
+// File changes component for chat
+function FileChangesDisplay({ files }: { files: Array<{ name: string; status: "modified" | "created" }> }) {
+  if (files.length === 0) return null;
+  
+  return (
+    <div className="border border-border/30 rounded-xl overflow-hidden bg-surface-2/50">
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-purple-500/10 border border-purple-500/20">
+          <ChevronDown className="w-4 h-4 text-purple-400" />
+        </div>
+        <span className="font-medium text-sm text-foreground">File changes</span>
+        <span className="ml-auto text-xs text-muted-foreground/70">
+          {files.length} file{files.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+      <div className="border-t border-border/20 divide-y divide-border/20">
+        {files.map((file, index) => (
+          <div 
+            key={index} 
+            className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface-3/20 transition-colors"
+          >
+            {/* Status indicator */}
+            <div className={`flex items-center justify-center w-6 h-6 rounded-lg ${
+              file.status === "modified" 
+                ? "bg-amber-500/15 border border-amber-500/20" 
+                : "bg-emerald-500/15 border border-emerald-500/20"
+            }`}>
+              {file.status === "modified" ? (
+                <span className="text-[10px] text-amber-400 font-bold">M</span>
+              ) : (
+                <Check className="w-3 h-3 text-emerald-400" />
+              )}
+            </div>
+            
+            {/* File icon */}
+            <div className="opacity-100">
+              {getFileIconForChanges(file.name)}
+            </div>
+            
+            {/* File name */}
+            <span className="text-sm font-mono text-foreground flex-1">
+              {file.name}
+            </span>
+            
+            {/* Status badge */}
+            <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg ${
+              file.status === "modified"
+                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+            }`}>
+              {file.status === "modified" ? "Modified" : "Created"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Tool call item component
 function ToolCallItem({ toolCall }: { toolCall: any }) {
   const [isExpanded, setIsExpanded] = useState(false);
   
   const isFileEdit = toolCall.name === "edit" || toolCall.name === "multiedit" || toolCall.name === "write";
   const filePath = toolCall.args?.filePath || toolCall.args?.file_path || null;
+  const userFriendlyDescription = getToolDescription(toolCall.name, toolCall.args);
   
   return (
     <div className="border border-border/30 rounded-xl overflow-hidden bg-surface-2/50">
@@ -68,27 +204,21 @@ function ToolCallItem({ toolCall }: { toolCall: any }) {
           )}
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           {getToolIcon(toolCall.name)}
-          <span className="font-mono text-sm text-foreground">{toolCall.name}</span>
+          <span className="text-sm text-foreground truncate">{userFriendlyDescription}</span>
         </div>
         
-        {filePath && (
-          <span className="text-xs text-muted-foreground truncate max-w-[150px]" title={filePath}>
-            {filePath}
-          </span>
-        )}
-        
         {toolCall.endTime && toolCall.startTime && (
-          <span className="text-[10px] text-muted-foreground ml-auto mr-2">
+          <span className="text-[10px] text-muted-foreground ml-auto mr-2 shrink-0">
             {toolCall.endTime - toolCall.startTime}ms
           </span>
         )}
         
         {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
         )}
       </div>
       
@@ -160,6 +290,7 @@ interface ChatPanelProps {
   onInspectorEnable?: () => void;
   conversationId?: string;
   currentToolCalls?: any[]; // Tool calls for current streaming message
+  chatId?: string | null; // Chat ID to detect if we're in a chat
 }
 
 export default function ChatPanel({
@@ -172,6 +303,7 @@ export default function ChatPanel({
   onInspectorEnable,
   conversationId,
   currentToolCalls = [],
+  chatId,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [fileDataMap, setFileDataMap] = useState<Map<string, string>>(
@@ -918,19 +1050,7 @@ export default function ChatPanel({
                       </div>
                     )}
                     
-                    {/* Tool calls display */}
-                    {(message as any).toolCalls && (message as any).toolCalls.length > 0 && (
-                      <div className="w-full space-y-2 mt-2">
-                        <div className="text-[10px] uppercase text-muted-foreground flex items-center gap-2">
-                          Tool Calls
-                        </div>
-                        {(message as any).toolCalls.map((tc: any) => (
-                          <ToolCallItem key={tc.id} toolCall={tc} />
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Render segments in order */}
+                    {/* Render text segments first (like Cursor) */}
                     {segments.map((segment, idx) => (
                       <div key={`segment-${idx}`}>
                         {segment.type === "text" && (
@@ -957,6 +1077,35 @@ export default function ChatPanel({
                         )}
                       </div>
                     ))}
+                    
+                    {/* File changes display at the end (only in chat, not main conversation) - like Cursor */}
+                    {chatId && (message as any).toolCalls && (message as any).toolCalls.length > 0 && (
+                      (() => {
+                        const fileChanges = extractFileChanges((message as any).toolCalls);
+                        if (fileChanges.length > 0) {
+                          return (
+                            <div className="w-full mt-4">
+                              <FileChangesDisplay files={fileChanges} />
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()
+                    )}
+                    
+                    {/* Tool calls display - user-friendly (collapsed by default, only show if expanded) */}
+                    {(message as any).toolCalls && (message as any).toolCalls.length > 0 && (
+                      <details className="w-full space-y-2 mt-2">
+                        <summary className="text-xs text-muted-foreground/80 cursor-pointer font-medium list-none">
+                          <span className="hover:text-foreground/80 transition-colors">Actions</span>
+                        </summary>
+                        <div className="mt-2 space-y-2">
+                          {(message as any).toolCalls.map((tc: any) => (
+                            <ToolCallItem key={tc.id} toolCall={tc} />
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 )}
               </div>
@@ -969,27 +1118,45 @@ export default function ChatPanel({
                 <Loader2 className="w-4 h-4 animate-spin text-foreground" />
               </div>
               <div className="flex-1">
-                {/* Show current tool calls while streaming */}
+                {/* Show file changes while streaming (only in chat) */}
+                {chatId && currentToolCalls && currentToolCalls.length > 0 && (
+                  (() => {
+                    const fileChanges = extractFileChanges(currentToolCalls);
+                    if (fileChanges.length > 0) {
+                      return (
+                        <div className="w-full mb-4">
+                          <FileChangesDisplay files={fileChanges} />
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()
+                )}
+                
+                {/* Show current tool calls while streaming - user-friendly */}
                 {currentToolCalls && currentToolCalls.length > 0 && (
                   <div className="w-full space-y-2 mb-4">
-                    <div className="text-[10px] uppercase text-muted-foreground flex items-center gap-2">
-                      Tool Calls
+                    <div className="text-xs text-muted-foreground/80 flex items-center gap-2 font-medium">
+                      Actions
                     </div>
                     {currentToolCalls.map((tc: any) => (
                       <ToolCallItem key={tc.id} toolCall={tc} />
                     ))}
                   </div>
                 )}
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium text-foreground">
-                    {isProcessingTemplate ? "Loading Template" : "Processing"}
-                  </span>
-                </div>
-                <div className="text-sm text-foreground">
-                  {isProcessingTemplate
-                    ? "Setting up your project template..."
-                    : "Analyzing your request..."}
-                </div>
+                
+                {isProcessingTemplate && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-medium text-foreground">
+                      Loading Template
+                    </span>
+                  </div>
+                )}
+                {isProcessingTemplate && (
+                  <div className="text-sm text-foreground">
+                    Setting up your project template...
+                  </div>
+                )}
               </div>
             </div>
           )}

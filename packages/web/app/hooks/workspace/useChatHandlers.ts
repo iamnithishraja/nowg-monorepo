@@ -70,8 +70,18 @@ export function useChatHandlers({
           // Import utilities once for this function scope
           const { loadConversation, convertToUIMessages } = await import("../../utils/workspaceApi");
           
-          // Store user message in chat first
-          const userMessageResponse = await fetch("/api/conversations?conversationId=" + conversationId, {
+          // Add user message to UI immediately for better UX
+          const userMessage: Message = {
+            id: `user-${Date.now()}`,
+            role: "user",
+            content: messageContent,
+          };
+          chat.addMessage(userMessage, isMountedRef);
+
+          // Store user message in chat (async, don't block)
+          // Don't reload messages here as it would overwrite streaming assistant message
+          // The messages will be synced when the assistant response completes
+          fetch("/api/conversations?conversationId=" + conversationId, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -82,17 +92,14 @@ export function useChatHandlers({
                 content: messageContent,
               },
             }),
+          }).then(async (response) => {
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              console.error("Failed to store user message:", errorData);
+            }
+          }).catch((error) => {
+            console.error("Error storing user message:", error);
           });
-
-          if (!userMessageResponse.ok) {
-            const errorData = await userMessageResponse.json().catch(() => ({}));
-            throw new Error(errorData.error || `Failed to store user message: ${userMessageResponse.status}`);
-          }
-
-          // Reload chat messages to update UI (this ensures messages are isolated to this chat)
-          const chatData = await loadConversation(conversationId, chatId);
-          const uiMessages = convertToUIMessages(chatData.messages || []);
-          chat.setMessages(uiMessages);
 
           chat.setIsLoading(true);
           chat.setIsStreaming(true);
@@ -130,8 +137,8 @@ export function useChatHandlers({
           }
 
           // Process agent stream with multi-step loop support
-          const processAgentStream = async (response: Response, sessionId?: string, currentStep = 0): Promise<{ text: string; toolCalls: any[] }> => {
-            console.log("[ChatHandler] Starting to process agent stream, step:", currentStep);
+          const processAgentStream = async (response: Response, sessionId?: string, currentStep = 0, isContinuation = false): Promise<{ text: string; toolCalls: any[] }> => {
+            console.log("[ChatHandler] Starting to process agent stream, step:", currentStep, "| Continuation:", isContinuation);
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
             let assistantText = "";
@@ -139,6 +146,11 @@ export function useChatHandlers({
             let currentToolCalls: any[] = [];
             let currentSessionId = sessionId;
             let messagesForContinuation: any[] = [];
+
+            // If this is a continuation, start a new assistant message
+            if (isContinuation) {
+              chat.beginAssistantMessage(isMountedRef);
+            }
 
             if (!reader) {
               throw new Error("No response stream");
@@ -236,36 +248,64 @@ export function useChatHandlers({
                     const toolResults = [];
                     for (const toolCall of allToolsToExecute) {
                       try {
-                        console.log("[ChatHandler] Executing tool:", toolCall.name);
+                        console.log("[ChatHandler] Executing tool:", toolCall.name, "| Args:", JSON.stringify(toolCall.args).substring(0, 200));
                         const { ToolRegistry } = await import("../../tools/registry");
                         const tool = ToolRegistry.get(toolCall.name);
-                        if (tool) {
-                          const toolCallIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
-                          if (toolCallIndex >= 0) {
-                            allToolCalls[toolCallIndex] = {
-                              ...allToolCalls[toolCallIndex],
-                              status: "executing" as const,
-                            };
-                            chat.setCurrentToolCalls([...allToolCalls.filter(tc => currentToolCalls.some(ctc => ctc.id === tc.id))]);
-                          }
+                        if (!tool) {
+                          console.error("[ChatHandler] Tool not found:", toolCall.name);
+                          throw new Error(`Tool "${toolCall.name}" not found in registry`);
+                        }
+                        
+                        const toolCallIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
+                        if (toolCallIndex >= 0) {
+                          allToolCalls[toolCallIndex] = {
+                            ...allToolCalls[toolCallIndex],
+                            status: "executing" as const,
+                          };
+                          chat.setCurrentToolCalls([...allToolCalls.filter(tc => currentToolCalls.some(ctc => ctc.id === tc.id))]);
+                        }
 
-                          const result = await tool.execute(toolCall.args, {
+                        // Execute with better error context
+                        let result;
+                        try {
+                          result = await tool.execute(toolCall.args, {
                             sessionID: currentSessionId || "chat-session",
                             messageID: `msg-${Date.now()}`,
                             metadata: () => {},
                           });
                           
-                          console.log("[ChatHandler] Tool executed successfully:", toolCall.name);
-                          const executedIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
-                          if (executedIndex >= 0) {
-                            allToolCalls[executedIndex] = {
-                              ...allToolCalls[executedIndex],
-                              status: "completed" as const,
-                              result,
-                              endTime: Date.now(),
-                            };
-                            chat.setCurrentToolCalls([...allToolCalls.filter(tc => currentToolCalls.some(ctc => ctc.id === tc.id))]);
+                          // Validate result
+                          if (!result) {
+                            throw new Error("Tool returned no result");
                           }
+                          
+                          // Check if result has output (success) or error
+                          const hasOutput = result && typeof result === 'object' && 'output' in result;
+                          const hasError = result && typeof result === 'object' && 'error' in result;
+                          
+                          if (!hasOutput && !hasError) {
+                            console.warn("[ChatHandler] Tool result format unexpected:", result);
+                          }
+                          
+                          console.log("[ChatHandler] Tool executed successfully:", toolCall.name, "| Has output:", hasOutput);
+                        } catch (executeError) {
+                          console.error("[ChatHandler] Tool execution failed:", toolCall.name, "| Error:", executeError);
+                          // Re-throw with more context
+                          throw new Error(
+                            `Tool "${toolCall.name}" execution failed: ${executeError instanceof Error ? executeError.message : String(executeError)}`
+                          );
+                        }
+                          
+                        const executedIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
+                        if (executedIndex >= 0) {
+                          allToolCalls[executedIndex] = {
+                            ...allToolCalls[executedIndex],
+                            status: "completed" as const,
+                            result,
+                            endTime: Date.now(),
+                          };
+                          chat.setCurrentToolCalls([...allToolCalls.filter(tc => currentToolCalls.some(ctc => ctc.id === tc.id))]);
+                        }
 
                           // If this is a file-writing tool (edit, write, multiedit), update UI files state
                           if (["edit", "write", "multiedit"].includes(toolCall.name)) {
@@ -347,9 +387,6 @@ export function useChatHandlers({
                             },
                           });
                           console.log("[ChatHandler] Tool result prepared:", toolCall.name, "| Output length:", output?.length || 0);
-                        } else {
-                          console.error("[ChatHandler] Tool not found:", toolCall.name);
-                        }
                       } catch (toolError) {
                         console.error("[ChatHandler] Tool execution error:", toolError);
                         const errorIndex = allToolCalls.findIndex(tc => tc.id === toolCall.id);
@@ -404,12 +441,14 @@ export function useChatHandlers({
                         throw new Error(`Agent continuation error: ${continuationResponse.status} - ${errorText}`);
                       }
 
-                      // Recursively process the continuation stream
+                      // Recursively process the continuation stream (create new message for continuation)
                       console.log("[ChatHandler] Processing continuation stream");
-                      const continuationResult = await processAgentStream(continuationResponse, currentSessionId, (data.step || currentStep) + 1);
-                      assistantText += continuationResult.text;
+                      const continuationResult = await processAgentStream(continuationResponse, currentSessionId, (data.step || currentStep) + 1, true);
+                      // Don't accumulate continuation text into previous message - it's already in a new message
+                      // Just collect tool calls
                       allToolCalls = [...allToolCalls, ...continuationResult.toolCalls];
-                      console.log("[ChatHandler] Continuation complete | Total text:", assistantText.length, "| Total tool calls:", allToolCalls.length);
+                      console.log("[ChatHandler] Continuation complete | Continuation text:", continuationResult.text.length, "| Total tool calls:", allToolCalls.length);
+                      // Return accumulated text from this step only (continuation text is in separate message)
                       return { text: assistantText, toolCalls: allToolCalls };
                     } else {
                       // No tools to execute or max steps reached - return current state
@@ -436,54 +475,69 @@ export function useChatHandlers({
           const result = await processAgentStream(response);
           console.log("[ChatHandler] Agent stream processing complete | Text:", result.text.length, "chars | Tool calls:", result.toolCalls.length);
           
-          // Store assistant message with tool calls
-          const assistantMessage = {
-            role: "assistant",
-            content: result.text,
-            model: effectiveModel,
-            toolCalls: result.toolCalls.map(tc => ({
-              id: tc.id,
-              name: tc.name,
-              args: tc.args,
-              status: tc.status,
-              result: tc.result,
-              startTime: tc.startTime,
-              endTime: tc.endTime,
-              category: tc.category,
-            })),
-          };
-
-          // Update the last assistant message with final content and tool calls
-          const lastMessage = chat.messages[chat.messages.length - 1];
-          if (lastMessage && lastMessage.role === "assistant") {
+          // Get current messages snapshot
+          const currentMessages = [...chat.messages];
+          const allAssistantMessages = currentMessages.filter(m => m.role === "assistant");
+          const lastAssistantMessage = allAssistantMessages[allAssistantMessages.length - 1];
+          
+          if (lastAssistantMessage) {
+            // Get the final content - prefer UI content (it has full streaming text)
+            const uiContent = typeof lastAssistantMessage.content === "string" 
+              ? lastAssistantMessage.content 
+              : "";
+            // Use result.text if it's longer (more complete)
+            const finalContent = result.text && result.text.length > uiContent.length
+              ? result.text
+              : uiContent || result.text || "";
+            
+            // Update the last assistant message with final content and tool calls
             chat.setMessages(prev => prev.map(msg => 
-              msg.id === lastMessage.id 
-                ? { ...msg, content: result.text, toolCalls: result.toolCalls }
+              msg.id === lastAssistantMessage.id 
+                ? { 
+                    ...msg, 
+                    content: finalContent, 
+                    toolCalls: result.toolCalls.length > 0 ? result.toolCalls : (msg as any).toolCalls || []
+                  }
                 : msg
             ));
+            
+            // Store assistant message in chat with final content
+            if (finalContent) {
+              const assistantMessage = {
+              role: "assistant",
+              content: finalContent,
+              model: effectiveModel,
+              toolCalls: result.toolCalls.map(tc => ({
+                id: tc.id,
+                name: tc.name,
+                args: tc.args,
+                status: tc.status,
+                result: tc.result,
+                startTime: tc.startTime,
+                endTime: tc.endTime,
+                category: tc.category,
+              })),
+            };
+
+            const assistantMessageResponse = await fetch("/api/conversations?conversationId=" + conversationId, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "addChatMessage",
+                chatId: chatId,
+                message: assistantMessage,
+              }),
+            });
+
+            if (!assistantMessageResponse.ok) {
+              const errorData = await assistantMessageResponse.json().catch(() => ({}));
+              console.error("Failed to store assistant message:", errorData);
+              // Don't throw - we still want to show the message in UI even if storage fails
+            }
+            // Don't reload from DB - it would overwrite our streaming content
+            // The UI already has the complete content, no need to sync
+            }
           }
-
-          // Store assistant message in chat
-          const assistantMessageResponse = await fetch("/api/conversations?conversationId=" + conversationId, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "addChatMessage",
-              chatId: chatId,
-              message: assistantMessage,
-            }),
-          });
-
-          if (!assistantMessageResponse.ok) {
-            const errorData = await assistantMessageResponse.json().catch(() => ({}));
-            console.error("Failed to store assistant message:", errorData);
-            // Don't throw - we still want to show the message in UI even if storage fails
-          }
-
-          // Reload chat messages to ensure UI matches database (this ensures messages are isolated)
-          const finalChatData = await loadConversation(conversationId, chatId);
-          const finalUiMessages = convertToUIMessages(finalChatData.messages || []);
-          chat.setMessages(finalUiMessages);
 
           chat.setIsLoading(false);
           chat.setIsStreaming(false);

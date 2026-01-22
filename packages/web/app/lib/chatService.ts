@@ -625,6 +625,46 @@ export class ChatService {
         console.error("[ChatService] Error updating profile:", profileError);
       }
 
+      // Generate title from first user message asynchronously (non-blocking)
+      // This allows the message to appear in UI immediately while title is generated in background
+      if (message.role === "user" && typeof message.content === "string" && message.content.trim()) {
+        // Check if chat has a default/generic title that should be replaced
+        const isDefaultTitle = /^Chat \d+$/.test(chat.title) || 
+                               chat.title === "New Chat" || 
+                               !chat.title || 
+                               chat.title.trim() === "";
+        
+        if (isDefaultTitle) {
+          // Fire and forget - don't await, let it run in background
+          // Check if this is the first user message in the chat
+          Messages.countDocuments({
+            chatId: new mongoose.Types.ObjectId(chatId),
+            role: "user",
+          }).then((existingUserMessages) => {
+            if (existingUserMessages === 1) { // 1 because we just added this message
+              // This is the first user message - generate title asynchronously
+              console.log("[ChatService] Generating title for chat:", chatId, "| Message:", message.content.substring(0, 50));
+              this.generateTitle(message.content)
+                .then((generatedTitle) => {
+                  console.log("[ChatService] Title generated:", generatedTitle);
+                  return Chat.findByIdAndUpdate(chatId, {
+                    $set: { title: generatedTitle },
+                  });
+                })
+                .then(() => {
+                  console.log("[ChatService] Chat title updated successfully");
+                })
+                .catch((titleError) => {
+                  console.error("[ChatService] Error generating chat title:", titleError);
+                  // Don't fail message creation if title generation fails
+                });
+            }
+          }).catch((countError) => {
+            console.error("[ChatService] Error counting user messages for title generation:", countError);
+          });
+        }
+      }
+
       return result._id.toString();
     } catch (error) {
       console.error("Error adding message to chat:", error);
