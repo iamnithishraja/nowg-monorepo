@@ -182,6 +182,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         const result = await tool.execute(toolCall.args, {
           sessionID: state.sessionId || "agent-session",
           messageID: `msg-${Date.now()}`,
+          abort: abortControllerRef.current?.signal,
           metadata: () => {},
         });
 

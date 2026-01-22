@@ -7,7 +7,6 @@ import type { Message } from "../types/chat";
 import { Button } from "./ui/button";
 import { FileCreationChecklist } from "./FileCreationChecklist";
 import { createClientFileStorageService } from "../lib/clientFileStorage";
-import { MessageModelSelector } from "./MessageModelSelector";
 import { 
   FileCode, 
   Terminal, 
@@ -1038,18 +1037,6 @@ export default function ChatPanel({
                 {/* Assistant message - clean text with file changes */}
                 {message.role === "assistant" && segments.length > 0 && (
                   <div className="w-full max-w-full space-y-4">
-                    {/* Model selector for assistant messages */}
-                    {conversationId && (message as any).model && (
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MessageModelSelector
-                          messageId={message.id}
-                          conversationId={conversationId}
-                          currentModel={(message as any).model}
-                          size="sm"
-                        />
-                      </div>
-                    )}
-                    
                     {/* Render text segments first (like Cursor) */}
                     {segments.map((segment, idx) => (
                       <div key={`segment-${idx}`}>

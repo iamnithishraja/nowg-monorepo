@@ -271,6 +271,7 @@ export function useChatHandlers({
                           result = await tool.execute(toolCall.args, {
                             sessionID: currentSessionId || "chat-session",
                             messageID: `msg-${Date.now()}`,
+                            abort: abortController.signal,
                             metadata: () => {},
                           });
                           
