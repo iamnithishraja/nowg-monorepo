@@ -491,15 +491,42 @@ export function useChatHandlers({
               : uiContent || result.text || "";
             
             // Update the last assistant message with final content and tool calls
-            chat.setMessages(prev => prev.map(msg => 
-              msg.id === lastAssistantMessage.id 
-                ? { 
-                    ...msg, 
-                    content: finalContent, 
-                    toolCalls: result.toolCalls.length > 0 ? result.toolCalls : (msg as any).toolCalls || []
-                  }
-                : msg
-            ));
+            // Ensure all tool calls have "completed" status for proper file changes display
+            const finalizedToolCalls = result.toolCalls.length > 0 
+              ? result.toolCalls.map(tc => ({
+                  ...tc,
+                  status: tc.status === "error" ? "error" : "completed" as const,
+                }))
+              : (lastAssistantMessage as any).toolCalls || [];
+            
+            // Update message with toolCalls BEFORE clearing currentToolCalls
+            chat.setMessages((prev: Message[]) => {
+              const updated = prev.map((msg: Message) => 
+                msg.id === lastAssistantMessage.id 
+                  ? { 
+                      ...msg, 
+                      content: finalContent, 
+                      toolCalls: finalizedToolCalls
+                    }
+                  : msg
+              );
+              
+              // Verify the update worked
+              const updatedMessage = updated.find((m: Message) => m.id === lastAssistantMessage.id);
+              console.log("[ChatHandler] Updated message with toolCalls:", {
+                messageId: lastAssistantMessage.id,
+                toolCallsCount: finalizedToolCalls.length,
+                fileChangesCount: finalizedToolCalls.filter((tc: any) => ["edit", "write", "multiedit"].includes(tc.name)).length,
+                messageHasToolCalls: !!(updatedMessage as any)?.toolCalls,
+                messageToolCallsCount: (updatedMessage as any)?.toolCalls?.length || 0,
+              });
+              
+              return updated;
+            });
+            
+            // Longer delay to ensure React state update completes and component re-renders
+            // This ensures file changes display persists smoothly
+            await new Promise(resolve => setTimeout(resolve, 100));
             
             // Store assistant message in chat with final content
             if (finalContent) {
@@ -507,11 +534,12 @@ export function useChatHandlers({
               role: "assistant",
               content: finalContent,
               model: effectiveModel,
-              toolCalls: result.toolCalls.map(tc => ({
+              // Use finalized toolCalls (with completed status) for storage
+              toolCalls: finalizedToolCalls.map((tc: any) => ({
                 id: tc.id,
                 name: tc.name,
                 args: tc.args,
-                status: tc.status,
+                status: tc.status === "error" ? "error" : "completed", // Ensure completed status
                 result: tc.result,
                 startTime: tc.startTime,
                 endTime: tc.endTime,

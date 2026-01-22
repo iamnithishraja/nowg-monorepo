@@ -124,6 +124,13 @@ export const convertToUIMessages = (messages: any[]): Message[] => {
       role: msg.role,
       content: msg.content || "", // Ensure content is never undefined
       files: msg.files || undefined, // Preserve file metadata
+      // Preserve toolCalls for assistant messages (needed for file changes display)
+      ...(msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0 
+        ? { toolCalls: msg.toolCalls } 
+        : {}),
+      // Preserve other message metadata
+      ...(msg.model ? { model: msg.model } : {}),
+      ...(msg.timestamp ? { timestamp: msg.timestamp } : {}),
     }));
 };
 

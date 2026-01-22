@@ -1079,19 +1079,38 @@ export default function ChatPanel({
                     ))}
                     
                     {/* File changes display at the end (only in chat, not main conversation) - like Cursor */}
-                    {chatId && (message as any).toolCalls && (message as any).toolCalls.length > 0 && (
-                      (() => {
-                        const fileChanges = extractFileChanges((message as any).toolCalls);
-                        if (fileChanges.length > 0) {
-                          return (
-                            <div className="w-full mt-4">
-                              <FileChangesDisplay files={fileChanges} />
-                            </div>
-                          );
-                        }
+                    {chatId && (() => {
+                      // Get toolCalls from message (persists after streaming) or currentToolCalls (during streaming)
+                      const messageToolCalls = (message as any).toolCalls;
+                      const isLastMessage = message.id === messages[messages.length - 1]?.id;
+                      
+                      // Priority: message.toolCalls (persists) > currentToolCalls (during streaming for last message)
+                      let toolCallsToUse: any[] | null = null;
+                      
+                      // Always check message's toolCalls first (works after streaming completes)
+                      if (messageToolCalls && Array.isArray(messageToolCalls) && messageToolCalls.length > 0) {
+                        toolCallsToUse = messageToolCalls;
+                      } 
+                      // Fallback to currentToolCalls only if this is the last message and we're still loading
+                      // OR if we just finished loading (isLoading might be false but currentToolCalls still has data briefly)
+                      else if (isLastMessage && currentToolCalls && currentToolCalls.length > 0) {
+                        toolCallsToUse = currentToolCalls;
+                      }
+                      
+                      if (!toolCallsToUse || toolCallsToUse.length === 0) {
                         return null;
-                      })()
-                    )}
+                      }
+                      
+                      const fileChanges = extractFileChanges(toolCallsToUse);
+                      if (fileChanges.length > 0) {
+                        return (
+                          <div className="w-full mt-4">
+                            <FileChangesDisplay files={fileChanges} />
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                     
                     {/* Tool calls display - user-friendly (collapsed by default, only show if expanded) */}
                     {(message as any).toolCalls && (message as any).toolCalls.length > 0 && (
