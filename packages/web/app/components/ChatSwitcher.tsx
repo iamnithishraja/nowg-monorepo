@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, MessageSquare } from "lucide-react";
+import { ChevronDown, MessageSquare, Check, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
+import { cn } from "../lib/utils";
 
 interface Chat {
   id: string;
@@ -54,68 +57,108 @@ export function ChatSwitcher({
     };
 
     loadChats();
-  }, [conversationId]);
+  }, [conversationId, currentChatId]);
 
   const currentChat = currentChatId
     ? chats.find((c) => c.id === currentChatId)
     : null;
-  const currentTitle = currentChat?.title || "Main Chat";
+  const currentTitle = currentChat?.title || "Main";
+
+  if (!isLoading && chats.length === 0) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-2/50 transition-colors text-sm font-medium text-primary">
-          <MessageSquare className="w-4 h-4" />
-          <span className="max-w-[120px] truncate">{currentTitle}</span>
-          <ChevronDown className="w-3.5 h-3.5 text-tertiary" />
+        <button className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-surface-2/50 transition-colors text-xs font-medium text-muted-foreground hover:text-foreground border border-transparent hover:border-border/30">
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span className="max-w-[80px] truncate">{currentTitle}</span>
+          <ChevronDown className="w-3 h-3 opacity-50" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-64 bg-surface-1 border-border/50 max-h-[300px] overflow-y-auto"
+        className="w-56 bg-surface-1/95 backdrop-blur-xl border-border/50 shadow-xl shadow-black/20"
       >
+        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1.5">
+          Switch Chat
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-border/30" />
+
         {isLoading ? (
-          <div className="px-2 py-1.5 text-sm text-muted-foreground">
-            Loading chats...
-          </div>
-        ) : chats.length === 0 ? (
-          <div className="px-2 py-1.5 text-sm text-muted-foreground">
-            No chats yet
+          <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>Loading...</span>
           </div>
         ) : (
           <>
             {/* Main chat option (no chatId) */}
             <DropdownMenuItem
               onClick={() => onChatChange(null)}
-              className={`gap-2 cursor-pointer ${
-                !currentChatId ? "bg-primary/10" : ""
-              }`}
+              className={cn(
+                "gap-2 cursor-pointer rounded-md mx-1 my-0.5",
+                !currentChatId && "bg-purple-500/10 text-purple-400"
+              )}
             >
-              <MessageSquare className="w-4 h-4" />
-              <div className="flex flex-col flex-1">
-                <span className="text-sm">Main Chat</span>
-                <span className="text-xs text-muted-foreground">
-                  All messages
+              <div
+                className={cn(
+                  "w-5 h-5 rounded-md flex items-center justify-center shrink-0",
+                  !currentChatId
+                    ? "bg-purple-500/20 border border-purple-500/30"
+                    : "bg-surface-2 border border-border/30"
+                )}
+              >
+                {!currentChatId ? (
+                  <Check className="w-3 h-3 text-purple-400" />
+                ) : (
+                  <MessageSquare className="w-3 h-3 text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex flex-col flex-1 min-w-0">
+                <span className="text-sm font-medium">Main Conversation</span>
+                <span className="text-[10px] text-muted-foreground">
+                  Original project chat
                 </span>
               </div>
             </DropdownMenuItem>
+
             {chats.length > 0 && (
-              <div className="h-px bg-border/50 my-1" />
+              <DropdownMenuSeparator className="bg-border/30 my-1" />
             )}
-            {/* Individual chats */}
+
+            {/* Side chats */}
             {chats.map((chat) => (
               <DropdownMenuItem
                 key={chat.id}
                 onClick={() => onChatChange(chat.id)}
-                className={`gap-2 cursor-pointer ${
-                  currentChatId === chat.id ? "bg-primary/10" : ""
-                }`}
+                className={cn(
+                  "gap-2 cursor-pointer rounded-md mx-1 my-0.5",
+                  currentChatId === chat.id &&
+                    "bg-purple-500/10 text-purple-400"
+                )}
               >
-                <MessageSquare className="w-4 h-4" />
+                <div
+                  className={cn(
+                    "w-5 h-5 rounded-md flex items-center justify-center shrink-0",
+                    currentChatId === chat.id
+                      ? "bg-purple-500/20 border border-purple-500/30"
+                      : "bg-surface-2 border border-border/30"
+                  )}
+                >
+                  {currentChatId === chat.id ? (
+                    <Check className="w-3 h-3 text-purple-400" />
+                  ) : (
+                    <MessageSquare className="w-3 h-3 text-muted-foreground" />
+                  )}
+                </div>
                 <div className="flex flex-col flex-1 min-w-0">
-                  <span className="text-sm truncate">{chat.title}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {chat.messageCount} message{chat.messageCount !== 1 ? "s" : ""}
+                  <span className="text-sm font-medium truncate">
+                    {chat.title}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {chat.messageCount} message
+                    {chat.messageCount !== 1 ? "s" : ""}
                   </span>
                 </div>
               </DropdownMenuItem>
@@ -126,4 +169,3 @@ export function ChatSwitcher({
     </DropdownMenu>
   );
 }
-

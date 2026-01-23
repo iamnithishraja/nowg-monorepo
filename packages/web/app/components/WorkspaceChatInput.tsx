@@ -40,9 +40,9 @@ import {
 import { Switch } from "./ui/switch";
 import { Textarea } from "./ui/textarea";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
+Tooltip,
+TooltipContent,
+TooltipTrigger,
 } from "./ui/tooltip";
 import { PlusCircle, SelectionPlus } from "phosphor-react";
 import { ArrowUp } from "lucide-react";
@@ -361,62 +361,62 @@ export function WorkspaceChatInput({
               {/* Input */}
               <div className="relative">
                 <div className="pb-10">
-              <Textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={chatMode === "ask" 
-                  ? `Ask a question... (${shortcutLabel} to send)`
-                  : `Describe what you want to build... (${shortcutLabel} to start)`}
-                disabled={isDisabled || isEnhancing}
-                className="w-full h-24 resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none p-3"
-              />
+                  <Textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={chatMode === "ask"
+                        ? `Ask a question... (${shortcutLabel} to send)`
+                        : `Describe what you want to build... (${shortcutLabel} to start)`}
+                    disabled={isDisabled || isEnhancing}
+                    className="w-full h-24 resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none p-3"
+                  />
                 </div>
 
-            {/* Bottom Bar with Buttons */}
-            <div className="absolute bottom-0 left-0 right-0 h-12 px-2 flex items-center gap-2">
-              {/* Chat Mode Toggle */}
-              <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5">
-                <Button
-                  onClick={() => setChatMode("build")}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-6 px-2 text-xs font-medium transition-all",
-                    chatMode === "build"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Cursor className="w-3 h-3 mr-1" />
-                  Build
-                </Button>
-                <Button
-                  onClick={() => setChatMode("ask")}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-6 px-2 text-xs font-medium transition-all",
-                    chatMode === "ask"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <ChatCircle className="w-3 h-3 mr-1" />
-                  Ask
-                </Button>
-              </div>
+                {/* Bottom Bar with Buttons */}
+                <div className="absolute bottom-0 left-0 right-0 h-12 px-2 flex items-center gap-2">
+                  {/* Chat Mode Toggle */}
+                  <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5">
+                    <Button
+                      onClick={() => setChatMode("build")}
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-6 px-2 text-xs font-medium transition-all",
+                        chatMode === "build"
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Cursor className="w-3 h-3 mr-1" />
+                      Build
+                    </Button>
+                    <Button
+                      onClick={() => setChatMode("ask")}
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-6 px-2 text-xs font-medium transition-all",
+                        chatMode === "ask"
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <ChatCircle className="w-3 h-3 mr-1" />
+                      Ask
+                    </Button>
+                  </div>
 
-              <Button
-                onClick={handleFileSelect}
-                variant="ghost"
-                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-              >
-                <Upload className="w-4 h-4" />
-              </Button>
+                  <Button
+                    onClick={handleFileSelect}
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </Button>
 
-              <div className="flex-1" />
+                  <div className="flex-1" />
 
                   <Button
                     onClick={handleEnhance}
@@ -531,7 +531,8 @@ export function WorkspaceChatInput({
                     </div>
                     <div className="px-1.5 pt-1.5 pb-0">
                       <span className="text-[11px] text-muted-foreground">
-                        Tip: Click an example to insert it into the prompt field.
+                        Tip: Click an example to insert it into the prompt
+                        field.
                       </span>
                     </div>
                   </DropdownMenuContent>
@@ -607,34 +608,38 @@ export function WorkspaceChatInput({
             )}
           >
             {/* Text Input */}
-            <div className="pb-11">
+            <div className="pb-12">
               <Textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={chatMode === "ask" ? "Ask a question..." : "What shall we build today?"}
+                placeholder={
+                  chatMode === "ask"
+                    ? "Ask a question..."
+                    : "What shall we build today?"
+                }
                 disabled={isDisabled || isEnhancing}
-                className="w-full min-h-24 resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none px-4 py-3 bg-transparent text-primary placeholder-tertiary text-sm"
+                className="w-full min-h-20 resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none px-4 py-3 bg-transparent text-primary placeholder-tertiary text-sm"
               />
             </div>
 
             {/* Bottom Bar with Buttons */}
-            <div className="absolute bottom-0 left-0 right-0 h-11 px-3 flex items-center gap-2">
-              {/* Chat Mode Toggle */}
-              <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5">
+            <div className="absolute bottom-0 left-0 right-0 h-12 px-3 flex items-center gap-1.5 border-t border-border/20 bg-surface-2/50">
+              {/* Chat Mode Toggle - With Text */}
+              <div className="flex items-center rounded-md border border-border/40 bg-surface-1/50 p-0.5">
                 <Button
                   onClick={() => setChatMode("build")}
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-7 px-2 text-xs font-medium transition-all",
+                    "h-6 px-2 text-xs gap-1 transition-all rounded-sm",
                     chatMode === "build"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "accent-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-transparent"
                   )}
                 >
-                  <Cursor className="w-3 h-3 mr-1" />
+                  <Cursor className="w-3 h-3" />
                   Build
                 </Button>
                 <Button
@@ -642,36 +647,52 @@ export function WorkspaceChatInput({
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-7 px-2 text-xs font-medium transition-all",
+                    "h-6 px-2 text-xs gap-1 transition-all rounded-sm",
                     chatMode === "ask"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "accent-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-transparent"
                   )}
                 >
-                  <ChatCircle className="w-3 h-3 mr-1" />
+                  <ChatCircle className="w-3 h-3" />
                   Ask
                 </Button>
               </div>
 
-              {/* Model Selector - Always visible */}
+              {/* Divider */}
+              <div className="w-px h-5 bg-border/30" />
+
+              {/* Model Selector - Compact with concise names */}
               {selectedModel && onModelChange && (
-                <Select
-                  value={selectedModel}
-                  onValueChange={(value) => {
-                    if (onModelChange) {
-                      onModelChange(value);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-auto min-w-[140px] bg-muted/50 border border-border/60 text-foreground text-xs hover:bg-muted hover:border-primary/30 transition-all">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background/80 border border-primary/30">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                    >
+                      <span className="max-w-[100px] truncate">
+                        {OPENROUTER_MODELS.find((m) => m.id === selectedModel)
+                          ?.shortName || "Model"}
+                      </span>
+                      <CaretRight className="w-3 h-3 rotate-90" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-56 bg-surface-1 border-border/50"
+                  >
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">
+                      Select Model
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
                     {OPENROUTER_MODELS.map((model) => (
-                      <SelectItem
+                      <DropdownMenuItem
                         key={model.id}
-                        value={model.id}
-                        className="text-foreground hover:bg-primary/20"
+                        onClick={() => onModelChange(model.id)}
+                        className={cn(
+                          "cursor-pointer",
+                          selectedModel === model.id && "bg-primary/10"
+                        )}
                       >
                         <div className="flex flex-col">
                           <span className="text-sm">{model.name}</span>
@@ -679,23 +700,16 @@ export function WorkspaceChatInput({
                             {model.provider}
                           </span>
                         </div>
-                      </SelectItem>
+                      </DropdownMenuItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-              
-              {/* Upload Button */}
-              <Button
-                onClick={handleFileSelect}
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-tertiary hover:text-primary hover:bg-surface-3/50 rounded-full transition-colors"
-              >
-                <PlusCircle className="w-4 h-4" />
-              </Button>
 
-              {/* Edit Button */}
+              {/* Divider */}
+              <div className="w-px h-5 bg-border/30" />
+
+              {/* Edit Canvas Button - With Text */}
               <Button
                 onClick={() => {
                   if (!isEditActive) {
@@ -719,10 +733,10 @@ export function WorkspaceChatInput({
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "h-8 px-3 rounded-lg gap-1.5 text-xs font-medium transition-all border",
+                  "h-7 px-2 text-xs gap-1 transition-all",
                   isEditActive
-                    ? "bg-[var(--accent-primary)]/20 text-accent-primary border-[var(--accent-primary)]/30 hover:bg-[var(--accent-primary)]/30"
-                    : "bg-surface-3/50 text-secondary border-subtle hover:bg-surface-3 hover:text-primary"
+                    ? "text-accent-primary accent-primary/20"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
                 title={
                   isEditActive
@@ -737,39 +751,62 @@ export function WorkspaceChatInput({
               {/* Spacer */}
               <div className="flex-1" />
 
+              {/* Upload Button - Right aligned */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleFileSelect}
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Upload files
+                </TooltipContent>
+              </Tooltip>
+
               {/* Action Buttons */}
               {!isLoading && !isStreaming && (
-                <Button
-                  onClick={handleEnhance}
-                  disabled={!input.trim() || isDisabled || isEnhancing}
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 text-tertiary hover:text-accent-primary hover:bg-[var(--accent-primary)]/10 rounded-full transition-colors"
-                  title="Enhance prompt"
-                >
-                  {isEnhancing ? (
-                    <SpinnerGap className="w-4 h-4 animate-spin text-accent-primary" />
-                  ) : (
-                    <Sparkle className="w-4 h-4" />
-                  )}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleEnhance}
+                      disabled={!input.trim() || isDisabled || isEnhancing}
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-accent-primary disabled:opacity-30"
+                    >
+                      {isEnhancing ? (
+                        <SpinnerGap className="w-3.5 h-3.5 animate-spin text-accent-primary" />
+                      ) : (
+                        <Sparkle className="w-3.5 h-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Enhance prompt
+                  </TooltipContent>
+                </Tooltip>
               )}
 
-              {/* Send button - Purple styled */}
+              {/* Send button */}
               {!isLoading && !isStreaming && (
                 <Button
                   onClick={handleSend}
                   disabled={!input.trim() || isDisabled || isEnhancing}
                   size="sm"
                   className={cn(
-                    "h-8 w-8 p-0 rounded-full transition-all",
+                    "h-7 w-7 p-0 rounded-full transition-all",
                     input.trim() && !isDisabled && !isEnhancing
                       ? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-hover)]"
                       : "bg-surface-3 text-tertiary cursor-not-allowed"
                   )}
                   title="Send message"
                 >
-                  <ArrowUp className="w-4 h-4" />
+                  <ArrowUp className="w-3.5 h-3.5" />
                 </Button>
               )}
 
@@ -778,10 +815,10 @@ export function WorkspaceChatInput({
                 <Button
                   onClick={onInterrupt}
                   size="sm"
-                  className="h-8 w-8 p-0 bg-[var(--error-500)]/20 hover:bg-[var(--error-500)]/30 text-error-500 rounded-full"
+                  className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full"
                   title="Stop generation"
                 >
-                  <Square className="w-4 h-4" />
+                  <Square className="w-3.5 h-3.5" />
                 </Button>
               )}
             </div>

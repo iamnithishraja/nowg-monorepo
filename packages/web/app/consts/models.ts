@@ -3,21 +3,25 @@ export const OPENROUTER_MODELS = [
   {
     id: "anthropic/claude-4.5-sonnet",
     name: "Claude 4.5 Sonnet",
+    shortName: "Sonnet 4.5",
     provider: "Anthropic",
   },
   {
     id: "anthropic/claude-3.5-sonnet",
     name: "Claude 3.5 Sonnet",
+    shortName: "Sonnet 3.5",
     provider: "Anthropic",
   },
   {
     id: "openai/gpt-5-nano",
     name: "GPT-5 Nano",
+    shortName: "GPT-5 Nano",
     provider: "OpenAI",
   },
   {
     id: "google/gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
+    shortName: "Gemini 2.5",
     provider: "Google",
   },
 ] as const;
