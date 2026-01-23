@@ -11,7 +11,7 @@ import { WorkspaceRightHeader } from "../components/WorkspaceRightHeader";
 import { useWorkspaceController } from "../hooks/useWorkspaceController";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useEffect, useState, useRef } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { usePreventBrowserDragDrop } from "../hooks/usePreventBrowserDragDrop";
 import { useFileHandling } from "../hooks/useFileHandling";
 import type { DesignScheme } from "../types/design-scheme";
@@ -86,6 +86,8 @@ export function meta({}: Route.MetaArgs) {
 export default function Workspace({ loaderData }: Route.ComponentProps) {
   const user = loaderData?.user;
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentChatId = searchParams.get("chatId");
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
   const [errorData, setErrorData] = useState<any>(null);
@@ -108,6 +110,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
   const lastConversationIdRef = useRef<string | null>(null);
   const messagesCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [shouldShowLoader, setShouldShowLoader] = useState(true); // Latch to prevent flicker
+  const [currentChatTitle, setCurrentChatTitle] = useState<string | null>(null);
+  const chatTitlePollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     hasSupabaseConnected,
@@ -433,25 +437,112 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     }
   };
 
+  // Reset chat title when chat changes
+  useEffect(() => {
+    setCurrentChatTitle(null);
+    if (chatTitlePollIntervalRef.current) {
+      clearTimeout(chatTitlePollIntervalRef.current);
+      chatTitlePollIntervalRef.current = null;
+    }
+  }, [currentChatId]);
+
+  // Fetch and poll for chat title when in a chat
+  useEffect(() => {
+    const fetchChatTitle = async () => {
+      if (!currentChatId || !controller.conversationId) {
+        setCurrentChatTitle(null);
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "getChats",
+            conversationId: controller.conversationId,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const chat = data.chats?.find((c: any) => c.id === currentChatId);
+          if (chat) {
+            setCurrentChatTitle(chat.title);
+            
+            // Check if title is still a default title (Chat X) and we have messages
+            // If so, keep polling for the generated title
+            const isDefaultTitle = /^Chat \d+$/.test(chat.title);
+            const hasMessages = controller.messages.length > 0;
+            
+            if (isDefaultTitle && hasMessages) {
+              // Title is being generated, poll again in 2 seconds
+              if (chatTitlePollIntervalRef.current) {
+                clearTimeout(chatTitlePollIntervalRef.current);
+              }
+              chatTitlePollIntervalRef.current = setTimeout(() => {
+                fetchChatTitle();
+              }, 2000);
+            } else {
+              // Title is generated or no messages, stop polling
+              if (chatTitlePollIntervalRef.current) {
+                clearTimeout(chatTitlePollIntervalRef.current);
+                chatTitlePollIntervalRef.current = null;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching chat title:", error);
+      }
+    };
+
+    fetchChatTitle();
+
+    return () => {
+      if (chatTitlePollIntervalRef.current) {
+        clearTimeout(chatTitlePollIntervalRef.current);
+        chatTitlePollIntervalRef.current = null;
+      }
+    };
+  }, [currentChatId, controller.conversationId, controller.messages.length]);
+
   // Use backend-generated title or fallback to first user message
   const getChatTitle = () => {
-    // Use backend-generated title if available
+    // If we're in a chat, use the chat title
+    if (currentChatId) {
+      // If we have a chat title, use it
+      if (currentChatTitle) {
+        // Check if it's still a default title and we have messages (title is being generated)
+        const isDefaultTitle = /^Chat \d+$/.test(currentChatTitle);
+        const hasMessages = controller.messages.length > 0;
+        
+        if (isDefaultTitle && hasMessages) {
+          // Title is being generated, show loading
+          return "Loading...";
+        }
+        
+        return currentChatTitle;
+      }
+      
+      // No title yet, check if we have messages
+      if (controller.messages.length > 0) {
+        // Title is being generated
+        return "Loading...";
+      }
+      
+      // No messages yet, show loading
+      return "Loading...";
+    }
+
+    // For conversations (not chats), use conversation title
     if (controller.conversationTitle) {
       return controller.conversationTitle;
     }
 
-    // If we have a conversation ID but no title, it might still be loading
+    // If we have a conversation ID but no title and no messages, it might still be loading
     if (controller.conversationId && !controller.conversationTitle) {
       return "Loading...";
-    }
-
-    // Fallback to first user message if no backend title
-    const firstUserMessage = controller.messages.find((m) => m.role === "user");
-    if (firstUserMessage?.content) {
-      const fallbackTitle =
-        firstUserMessage.content.slice(0, 50).trim() +
-        (firstUserMessage.content.length > 50 ? "..." : "");
-      return fallbackTitle;
     }
 
     return undefined;
@@ -748,7 +839,73 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
               <ResizablePanel defaultSize={28} minSize={22} maxSize={40}>
                 <div className="flex flex-col h-full min-h-0 max-h-full bg-canvas py-2">
                   {/* Left Panel Header */}
-                  <WorkspaceLeftHeader chatTitle={getChatTitle()} />
+                  <WorkspaceLeftHeader 
+                    chatTitle={getChatTitle()} 
+                    conversationId={controller.conversationId || undefined}
+                    onCreateNewChat={async () => {
+                      if (!controller.conversationId) return;
+                      try {
+                        const response = await fetch("/api/conversations", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            action: "createChat",
+                            conversationId: controller.conversationId,
+                          }),
+                        });
+                        
+                        let data;
+                        try {
+                          data = await response.json();
+                        } catch (jsonError) {
+                          console.error("Error parsing JSON response:", jsonError);
+                          const text = await response.text();
+                          console.error("Response text:", text);
+                          alert(`Failed to create chat: Invalid response from server (${response.status})`);
+                          return;
+                        }
+                        
+                        if (!response.ok) {
+                          console.error("Error creating chat:", data.error || data.message || "Unknown error");
+                          alert(`Failed to create chat: ${data.error || data.message || `Server error (${response.status})`}`);
+                          return;
+                        }
+                        
+                        if (data.success && data.chatId) {
+                          // Navigate to the new chat with chatId query parameter
+                          // Use setSearchParams instead of reload to preserve WebContainer state and preview
+                          const newSearchParams = new URLSearchParams(searchParams);
+                          newSearchParams.set("chatId", data.chatId);
+                          setSearchParams(newSearchParams);
+                          // No reload needed - React Router will handle the navigation
+                          // The useWorkspaceInit hook will detect the chatId change and load chat messages
+                        } else {
+                          console.error("Unexpected response format:", data);
+                          alert("Failed to create chat: Invalid response format");
+                        }
+                      } catch (error) {
+                        console.error("Error creating new chat:", error);
+                        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                        // Only show error if it's not a network error (network errors might be transient)
+                        if (!errorMessage.includes("network") && !errorMessage.includes("Network")) {
+                          alert(`Failed to create chat: ${errorMessage}`);
+                        } else {
+                          // For network errors, try to create chat again silently or just navigate
+                          console.warn("Network error during chat creation, but continuing...");
+                        }
+                      }
+                    }}
+                    currentChatId={currentChatId}
+                    onChatChange={(chatId) => {
+                      const newSearchParams = new URLSearchParams(searchParams);
+                      if (chatId !== null) {
+                        newSearchParams.set("chatId", chatId.toString());
+                      } else {
+                        newSearchParams.delete("chatId");
+                      }
+                      setSearchParams(newSearchParams);
+                    }}
+                  />
 
                   {/* Chat Messages */}
                   <div className="flex-1 min-h-0 overflow-auto modern-scrollbar">
@@ -763,6 +920,9 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       onRevert={controller.handleRevert}
                       selectedElementInfo={selectedElementInfo}
                       onInspectorEnable={() => setSelectedElementInfo(null)}
+                      conversationId={controller.conversationId || undefined}
+                      currentToolCalls={(controller as any).currentToolCalls || []}
+                      chatId={currentChatId}
                     />
                   </div>
                   {/* Bottom Section with Balance and Input */}

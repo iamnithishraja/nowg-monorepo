@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Tool } from "./tool";
 import DESCRIPTION from "./webfetch.txt?raw";
+import { combineAbortSignals } from "./abortSignalHelper";
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000; // 30 seconds
@@ -24,20 +25,16 @@ interface WebFetchMetadata {
  * WebFetch tool for fetching content from URLs
  *
  * This tool fetches content from a specified URL and can convert it to
- * different formats (markdown, text, html). It runs in the browser environment
- * and is useful for retrieving and analyzing web content.
+ * different formats (markdown, text, html). It uses a backend API proxy
+ * to bypass CORS restrictions and is useful for retrieving and analyzing web content.
  */
 export const WebFetchTool = Tool.define<
-  z.ZodObject<{
-    url: z.ZodString;
-    format: z.ZodDefault<z.ZodEnum<["text", "markdown", "html"]>>;
-    timeout: z.ZodOptional<z.ZodNumber>;
-  }>,
+  z.ZodType<any>,
   WebFetchMetadata
 >("webfetch", {
   description: DESCRIPTION,
   parameters: z.object({
-    url: z.string().describe("The URL to fetch content from"),
+    url: z.string().describe("The specific URL to fetch content from (must start with http:// or https://). Use this tool when you have an exact URL. For searching with keywords/queries, use websearch tool instead."),
     format: z
       .enum(["text", "markdown", "html"])
       .default("markdown")
@@ -67,46 +64,36 @@ export const WebFetchTool = Tool.define<
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    // Build Accept header based on requested format with q parameters for fallbacks
-    let acceptHeader = "*/*";
-    switch (params.format) {
-      case "markdown":
-        acceptHeader =
-          "text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1";
-        break;
-      case "text":
-        acceptHeader =
-          "text/plain;q=1.0, text/markdown;q=0.9, text/html;q=0.8, */*;q=0.1";
-        break;
-      case "html":
-        acceptHeader =
-          "text/html;q=1.0, application/xhtml+xml;q=0.9, text/plain;q=0.8, text/markdown;q=0.7, */*;q=0.1";
-        break;
-      default:
-        acceptHeader =
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8";
-    }
-
     // Combine abort signals if context has one
     const signals: AbortSignal[] = [controller.signal];
     if (ctx.abort) {
       signals.push(ctx.abort);
     }
 
-    let response: Response;
+    let apiResponse: Response;
     try {
-      response = await fetch(params.url, {
-        signal:
-          signals.length > 1
-            ? AbortSignal.any(signals)
-            : controller.signal,
+      // Use the combined abort signal helper for compatibility
+      const abortSignal = signals.length > 1
+        ? combineAbortSignals(signals)
+        : controller.signal;
+
+      // Call backend API proxy to bypass CORS restrictions
+      // NOTE: This fetch is done via BACKEND API, not frontend direct fetch
+      console.log("[WebFetch Tool] Calling BACKEND API (not frontend fetch) for URL:", params.url);
+      apiResponse = await fetch("/api/webfetch", {
+        method: "POST",
+        signal: abortSignal,
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          Accept: acceptHeader,
-          "Accept-Language": "en-US,en;q=0.9",
+          "Content-Type": "application/json",
         },
+        credentials: "include", // Include cookies for authentication
+        body: JSON.stringify({
+          url: params.url,
+          format: params.format,
+          timeout: params.timeout,
+        }),
       });
+      console.log("[WebFetch Tool] Backend API response received, status:", apiResponse.status);
     } catch (error) {
       clearTimeout(timeoutId);
       if (error instanceof Error && error.name === "AbortError") {
@@ -114,34 +101,57 @@ export const WebFetchTool = Tool.define<
           `Request timed out after ${timeout / 1000} seconds`
         );
       }
-      throw new Error(`Failed to fetch URL: ${(error as Error).message}`);
+      // Provide more detailed error information
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("[WebFetch] API call failed:", errorMessage, "URL:", params.url);
+      throw new Error(`Failed to fetch URL via API: ${errorMessage}. The API endpoint may not be available or there was a network error.`);
     }
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      throw new Error(`Request failed with status code: ${response.status}`);
+    if (!apiResponse.ok) {
+      let errorMessage = `Request failed with status code: ${apiResponse.status}`;
+      try {
+        const errorData = await apiResponse.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // Try to get text response if JSON parsing fails
+        try {
+          const textResponse = await apiResponse.text();
+          if (textResponse) {
+            errorMessage = `Request failed (${apiResponse.status}): ${textResponse.substring(0, 200)}`;
+          }
+        } catch {
+          // Ignore text parse errors, use default message
+        }
+      }
+      console.error("[WebFetch] API returned error:", errorMessage, "Status:", apiResponse.status);
+      throw new Error(errorMessage);
     }
 
-    // Check content length
-    const contentLength = response.headers.get("content-length");
-    if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
-      throw new Error("Response too large (exceeds 5MB limit)");
-    }
-
-    let arrayBuffer: ArrayBuffer;
+    // Parse API response
+    let apiData: {
+      success: boolean;
+      content: string;
+      contentType: string;
+      url: string;
+      format: string;
+      error?: string;
+    };
     try {
-      arrayBuffer = await response.arrayBuffer();
+      apiData = await apiResponse.json();
     } catch (error) {
-      throw new Error(`Failed to read response: ${(error as Error).message}`);
+      throw new Error(`Failed to parse API response: ${(error as Error).message}`);
     }
 
-    if (arrayBuffer.byteLength > MAX_RESPONSE_SIZE) {
-      throw new Error("Response too large (exceeds 5MB limit)");
+    if (!apiData.success || apiData.error) {
+      throw new Error(apiData.error || "Failed to fetch URL");
     }
 
-    const content = new TextDecoder().decode(arrayBuffer);
-    const contentType = response.headers.get("content-type") || "text/plain";
+    const content = apiData.content;
+    const contentType = apiData.contentType || "text/plain";
     const title = `${params.url} (${contentType})`;
 
     // Handle content based on requested format and actual content type
@@ -184,7 +194,7 @@ export const WebFetchTool = Tool.define<
       metadata: {
         url: params.url,
         contentType,
-        format: params.format,
+        format: params.format as string,
         truncated,
       },
     };

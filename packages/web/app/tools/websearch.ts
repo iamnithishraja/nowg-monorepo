@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Tool } from "./tool";
 import DESCRIPTION from "./websearch.txt?raw";
+import { combineAbortSignals } from "./abortSignalHelper";
 
 const API_CONFIG = {
   BASE_URL: "https://mcp.exa.ai",
@@ -69,7 +70,7 @@ export const WebSearchTool = Tool.define<
 >("websearch", {
   description: DESCRIPTION,
   parameters: z.object({
-    query: z.string().describe("Websearch query"),
+    query: z.string().describe("Search query (keywords, questions, or topics to search for). Do NOT use this tool if you have a specific URL - use webfetch tool instead for direct URL access."),
     numResults: z.coerce
       .number()
       .optional()
@@ -134,7 +135,7 @@ export const WebSearchTool = Tool.define<
           body: JSON.stringify(searchRequest),
           signal:
             signals.length > 1
-              ? AbortSignal.any(signals)
+              ? combineAbortSignals(signals)
               : controller.signal,
         }
       );

@@ -1,0 +1,243 @@
+import crypto from "crypto";
+import { getEnvWithDefault } from "./env";
+
+/**
+ * Upload file to R2 bucket
+ * Structure: users/{userId}/projects/{projectId}/conversations/{conversationId}/files/{filename}
+ * If projectId is not provided, uses: users/{userId}/conversations/{conversationId}/files/{filename}
+ */
+export async function uploadFileToR2(
+  userId: string,
+  conversationId: string,
+  fileData: Buffer,
+  fileName: string,
+  contentType: string,
+  projectId?: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    // Get R2 configuration
+    const r2Endpoint = getEnvWithDefault("R2_ENDPOINT", "");
+    const r2AccessKey = getEnvWithDefault("R2_ACCESS_KEY", "");
+    const r2SecretKey = getEnvWithDefault("R2_SECRET_KEY", "");
+    const r2BucketName = getEnvWithDefault("R2_BUCKET_NAME", "");
+    const r2PublicBaseUrl = getEnvWithDefault("R2_PUBLIC_BASE_URL", "");
+
+    if (!r2Endpoint || !r2AccessKey || !r2SecretKey || !r2BucketName) {
+      console.error("R2 configuration is incomplete");
+      return { success: false, error: "R2 configuration is incomplete" };
+    }
+
+    // Generate unique filename to avoid collisions
+    const timestamp = Date.now();
+    const randomId = crypto.randomBytes(8).toString("hex");
+    const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_").substring(0, 100);
+    
+    // Build object key with project structure if projectId is provided
+    const objectKey = projectId
+      ? `users/${userId}/projects/${projectId}/conversations/${conversationId}/files/${timestamp}-${randomId}-${sanitizedName}`
+      : `users/${userId}/conversations/${conversationId}/files/${timestamp}-${randomId}-${sanitizedName}`;
+
+    // Upload to R2 using S3-compatible API
+    const uploadResult = await uploadToR2({
+      endpoint: r2Endpoint,
+      accessKey: r2AccessKey,
+      secretKey: r2SecretKey,
+      bucketName: r2BucketName,
+      objectKey,
+      fileBuffer: fileData,
+      contentType,
+    });
+
+    if (!uploadResult.success) {
+      console.error("Failed to upload to R2:", uploadResult.error);
+      return { success: false, error: uploadResult.error };
+    }
+
+    // Construct public URL
+    const publicUrl = r2PublicBaseUrl
+      ? `${r2PublicBaseUrl.replace(/\/$/, "")}/${objectKey}`
+      : `${r2Endpoint}/${r2BucketName}/${objectKey}`;
+
+    return { success: true, url: publicUrl };
+  } catch (error: any) {
+    console.error("Error uploading file to R2:", error.message);
+    return {
+      success: false,
+      error: error.message || "Unknown error during upload",
+    };
+  }
+}
+
+/**
+ * Upload file to R2 using S3-compatible API
+ */
+async function uploadToR2({
+  endpoint,
+  accessKey,
+  secretKey,
+  bucketName,
+  objectKey,
+  fileBuffer,
+  contentType,
+}: {
+  endpoint: string;
+  accessKey: string;
+  secretKey: string;
+  bucketName: string;
+  objectKey: string;
+  fileBuffer: Buffer;
+  contentType: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Parse endpoint to get host
+    const endpointUrl = new URL(endpoint);
+    const host = endpointUrl.host;
+    const region = "auto"; // R2 uses 'auto' for region
+    const service = "s3";
+
+    // Prepare request details
+    const method = "PUT";
+    const url = `${endpoint}/${bucketName}/${objectKey}`;
+    const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "");
+    const dateStamp = amzDate.slice(0, 8);
+
+    // Create payload hash
+    const payloadHash = crypto
+      .createHash("sha256")
+      .update(fileBuffer)
+      .digest("hex");
+
+    // Create canonical headers
+    const headers: Record<string, string> = {
+      "Content-Type": contentType,
+      "Content-Length": fileBuffer.length.toString(),
+      Host: host,
+      "x-amz-content-sha256": payloadHash,
+      "x-amz-date": amzDate,
+    };
+
+    // Create signed headers string
+    const signedHeaders = Object.keys(headers)
+      .map((k) => k.toLowerCase())
+      .sort()
+      .join(";");
+
+    // Rebuild canonical headers properly
+    const sortedHeaderKeys = Object.keys(headers)
+      .map((k) => k.toLowerCase())
+      .sort();
+
+    const canonicalHeadersStr = sortedHeaderKeys
+      .map((k) => {
+        const originalKey = Object.keys(headers).find(
+          (hk) => hk.toLowerCase() === k
+        );
+        return `${k}:${headers[originalKey!].trim()}`;
+      })
+      .join("\n") + "\n";
+
+    const canonicalUri = `/${bucketName}/${objectKey}`;
+    const canonicalQueryString = "";
+
+    const canonicalRequest = [
+      method,
+      canonicalUri,
+      canonicalQueryString,
+      canonicalHeadersStr,
+      signedHeaders,
+      payloadHash,
+    ].join("\n");
+
+    // Create string to sign
+    const algorithm = "AWS4-HMAC-SHA256";
+    const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+    const canonicalRequestHash = crypto
+      .createHash("sha256")
+      .update(canonicalRequest)
+      .digest("hex");
+
+    const stringToSign = [
+      algorithm,
+      amzDate,
+      credentialScope,
+      canonicalRequestHash,
+    ].join("\n");
+
+    // Calculate signature
+    const getSignatureKey = (
+      key: string,
+      dateStamp: string,
+      regionName: string,
+      serviceName: string
+    ): Buffer => {
+      const kDate = crypto
+        .createHmac("sha256", `AWS4${key}`)
+        .update(dateStamp)
+        .digest();
+      const kRegion = crypto
+        .createHmac("sha256", kDate)
+        .update(regionName)
+        .digest();
+      const kService = crypto
+        .createHmac("sha256", kRegion)
+        .update(serviceName)
+        .digest();
+      const kSigning = crypto
+        .createHmac("sha256", kService)
+        .update("aws4_request")
+        .digest();
+      return kSigning;
+    };
+
+    const signingKey = getSignatureKey(secretKey, dateStamp, region, service);
+    const signature = crypto
+      .createHmac("sha256", signingKey)
+      .update(stringToSign)
+      .digest("hex");
+
+    // Create authorization header
+    const authorization = `${algorithm} Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+    // Make the request
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        ...headers,
+        Authorization: authorization,
+      },
+      body: new Uint8Array(fileBuffer),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("R2 upload error:", response.status, errorText);
+      return {
+        success: false,
+        error: `R2 upload failed: ${response.status} - ${errorText}`,
+      };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("R2 upload exception:", error);
+    return {
+      success: false,
+      error: error.message || "Unknown error during upload",
+    };
+  }
+}
+
+/**
+ * Check if a file should be ignored (node_modules, package-lock.json, etc.)
+ */
+export function shouldIgnoreFile(fileName: string): boolean {
+  const ignorePatterns = [
+    /node_modules/,
+    /package-lock\.json$/i,
+    /\.lock$/i,
+    /\.log$/i,
+  ];
+  
+  return ignorePatterns.some((pattern) => pattern.test(fileName));
+}
+

@@ -22,10 +22,40 @@ export const createConversation = async (
   return data.conversationId;
 };
 
-export const loadConversation = async (conversationId: string) => {
-  const response = await fetch(
-    `/api/conversations?conversationId=${conversationId}`
-  );
+export const loadConversation = async (
+  conversationId: string,
+  chatId?: string | null
+) => {
+  let url = `/api/conversations?conversationId=${conversationId}`;
+  
+  // If chatId is provided, load messages for that specific chat
+  if (chatId !== null && chatId !== undefined && chatId !== "null" && chatId !== "undefined") {
+    const response = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "getChatMessages",
+        conversationId,
+        chatId: chatId,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load chat messages: ${response.status}`);
+    }
+
+    const data = await response.json();
+    // Ensure we always return an array - empty chats should show empty, not fall back to conversation messages
+    const chatMessages = Array.isArray(data.messages) ? data.messages : [];
+    
+    return {
+      conversation: { id: conversationId }, // Minimal conversation data
+      messages: chatMessages, // Always return chat messages, even if empty
+    };
+  }
+
+  // Otherwise, load all conversation messages
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load conversation: ${response.status}`);
@@ -94,6 +124,13 @@ export const convertToUIMessages = (messages: any[]): Message[] => {
       role: msg.role,
       content: msg.content || "", // Ensure content is never undefined
       files: msg.files || undefined, // Preserve file metadata
+      // Preserve toolCalls for assistant messages (needed for file changes display)
+      ...(msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0 
+        ? { toolCalls: msg.toolCalls } 
+        : {}),
+      // Preserve other message metadata
+      ...(msg.model ? { model: msg.model } : {}),
+      ...(msg.timestamp ? { timestamp: msg.timestamp } : {}),
     }));
 };
 

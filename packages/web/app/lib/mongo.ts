@@ -18,8 +18,7 @@ async function connectToDatabase() {
     mongoose.connection.readyState === 0 ||
     mongoose.connection.readyState === 3
   ) {
-    isConnected = false;
-  }
+    isConnected = false;  }
 
   const uri = process.env.MONGODB_URI;
   if (!uri) {

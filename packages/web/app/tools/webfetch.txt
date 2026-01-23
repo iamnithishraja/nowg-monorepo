@@ -1,4 +1,9 @@
-Fetches content from a specified URL. Takes a URL and optional format as input, fetches the URL content, and converts to the requested format (markdown by default).
+Fetches content directly from a specific URL. Use this tool when you have an exact URL (http:// or https://) that you want to fetch and analyze.
+
+IMPORTANT: 
+- Use webfetch when you have a SPECIFIC URL to fetch (e.g., "https://example.com/page", "http://api.example.com/data")
+- Use websearch when you need to SEARCH for information with keywords/queries (e.g., "latest React features", "Python tutorials")
+- Do NOT use websearch when you already have the URL - use webfetch instead
 
 Usage:
 - The URL must be a fully-formed valid URL starting with http:// or https://
@@ -9,4 +14,4 @@ Usage:
 - Results may be summarized if the content is very large
 - Default timeout is 30 seconds (max 120 seconds)
 
-Note: This tool performs real network requests via the WebContainer environment. Use this tool when you need to retrieve and analyze web content.
+Note: This tool performs real network requests via the browser fetch API. Use this tool when you need to retrieve and analyze content from a specific URL.

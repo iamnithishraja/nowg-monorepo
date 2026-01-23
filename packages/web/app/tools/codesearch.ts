@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Tool } from "./tool";
 import DESCRIPTION from "./codesearch.txt?raw";
+import { combineAbortSignals } from "./abortSignalHelper";
 
 const API_CONFIG = {
   BASE_URL: "https://mcp.exa.ai",
@@ -110,7 +111,7 @@ export const CodeSearchTool = Tool.define<
           body: JSON.stringify(codeRequest),
           signal:
             signals.length > 1
-              ? AbortSignal.any(signals)
+              ? combineAbortSignals(signals)
               : controller.signal,
         }
       );

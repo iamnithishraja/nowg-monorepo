@@ -6,6 +6,13 @@ const messageSchema = new mongoose.Schema({
     ref: "Conversation",
     required: true,
   },
+  // Optional reference to Chat - if set, this message belongs to a chat, not the main conversation
+  chatId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Chat",
+    default: null,
+    index: true,
+  },
   // Optional idempotency key provided by client to avoid duplicates
   clientRequestId: { type: String, index: true },
   role: {
@@ -20,11 +27,75 @@ const messageSchema = new mongoose.Schema({
   tokensUsed: { type: Number },
   inputTokens: { type: Number },
   outputTokens: { type: Number },
-  // Reference to File model
+  // Reference to File model (legacy - files now stored in R2)
   files: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: "File",
+    },
+  ],
+  // Tool calls made by assistant (for agent messages)
+  toolCalls: [
+    {
+      id: {
+        type: String,
+        required: true,
+      },
+      name: {
+        type: String,
+        required: true,
+      },
+      args: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {},
+      },
+      status: {
+        type: String,
+        enum: ["pending", "executing", "completed", "error"],
+        default: "completed",
+      },
+      result: {
+        type: mongoose.Schema.Types.Mixed,
+        default: undefined,
+      },
+      startTime: {
+        type: Number,
+        default: undefined,
+      },
+      endTime: {
+        type: Number,
+        default: undefined,
+      },
+      category: {
+        type: String,
+        enum: ["auto", "ack"],
+        default: undefined,
+      },
+    },
+  ],
+  // File references stored in R2 (replaces files array)
+  r2Files: [
+    {
+      name: {
+        type: String,
+        required: true,
+      },
+      type: {
+        type: String,
+        required: true,
+      },
+      size: {
+        type: Number,
+        required: true,
+      },
+      url: {
+        type: String,
+        required: true, // R2 URL
+      },
+      uploadedAt: {
+        type: Date,
+        default: Date.now,
+      },
     },
   ],
 });

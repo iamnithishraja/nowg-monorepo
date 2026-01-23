@@ -916,10 +916,15 @@ conversationId
     enableFigmaMCP,
   });
 
+  // Get chatId from search params
+  const chatId = searchParams.get("chatId");
+  const chatMode = useWorkspaceStore((s) => s.chatMode);
+
   const { handleSend: baseHandleSend } = useChatHandlers({
     chat,
     files,
     conversationId,
+    chatId, // Pass chatId to handlers
     selectedModel,
     setInput,
     hasHandledInitialPrompt,
@@ -931,6 +936,7 @@ conversationId
     onInsufficientBalance,
     figmaUrl,
     enableFigmaMCP,
+    chatMode,
   });
 
   const handleSend = async (messageContent: string) => {
@@ -1412,6 +1418,7 @@ conversationId
     chatIsLoading: chat.isLoading,
     chatIsStreaming: chat.isStreaming,
     chatError: chat.error,
+    currentToolCalls: chat.currentToolCalls || [],
 
     // files state
     templateFilesState: files.templateFilesState,

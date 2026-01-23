@@ -9,7 +9,8 @@ import {
   PaperPlaneRight,
   Sparkle,
   Square,
-  Upload
+  Upload,
+  ChatCircle
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { OPENROUTER_MODELS } from "../consts/models";
@@ -104,6 +105,8 @@ export function WorkspaceChatInput({
   const isEditActive = useWorkspaceStore((s) => s.isEditActive);
   const setIsEditActive = useWorkspaceStore((s) => s.setIsEditActive);
   const storeSelectedModel = useWorkspaceStore((s) => s.selectedModel);
+  const chatMode = useWorkspaceStore((s) => s.chatMode);
+  const setChatMode = useWorkspaceStore((s) => s.setChatMode);
   // Use propSelectedModel if provided, otherwise fall back to store value
   const selectedModel = propSelectedModel || storeSelectedModel;
 
@@ -358,28 +361,62 @@ export function WorkspaceChatInput({
               {/* Input */}
               <div className="relative">
                 <div className="pb-10">
-                  <Textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={`Describe what you want to build... (${shortcutLabel} to start)`}
-                    disabled={isDisabled || isEnhancing}
-                    className="w-full h-24 resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none p-3"
-                  />
+              <Textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={chatMode === "ask" 
+                  ? `Ask a question... (${shortcutLabel} to send)`
+                  : `Describe what you want to build... (${shortcutLabel} to start)`}
+                disabled={isDisabled || isEnhancing}
+                className="w-full h-24 resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none p-3"
+              />
                 </div>
 
-                {/* Bottom Bar with Buttons */}
-                <div className="absolute bottom-0 left-0 right-0 h-12 px-2 flex items-center gap-2">
-                  <Button
-                    onClick={handleFileSelect}
-                    variant="ghost"
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                  >
-                    <Upload className="w-4 h-4" />
-                  </Button>
+            {/* Bottom Bar with Buttons */}
+            <div className="absolute bottom-0 left-0 right-0 h-12 px-2 flex items-center gap-2">
+              {/* Chat Mode Toggle */}
+              <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5">
+                <Button
+                  onClick={() => setChatMode("build")}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-6 px-2 text-xs font-medium transition-all",
+                    chatMode === "build"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Cursor className="w-3 h-3 mr-1" />
+                  Build
+                </Button>
+                <Button
+                  onClick={() => setChatMode("ask")}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-6 px-2 text-xs font-medium transition-all",
+                    chatMode === "ask"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <ChatCircle className="w-3 h-3 mr-1" />
+                  Ask
+                </Button>
+              </div>
 
-                  <div className="flex-1" />
+              <Button
+                onClick={handleFileSelect}
+                variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              >
+                <Upload className="w-4 h-4" />
+              </Button>
+
+              <div className="flex-1" />
 
                   <Button
                     onClick={handleEnhance}
@@ -576,7 +613,7 @@ export function WorkspaceChatInput({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="What shall we build today?"
+                placeholder={chatMode === "ask" ? "Ask a question..." : "What shall we build today?"}
                 disabled={isDisabled || isEnhancing}
                 className="w-full min-h-24 resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none px-4 py-3 bg-transparent text-primary placeholder-tertiary text-sm"
               />
@@ -584,6 +621,70 @@ export function WorkspaceChatInput({
 
             {/* Bottom Bar with Buttons */}
             <div className="absolute bottom-0 left-0 right-0 h-11 px-3 flex items-center gap-2">
+              {/* Chat Mode Toggle */}
+              <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5">
+                <Button
+                  onClick={() => setChatMode("build")}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-7 px-2 text-xs font-medium transition-all",
+                    chatMode === "build"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Cursor className="w-3 h-3 mr-1" />
+                  Build
+                </Button>
+                <Button
+                  onClick={() => setChatMode("ask")}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-7 px-2 text-xs font-medium transition-all",
+                    chatMode === "ask"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <ChatCircle className="w-3 h-3 mr-1" />
+                  Ask
+                </Button>
+              </div>
+
+              {/* Model Selector - Always visible */}
+              {selectedModel && onModelChange && (
+                <Select
+                  value={selectedModel}
+                  onValueChange={(value) => {
+                    if (onModelChange) {
+                      onModelChange(value);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-auto min-w-[140px] bg-muted/50 border border-border/60 text-foreground text-xs hover:bg-muted hover:border-primary/30 transition-all">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background/80 border border-primary/30">
+                    {OPENROUTER_MODELS.map((model) => (
+                      <SelectItem
+                        key={model.id}
+                        value={model.id}
+                        className="text-foreground hover:bg-primary/20"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm">{model.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {model.provider}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              
               {/* Upload Button */}
               <Button
                 onClick={handleFileSelect}

@@ -58,7 +58,7 @@ interface InitDeps {
     displayMessage?: string
   ) => Promise<void>;
   createConversation: (title: string, model: string) => Promise<string>;
-  loadConversation: (id: string) => Promise<any>;
+  loadConversation: (id: string, chatId?: string | null) => Promise<any>;
   updateConversationUrl: (
     newConversationId: string,
     searchParams: URLSearchParams,
@@ -640,6 +640,7 @@ export function useWorkspaceInit({
   const initialSendRef = useRef(false);
   const isInitializingRef = useRef(false);
   const lastConversationIdRef = useRef<string | null>(null);
+  const lastChatIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const initializeWorkspace = async () => {
@@ -654,6 +655,10 @@ export function useWorkspaceInit({
           urlConversationId !== null &&
           previousConversationId === urlConversationId;
 
+        // Get current chatId
+        const currentChatId = searchParams?.get("chatId") || null;
+        const isChatChange = lastChatIdRef.current !== currentChatId && isSameConversation;
+
         // Reset initialization flag if conversation changed
         if (previousConversationId !== urlConversationId) {
           isInitializingRef.current = false;
@@ -662,9 +667,10 @@ export function useWorkspaceInit({
         // Update BOTH the ref (for component-level) and module-level variable
         lastConversationIdRef.current = urlConversationId;
         lastActiveConversationId = urlConversationId;
+        lastChatIdRef.current = currentChatId;
 
-        // Prevent multiple initializations for the same conversation
-        if (isInitializingRef.current) {
+        // Prevent multiple initializations for the same conversation (unless chat changed)
+        if (isInitializingRef.current && !isChatChange) {
           return;
         }
 
@@ -673,6 +679,8 @@ export function useWorkspaceInit({
         // Clear any existing messages to prevent duplicates
         chat.setMessages([]);
 
+        // Only kill processes when switching to a DIFFERENT conversation
+        // When switching between chats in the same conversation, preserve WebContainer state and preview
         if (!isSameConversation) {
           // Clear terminal when switching conversations
           const { clearTerminal, setIsTerminalRunning } =
@@ -686,6 +694,10 @@ export function useWorkspaceInit({
           } catch (error) {
             // Ignore
           }
+        } else if (isChatChange) {
+          // When switching between chats in the same conversation, preserve WebContainer state
+          // Don't kill processes or clear terminal - keep the preview running
+          console.log("[useWorkspaceInit] Switching chats, preserving WebContainer state and preview");
         }
 
         if (urlConversationId) {
@@ -694,9 +706,10 @@ export function useWorkspaceInit({
           // First, try to load the existing conversation to get its title and messages
           let conversationData: any = null;
           try {
-            conversationData = await loadConversation(urlConversationId);
-            setSelectedModel(conversationData.conversation.model);
-            setConversationTitle(conversationData.conversation.title);
+            const chatId = searchParams?.get("chatId") || null;
+            conversationData = await loadConversation(urlConversationId, chatId);
+            setSelectedModel(conversationData.conversation?.model || selectedModel);
+            setConversationTitle(conversationData.conversation?.title || null);
           } catch (error) {
             // Failed to load existing conversation, will create new one
           }
@@ -769,57 +782,75 @@ export function useWorkspaceInit({
             }
           } else if (!initialPrompt) {
             try {
-              const data = await loadConversation(urlConversationId);
-              setSelectedModel(data.conversation.model);
-              setConversationTitle(data.conversation.title);
-              const uiMessages = convertToUIMessages(data.messages);
+              // Get chatId from searchParams if available
+              const chatId = searchParams?.get("chatId") || null;
+              const data = await loadConversation(urlConversationId, chatId);
+              setSelectedModel(data.conversation?.model || selectedModel);
+              setConversationTitle(data.conversation?.title || null);
+              
+              // Ensure messages is always an array - empty chats should show empty, not conversation messages
+              const messages = Array.isArray(data.messages) ? data.messages : [];
+              const uiMessages = convertToUIMessages(messages);
+              
+              // Always set messages, even if empty (this ensures empty chats show empty, not cached messages)
               chat.setMessages(uiMessages);
 
-              // Skip file restoration if returning to same conversation with WebContainer still running
-              // This keeps the dev server alive and avoids re-running npm install
-
-              const hasActivePreview = !!getPreviewUrl();
-
-              if (isSameConversation && hasActivePreview) {
-                // Just restore UI state from the files we already have
-                // The WebContainer still has all the files and dev server running
-              } else if (uiMessages && uiMessages.length > 0) {
-                // Restore files - try snapshot first (fast), fall back to message reconstruction (slow)
-                // Add a small delay to prevent layout shift
-                await new Promise((resolve) => setTimeout(resolve, 100));
-                try {
-                  // Set loading state to prevent layout shift
-                  const { setIsReconstructingFiles } =
-                    useWorkspaceStore.getState() as any;
-                  setIsReconstructingFiles(true);
-
-                  // Try fast path (IndexedDB snapshot) first, falls back to message reconstruction
-                  await restoreFilesFromSnapshot(
-                    urlConversationId,
-                    uiMessages,
-                    files,
-                    saveFile,
-                    runLinear
-                  );
-
-                  setIsReconstructingFiles(false);
-                } catch (reconstructError) {
-                  console.error(
-                    "Failed to reconstruct files:",
-                    reconstructError
-                  );
-                  const { setIsReconstructingFiles } =
-                    useWorkspaceStore.getState() as any;
-                  setIsReconstructingFiles(false);
-                  // Don't fail the entire conversation load if file reconstruction fails
-                }
-              }
-
-              // If conversation has no messages, allow initial prompt handler to run
-              if (uiMessages && uiMessages.length === 0) {
-                setHasHandledInitialPrompt(false);
-              } else {
+              // If viewing a chat (chatId is present), skip file restoration
+              // Chats are for conversation only, not for file operations
+              // BUT: Preserve WebContainer state and preview URL so tools can still work
+              if (chatId) {
+                // Just load messages, don't restore files or clone anything
+                // But preserve the existing WebContainer and preview state
+                // This allows tools to work in chats while keeping the preview running
                 setHasHandledInitialPrompt(true);
+              } else {
+                // Only restore files for main conversation (not chats)
+                // Skip file restoration if returning to same conversation with WebContainer still running
+                // This keeps the dev server alive and avoids re-running npm install
+
+                const hasActivePreview = !!getPreviewUrl();
+
+                if (isSameConversation && hasActivePreview) {
+                  // Just restore UI state from the files we already have
+                  // The WebContainer still has all the files and dev server running
+                } else if (uiMessages && uiMessages.length > 0) {
+                  // Restore files - try snapshot first (fast), fall back to message reconstruction (slow)
+                  // Add a small delay to prevent layout shift
+                  await new Promise((resolve) => setTimeout(resolve, 100));
+                  try {
+                    // Set loading state to prevent layout shift
+                    const { setIsReconstructingFiles } =
+                      useWorkspaceStore.getState() as any;
+                    setIsReconstructingFiles(true);
+
+                    // Try fast path (IndexedDB snapshot) first, falls back to message reconstruction
+                    await restoreFilesFromSnapshot(
+                      urlConversationId,
+                      uiMessages,
+                      files,
+                      saveFile,
+                      runLinear
+                    );
+
+                    setIsReconstructingFiles(false);
+                  } catch (reconstructError) {
+                    console.error(
+                      "Failed to reconstruct files:",
+                      reconstructError
+                    );
+                    const { setIsReconstructingFiles } =
+                      useWorkspaceStore.getState() as any;
+                    setIsReconstructingFiles(false);
+                    // Don't fail the entire conversation load if file reconstruction fails
+                  }
+                }
+
+                // If conversation has no messages, allow initial prompt handler to run
+                if (uiMessages && uiMessages.length === 0) {
+                  setHasHandledInitialPrompt(false);
+                } else {
+                  setHasHandledInitialPrompt(true);
+                }
               }
             } catch (loadError) {
               console.error("Failed to load conversation:", loadError);
@@ -881,7 +912,45 @@ export function useWorkspaceInit({
     };
 
     initializeWorkspace();
-  }, [urlConversationId, initialPrompt]);
+  }, [urlConversationId, initialPrompt, searchParams?.get("chatId")]);
+
+  // Separate effect to reload messages when chatId changes (but conversation stays the same)
+  useEffect(() => {
+    // Only reload if conversationId exists and we're not handling initial prompt
+    if (!urlConversationId || initialPrompt) return;
+    
+    const chatId = searchParams?.get("chatId") || null;
+    
+    // Skip if this is the initial load (handled by main effect)
+    // Only reload if chatId actually changed
+    if (lastChatIdRef.current === chatId) return;
+    
+    const reloadChatMessages = async () => {
+      try {
+        // Clear messages first to prevent showing old messages
+        chat.setMessages([]);
+        
+        const data = await loadConversation(urlConversationId, chatId);
+        
+        // Ensure messages is always an array - empty chats should show empty
+        const messages = Array.isArray(data.messages) ? data.messages : [];
+        const uiMessages = convertToUIMessages(messages);
+        
+        // Always set messages, even if empty (this ensures empty chats show empty)
+        chat.setMessages(uiMessages);
+        
+        // When switching chats, don't restore files - chats are conversation-only
+        // The main conversation files remain in WebContainer
+        
+        // Update the ref to track current chatId
+        lastChatIdRef.current = chatId;
+      } catch (error) {
+        console.error("Failed to reload chat messages:", error);
+      }
+    };
+
+    reloadChatMessages();
+  }, [searchParams?.get("chatId"), urlConversationId, initialPrompt, loadConversation, convertToUIMessages, chat]); // Watch chatId changes
 
   return null;
 }

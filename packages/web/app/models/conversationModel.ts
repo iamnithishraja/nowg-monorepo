@@ -27,12 +27,20 @@ const conversationSchema = new mongoose.Schema({
       ref: "Message",
     },
   ],
+  // Reference to chats (separate Chat model)
+  // This allows organizing messages into different chat threads within a conversation
+  chats: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Chat",
+    },
+  ],
   // Track tokens from reverted messages
   additionalTokensUsed: {
     type: Number,
     default: 0,
   },
-  // Store uploaded files for the conversation
+  // Store uploaded files for the conversation (legacy - files now stored in R2)
   filesMap: {
     type: mongoose.Schema.Types.Mixed,
     default: {},

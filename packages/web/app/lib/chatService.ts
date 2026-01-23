@@ -1,6 +1,7 @@
 import type { Message } from "../types/chat";
 import Conversation from "../models/conversationModel";
 import Messages from "../models/messageModel";
+import Chat from "../models/chatModel";
 import { connectToDatabase } from "./mongo";
 import { ProfileService } from "./profileService";
 import { FileService } from "./fileService";
@@ -159,6 +160,7 @@ export class ChatService {
         _id: conversationId,
       }).populate({
         path: "messages",
+        match: { chatId: null }, // Only get messages that don't belong to a chat (main conversation messages)
         options: { sort: { timestamp: 1 } },
         populate: {
           path: "files",
@@ -309,11 +311,13 @@ export class ChatService {
         }
       }
 
-      // Only assistant messages need the model field and tokens
+      // Allow model to be specified for any message (user or assistant)
+      // For assistant messages, fallback to conversation model if not specified
+      // For user messages, store the model if provided (useful for tracking which model was requested)
       const modelToUse =
-        message.role === "assistant"
-          ? message.model || conversation.model
-          : undefined;
+        message.model ||
+        (message.role === "assistant" ? conversation.model : undefined);
+      
       const tokensUsed =
         message.role === "assistant" ? message.tokensUsed || 0 : undefined;
       const inputTokens =
@@ -325,6 +329,9 @@ export class ChatService {
           ? (message as any).outputTokens || undefined
           : undefined;
 
+      // Extract tool calls if present (for assistant messages)
+      const toolCalls = (message as any).toolCalls || undefined;
+      
       const messageDoc = new Messages({
         conversationId,
         role: message.role,
@@ -335,10 +342,51 @@ export class ChatService {
         tokensUsed: tokensUsed,
         inputTokens: inputTokens,
         outputTokens: outputTokens,
-        files: [], // Initialize empty files array
+        files: [], // Initialize empty files array (legacy)
+        r2Files: [], // Initialize empty R2 files array
+        toolCalls: toolCalls ? toolCalls.map((tc: any) => ({
+          id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
+          name: tc.name || tc.toolName,
+          args: tc.args || {},
+          status: tc.status || "completed",
+          result: tc.result,
+          startTime: tc.startTime,
+          endTime: tc.endTime,
+          category: tc.category,
+        })) : undefined,
       });
 
       const result = await messageDoc.save();
+
+      // Automatically extract files from message content and store in R2 (for assistant messages)
+      if (message.role === "assistant" && message.content) {
+        try {
+          const { extractAndStoreFilesFromMessage } = await import("./extractAndStoreFiles");
+          const uploadedFiles = await extractAndStoreFilesFromMessage(
+            result._id.toString(),
+            conversationId,
+            conversation.userId,
+            message.content,
+            message.role
+          );
+
+          // Update message with R2 file references
+          if (uploadedFiles.length > 0) {
+            await Messages.findByIdAndUpdate(result._id, {
+              $set: { r2Files: uploadedFiles },
+            });
+            console.log(
+              `[ChatService] Automatically stored ${uploadedFiles.length} files in R2 for message ${result._id}`
+            );
+          }
+        } catch (fileExtractionError) {
+          console.error(
+            "[ChatService] Error extracting and storing files:",
+            fileExtractionError
+          );
+          // Don't fail message creation if file extraction fails
+        }
+      }
 
       // Update conversation metadata
       await Conversation.findByIdAndUpdate(conversationId, {
@@ -370,16 +418,390 @@ export class ChatService {
     }
   }
 
+  // Create a new chat within a conversation
+  async createChat(
+    conversationId: string,
+    userId: string,
+    title?: string
+  ): Promise<string> {
+    try {
+      await this.ensureConnection();
+
+      // Validate conversationId format
+      if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
+        throw new Error("Invalid conversation ID format");
+      }
+
+      // Ensure Chat model is registered
+      const ChatModel = mongoose.models.Chat || Chat;
+      if (!ChatModel) {
+        throw new Error("Chat model not available");
+      }
+
+      // Verify ownership using the same logic as getConversation
+      const conversation = await this.getConversation(conversationId, userId);
+      if (!conversation) {
+        throw new Error("Conversation not found or unauthorized");
+      }
+
+      // Count existing chats to generate title
+      const conversationObjectId = new mongoose.Types.ObjectId(conversationId);
+      const existingChatsCount = await ChatModel.countDocuments({ 
+        conversationId: conversationObjectId 
+      });
+      const chatTitle = title || `Chat ${existingChatsCount + 1}`;
+
+      // Create new chat document
+      const newChat = new ChatModel({
+        conversationId: conversationObjectId,
+        title: chatTitle,
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const savedChat = await newChat.save();
+
+      // Add chat reference to conversation (ensure chats array exists)
+      const updateResult = await Conversation.findByIdAndUpdate(
+        conversationId,
+        {
+          $push: { chats: savedChat._id },
+          $set: { updatedAt: new Date() },
+        },
+        { new: true }
+      );
+
+      if (!updateResult) {
+        // If update failed, clean up the chat we just created
+        await ChatModel.findByIdAndDelete(savedChat._id);
+        throw new Error("Failed to update conversation with new chat");
+      }
+
+      // Return the chat ID
+      return savedChat._id.toString();
+    } catch (error) {
+      console.error("Error creating chat:", error);
+      // Re-throw with more context if it's not already an Error
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Failed to create chat: ${String(error)}`);
+    }
+  }
+
+  // Add message to a specific chat (NOT to conversation)
+  async addMessageToChat(
+    conversationId: string,
+    chatId: string,
+    message: Omit<Message, "id">,
+    userId: string
+  ): Promise<string> {
+    try {
+      await this.ensureConnection();
+
+      // Verify access using the same logic as getConversation
+      const conversationAccess = await this.getConversation(conversationId, userId);
+      if (!conversationAccess) {
+        throw new Error("Conversation not found or unauthorized");
+      }
+
+      // Validate chatId is a valid ObjectId
+      if (!chatId || chatId === "undefined" || chatId === "null" || !mongoose.Types.ObjectId.isValid(chatId)) {
+        throw new Error("Invalid chatId");
+      }
+
+      // Verify chat belongs to conversation
+      const chat = await Chat.findOne({
+        _id: new mongoose.Types.ObjectId(chatId),
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+      });
+
+      if (!chat) {
+        throw new Error("Chat not found or doesn't belong to conversation");
+      }
+
+      // Get the conversation to retrieve the model
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+
+      // Allow model to be specified for any message (user or assistant)
+      const modelToUse =
+        message.model ||
+        (message.role === "assistant" ? conversation.model : undefined);
+      
+      const tokensUsed =
+        message.role === "assistant" ? message.tokensUsed || 0 : undefined;
+      const inputTokens =
+        message.role === "assistant"
+          ? (message as any).inputTokens || undefined
+          : undefined;
+      const outputTokens =
+        message.role === "assistant"
+          ? (message as any).outputTokens || undefined
+          : undefined;
+
+      // Extract tool calls if present (for assistant messages)
+      const toolCalls = (message as any).toolCalls || undefined;
+      
+      // Create message with chatId set - this marks it as a chat message, not conversation message
+      const messageDoc = new Messages({
+        conversationId,
+        chatId: new mongoose.Types.ObjectId(chatId), // Set chatId to mark this as a chat message
+        role: message.role,
+        content: message.content,
+        timestamp: new Date(),
+        clientRequestId: (message as any).clientRequestId || undefined,
+        model: modelToUse,
+        tokensUsed: tokensUsed,
+        inputTokens: inputTokens,
+        outputTokens: outputTokens,
+        files: [], // Initialize empty files array (legacy)
+        r2Files: [], // Initialize empty R2 files array
+        toolCalls: toolCalls ? toolCalls.map((tc: any) => ({
+          id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
+          name: tc.name || tc.toolName,
+          args: tc.args || {},
+          status: tc.status || "completed",
+          result: tc.result,
+          startTime: tc.startTime,
+          endTime: tc.endTime,
+          category: tc.category,
+        })) : undefined,
+      });
+
+      const result = await messageDoc.save();
+
+      // Automatically extract files from message content and store in R2 (for assistant messages)
+      if (message.role === "assistant" && message.content) {
+        try {
+          const { extractAndStoreFilesFromMessage } = await import("./extractAndStoreFiles");
+          const uploadedFiles = await extractAndStoreFilesFromMessage(
+            result._id.toString(),
+            conversationId,
+            conversation.userId,
+            message.content,
+            message.role
+          );
+
+          // Update message with R2 file references
+          if (uploadedFiles.length > 0) {
+            await Messages.findByIdAndUpdate(result._id, {
+              $set: { r2Files: uploadedFiles },
+            });
+          }
+        } catch (fileExtractionError) {
+          console.error(
+            "[ChatService] Error extracting and storing files:",
+            fileExtractionError
+          );
+        }
+      }
+
+      // Add message reference to chat (but NOT to conversation.messages)
+      await Chat.findByIdAndUpdate(chatId, {
+        $push: { messages: result._id },
+        $set: { updatedAt: new Date() },
+      });
+
+      // Update conversation updatedAt but DON'T add to conversation.messages
+      await Conversation.findByIdAndUpdate(conversationId, {
+        $set: { updatedAt: new Date() },
+      });
+
+      // Update user profile with message data
+      try {
+        const profileService = new ProfileService();
+        await profileService.updateOnMessage(conversation.userId, {
+          role: message.role,
+          model: modelToUse,
+          tokensUsed: tokensUsed,
+          inputTokens: inputTokens,
+          outputTokens: outputTokens,
+        });
+      } catch (profileError) {
+        console.error("[ChatService] Error updating profile:", profileError);
+      }
+
+      // Generate title from first user message asynchronously (non-blocking)
+      // This allows the message to appear in UI immediately while title is generated in background
+      if (message.role === "user" && typeof message.content === "string" && message.content.trim()) {
+        // Check if chat has a default/generic title that should be replaced
+        const isDefaultTitle = /^Chat \d+$/.test(chat.title) || 
+                               chat.title === "New Chat" || 
+                               !chat.title || 
+                               chat.title.trim() === "";
+        
+        if (isDefaultTitle) {
+          // Fire and forget - don't await, let it run in background
+          // Check if this is the first user message in the chat
+          Messages.countDocuments({
+            chatId: new mongoose.Types.ObjectId(chatId),
+            role: "user",
+          }).then((existingUserMessages) => {
+            if (existingUserMessages === 1) { // 1 because we just added this message
+              // This is the first user message - generate title asynchronously
+              console.log("[ChatService] Generating title for chat:", chatId, "| Message:", message.content.substring(0, 50));
+              this.generateTitle(message.content)
+                .then((generatedTitle) => {
+                  console.log("[ChatService] Title generated:", generatedTitle);
+                  return Chat.findByIdAndUpdate(chatId, {
+                    $set: { title: generatedTitle },
+                  });
+                })
+                .then(() => {
+                  console.log("[ChatService] Chat title updated successfully");
+                })
+                .catch((titleError) => {
+                  console.error("[ChatService] Error generating chat title:", titleError);
+                  // Don't fail message creation if title generation fails
+                });
+            }
+          }).catch((countError) => {
+            console.error("[ChatService] Error counting user messages for title generation:", countError);
+          });
+        }
+      }
+
+      return result._id.toString();
+    } catch (error) {
+      console.error("Error adding message to chat:", error);
+      throw error;
+    }
+  }
+
+  // Get messages for a specific chat
+  async getChatMessages(
+    conversationId: string,
+    chatId: string,
+    userId: string
+  ): Promise<Message[]> {
+    try {
+      await this.ensureConnection();
+
+      // Validate chatId is a valid ObjectId
+      if (!chatId || chatId === "undefined" || chatId === "null" || !mongoose.Types.ObjectId.isValid(chatId)) {
+        throw new Error("Invalid chatId");
+      }
+
+      // Verify access using the same logic as getConversation
+      const conversationAccess = await this.getConversation(conversationId, userId);
+      if (!conversationAccess) {
+        throw new Error("Conversation not found or unauthorized");
+      }
+
+      // Get chat and populate messages
+      const chat = await Chat.findOne({
+        _id: new mongoose.Types.ObjectId(chatId),
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+      })
+        .populate({
+          path: "messages",
+          populate: {
+            path: "r2Files",
+          },
+        })
+        .lean();
+
+      if (!chat) {
+        // Chat doesn't exist, return empty array
+        console.log(`[ChatService] Chat ${chatId} not found, returning empty array`);
+        return [];
+      }
+
+      // Ensure messages is an array (defensive check)
+      const messages = Array.isArray((chat as any).messages) 
+        ? ((chat as any).messages || []) 
+        : [];
+
+      // Filter out any null/undefined messages that might have been populated incorrectly
+      const validMessages = messages.filter((msg: any) => msg && msg._id);
+
+      // If chat has no messages, return empty array (don't fall back to conversation messages)
+      if (validMessages.length === 0) {
+        console.log(`[ChatService] Chat ${chatId} has no messages, returning empty array`);
+        return [];
+      }
+
+      // Sort messages by timestamp
+      const sortedMessages = validMessages.sort(
+        (a: any, b: any) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      return sortedMessages.map((msg: any) => ({
+        id: msg._id.toString(),
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        model: msg.model,
+        toolCalls: msg.toolCalls,
+        files: msg.r2Files?.map((f: any) => ({
+          id: f.url || f._id?.toString(),
+          name: f.name,
+          type: f.type,
+          size: f.size,
+          url: f.url,
+          uploadedAt: f.uploadedAt,
+        })),
+      }));
+    } catch (error) {
+      console.error("Error getting chat messages:", error);
+      throw error;
+    }
+  }
+
+  // Get all chats for a conversation
+  async getConversationChats(
+    conversationId: string,
+    userId: string
+  ): Promise<Array<{ id: string; title: string; messageCount: number; createdAt: Date; updatedAt: Date }>> {
+    try {
+      await this.ensureConnection();
+
+      // Verify access using the same logic as getConversation
+      const conversationAccess = await this.getConversation(conversationId, userId);
+      if (!conversationAccess) {
+        throw new Error("Conversation not found or unauthorized");
+      }
+
+      // Get all chats for this conversation
+      const chats = await Chat.find({ 
+        conversationId: new mongoose.Types.ObjectId(conversationId) 
+      })
+        .select("title messages createdAt updatedAt")
+        .lean();
+
+      return chats.map((chat: any) => ({
+        id: chat._id.toString(),
+        title: chat.title,
+        messageCount: chat.messages?.length || 0,
+        createdAt: chat.createdAt,
+        updatedAt: chat.updatedAt,
+      }));
+    } catch (error) {
+      console.error("Error getting conversation chats:", error);
+      throw error;
+    }
+  }
+
   // Get messages for a conversation
   async getMessages(conversationId: string, limit = 100, offset = 0) {
     try {
       await this.ensureConnection();
 
-      const messages = await Messages.find({ conversationId })
+      // Only get messages that don't belong to a chat (main conversation messages)
+      const messages = await Messages.find({ 
+        conversationId,
+        chatId: null, // Exclude chat messages
+      })
         .sort({ timestamp: 1 })
         .skip(offset)
         .limit(limit)
-        .populate("files"); // Populate files using the virtual field
+        .populate("files"); // Populate legacy files using the virtual field
+      // Note: r2Files and toolCalls are embedded, no need to populate
 
       return messages;
     } catch (error) {
@@ -424,6 +846,53 @@ export class ChatService {
       });
     } catch (error) {
       console.error("Error updating conversation messages:", error);
+      throw error;
+    }
+  }
+
+  // Update a message's model
+  async updateMessageModel(
+    messageId: string,
+    conversationId: string,
+    userId: string,
+    model: string
+  ): Promise<void> {
+    try {
+      await this.ensureConnection();
+
+      // Verify conversation ownership
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+      if (conversation.userId !== userId) {
+        throw new Error("Unauthorized: You don't own this conversation");
+      }
+
+      // Verify message belongs to conversation
+      const message = await Messages.findById(messageId);
+      if (!message) {
+        throw new Error("Message not found");
+      }
+      if (message.conversationId.toString() !== conversationId) {
+        throw new Error("Message does not belong to this conversation");
+      }
+
+      // Update the message model
+      await Messages.findByIdAndUpdate(messageId, {
+        $set: {
+          model,
+        },
+      });
+
+      // Update conversation updatedAt
+      await Conversation.findByIdAndUpdate(conversationId, {
+        $set: {
+          updatedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error("Error updating message model:", error);
       throw error;
     }
   }

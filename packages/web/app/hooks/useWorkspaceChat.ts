@@ -12,6 +12,7 @@ export function useWorkspaceChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentToolCalls, setCurrentToolCalls] = useState<any[]>([]); // Tool calls for current assistant message
   const abortControllerRef = useRef<AbortController | null>(null);
   const userCancelledRef = useRef(false);
   const processedFiles = useRef(new Set<string>());
@@ -725,15 +726,36 @@ export function useWorkspaceChat() {
   };
 
   // Wrapper function to prevent duplicate messages when setting the entire array
-  const setMessagesWithDeduplication = (newMessages: Message[]) => {
-    newMessages.forEach((msg, i) => {
+  const setMessagesWithDeduplication = (newMessages: Message[] | ((prev: Message[]) => Message[])) => {
+    // Handle both direct array and function updater
+    let messagesArray: Message[];
+    
+    if (typeof newMessages === 'function') {
+      // Function updater - call it with current messages
+      messagesArray = newMessages(messages);
+    } else if (Array.isArray(newMessages)) {
+      // Direct array
+      messagesArray = newMessages;
+    } else {
+      // Invalid input - log error and return
+      console.error("[useWorkspaceChat] setMessages received non-array:", typeof newMessages, newMessages);
+      return;
+    }
+    
+    // Ensure it's still an array after function call
+    if (!Array.isArray(messagesArray)) {
+      console.error("[useWorkspaceChat] setMessages function returned non-array:", typeof messagesArray, messagesArray);
+      return;
+    }
+    
+    messagesArray.forEach((msg, i) => {
       if (msg.role === "assistant") {
       }
     });
 
     // Deduplicate messages by id before setting
     const seenIds = new Set<string>();
-    const deduplicatedMessages = newMessages.filter((msg) => {
+    const deduplicatedMessages = messagesArray.filter((msg) => {
       if (seenIds.has(msg.id)) {
         return false;
       }
@@ -760,6 +782,8 @@ export function useWorkspaceChat() {
     setIsStreaming,
     error,
     setError,
+    currentToolCalls,
+    setCurrentToolCalls,
     addMessage,
     beginAssistantMessage,
     updateLastAssistantMessage,
