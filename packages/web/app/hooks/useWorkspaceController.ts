@@ -1,47 +1,47 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 import { OPENROUTER_MODELS } from "../consts/models";
-import { useWebContainer } from "./useWebContainer";
-import { useWorkspaceChat } from "./useWorkspaceChat";
-import { useWorkspaceFiles } from "./useWorkspaceFiles";
-import { useStreamingHandler } from "./useStreamingHandler";
-import { useToolExecution } from "./useToolExecution";
-import type { Message } from "../types/chat";
-import { WORK_DIR } from "../utils/constants";
-import type { FileMap } from "../utils/constants";
-import {
-  createConversation,
-  loadConversation,
-  selectTemplate,
-  updateConversationUrl,
-  convertToUIMessages,
-} from "../utils/workspaceApi";
-import { useWorkspaceStore } from "../stores/useWorkspaceStore";
-import { useTemplateFiles } from "./workspace/useTemplateFiles";
-import { useStreamingWrapper } from "./workspace/useStreamingWrapper";
-import {
-  reconstructFilesFromMessages,
-  reconstructFilesFromArtifacts,
-} from "./workspace/useWorkspaceInit";
-import { useWorkspaceInit } from "./workspace/useWorkspaceInit";
-import { useExposeFiles } from "./workspace/useExposeFiles";
-import { useChatHandlers } from "./workspace/useChatHandlers";
-import { useInitialPromptHandler } from "./workspace/useInitialPromptHandler";
+import { filesToSnapshot, saveSnapshot } from "../lib/chatPersistence";
 import { createClientFileStorageService } from "../lib/clientFileStorage";
-import { getWebContainer } from "../lib/webcontainer";
 import {
   autoInstallDependencies,
   tryRestoreNodeModulesCache,
 } from "../lib/nodeModulesAutoInstall";
-import { saveSnapshot, filesToSnapshot } from "../lib/chatPersistence";
+import { getWebContainer } from "../lib/webcontainer";
+import { useWorkspaceStore } from "../stores/useWorkspaceStore";
+import type { Message } from "../types/chat";
 import type {
   TemplateFileSnapshot,
   WorkspaceVersion,
 } from "../types/versioning";
+import type { FileMap } from "../utils/constants";
+import { WORK_DIR } from "../utils/constants";
 import {
   createConversationVersion,
   fetchConversationVersions,
 } from "../utils/versionApi";
+import {
+  convertToUIMessages,
+  createConversation,
+  loadConversation,
+  selectTemplate,
+  updateConversationUrl,
+} from "../utils/workspaceApi";
+import { useStreamingHandler } from "./useStreamingHandler";
+import { useToolExecution } from "./useToolExecution";
+import { useWebContainer } from "./useWebContainer";
+import { useWorkspaceChat } from "./useWorkspaceChat";
+import { useWorkspaceFiles } from "./useWorkspaceFiles";
+import { useChatHandlers } from "./workspace/useChatHandlers";
+import { useExposeFiles } from "./workspace/useExposeFiles";
+import { useInitialPromptHandler } from "./workspace/useInitialPromptHandler";
+import { useStreamingWrapper } from "./workspace/useStreamingWrapper";
+import { useTemplateFiles } from "./workspace/useTemplateFiles";
+import {
+  reconstructFilesFromArtifacts,
+  reconstructFilesFromMessages,
+  useWorkspaceInit,
+} from "./workspace/useWorkspaceInit";
 
 const isBase64DataUrl = (content: string) =>
   content.startsWith("data:") && content.includes("base64,");
@@ -1400,6 +1400,38 @@ conversationId
     void handleVersionSelect(latestVersionIdInList);
   }, [isOnLatestVersion, latestVersionIdInList, handleVersionSelect]);
 
+  // Memoize saveFile to prevent recreation
+  const memoizedSaveFile = useCallback((path: string, content: string) => {
+    files.updateFileContent(path, content);
+    return saveFile(path, content);
+  }, [files.updateFileContent, saveFile]);
+
+  // Memoize terminal state to prevent unnecessary re-renders
+  const terminalLines = useWorkspaceStore((s) => s.terminalLines);
+  const isTerminalRunning = useWorkspaceStore((s) => s.isTerminalRunning);
+
+  // Memoize tool execution status to prevent re-renders
+  const toolExecutionStatuses = useMemo(
+    () => toolExecution.getAllStatuses(),
+    [toolExecution.getAllStatuses]
+  );
+
+  const availableTools = useMemo(
+    () => toolExecution.getAvailableTools(),
+    [toolExecution.getAvailableTools]
+  );
+
+  const hasToolSupport = useMemo(
+    () => toolExecution.hasToolSupport(),
+    [toolExecution.hasToolSupport]
+  );
+
+  // Memoize the preview URL to prevent unnecessary re-renders
+  const resolvedPreviewUrl = useMemo(
+    () => livePreviewUrl || previewUrl,
+    [livePreviewUrl, previewUrl]
+  );
+
   return {
     // ui state
     selectedModel,
@@ -1409,9 +1441,9 @@ conversationId
     input,
     setInput,
     isProcessingTemplate,
-    previewUrl: livePreviewUrl || previewUrl,
-    terminalLines: useWorkspaceStore((s) => s.terminalLines),
-    isTerminalRunning: useWorkspaceStore((s) => s.isTerminalRunning),
+    previewUrl: resolvedPreviewUrl,
+    terminalLines,
+    isTerminalRunning,
 
     // chat state
     messages: chat.messages,
@@ -1424,10 +1456,7 @@ conversationId
     templateFilesState: files.templateFilesState,
     selectedPath: files.selectedPath,
     setSelectedPath: files.setSelectedPath,
-    saveFile: (path: string, content: string) => {
-      files.updateFileContent(path, content);
-      return saveFile(path, content);
-    },
+    saveFile: memoizedSaveFile,
 
     // conversation state
     conversationId,
@@ -1456,9 +1485,9 @@ conversationId
     setUploadedFiles,
 
     // tool execution state
-    toolExecutionStatuses: toolExecution.getAllStatuses(),
+    toolExecutionStatuses,
     isExecutingTools: toolExecution.isExecuting,
-    availableTools: toolExecution.getAvailableTools(),
-    hasToolSupport: toolExecution.hasToolSupport(),
+    availableTools,
+    hasToolSupport,
   };
 }

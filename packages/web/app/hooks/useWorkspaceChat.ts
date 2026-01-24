@@ -1,9 +1,7 @@
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import type {
-  Message,
-  Attachment,
-  TextUIPart,
-  FileUIPart,
+    Attachment,
+    Message
 } from "../types/chat";
 import type { FileMap } from "../utils/constants";
 
@@ -773,7 +771,9 @@ export function useWorkspaceChat() {
     setMessages(finalMessages);
   };
 
-  return {
+  // Memoize the return object to prevent unnecessary re-renders in consumers
+  // The object reference only changes when state values change
+  return useMemo(() => ({
     messages,
     setMessages: setMessagesWithDeduplication,
     isLoading,
@@ -796,5 +796,12 @@ export function useWorkspaceChat() {
     interruptGeneration,
     resetFileIndicators,
     userCancelledRef,
-  };
+  }), [
+    messages,
+    isLoading,
+    isStreaming,
+    error,
+    currentToolCalls,
+    // Functions are stable references, but include for completeness
+  ]);
 }

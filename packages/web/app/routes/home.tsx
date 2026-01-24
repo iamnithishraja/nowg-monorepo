@@ -1,84 +1,124 @@
-import { useEffect, useRef, useState } from "react";
+import {
+    ArrowSquareOut,
+    ArrowUp,
+    Bell,
+    BookOpen,
+    CaretRight,
+    ChartBar,
+    ChatCircle,
+    CurrencyDollar,
+    Database,
+    Gear,
+    GitBranch,
+    GithubLogo,
+    Lightning,
+    Palette,
+    PlusCircle,
+    Shield,
+    SignOut,
+    Sparkle,
+    SpinnerGap,
+    Users
+} from "@phosphor-icons/react";
+import { memo, useEffect, useRef, useState } from "react";
 import { redirect, useNavigate } from "react-router";
-import { ProjectSidebar } from "../components/ProjectSidebar";
-import GradientGlow from "../components/GradientGlow";
+import {
+    DatabaseConnectionDialog,
+    type DbProvider,
+} from "../components/DatabaseConnectionDialog";
 import FigmaImportModal from "../components/FigmaImportModal";
-import GitHubImportModal from "../components/GitHubImportModal";
 import { FilePreview } from "../components/FileUpload";
+import GitHubImportModal from "../components/GitHubImportModal";
+import GradientGlow from "../components/GradientGlow";
+import { ProjectAdminDialog } from "../components/ProjectAdminDialog";
+import { ProjectSidebar } from "../components/ProjectSidebar";
+import { Button } from "../components/ui/button";
 import { ColorSchemeDialog } from "../components/ui/ColorSchemeDialog";
 import {
-  DatabaseConnectionDialog,
-  type DbProvider,
-} from "../components/DatabaseConnectionDialog";
-import { Button } from "../components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
-import { Switch } from "../components/ui/switch";
-import { Label } from "../components/ui/label";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../components/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
 } from "../components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import { ScrollArea } from "../components/ui/scroll-area";
 import {
-  GithubLogo,
-  SpinnerGap,
-  PaperPlaneTilt,
-  Sparkle,
-  ArrowUp,
-  Bell,
-  Upload,
-  Database,
-  Palette,
-  BookOpen,
-  CaretRight,
-  ArrowSquareOut,
-  MagnifyingGlass,
-  ChartBar,
-  GitBranch,
-  Users,
-  ChatCircle,
-  Shield,
-  SignOut,
-  CurrencyDollar,
-  Lightning,
-  Gear,
-} from "@phosphor-icons/react";
-import { useSupabaseAuth } from "../hooks/useSupabaseAuth";
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "../components/ui/select";
+import { Switch } from "../components/ui/switch";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "../components/ui/tooltip";
+import { OPENROUTER_MODELS } from "../consts/models";
 import { useFileHandling } from "../hooks/useFileHandling";
+import { useOrgAdminData } from "../hooks/useOrgAdminData";
+import { useProjectCreation } from "../hooks/useProjectCreation";
+import { useSupabaseAuth } from "../hooks/useSupabaseAuth";
 import { auth } from "../lib/auth";
 import { authClient } from "../lib/authClient";
 import { preloadNodeModulesCache } from "../lib/nodeModulesPreloader";
-import { cn } from "../lib/utils";
-import type { Route } from "./+types/home";
-import type { DesignScheme } from "../types/design-scheme";
-import { OPENROUTER_MODELS } from "../consts/models";
 import { UserRole } from "../lib/types/roles";
-import { ProjectAdminDialog } from "../components/ProjectAdminDialog";
-import { useOrgAdminData } from "../hooks/useOrgAdminData";
-import { useProjectCreation } from "../hooks/useProjectCreation";
-import { PlusCircle } from "phosphor-react";
+import { cn } from "../lib/utils";
+import type { DesignScheme } from "../types/design-scheme";
+import { getShortcutLabel } from "../utils/platform";
+import type { Route } from "./+types/home";
+
+// Memoized Avatar component - extracted to avoid recreation on every render
+interface HomeAvatarProps {
+  displayName?: string;
+  imageUrl?: string;
+  size?: number;
+}
+
+const HomeAvatar = memo(function HomeAvatar({ displayName, imageUrl, size = 8 }: HomeAvatarProps) {
+  const [broken, setBroken] = useState(false);
+  const sizeClass = size === 10 ? "w-10 h-10" : "w-8 h-8";
+
+  if (imageUrl && !broken) {
+    return (
+      <img
+        src={imageUrl}
+        alt=""
+        referrerPolicy="no-referrer"
+        crossOrigin="anonymous"
+        onError={() => setBroken(true)}
+        className={`${sizeClass} rounded-full object-cover border border-white/10`}
+      />
+    );
+  }
+
+  const initials = displayName
+    ? displayName
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "?";
+
+  return (
+    <div
+      className={`${sizeClass} rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold`}
+    >
+      {initials}
+    </div>
+  );
+});
 
 export async function loader({ request }: Route.LoaderArgs) {
   const authInstance = await auth;
@@ -111,7 +151,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   );
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
-  const [shortcutLabel, setShortcutLabel] = useState("⌘ Return");
+  const shortcutLabel = getShortcutLabel();
 
   const [useSupabase, setUseSupabase] = useState(false);
   const [showDatabaseDialog, setShowDatabaseDialog] = useState(false);
@@ -317,18 +357,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       }, 500);
     }
   }, [checkSupabaseToken]);
-
-  // Platform-aware shortcut label
-  useEffect(() => {
-    try {
-      const ua = navigator.userAgent || "";
-      const platform = (navigator.platform || "").toLowerCase();
-      const isApple =
-        /mac|iphone|ipad|ipod/.test(platform) ||
-        /Mac|iPhone|iPad|iPod/.test(ua);
-      setShortcutLabel(isApple ? "⌘ Return" : "Ctrl+Enter");
-    } catch {}
-  }, []);
 
   // Focus search input when dialog opens
   useEffect(() => {
@@ -645,43 +673,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     return model ? `${model.name}` : modelId;
   };
 
-  // User avatar
-  const Avatar = ({ size = 8 }: { size?: number }) => {
-    const displayName = user?.name || user?.email;
-    const imageUrl = user?.image;
-    const [broken, setBroken] = useState(false);
-    const sizeClass = size === 10 ? "w-10 h-10" : "w-8 h-8";
-
-    if (imageUrl && !broken) {
-      return (
-        <img
-          src={imageUrl}
-          alt=""
-          referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
-          onError={() => setBroken(true)}
-          className={`${sizeClass} rounded-full object-cover border border-white/10`}
-        />
-      );
-    }
-
-    const initials = displayName
-      ? displayName
-          .split(" ")
-          .map((n: string) => n[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase()
-      : "?";
-
-    return (
-      <div
-        className={`${sizeClass} rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold`}
-      >
-        {initials}
-      </div>
-    );
-  };
+  // Get display name and image for avatar
+  const displayName = user?.name || user?.email;
+  const imageUrl = user?.image;
 
   return (
     <div className="h-screen w-screen bg-[#0c0c0c] text-white flex overflow-hidden">
@@ -722,7 +716,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center justify-center hover:opacity-80 transition-opacity">
-                  <Avatar />
+                  <HomeAvatar displayName={displayName} imageUrl={imageUrl} />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-72" align="end">
@@ -733,7 +727,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     className="w-full text-left"
                   >
                     <div className="flex items-center gap-3 cursor-pointer">
-                      <Avatar size={10} />
+                      <HomeAvatar displayName={displayName} imageUrl={imageUrl} size={10} />
                       <div className="min-w-0">
                         <div className="font-semibold truncate text-white">
                           {user?.name || "User"}

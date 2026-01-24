@@ -1,4 +1,21 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import {
+  ArrowsClockwise,
+  CaretDown,
+  CaretRight,
+  CaretUp,
+  File,
+  Plus,
+  Terminal as TerminalIcon,
+  X
+} from "@phosphor-icons/react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { downloadCodebaseAsZip, getProjectName } from "../lib/downloadCodebase";
+import { attachInteractiveShell } from "../lib/webcontainer";
+import CodeEditor from "./CodeEditor";
+import FileSearchPane from "./FileSearchPane";
+import FileTree from "./FileTree";
+import PreviewPanel from "./Preview";
+import { Terminal, type TerminalRef } from "./Terminal";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -6,38 +23,19 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "./ui/breadcrumb";
-import {
-  File,
-  CaretRight,
-  Terminal as TerminalIcon,
-  Plus,
-  ArrowsClockwise,
-  X,
-  CaretDown,
-  CaretUp,
-  DownloadSimple,
-} from "@phosphor-icons/react";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "./ui/resizable";
 import { Button } from "./ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "./ui/resizable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
-import FileTree from "./FileTree";
-import CodeEditor from "./CodeEditor";
-import PreviewPanel from "./Preview";
-import FileSearchPane from "./FileSearchPane";
-import { Terminal, type TerminalRef } from "./Terminal";
-import { useState, useEffect, useRef } from "react";
-import { downloadCodebaseAsZip, getProjectName } from "../lib/downloadCodebase";
-import { attachInteractiveShell } from "../lib/webcontainer";
-import { cn } from "../lib/utils";
 
 type TabType = "files" | "preview";
 
@@ -64,7 +62,7 @@ interface RightPanelProps {
   onInspectorEnable?: () => void;
 }
 
-export default function RightPanel({
+function RightPanelComponent({
   activeTab,
   setActiveTab,
   templateFilesState,
@@ -137,7 +135,7 @@ export default function RightPanel({
     }
   };
 
-  const closeTerminal = (id: number) => {
+  const closeTerminal = useCallback((id: number) => {
     if (id === 0) return; // Can't close first terminal
 
     // Cleanup shell connection
@@ -149,16 +147,19 @@ export default function RightPanel({
 
     terminalRefs.current.delete(id);
     lastLineIndexRefs.current.delete(id);
-    setTerminalCount(terminalCount - 1);
+    setTerminalCount((prev) => prev - 1);
 
-    if (activeTerminalId === id) {
-      setActiveTerminalId(Math.max(0, id - 1));
-    } else if (activeTerminalId > id) {
-      setActiveTerminalId(activeTerminalId - 1);
-    }
-  };
+    setActiveTerminalId((currentActive) => {
+      if (currentActive === id) {
+        return Math.max(0, id - 1);
+      } else if (currentActive > id) {
+        return currentActive - 1;
+      }
+      return currentActive;
+    });
+  }, []);
 
-  const handleDownloadCodebase = async () => {
+  const handleDownloadCodebase = useCallback(async () => {
     if (templateFilesState.length === 0) {
       alert("No files to download. Create some files first!");
       return;
@@ -176,7 +177,7 @@ export default function RightPanel({
     } finally {
       setIsDownloading(false);
     }
-  };
+  }, [templateFilesState, conversationTitle]);
 
   return (
     <div className="h-full min-h-0 max-h-full flex flex-col border">
@@ -613,3 +614,7 @@ export default function RightPanel({
     </div>
   );
 }
+
+// Export memoized component
+const RightPanel = memo(RightPanelComponent);
+export default RightPanel;

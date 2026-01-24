@@ -1,34 +1,29 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
-import { cn } from "../lib/utils";
 import {
-  House,
-  MagnifyingGlass,
-  FolderSimple,
-  Star,
+  Bell,
+  Buildings,
+  Cardholder,
   CaretDown,
   CaretRight,
+  ChatTeardropDots,
   Compass,
-  Layout,
-  GraduationCap,
-  Bell,
-  SidebarSimple,
-  Buildings,
-  User,
+  Cube,
   DotsThreeOutline,
-  Trash,
-  PencilSimple,
-  SpinnerGap,
-  Warning,
+  House,
   KanbanIcon,
+  MagnifyingGlass,
+  PencilSimple,
+  SidebarSimple,
+  SpinnerGap,
+  Star,
+  Trash,
+  User,
+  Warning
 } from "@phosphor-icons/react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router";
+import crop from "~/assets/crop.png";
+import { cn } from "../lib/utils";
+import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
@@ -37,13 +32,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { ScrollArea } from "./ui/scroll-area";
-import crop from "~/assets/crop.png";
-import { Cardholder, ChatTeardropDots, Cube } from "phosphor-react";
-import { Kanban } from "lucide-react";
 
 interface Project {
   id: string;
@@ -63,6 +61,44 @@ interface Organization {
 
 const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
 
+// User avatar component - extracted and memoized
+interface UserAvatarProps {
+  displayName?: string;
+  imageUrl?: string;
+}
+
+const UserAvatar = memo(function UserAvatar({ displayName, imageUrl }: UserAvatarProps) {
+  const [broken, setBroken] = useState(false);
+
+  if (imageUrl && !broken) {
+    return (
+      <img
+        src={imageUrl}
+        alt=""
+        referrerPolicy="no-referrer"
+        crossOrigin="anonymous"
+        onError={() => setBroken(true)}
+        className="w-8 h-8 rounded-full object-cover border border-white/10"
+      />
+    );
+  }
+
+  const initials = displayName
+    ? displayName
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "?";
+
+  return (
+    <div className="w-8 h-8 rounded-full bg-linear-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold">
+      {initials}
+    </div>
+  );
+});
+
 interface ProjectSidebarProps {
   className?: string;
   user?: {
@@ -73,7 +109,7 @@ interface ProjectSidebarProps {
   onSearchClick?: () => void;
 }
 
-export function ProjectSidebar({
+function ProjectSidebarComponent({
   className,
   user,
   onSearchClick,
@@ -101,8 +137,9 @@ export function ProjectSidebar({
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const currentProjectId = new URLSearchParams(location.search).get(
-    "conversationId"
+  const currentProjectId = useMemo(() => 
+    new URLSearchParams(location.search).get("conversationId"),
+    [location.search]
   );
 
   // Listen for toggle event from workspace header
@@ -202,41 +239,47 @@ export function ProjectSidebar({
     fetchData();
   }, []);
 
-  // Filter projects based on selected workspace
-  const filteredProjects = projects.filter((p) => {
-    if (selectedWorkspace === "personal") {
-      return p.type === "personal";
-    }
-    return p.type === "organization" && p.organizationId === selectedWorkspace;
-  });
+  // Filter projects based on selected workspace - MEMOIZED
+  const filteredProjects = useMemo(() => 
+    projects.filter((p) => {
+      if (selectedWorkspace === "personal") {
+        return p.type === "personal";
+      }
+      return p.type === "organization" && p.organizationId === selectedWorkspace;
+    }),
+    [projects, selectedWorkspace]
+  );
 
-  // Get recent projects (last 10)
-  const recentProjects = [...filteredProjects]
-    .sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    )
-    .slice(0, 10);
+  // Get recent projects (last 10) - MEMOIZED
+  const recentProjects = useMemo(() => 
+    [...filteredProjects]
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )
+      .slice(0, 10),
+    [filteredProjects]
+  );
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
+  // Format date for display - MEMOIZED
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
       day: "numeric",
       month: "short",
       year: "numeric",
     });
-  };
+  }, []);
 
-  // Get workspace display name
-  const getWorkspaceName = () => {
+  // Get workspace display name - MEMOIZED
+  const getWorkspaceName = useCallback(() => {
     if (selectedWorkspace === "personal") return "Personal Projects";
     const org = organizations.find((o) => o.id === selectedWorkspace);
     return org?.name || "Organization";
-  };
+  }, [selectedWorkspace, organizations]);
 
-  // Handle project rename
-  const handleRename = async (projectId: string, title: string) => {
+  // Handle project rename - MEMOIZED
+  const handleRename = useCallback(async (projectId: string, title: string) => {
     try {
       const response = await fetch("/api/conversations", {
         method: "POST",
@@ -257,10 +300,10 @@ export function ProjectSidebar({
     } catch (err) {
       console.error("Error renaming project:", err);
     }
-  };
+  }, []);
 
-  // Handle project delete
-  const handleDelete = async (projectId: string) => {
+  // Handle project delete - MEMOIZED
+  const handleDelete = useCallback(async (projectId: string) => {
     setIsDeleting(true);
     try {
       const response = await fetch("/api/conversations", {
@@ -281,42 +324,13 @@ export function ProjectSidebar({
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [currentProjectId, navigate]);
 
-  // User avatar component
-  const Avatar = () => {
-    const displayName = user?.name || user?.email;
-    const imageUrl = user?.image;
-    const [broken, setBroken] = useState(false);
-
-    if (imageUrl && !broken) {
-      return (
-        <img
-          src={imageUrl}
-          alt=""
-          referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
-          onError={() => setBroken(true)}
-          className="w-8 h-8 rounded-full object-cover border border-white/10"
-        />
-      );
-    }
-
-    const initials = displayName
-      ? displayName
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase()
-      : "?";
-
-    return (
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold">
-        {initials}
-      </div>
-    );
-  };
+  // Memoize user avatar props
+  const avatarProps = useMemo(() => ({
+    displayName: user?.name || user?.email,
+    imageUrl: user?.image,
+  }), [user?.name, user?.email, user?.image]);
 
   return (
     <>
@@ -603,21 +617,21 @@ export function ProjectSidebar({
         </ScrollArea>
 
         {/* Footer */}
-        <div className="px-3 py-4 border-t border-white/[0.06]">
+        <div className="px-3 py-4 border-t border-white/6">
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate("/profile")}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/[0.04] transition-colors"
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/4 transition-colors"
             >
-              <Avatar />
+              <UserAvatar displayName={avatarProps.displayName} imageUrl={avatarProps.imageUrl} />
               {!isCollapsed && (
-                <span className="text-sm text-white/70 truncate max-w-[120px]">
+                <span className="text-sm text-white/70 truncate max-w-30">
                   {user?.name || user?.email || "User"}
                 </span>
               )}
             </button>
             {!isCollapsed && (
-              <button className="p-2 rounded-lg hover:bg-white/[0.04] text-white/40 hover:text-white transition-colors relative">
+              <button className="p-2 rounded-lg hover:bg-white/4 text-white/40 hover:text-white transition-colors relative">
                 <Bell className="w-4 h-4" />
               </button>
             )}
@@ -739,4 +753,6 @@ export function ProjectSidebar({
   );
 }
 
+// Memoize the component to prevent unnecessary re-renders
+export const ProjectSidebar = memo(ProjectSidebarComponent);
 export default ProjectSidebar;

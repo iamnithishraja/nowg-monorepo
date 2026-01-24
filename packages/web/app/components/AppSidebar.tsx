@@ -1,5 +1,39 @@
-import { useState, useEffect, useRef } from "react";
+import {
+  AlertTriangle,
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  Edit2,
+  Filter,
+  Home as HomeIcon,
+  Loader2,
+  MessageCircle,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+  Users,
+  X
+} from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
+import { cn } from "../lib/utils";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "./ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 import {
   Sidebar,
   SidebarContent,
@@ -13,44 +47,6 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "./ui/sidebar";
-import { Button } from "./ui/button";
-import {
-  MessageCircle,
-  Plus,
-  Home as HomeIcon,
-  MoreHorizontal,
-  Trash2,
-  Edit2,
-  Calendar,
-  X,
-  Sparkles,
-  Brain,
-  AlertTriangle,
-  Loader2,
-  Filter,
-  ChevronDown,
-  ChevronRight,
-  Users,
-  Building2,
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "./ui/dialog";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { cn } from "../lib/utils";
 
 interface Conversation {
   id: string;
@@ -70,7 +66,7 @@ interface AppSidebarProps {
   className?: string;
 }
 
-export function AppSidebar({ className }: AppSidebarProps) {
+function AppSidebarComponent({ className }: AppSidebarProps) {
   const { open, setOpen } = useSidebar();
   const openedByEdgeRef = useRef(false);
   const [persistentOpen, setPersistentOpen] = useState(false);
@@ -159,8 +155,8 @@ export function AppSidebar({ className }: AppSidebarProps) {
     }
   };
 
-  // Update conversation title
-  const updateTitle = async (conversationId: string, title: string) => {
+  // Update conversation title - MEMOIZED
+  const updateTitle = useCallback(async (conversationId: string, title: string) => {
     try {
       const response = await fetch("/api/conversations", {
         method: "POST",
@@ -191,10 +187,10 @@ export function AppSidebar({ className }: AppSidebarProps) {
       console.error("Error updating title:", err);
       setError(err instanceof Error ? err.message : "Failed to update title");
     }
-  };
+  }, []);
 
-  // Delete conversation
-  const deleteConversation = async (conversationId: string) => {
+  // Delete conversation - MEMOIZED
+  const deleteConversation = useCallback(async (conversationId: string) => {
     setIsDeleting(true);
     try {
       const response = await fetch("/api/conversations", {
@@ -229,10 +225,10 @@ export function AppSidebar({ className }: AppSidebarProps) {
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [currentConversationId]);
 
-  // Format relative time
-  const formatTimeAgo = (dateString: string) => {
+  // Format relative time - memoized as callback
+  const formatTimeAgo = useCallback((dateString: string) => {
     if (!dateString) return "Unknown";
 
     const date = new Date(dateString);
@@ -253,127 +249,131 @@ export function AppSidebar({ className }: AppSidebarProps) {
     if (diffInDays < 7) return `${diffInDays}d ago`;
 
     return date.toLocaleDateString();
-  };
+  }, []);
 
-  // Separate personal, team, and organization conversations
-  // Organization conversations should NOT appear in personal conversations
-  const organizationConversations = conversations.filter(
-    (c) => c.organizationId && c.projectType === "organization"
-  );
-  const teamConversations = conversations.filter(
-    (c) => c.teamId && c.projectType === "team"
-  );
-  // Personal conversations exclude both team and organization conversations
-  // Also exclude any conversation that has organizationId, even if projectType is not set
-  const personalConversations = conversations.filter(
-    (c) =>
-      !c.teamId &&
-      !c.organizationId &&
-      c.projectType !== "organization" &&
-      (c.projectType === "personal" || !c.projectType)
-  );
+  // MEMOIZED: Separate personal, team, and organization conversations
+  const { personalConversations, teamConversations, organizationConversations } = useMemo(() => {
+    const organization = conversations.filter(
+      (c) => c.organizationId && c.projectType === "organization"
+    );
+    const team = conversations.filter(
+      (c) => c.teamId && c.projectType === "team"
+    );
+    const personal = conversations.filter(
+      (c) =>
+        !c.teamId &&
+        !c.organizationId &&
+        c.projectType !== "organization" &&
+        (c.projectType === "personal" || !c.projectType)
+    );
+    return { personalConversations: personal, teamConversations: team, organizationConversations: organization };
+  }, [conversations]);
 
-  // Filter conversations
-  const filteredPersonal = filterQuery
-    ? personalConversations.filter((c) =>
-        (c.title || "").toLowerCase().includes(filterQuery.trim().toLowerCase())
-      )
-    : personalConversations;
+  // MEMOIZED: Filter conversations
+  const { filteredPersonal, filteredTeam, filteredOrganization } = useMemo(() => {
+    const query = filterQuery.trim().toLowerCase();
+    if (!query) {
+      return { 
+        filteredPersonal: personalConversations, 
+        filteredTeam: teamConversations, 
+        filteredOrganization: organizationConversations 
+      };
+    }
+    return {
+      filteredPersonal: personalConversations.filter((c) =>
+        (c.title || "").toLowerCase().includes(query)
+      ),
+      filteredTeam: teamConversations.filter((c) =>
+        (c.title || "").toLowerCase().includes(query)
+      ),
+      filteredOrganization: organizationConversations.filter((c) =>
+        (c.title || "").toLowerCase().includes(query)
+      ),
+    };
+  }, [filterQuery, personalConversations, teamConversations, organizationConversations]);
 
-  const filteredTeam = filterQuery
-    ? teamConversations.filter((c) =>
-        (c.title || "").toLowerCase().includes(filterQuery.trim().toLowerCase())
-      )
-    : teamConversations;
-
-  const filteredOrganization = filterQuery
-    ? organizationConversations.filter((c) =>
-        (c.title || "").toLowerCase().includes(filterQuery.trim().toLowerCase())
-      )
-    : organizationConversations;
-
-  // Group personal conversations by date
-  const groupedPersonalConversations = filteredPersonal.reduce(
-    (groups, conversation) => {
-      if (!conversation.lastMessageAt) {
-        if (!groups["Older"]) {
-          groups["Older"] = [];
+  // MEMOIZED: Group personal conversations by date
+  const groupedPersonalConversations = useMemo(() => {
+    // Pre-compute today and yesterday dates once
+    const today = new Date();
+    const todayStr = today.toDateString();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toDateString();
+    const weekAgo = today.getTime() - 7 * 24 * 60 * 60 * 1000;
+    
+    return filteredPersonal.reduce(
+      (groups, conversation) => {
+        if (!conversation.lastMessageAt) {
+          if (!groups["Older"]) groups["Older"] = [];
+          groups["Older"].push(conversation);
+          return groups;
         }
-        groups["Older"].push(conversation);
-        return groups;
-      }
 
-      const date = new Date(conversation.lastMessageAt);
-      if (isNaN(date.getTime())) {
-        if (!groups["Older"]) {
-          groups["Older"] = [];
+        const date = new Date(conversation.lastMessageAt);
+        if (isNaN(date.getTime())) {
+          if (!groups["Older"]) groups["Older"] = [];
+          groups["Older"].push(conversation);
+          return groups;
         }
-        groups["Older"].push(conversation);
+
+        let groupKey: string;
+        const dateStr = date.toDateString();
+        if (dateStr === todayStr) {
+          groupKey = "Today";
+        } else if (dateStr === yesterdayStr) {
+          groupKey = "Yesterday";
+        } else if (date.getTime() > weekAgo) {
+          groupKey = "This week";
+        } else {
+          groupKey = "Older";
+        }
+
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(conversation);
         return groups;
-      }
+      },
+      {} as Record<string, Conversation[]>
+    );
+  }, [filteredPersonal]);
 
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+  // MEMOIZED: Group team conversations by team
+  const groupedTeamConversations = useMemo(() => 
+    filteredTeam.reduce(
+      (groups, conversation) => {
+        const teamKey = conversation.teamName || "Unknown Team";
+        if (!groups[teamKey]) groups[teamKey] = [];
+        groups[teamKey].push(conversation);
+        return groups;
+      },
+      {} as Record<string, Conversation[]>
+    ), [filteredTeam]);
 
-      let groupKey: string;
-      if (date.toDateString() === today.toDateString()) {
-        groupKey = "Today";
-      } else if (date.toDateString() === yesterday.toDateString()) {
-        groupKey = "Yesterday";
-      } else if (date > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)) {
-        groupKey = "This week";
-      } else {
-        groupKey = "Older";
-      }
-
-      if (!groups[groupKey]) {
-        groups[groupKey] = [];
-      }
-      groups[groupKey].push(conversation);
-      return groups;
-    },
-    {} as Record<string, Conversation[]>
-  );
-
-  // Group team conversations by team
-  const groupedTeamConversations = filteredTeam.reduce(
-    (groups, conversation) => {
-      const teamKey = conversation.teamName || "Unknown Team";
-      if (!groups[teamKey]) {
-        groups[teamKey] = [];
-      }
-      groups[teamKey].push(conversation);
-      return groups;
-    },
-    {} as Record<string, Conversation[]>
-  );
-
-  // Group organization conversations by organization
-  const groupedOrganizationConversations = filteredOrganization.reduce(
-    (groups, conversation) => {
-      const orgKey = conversation.organizationName || "Unknown Organization";
-      if (!groups[orgKey]) {
-        groups[orgKey] = [];
-      }
-      groups[orgKey].push(conversation);
-      return groups;
-    },
-    {} as Record<string, Conversation[]>
-  );
+  // MEMOIZED: Group organization conversations by organization
+  const groupedOrganizationConversations = useMemo(() =>
+    filteredOrganization.reduce(
+      (groups, conversation) => {
+        const orgKey = conversation.organizationName || "Unknown Organization";
+        if (!groups[orgKey]) groups[orgKey] = [];
+        groups[orgKey].push(conversation);
+        return groups;
+      },
+      {} as Record<string, Conversation[]>
+    ), [filteredOrganization]);
 
   useEffect(() => {
     fetchConversations();
   }, []);
 
-  const handleEditClick = (conversation: Conversation, e: React.MouseEvent) => {
+  // MEMOIZED event handlers to prevent re-renders
+  const handleEditClick = useCallback((conversation: Conversation, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setEditingConversation(conversation);
     setNewTitle(conversation.title);
-  };
+  }, []);
 
-  const handleDeleteClick = (
+  const handleDeleteClick = useCallback((
     conversation: Conversation,
     e: React.MouseEvent
   ) => {
@@ -381,14 +381,14 @@ export function AppSidebar({ className }: AppSidebarProps) {
     e.stopPropagation();
     setConversationToDelete(conversation);
     setDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (editingConversation && newTitle.trim()) {
       updateTitle(editingConversation.id, newTitle.trim());
     }
-  };
+  }, [editingConversation, newTitle, updateTitle]);
 
   // Open on cursor touching the left screen edge
   useEffect(() => {
@@ -1152,3 +1152,6 @@ export function AppSidebar({ className }: AppSidebarProps) {
     </>
   );
 }
+
+// Export memoized component to prevent unnecessary re-renders
+export const AppSidebar = memo(AppSidebarComponent);

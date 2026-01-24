@@ -1,25 +1,24 @@
-import { CaretDown, Shield, User } from "@phosphor-icons/react";
+import { Shield, User, UserGear } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
 } from "~/components/ui/dialog";
 import { Label } from "~/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "~/components/ui/select";
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
-import { Icon } from "~/components/Icon";
 import type { TeamMember } from "./TeamMembersTable";
 
 export type ProjectRole = "project_admin" | "project_member";
@@ -165,7 +164,7 @@ export function ManageRoleDialog({
           <DialogHeader className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7b4cff]/20 to-[#a855f7]/20 border border-[#7b4cff]/30 flex items-center justify-center">
-                <Icon name="UserGear" size="md" color="#a78bfa" />
+                <UserGear size={20} color="#a78bfa" />
               </div>
               <div>
                 <DialogTitle className="text-[18px] font-semibold text-primary tracking-[-0.36px]">
