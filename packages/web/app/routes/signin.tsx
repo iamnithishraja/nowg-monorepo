@@ -1,11 +1,8 @@
-import type { Route } from "./+types/signin";
-import { useState } from "react";
 import { Link, redirect, useSearchParams } from "react-router";
-import { signIn, authClient } from "../lib/authClient";
-import { auth } from "../lib/auth";
-import AuthLayout from "~/components/AuthLayout";
 import AuthForm from "~/components/AuthForm";
-// cleaned unused UI imports
+import AuthLayout from "~/components/AuthLayout";
+import { auth } from "../lib/auth";
+import type { Route } from "./+types/signin";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const authInstance = await auth;
@@ -33,18 +30,18 @@ export default function SignIn() {
 
   return (
     <AuthLayout
-      title="Welcome"
+      title="Welcome back"
       subtitle={
         inviteToken
           ? "Sign in to accept the organization invitation"
           : "Continue bringing your ideas to life."
       }
       footer={
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-xs text-white/40 text-center">
           By continuing, you agree to our{" "}
           <Link
             to="/privacy-policy"
-            className="underline underline-offset-2 hover:text-foreground"
+            className="text-white/60 hover:text-white underline underline-offset-2 transition-colors"
           >
             Privacy Policy
           </Link>

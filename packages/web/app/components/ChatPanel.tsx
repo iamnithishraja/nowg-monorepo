@@ -1,252 +1,14 @@
 import { useRef, useEffect, Fragment, useState } from "react";
 import type React from "react";
-import { Bot, Loader2, RotateCcw, Download, X, Clock, Check, ChevronDown, ChevronRight, XCircle } from "lucide-react";
+import { Bot, Loader2, RotateCcw, Download, X, FileText } from "lucide-react";
 import SelectedElementCard from "./SelectedElementCard";
 import { cn } from "../lib/utils";
 import type { Message } from "../types/chat";
 import { Button } from "./ui/button";
 import { FileCreationChecklist } from "./FileCreationChecklist";
 import { createClientFileStorageService } from "../lib/clientFileStorage";
-import { 
-  FileCode, 
-  Terminal, 
-  GitBranch, 
-  Package, 
-  Wrench,
-  File,
-  FolderOpen,
-  FileText,
-  Atom
-} from "lucide-react";
-
-// Tool call status colors
-function getStatusColor(status: string) {
-  switch (status) {
-    case "completed": return "text-green-400 bg-green-500/10 border-green-500/20";
-    case "executing": return "text-blue-400 bg-blue-500/10 border-blue-500/20";
-    case "error": return "text-red-400 bg-red-500/10 border-red-500/20";
-    default: return "text-gray-400 bg-gray-500/10 border-gray-500/20";
-  }
-}
-
-// Get icon for tool name
-function getToolIcon(name: string) {
-  const iconMap: Record<string, React.ReactNode> = {
-    edit: <FileCode className="w-4 h-4" />,
-    multiedit: <FileCode className="w-4 h-4" />,
-    write: <FileCode className="w-4 h-4" />,
-    read: <File className="w-4 h-4" />,
-    shell: <Terminal className="w-4 h-4" />,
-    git: <GitBranch className="w-4 h-4" />,
-    install: <Package className="w-4 h-4" />,
-    mkdir: <FolderOpen className="w-4 h-4" />,
-  };
-  return iconMap[name] || <Wrench className="w-4 h-4" />;
-}
-
-// Get user-friendly description for tool name
-function getToolDescription(name: string, args?: any): string {
-  const filePath = args?.filePath || args?.file_path || args?.path;
-  const fileName = filePath ? filePath.split("/").pop() || filePath : null;
-  
-  const descriptions: Record<string, string> = {
-    edit: fileName ? `Editing ${fileName}` : "Editing file",
-    multiedit: fileName ? `Editing ${fileName}` : "Editing files",
-    write: fileName ? `Creating ${fileName}` : "Creating file",
-    read: fileName ? `Reading ${fileName}` : "Reading file",
-    shell: args?.command ? `Running: ${args.command}` : "Running command",
-    git: "Working with Git",
-    install: args?.package ? `Installing ${args.package}` : "Installing packages",
-    mkdir: args?.path ? `Creating folder: ${args.path}` : "Creating folder",
-  };
-  
-  return descriptions[name] || "Working...";
-}
-
-// Get file icon for file changes display
-function getFileIconForChanges(name: string) {
-  const lower = name.toLowerCase();
-  const ext = lower.includes(".") ? lower.split(".").pop() || "" : "";
-  
-  // React for JSX/TSX
-  if (ext === "jsx" || ext === "tsx") {
-    return <Atom className="w-4 h-4 shrink-0" style={{ color: "#61DAFB" }} />;
-  }
-  
-  // Code files
-  if (["js", "ts", "mjs", "cjs", "py", "rb", "go", "rs", "java", "kt", "c", "cpp", "h", "hpp", "cs", "php", "swift", "r", "scala", "dart", "lua", "pl", "vim", "ex", "exs", "erl", "hrl", "clj", "cljs", "cljc", "elm", "fs", "fsx", "ml", "mli", "hs", "lhs"].includes(ext)) {
-    return <FileCode className="w-4 h-4 shrink-0" />;
-  }
-  
-  // HTML/CSS
-  if (["html", "htm", "css", "scss", "sass", "less", "styl"].includes(ext)) {
-    return <FileCode className="w-4 h-4 shrink-0" />;
-  }
-  
-  // Markdown/Text
-  if (["md", "mdx", "txt"].includes(ext)) {
-    return <FileText className="w-4 h-4 shrink-0" />;
-  }
-  
-  // Default
-  return <FileCode className="w-4 h-4 shrink-0" />;
-}
-
-// Extract file changes from tool calls
-function extractFileChanges(toolCalls: any[]): Array<{ name: string; status: "modified" | "created" }> {
-  const fileChanges = new Map<string, "modified" | "created">();
-  
-  for (const toolCall of toolCalls) {
-    // Include completed tool calls and also executing ones (for streaming)
-    if (toolCall.status === "completed" || toolCall.status === "executing") {
-      if (toolCall.name === "edit" || toolCall.name === "multiedit") {
-        const filePath = toolCall.args?.filePath || toolCall.args?.file_path;
-        if (filePath) {
-          fileChanges.set(filePath, "modified");
-        }
-      } else if (toolCall.name === "write") {
-        const filePath = toolCall.args?.filePath || toolCall.args?.path;
-        if (filePath) {
-          // Check if file already exists (would be modified) or is new (created)
-          // For now, assume write is creating a new file unless we have better info
-          fileChanges.set(filePath, "created");
-        }
-      }
-    }
-  }
-  
-  return Array.from(fileChanges.entries()).map(([name, status]) => ({ name, status }));
-}
-
-// File changes component for chat
-function FileChangesDisplay({ files }: { files: Array<{ name: string; status: "modified" | "created" }> }) {
-  if (files.length === 0) return null;
-  
-  return (
-    <div className="border border-border/30 rounded-xl overflow-hidden bg-surface-2/50">
-      <div className="flex items-center gap-3 px-3 py-2.5">
-        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-purple-500/10 border border-purple-500/20">
-          <ChevronDown className="w-4 h-4 text-purple-400" />
-        </div>
-        <span className="font-medium text-sm text-foreground">File changes</span>
-        <span className="ml-auto text-xs text-muted-foreground/70">
-          {files.length} file{files.length !== 1 ? "s" : ""}
-        </span>
-      </div>
-      <div className="border-t border-border/20 divide-y divide-border/20">
-        {files.map((file, index) => (
-          <div 
-            key={index} 
-            className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface-3/20 transition-colors"
-          >
-            {/* Status indicator */}
-            <div className={`flex items-center justify-center w-6 h-6 rounded-lg ${
-              file.status === "modified" 
-                ? "bg-amber-500/15 border border-amber-500/20" 
-                : "bg-emerald-500/15 border border-emerald-500/20"
-            }`}>
-              {file.status === "modified" ? (
-                <span className="text-[10px] text-amber-400 font-bold">M</span>
-              ) : (
-                <Check className="w-3 h-3 text-emerald-400" />
-              )}
-            </div>
-            
-            {/* File icon */}
-            <div className="opacity-100">
-              {getFileIconForChanges(file.name)}
-            </div>
-            
-            {/* File name */}
-            <span className="text-sm font-mono text-foreground flex-1">
-              {file.name}
-            </span>
-            
-            {/* Status badge */}
-            <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg ${
-              file.status === "modified"
-                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-            }`}>
-              {file.status === "modified" ? "Modified" : "Created"}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Tool call item component
-function ToolCallItem({ toolCall }: { toolCall: any }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  const isFileEdit = toolCall.name === "edit" || toolCall.name === "multiedit" || toolCall.name === "write";
-  const filePath = toolCall.args?.filePath || toolCall.args?.file_path || null;
-  const userFriendlyDescription = getToolDescription(toolCall.name, toolCall.args);
-  
-  return (
-    <div className="border border-border/30 rounded-xl overflow-hidden bg-surface-2/50">
-      <div
-        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-surface-3/30 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className={`flex items-center justify-center w-6 h-6 rounded-lg border ${getStatusColor(toolCall.status)}`}>
-          {toolCall.status === "executing" ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : toolCall.status === "completed" ? (
-            <Check className="w-3 h-3" />
-          ) : toolCall.status === "error" ? (
-            <XCircle className="w-3 h-3" />
-          ) : (
-            <div className="w-2 h-2 rounded-full bg-current" />
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {getToolIcon(toolCall.name)}
-          <span className="text-sm text-foreground truncate">{userFriendlyDescription}</span>
-        </div>
-        
-        {toolCall.endTime && toolCall.startTime && (
-          <span className="text-[10px] text-muted-foreground ml-auto mr-2 shrink-0">
-            {toolCall.endTime - toolCall.startTime}ms
-          </span>
-        )}
-        
-        {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-        )}
-      </div>
-      
-      {isExpanded && (
-        <div className="border-t border-border/20 px-3 py-2.5 space-y-2">
-          <div>
-            <div className="text-[10px] uppercase text-muted-foreground mb-1">Arguments</div>
-            <pre className="text-xs font-mono bg-surface-1/80 rounded-lg p-2 overflow-x-auto max-h-32">
-              {JSON.stringify(toolCall.args, null, 2)}
-            </pre>
-          </div>
-          
-          {toolCall.result && (
-            <div>
-              <div className="text-[10px] uppercase text-muted-foreground mb-1">Result</div>
-              <pre className="text-xs font-mono bg-surface-1/80 rounded-lg p-2 overflow-x-auto max-h-48">
-                {toolCall.result?.output 
-                  ? (toolCall.result.output.substring(0, 1000) + (toolCall.result.output.length > 1000 ? '...' : ''))
-                  : toolCall.result?.error
-                    ? toolCall.result.error
-                    : JSON.stringify(toolCall.result, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+import { ChatCircle } from "phosphor-react";
+import { ToolCallItem } from "./ToolCallItem";
 
 // Format timestamp for messages
 const formatMessageTime = (timestamp?: string | Date) => {
@@ -263,7 +25,7 @@ const formatMessageTime = (timestamp?: string | Date) => {
   const timeStr = date.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
-    hour12: true
+    hour12: true,
   });
 
   if (isToday) {
@@ -271,10 +33,12 @@ const formatMessageTime = (timestamp?: string | Date) => {
   } else if (isYesterday) {
     return `Yesterday at ${timeStr}`;
   } else {
-    return date.toLocaleDateString("en-US", {
+    return (
+      date.toLocaleDateString("en-US", {
         month: "short",
-        day: "numeric"
-      }) + ` at ${timeStr}`;
+        day: "numeric",
+      }) + ` at ${timeStr}`
+    );
   }
 };
 
@@ -335,11 +99,11 @@ export default function ChatPanel({
 
       for (const message of messages) {
         if (message.files && message.files.length > 0) {
-
           for (const file of message.files) {
             if (!fileDataMap.has(file.id)) {
               // First, check if file data is embedded in the message (from DB)
-              const embeddedData = (file as any).base64Data || (file as any).content;
+              const embeddedData =
+                (file as any).base64Data || (file as any).content;
               if (embeddedData) {
                 newFileDataMap.set(file.id, embeddedData);
 
@@ -364,10 +128,8 @@ export default function ChatPanel({
                   const data = result.base64Data || result.content;
                   if (data) {
                     newFileDataMap.set(file.id, data);
-
                   }
                 } else {
-
                 }
               } catch (error) {
                 console.error("Error loading file from IndexedDB:", error);
@@ -378,7 +140,6 @@ export default function ChatPanel({
       }
 
       if (newFileDataMap.size > 0) {
-
         setFileDataMap((prev) => new Map([...prev, ...newFileDataMap]));
       }
     };
@@ -391,7 +152,6 @@ export default function ChatPanel({
     onInspectorEnable?.();
   };
 
-
   const getModelDisplayName = (modelId: string) => {
     return modelId;
   };
@@ -402,7 +162,11 @@ export default function ChatPanel({
   };
 
   // File attachment component with download functionality
-  const FileAttachmentItem = ({ file, fileData, isImage }: { 
+  const FileAttachmentItem = ({
+    file,
+    fileData,
+    isImage,
+  }: {
     file: any;
     fileData: string | undefined;
     isImage: boolean;
@@ -422,11 +186,12 @@ export default function ChatPanel({
 
     return (
       <>
-                    <div
-              className="relative rounded-lg border border-primary-foreground/20 overflow-hidden bg-primary-foreground/10 group"
+        <div className="relative rounded-lg border border-primary-foreground/20 overflow-hidden bg-primary-foreground/10 group">
+          {isImage && fileData ? (
+            <div
+              className="h-16 w-16 relative cursor-pointer"
+              onClick={() => setIsExpanded(true)}
             >
-{isImage && fileData ? (
-            <div className="h-16 w-16 relative cursor-pointer" onClick={() => setIsExpanded(true)}>
               <img
                 src={fileData}
                 alt={file.name}
@@ -443,7 +208,10 @@ export default function ChatPanel({
               </div>
             </div>
           ) : (
-            <div className="h-16 w-16 flex flex-col items-center justify-center gap-1 p-2 cursor-pointer" onClick={handleDownload}>
+            <div
+              className="h-16 w-16 flex flex-col items-center justify-center gap-1 p-2 cursor-pointer"
+              onClick={handleDownload}
+            >
               <FileText className="w-5 h-5 text-primary-foreground" />
               <span className="text-[9px] text-center text-primary-foreground truncate w-full">
                 {file.name}
@@ -532,6 +300,11 @@ export default function ChatPanel({
 
     const isBullet = (line: string) => /^\s*[-•\*]\s+/.test(line);
     const isNumbered = (line: string) => /^\s*\d+\.\s+/.test(line);
+    const isHeader = (line: string) => /^#{1,6}\s+/.test(line);
+    const isCodeBlockStart = (line: string) => /^```/.test(line.trim());
+    const isBlockquote = (line: string) => /^>\s*/.test(line);
+    const isHorizontalRule = (line: string) =>
+      /^(---|\*\*\*|___)\s*$/.test(line.trim());
 
     // Helper function to handle markdown formatting and long content
     const handleLongContent = (content: string) => {
@@ -544,9 +317,9 @@ export default function ChatPanel({
         const parts: React.ReactNode[] = [];
         let lastIndex = 0;
 
-        // Regex to match **bold**, *italic*, and `code`
-        // Use non-greedy matching and handle nested cases
-        const markdownRegex = /(\*\*([^*]+?)\*\*|\*([^*]+?)\*|`([^`]+?)`)/g;
+        // Regex to match **bold**, *italic*, `code`, and [links](url)
+        const markdownRegex =
+          /(\*\*([^*]+?)\*\*|\*([^*]+?)\*|`([^`]+?)`|\[([^\]]+?)\]\(([^)]+?)\))/g;
         let match;
 
         while ((match = markdownRegex.exec(text)) !== null) {
@@ -575,6 +348,19 @@ export default function ChatPanel({
               >
                 {match[4]}
               </code>
+            );
+          } else if (match[5] && match[6]) {
+            // Link: [text](url)
+            parts.push(
+              <a
+                key={`link-${match.index}`}
+                href={match[6]}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 underline underline-offset-2"
+              >
+                {match[5]}
+              </a>
             );
           }
 
@@ -639,8 +425,150 @@ export default function ChatPanel({
       return processLongWords(content);
     };
 
+    // Parse header and return appropriate element
+    const parseHeader = (line: string, key: string) => {
+      const match = line.match(/^(#{1,6})\s+(.+)$/);
+      if (!match) return null;
+
+      const level = match[1].length;
+      const content = match[2];
+
+      const headerClasses: Record<number, string> = {
+        1: "text-2xl font-bold mt-6 mb-3 text-foreground",
+        2: "text-xl font-bold mt-5 mb-2 text-foreground",
+        3: "text-lg font-semibold mt-4 mb-2 text-foreground",
+        4: "text-base font-semibold mt-3 mb-1 text-foreground",
+        5: "text-sm font-semibold mt-2 mb-1 text-foreground",
+        6: "text-sm font-medium mt-2 mb-1 text-muted-foreground",
+      };
+
+      const className = headerClasses[level];
+      const processedContent = handleLongContent(content);
+
+      switch (level) {
+        case 1:
+          return (
+            <h1 key={key} className={className}>
+              {processedContent}
+            </h1>
+          );
+        case 2:
+          return (
+            <h2 key={key} className={className}>
+              {processedContent}
+            </h2>
+          );
+        case 3:
+          return (
+            <h3 key={key} className={className}>
+              {processedContent}
+            </h3>
+          );
+        case 4:
+          return (
+            <h4 key={key} className={className}>
+              {processedContent}
+            </h4>
+          );
+        case 5:
+          return (
+            <h5 key={key} className={className}>
+              {processedContent}
+            </h5>
+          );
+        case 6:
+          return (
+            <h6 key={key} className={className}>
+              {processedContent}
+            </h6>
+          );
+        default:
+          return (
+            <p key={key} className={className}>
+              {processedContent}
+            </p>
+          );
+      }
+    };
+
     while (i < lines.length) {
       const line = lines[i];
+
+      // Code blocks
+      if (isCodeBlockStart(line)) {
+        const langMatch = line.trim().match(/^```(\w+)?/);
+        const lang = langMatch?.[1] || "";
+        const codeLines: string[] = [];
+        i++; // Skip opening ```
+
+        while (i < lines.length && !isCodeBlockStart(lines[i])) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        i++; // Skip closing ```
+
+        elements.push(
+          <div
+            key={`code-block-${elements.length}`}
+            className="my-3 rounded-xl overflow-hidden border border-border/30 bg-surface-1/80"
+          >
+            {lang && (
+              <div className="px-4 py-2 text-xs font-mono text-muted-foreground bg-surface-2/50 border-b border-border/30">
+                {lang}
+              </div>
+            )}
+            <pre className="p-4 overflow-x-auto">
+              <code className="text-sm font-mono text-foreground/90 leading-relaxed">
+                {codeLines.join("\n")}
+              </code>
+            </pre>
+          </div>
+        );
+        continue;
+      }
+
+      // Headers
+      if (isHeader(line)) {
+        const header = parseHeader(line, `h-${elements.length}`);
+        if (header) {
+          elements.push(header);
+        }
+        i++;
+        continue;
+      }
+
+      // Horizontal rules
+      if (isHorizontalRule(line)) {
+        elements.push(
+          <hr key={`hr-${elements.length}`} className="my-4 border-border/30" />
+        );
+        i++;
+        continue;
+      }
+
+      // Blockquotes
+      if (isBlockquote(line)) {
+        const quoteLines: string[] = [];
+        while (i < lines.length && isBlockquote(lines[i])) {
+          quoteLines.push(lines[i].replace(/^>\s*/, ""));
+          i++;
+        }
+        elements.push(
+          <blockquote
+            key={`quote-${elements.length}`}
+            className="my-3 pl-4 border-l-2 border-purple-500/50 text-muted-foreground italic"
+          >
+            {quoteLines.map((ql, idx) => (
+              <p key={idx} className="my-1">
+                {handleLongContent(ql)}
+              </p>
+            ))}
+          </blockquote>
+        );
+        continue;
+      }
+
+      // Bullet lists
       if (isBullet(line)) {
         const items: string[] = [];
         while (i < lines.length && isBullet(lines[i])) {
@@ -949,7 +877,7 @@ export default function ChatPanel({
   return (
     <div className="flex-1 flex flex-col overflow-auto h-full modern-scrollbar">
       <div className="flex-1 h-full p-4 overflow-auto modern-scrollbar">
-        <div className="space-y-6">
+        <div className="space-y-6 h-full">
           {messages.map((message) => {
             // Use parseMessageSegments for assistant messages, simple text for user messages
             const segments =
@@ -965,7 +893,9 @@ export default function ChatPanel({
                     },
                   ];
 
-            const timestamp = formatMessageTime((message as any).createdAt || (message as any).timestamp);
+            const timestamp = formatMessageTime(
+              (message as any).createdAt || (message as any).timestamp
+            );
 
             return (
               <div
@@ -1036,133 +966,157 @@ export default function ChatPanel({
 
                 {/* Assistant message - clean text with file changes */}
                 {message.role === "assistant" && segments.length > 0 && (
-                  <div className="w-full max-w-full space-y-4">
-                    {/* Render text segments first (like Cursor) */}
-                    {segments.map((segment, idx) => (
-                      <div key={`segment-${idx}`}>
-                        {segment.type === "text" && (
-                          <div className="text-sm leading-relaxed text-foreground/90">
-                            {renderRichContent(segment.content)}
-                          </div>
-                        )}
-                        {segment.type === "checklist" && (
-                          <div className="w-full mt-4">
-                            <FileCreationChecklist
-                              title={segment.data.title}
-                              files={segment.data.files}
-                              isApplicationStarted={
-                                segment.data.isApplicationStarted
-                              }
-                              command={segment.data.command}
-                            />
-                          </div>
-                        )}
-                        {segment.type === "textAfterChecklist" && (
-                          <div className="text-sm leading-relaxed text-foreground/90 mt-4">
-                            {renderRichContent(segment.content)}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    
-                    {/* File changes display at the end (only in chat, not main conversation) - like Cursor */}
-                    {chatId && (() => {
-                      // Get toolCalls from message (persists after streaming) or currentToolCalls (during streaming)
+                  <div className="w-full max-w-full space-y-2">
+                    {(() => {
+                      // Get the full text content
+                      const textContent =
+                        typeof message.content === "string"
+                          ? message.content
+                          : segments
+                              .filter(
+                                (s) =>
+                                  s.type === "text" ||
+                                  s.type === "textAfterChecklist"
+                              )
+                              .map((s) => s.content)
+                              .join("\n");
+
+                      // Get tool calls (from message or currentToolCalls for streaming)
                       const messageToolCalls = (message as any).toolCalls;
-                      const isLastMessage = message.id === messages[messages.length - 1]?.id;
-                      
-                      // Priority: message.toolCalls (persists) > currentToolCalls (during streaming for last message)
-                      let toolCallsToUse: any[] | null = null;
-                      
-                      // Always check message's toolCalls first (works after streaming completes)
-                      if (messageToolCalls && Array.isArray(messageToolCalls) && messageToolCalls.length > 0) {
-                        toolCallsToUse = messageToolCalls;
-                      } 
-                      // Fallback to currentToolCalls only if this is the last message and we're still loading
-                      // OR if we just finished loading (isLoading might be false but currentToolCalls still has data briefly)
-                      else if (isLastMessage && currentToolCalls && currentToolCalls.length > 0) {
-                        toolCallsToUse = currentToolCalls;
+                      const isLastMessage =
+                        message.id === messages[messages.length - 1]?.id;
+
+                      // Combine message tool calls with current tool calls for the last message
+                      // This ensures tool calls don't disappear during streaming
+                      let toolCallsToUse: any[] = [];
+                      const messageToolCallsArray =
+                        messageToolCalls &&
+                        Array.isArray(messageToolCalls) &&
+                        messageToolCalls.length > 0
+                          ? messageToolCalls
+                          : [];
+                      const currentToolCallsArray =
+                        isLastMessage &&
+                        currentToolCalls &&
+                        currentToolCalls.length > 0
+                          ? currentToolCalls
+                          : [];
+
+                      // For the last message during streaming, merge both arrays
+                      // Use a Map to deduplicate by ID (message tool calls take precedence)
+                      if (
+                        isLastMessage &&
+                        (messageToolCallsArray.length > 0 ||
+                          currentToolCallsArray.length > 0)
+                      ) {
+                        const toolCallMap = new Map();
+                        // Add current tool calls first
+                        currentToolCallsArray.forEach((tc: any) => {
+                          toolCallMap.set(tc.id, tc);
+                        });
+                        // Override with message tool calls (more up-to-date)
+                        messageToolCallsArray.forEach((tc: any) => {
+                          toolCallMap.set(tc.id, tc);
+                        });
+                        toolCallsToUse = Array.from(toolCallMap.values());
+                      } else if (messageToolCallsArray.length > 0) {
+                        // For non-last messages, just use message tool calls
+                        toolCallsToUse = messageToolCallsArray;
                       }
-                      
-                      if (!toolCallsToUse || toolCallsToUse.length === 0) {
-                        return null;
-                      }
-                      
-                      const fileChanges = extractFileChanges(toolCallsToUse);
-                      if (fileChanges.length > 0) {
-                        return (
-                          <div className="w-full mt-4">
-                            <FileChangesDisplay files={fileChanges} />
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                    
-                    {/* Tool calls display - user-friendly (collapsed by default, only show if expanded) */}
-                    {(message as any).toolCalls && (message as any).toolCalls.length > 0 && (
-                      <details className="w-full space-y-2 mt-2">
-                        <summary className="text-xs text-muted-foreground/80 cursor-pointer font-medium list-none">
-                          <span className="hover:text-foreground/80 transition-colors">Actions</span>
-                        </summary>
-                        <div className="mt-2 space-y-2">
-                          {(message as any).toolCalls.map((tc: any) => (
-                            <ToolCallItem key={tc.id} toolCall={tc} />
+
+                      // Render segments normally, then tool calls at end
+                      return (
+                        <>
+                          {segments.map((segment, idx) => (
+                            <div key={`segment-${idx}`}>
+                              {segment.type === "text" && (
+                                <div className="text-sm leading-relaxed text-foreground/90">
+                                  {renderRichContent(segment.content)}
+                                </div>
+                              )}
+                              {segment.type === "checklist" && (
+                                <div className="w-full mt-4">
+                                  <FileCreationChecklist
+                                    title={segment.data.title}
+                                    files={segment.data.files}
+                                    isApplicationStarted={
+                                      segment.data.isApplicationStarted
+                                    }
+                                    command={segment.data.command}
+                                  />
+                                </div>
+                              )}
+                              {segment.type === "textAfterChecklist" && (
+                                <div className="text-sm leading-relaxed text-foreground/90 mt-4">
+                                  {renderRichContent(segment.content)}
+                                </div>
+                              )}
+                            </div>
                           ))}
-                        </div>
-                      </details>
-                    )}
+                          {/* Tool calls at end if no textIndex */}
+                          {toolCallsToUse.length > 0 && (
+                            <div className="space-y-0.5 mt-2">
+                              {toolCallsToUse.map((tc: any) => (
+                                <ToolCallItem
+                                  key={tc.id}
+                                  toolCall={tc}
+                                  isCompact
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
             );
           })}
 
-          {(isLoading || isProcessingTemplate) && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
-                <Loader2 className="w-4 h-4 animate-spin text-foreground" />
+          {/* Empty state for side chats */}
+          {messages.length === 0 &&
+            !isLoading &&
+            !isProcessingTemplate &&
+            chatId && (
+              <div className="flex flex-col items-center justify-center flex-1 h-full px-4">
+                <div className="flex flex-col items-center max-w-md text-center space-y-4">
+                  {/* Icon */}
+                  <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center">
+                    <ChatCircle
+                      className="w-8 h-8 text-purple-400"
+                      weight="duotone"
+                    />
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="text-lg font-semibold text-foreground">
+                    New Chat
+                  </h3>
+
+                  {/* Description */}
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Start a conversation in this chat. New chats let you explore
+                    different ideas or ask questions without affecting your main
+                    conversation.
+                  </p>
+
+                  {/* Hint */}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground/70 bg-surface-2/50 px-3 py-2 rounded-lg border border-border/30">
+                    <div className="w-1 h-1 rounded-full bg-purple-400/70" />
+                    <span>Type your message below to get started</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1">
-                {/* Show file changes while streaming (only in chat) */}
-                {chatId && currentToolCalls && currentToolCalls.length > 0 && (
-                  (() => {
-                    const fileChanges = extractFileChanges(currentToolCalls);
-                    if (fileChanges.length > 0) {
-                      return (
-                        <div className="w-full mb-4">
-                          <FileChangesDisplay files={fileChanges} />
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()
-                )}
-                
-                {/* Show current tool calls while streaming - user-friendly */}
-                {currentToolCalls && currentToolCalls.length > 0 && (
-                  <div className="w-full space-y-2 mb-4">
-                    <div className="text-xs text-muted-foreground/80 flex items-center gap-2 font-medium">
-                      Actions
-                    </div>
-                    {currentToolCalls.map((tc: any) => (
-                      <ToolCallItem key={tc.id} toolCall={tc} />
-                    ))}
-                  </div>
-                )}
-                
-                {isProcessingTemplate && (
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-medium text-foreground">
-                      Loading Template
-                    </span>
-                  </div>
-                )}
-                {isProcessingTemplate && (
-                  <div className="text-sm text-foreground">
-                    Setting up your project template...
-                  </div>
-                )}
+            )}
+
+          {/* Loading state - only show when processing template */}
+          {/* Tool calls are now shown inline in the message via interleaving */}
+          {isProcessingTemplate && (
+            <div className="w-full animate-in fade-in-0 duration-200">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Setting up project...</span>
               </div>
             </div>
           )}

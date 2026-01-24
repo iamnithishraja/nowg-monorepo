@@ -112,6 +112,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
   const [shouldShowLoader, setShouldShowLoader] = useState(true); // Latch to prevent flicker
   const [currentChatTitle, setCurrentChatTitle] = useState<string | null>(null);
   const chatTitlePollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isCreatingNewChat, setIsCreatingNewChat] = useState(false);
 
   const {
     hasSupabaseConnected,
@@ -842,8 +843,11 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                   <WorkspaceLeftHeader 
                     chatTitle={getChatTitle()} 
                     conversationId={controller.conversationId || undefined}
+                    isCreatingNewChat={isCreatingNewChat}
                     onCreateNewChat={async () => {
-                      if (!controller.conversationId) return;
+                      if (!controller.conversationId || isCreatingNewChat) return;
+                      
+                      setIsCreatingNewChat(true);
                       try {
                         const response = await fetch("/api/conversations", {
                           method: "POST",
@@ -893,6 +897,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                           // For network errors, try to create chat again silently or just navigate
                           console.warn("Network error during chat creation, but continuing...");
                         }
+                      } finally {
+                        setIsCreatingNewChat(false);
                       }
                     }}
                     currentChatId={currentChatId}

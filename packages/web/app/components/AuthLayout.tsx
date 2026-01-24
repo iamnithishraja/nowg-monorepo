@@ -1,11 +1,15 @@
+import {
+  GithubLogo,
+  Play,
+  Rocket,
+  Sparkle,
+  Terminal,
+  Users
+} from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import Background from "./Background";
-import GlowEffects from "./GlowEffects";
-import { Badge } from "./ui/badge";
-import { Github, Rocket, Sparkles, TerminalSquare, Zap } from "lucide-react";
-import AnimatedHeadline from "./AnimatedHeadline";
 import logo from "../assets/logo.png";
+import GradientGlow from "./GradientGlow";
 
 interface AuthLayoutProps {
   title: string;
@@ -21,123 +25,168 @@ export default function AuthLayout({
   footer,
 }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen relative text-foreground">
-      {/* Ambient background */}
-      <Background />
-      <GlowEffects />
+    <div className="min-h-screen h-screen bg-[#0c0c0c] text-white flex overflow-hidden">
+      {/* Gradient Background - covers entire screen */}
+      <GradientGlow />
 
-      <div className="relative z-10 flex min-h-screen">
-        {/* Brand / Showcase Panel */}
-        <aside className="hidden lg:flex w-[54%] xl:w-[58%] border-r border-border/60 bg-gradient-to-b from-background/60 to-background/20 backdrop-blur-xl relative overflow-hidden">
-          {/* decorative mesh gradient */}
-          <div className="pointer-events-none absolute inset-0 mesh-gradient opacity-60" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/5" />
-          <div className="mx-auto max-w-2xl px-12 xl:px-16 py-18 flex flex-col gap-12 justify-between w-full">
-            <header className="flex items-center gap-3 text-white">
+      {/* Left Panel - Brand Showcase */}
+      <aside className="hidden lg:flex w-[52%] xl:w-[55%] relative z-10 overflow-hidden">
+        {/* Subtle grid overlay */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+            backgroundSize: "60px 60px",
+          }}
+        />
+
+        <div className="mx-auto max-w-xl px-12 xl:px-16 py-12 flex flex-col justify-between w-full relative z-10">
+          {/* Logo */}
+          <header className="flex items-center gap-3">
+            <Link to="/" className="flex items-center">
               <img
                 src={logo}
                 alt="Nowgai"
-                className="h-45 w-65 rounded-sm shadow-md shadow-black/30"
+                className="h-36 w-auto rounded-lg shadow-lg shadow-black/20"
               />
-            </header>
+            </Link>
+          </header>
 
-            <div className="space-y-7">
-              <AnimatedHeadline className="[&>span:first-child]:text-5xl [&>span:first-child]:md:text-6xl" />
-              <p className="text-muted-foreground/90 text-xl leading-relaxed max-w-xl">
+          {/* Main Content */}
+          <div className="space-y-8 -mt-8">
+            {/* Headline */}
+            <div className="space-y-4">
+              <h1 className="text-4xl xl:text-5xl font-bold text-white tracking-tight leading-[1.1]">
+                Ship ideas
+                <span className="block mt-2 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+                  at the speed of thought
+                </span>
+              </h1>
+              <p className="text-lg text-white/50 leading-relaxed max-w-md">
                 Describe what you want and watch it come to life with clean
                 code, live preview, and instant deploys.
               </p>
-
-              {/* feature badges with icons and hover micro-interactions */}
-              <div className="flex flex-wrap gap-2.5 pt-1">
-                <Badge className="rounded-full px-3 py-1.5 hover:scale-[1.02] transition will-change-transform bg-white/10 text-white/90">
-                  <Zap className="h-3.5 w-3.5 mr-1.5" /> Live preview
-                </Badge>
-                <Badge
-                  className="rounded-full px-3 py-1.5 hover:scale-[1.02] transition will-change-transform"
-                  variant="secondary"
-                >
-                  <Github className="h-3.5 w-3.5 mr-1.5" /> GitHub import
-                </Badge>
-                <Badge
-                  className="rounded-full px-3 py-1.5 hover:scale-[1.02] transition will-change-transform"
-                  variant="outline"
-                >
-                  <Rocket className="h-3.5 w-3.5 mr-1.5" /> 1‑click deploy
-                </Badge>
-                <Badge
-                  className="rounded-full px-3 py-1.5 hover:scale-[1.02] transition will-change-transform"
-                  variant="secondary"
-                >
-                  <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Collab ready
-                </Badge>
-              </div>
             </div>
 
-            {/* feature cards with hover glassmorphism */}
-            <div className="grid grid-cols-2 gap-4 pt-6">
-              <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-md p-5 hover:bg-card/60 transition group">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <TerminalSquare className="h-4 w-4 opacity-80" />
-                  <p className="text-sm">AI workspace</p>
+            {/* Feature Pills */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                { icon: Play, label: "Live preview" },
+                { icon: GithubLogo, label: "GitHub import" },
+                { icon: Rocket, label: "1-click deploy" },
+                { icon: Users, label: "Collab ready" },
+              ].map((feature) => (
+                <div
+                  key={feature.label}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-white/70 text-sm font-medium hover:bg-white/[0.06] hover:border-white/[0.12] transition-all cursor-default"
+                >
+                  <feature.icon className="w-3.5 h-3.5" weight="bold" />
+                  {feature.label}
                 </div>
-                <p className="mt-2 text-sm text-foreground/90">
-                  Chat, edit, and preview—side by side.
-                </p>
-                <div className="mt-3 h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-70 group-hover:opacity-100" />
-              </div>
-              <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-md p-5 hover:bg-card/60 transition group">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Sparkles className="h-4 w-4 opacity-80" />
-                  <p className="text-sm">Smart snippets</p>
-                </div>
-                <p className="mt-2 text-sm text-foreground/90">
-                  Starter templates to move faster.
-                </p>
-                <div className="mt-3 h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-70 group-hover:opacity-100" />
-              </div>
+              ))}
             </div>
 
-            {/* social proof */}
-            <footer className="text-sm text-muted-foreground flex items-center gap-3 pt-2">
-              <div className="flex -space-x-2">
-                <span className="inline-block h-6 w-6 rounded-full bg-white/20 border border-white/20" />
-                <span className="inline-block h-6 w-6 rounded-full bg-white/20 border border-white/20" />
-                <span className="inline-block h-6 w-6 rounded-full bg-white/20 border border-white/20" />
+            {/* Feature Cards */}
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="group p-5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1] transition-all">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+                    <Terminal className="w-4 h-4" weight="bold" />
+                  </div>
+                  <span className="text-sm font-medium text-white/80">
+                    AI Workspace
+                  </span>
+                </div>
+                <p className="text-sm text-white/40 leading-relaxed">
+                  Chat, edit, and preview—all side by side.
+                </p>
+                <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-purple-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <span>Trusted by 10k+ builders and teams.</span>
-            </footer>
+              <div className="group p-5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1] transition-all">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="p-2 rounded-lg bg-pink-500/10 text-pink-400">
+                    <Sparkle className="w-4 h-4" weight="bold" />
+                  </div>
+                  <span className="text-sm font-medium text-white/80">
+                    Smart Templates
+                  </span>
+                </div>
+                <p className="text-sm text-white/40 leading-relaxed">
+                  Starter templates to move even faster.
+                </p>
+                <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-pink-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </div>
           </div>
-        </aside>
 
-        {/* Form Panel */}
-        <main className="flex-1 flex items-center justify-center px-6 py-12 relative">
-          {/* subtle connector to relate to the left panel */}
-          <div className="hidden lg:block absolute left-0 top-24 bottom-24 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent" />
-          {/* subtle background grid */}
-          <div className="pointer-events-none absolute inset-0 auth-grid opacity-10" />
-          <div className="w-full max-w-lg">
-            <div className="mb-8">
-              <h2 className="mt-1 text-3xl md:text-4xl font-semibold tracking-tight bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+          {/* Social Proof */}
+          <footer className="flex items-center gap-4 text-sm text-white/40">
+            <div className="flex -space-x-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 border-2 border-[#0c0c0c] flex items-center justify-center"
+                >
+                  {/* <span className="text-[10px] font-medium text-white/60">
+                    {String.fromCharCode(64 + i)}
+                  </span> */}
+                </div>
+              ))}
+            </div>
+            <span>Trusted by 10k+ builders and teams</span>
+          </footer>
+        </div>
+
+        {/* Right edge gradient fade */}
+        <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-r from-transparent to-[#0c0c0c]/50 pointer-events-none" />
+      </aside>
+
+      {/* Right Panel - Auth Form */}
+      <main className="flex-1 flex items-center justify-center px-6 py-8 relative bg-[#111111]/60 backdrop-blur-sm">
+        {/* Simple divider */}
+        <div className="hidden lg:block absolute left-0 top-0 bottom-0 w-px bg-white/10" />
+
+        <div className="w-full max-w-md relative">
+          {/* Simple Header */}
+          <div className="mb-10 text-center">
+            {/* Mobile logo */}
+            <div className="lg:hidden flex justify-center mb-8">
+              <Link to="/" className="block">
+                <img
+                  src={logo}
+                  alt="Nowgai"
+                  className="h-16 w-auto"
+                />
+              </Link>
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-3xl font-semibold text-white tracking-tight">
                 {title}
               </h2>
-              {subtitle ? (
-                <p className="mt-2 text-sm text-muted-foreground/90">
+              {subtitle && (
+                <p className="text-sm text-white/60">
                   {subtitle}
                 </p>
-              ) : null}
+              )}
             </div>
-            <div className="relative">
-              <div className="absolute -inset-[1px] rounded-3xl bg-gradient-to-b from-white/20 via-white/10 to-transparent blur-[1px]" />
-              <div className="relative bg-background/70 backdrop-blur-2xl border border-border/60 rounded-3xl p-6 md:p-8 shadow-2xl shadow-black/40">
-                <div className="pointer-events-none absolute -inset-2 rounded-[28px] bg-[conic-gradient(from_180deg_at_50%_50%,rgba(139,92,246,0.15)_0deg,transparent_120deg,transparent_240deg,rgba(139,92,246,0.15)_360deg)] blur-2xl" />
-                {children}
-              </div>
-            </div>
-            {footer ? <div className="mt-8">{footer}</div> : null}
           </div>
-        </main>
-      </div>
+
+          {/* Enhanced Form Card */}
+          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/20 p-8 shadow-xl">
+            <div className="space-y-6">
+              {children}
+            </div>
+          </div>
+
+          {/* Simple Footer */}
+          {footer && (
+            <div className="mt-8 text-center">
+              {footer}
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
