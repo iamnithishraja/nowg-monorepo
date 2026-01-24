@@ -1,18 +1,18 @@
-import { useState, useMemo } from "react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Separator } from "./ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
-  Github,
-  Chrome,
-  Eye,
-  EyeOff,
   Check,
-  X,
+  Eye,
+  EyeSlash,
+  GithubLogo,
+  GoogleLogo,
   ShieldCheck,
-} from "lucide-react";
-import { signIn, signUp, authClient } from "../lib/authClient";
+  SpinnerGap,
+  X,
+} from "@phosphor-icons/react";
+import { useState } from "react";
+import { Link } from "react-router";
+import { authClient, signIn, signUp } from "../lib/authClient";
+import { Input } from "./ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 type AuthInitialTab = "signin" | "signup";
 
@@ -191,60 +191,64 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
   };
 
   return (
-    <div>
-      {/* Social */}
-      <div className="space-y-3 mb-6">
-        <Button
-          variant="outline"
-          className="w-full h-12 bg-muted/50 border border-border/60 hover:bg-muted rounded-xl font-medium"
+    <div className="space-y-7">
+      {/* Social Login Buttons */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
           onClick={() => handleSocial("google")}
           disabled={isLoading}
+          className="group flex items-center justify-center gap-2.5 h-12 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/70 font-medium text-sm hover:bg-white/[0.06] hover:border-white/[0.12] hover:text-white hover:shadow-lg hover:shadow-white/[0.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Chrome className="w-5 h-5 mr-3" /> Continue with Google
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full h-12 bg-muted/50 border border-border/60 hover:bg-muted rounded-xl font-medium"
+          <GoogleLogo className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" weight="bold" />
+          Google
+        </button>
+        <button
           onClick={() => handleSocial("github")}
           disabled={isLoading}
+          className="group flex items-center justify-center gap-2.5 h-12 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/70 font-medium text-sm hover:bg-white/[0.06] hover:border-white/[0.12] hover:text-white hover:shadow-lg hover:shadow-white/[0.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Github className="w-5 h-5 mr-3" /> Continue with GitHub
-        </Button>
+          <GithubLogo className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" weight="bold" />
+          GitHub
+        </button>
       </div>
 
       {/* Divider */}
-      <div className="flex items-center gap-4 mb-6">
-        <Separator className="flex-1 bg-gradient-to-r from-transparent via-gray-600 to-transparent h-px" />
-        <span className="text-muted-foreground text-sm font-medium">or</span>
-        <Separator className="flex-1 bg-gradient-to-r from-transparent via-gray-600 to-transparent h-px" />
+      <div className="relative flex items-center">
+        <div className="flex-1 border-t border-white/[0.06]" />
+        <div className="relative flex justify-center text-xs text-white/40 font-medium px-4 bg-[#0c0c0c]">
+          <span className="bg-[#0c0c0c] px-2 uppercase tracking-widest">or</span>
+        </div>
+        <div className="flex-1 border-t border-white/[0.06]" />
       </div>
 
+      {/* Tabs */}
       <Tabs defaultValue={initialTab} className="w-full">
-        <TabsList className="grid grid-cols-2 w-full bg-muted/20 border border-border/60 rounded-full p-1">
+        <TabsList className="grid grid-cols-2 w-full h-12 p-1.5 bg-white/[0.02] border border-white/[0.04] rounded-xl backdrop-blur-sm">
           <TabsTrigger
             value="signin"
-            className="rounded-full py-2 text-sm data-[state=active]:bg-[var(--accent-primary)] data-[state=active]:text-white data-[state=active]:shadow-[0_0_0_2px_rgba(123,76,255,0.35),0_10px_30px_-12px_rgba(123,76,255,0.55)]"
+            className="rounded-lg text-sm font-semibold text-white/50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/30 transition-all duration-300"
           >
             Sign in
           </TabsTrigger>
           <TabsTrigger
             value="signup"
-            className="rounded-full py-2 text-sm data-[state=active]:bg-[var(--accent-primary)] data-[state=active]:text-white data-[state=active]:shadow-[0_0_0_2px_rgba(123,76,255,0.35),0_10px_30px_-12px_rgba(123,76,255,0.55)]"
+            className="rounded-lg text-sm font-semibold text-white/50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/30 transition-all duration-300"
           >
             Create account
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="signin" className="mt-6">
+        {/* Sign In Tab */}
+        <TabsContent value="signin" className="mt-8 space-y-6">
           <form className="space-y-5" onSubmit={handleEmailSignIn}>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground block">
+            <div className="space-y-2.5">
+              <label className="text-sm font-semibold text-white/80 tracking-wide">
                 Email address
               </label>
               <Input
                 type="email"
-                placeholder="you@studio.dev"
-                className="h-12 bg-muted/30 border border-border/60 rounded-xl"
+                placeholder="you@example.com"
+                className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
                 value={signinEmail}
                 onChange={(e) => setSigninEmail(e.target.value)}
                 disabled={isLoading}
@@ -252,128 +256,160 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Password
-              </label>
-              <div className="relative">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-white/80 tracking-wide">
+                  Password
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-purple-400 hover:text-purple-300 font-medium hover:underline transition-all duration-200"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative group">
                 <Input
                   type={showSigninPassword ? "text" : "password"}
                   placeholder="Enter your password"
-                  className="h-12 bg-muted/30 border border-border/60 rounded-xl pr-12"
+                  className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 pr-12 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
                   value={signinPassword}
                   onChange={(e) => setSigninPassword(e.target.value)}
                   disabled={isLoading}
                   required
                 />
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground h-8 w-8 p-0"
                   onClick={() => setShowSigninPassword(!showSigninPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-white/40 hover:text-white/70 hover:bg-white/[0.05] transition-all duration-200"
                 >
                   {showSigninPassword ? (
-                    <EyeOff className="h-4 w-4" />
+                    <EyeSlash className="w-5 h-5" weight="bold" />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <Eye className="w-5 h-5" weight="bold" />
                   )}
-                </Button>
+                </button>
               </div>
             </div>
 
+            {/* Error Message */}
             {error && (
-              <div className="p-4 bg-destructive/10 backdrop-blur-sm border border-destructive/20 rounded-xl">
-                <p
-                  className="text-destructive text-sm font-medium"
-                  role="alert"
-                >
-                  {error}
-                </p>
-                {showResendVerification && (
-                  <div className="mt-4 pt-4 border-t border-destructive/20">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleResendVerification}
-                      disabled={resendLoading}
-                      className="w-full bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20 rounded-lg"
-                    >
-                      {resendLoading
-                        ? "Sending..."
-                        : "Resend Verification Email"}
-                    </Button>
+              <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <X className="w-3 h-3 text-red-400" weight="bold" />
                   </div>
+                  <p className="text-sm text-red-400 font-medium flex-1">{error}</p>
+                </div>
+                {showResendVerification && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendLoading}
+                    className="mt-4 w-full h-10 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-200 disabled:opacity-50"
+                  >
+                    {resendLoading ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <SpinnerGap className="w-4 h-4 animate-spin" weight="bold" />
+                        Sending...
+                      </div>
+                    ) : (
+                      "Resend Verification Email"
+                    )}
+                  </button>
                 )}
               </div>
             )}
 
+            {/* Resend Success */}
             {resendSuccess && (
-              <div className="p-4 bg-[var(--accent-primary)]/10 backdrop-blur-sm border border-[var(--accent-primary)]/20 rounded-xl">
-                <p className="text-accent-primary text-sm font-medium">
-                  Verification email sent! Check your inbox.
-                </p>
+              <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/10 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-green-400" weight="bold" />
+                  </div>
+                  <p className="text-sm text-green-400 font-medium">
+                    Verification email sent! Check your inbox.
+                  </p>
+                </div>
               </div>
             )}
 
-            <Button
-              className="w-full h-12 bg-foreground text-background hover:bg-foreground/90 font-semibold rounded-xl"
-              disabled={!signinEmail || !signinPassword || isLoading}
+            {/* Submit Button */}
+            <button
               type="submit"
+              disabled={!signinEmail || !signinPassword || isLoading}
+              className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-white to-white/95 text-black font-bold text-sm hover:from-white/95 hover:to-white/85 hover:shadow-lg hover:shadow-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center justify-center gap-2 overflow-hidden"
             >
-              {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  Signing in...
+              {isLoading && (
+                <div className="absolute inset-0 bg-gradient-to-r from-white/90 to-white/80 flex items-center justify-center">
+                  <SpinnerGap className="w-5 h-5 animate-spin text-black" weight="bold" />
                 </div>
-              ) : (
-                "Sign in"
               )}
-            </Button>
+              <span className={isLoading ? "opacity-0" : "opacity-100"}>
+                Sign in
+              </span>
+            </button>
 
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Protected by industry‑standard encryption</span>
+            {/* Security Note */}
+            <div className="flex items-center justify-center gap-2 text-xs text-white/40 pt-2">
+              <ShieldCheck className="w-4 h-4" weight="bold" />
+              <span>Protected by industry-standard encryption</span>
             </div>
           </form>
         </TabsContent>
 
-        <TabsContent value="signup" className="mt-6">
+        {/* Sign Up Tab */}
+        <TabsContent value="signup" className="mt-8">
           {signupSuccess ? (
-            <div className="text-center space-y-6">
-              <div className="p-6 bg-[var(--accent-primary)]/10 backdrop-blur-sm border border-[var(--accent-primary)]/20 rounded-2xl">
-                <p className="text-accent-primary text-sm leading-relaxed">
-                  We sent a verification email to{" "}
-                  <span className="font-semibold">{signupEmail}</span>.
+            <div className="text-center space-y-8 py-6">
+              <div className="relative">
+                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-green-400/20 to-green-600/20 border border-green-500/30 flex items-center justify-center backdrop-blur-sm">
+                  <Check className="w-10 h-10 text-green-400" weight="bold" />
+                </div>
+                <div className="absolute inset-0 w-20 h-20 mx-auto rounded-full bg-green-500/5 animate-ping" />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-xl font-bold text-white">
+                  Check your email
+                </h3>
+                <p className="text-sm text-white/60 leading-relaxed">
+                  We sent a verification link to{" "}
+                  <span className="text-white font-semibold break-all">{signupEmail}</span>
                 </p>
               </div>
-              <Button
-                className="w-full h-12 rounded-xl"
+              <button
                 onClick={() => window.location.assign("/signin")}
+                className="w-full h-12 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold text-sm hover:from-purple-400 hover:to-purple-500 hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300"
               >
                 Go to Sign In
-              </Button>
+              </button>
             </div>
           ) : (
             <form className="space-y-5" onSubmit={handleEmailSignUp}>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Full name</label>
+              <div className="space-y-2.5">
+                <label className="text-sm font-semibold text-white/80 tracking-wide">
+                  Full name
+                </label>
                 <Input
                   type="text"
                   placeholder="Your name"
-                  className="h-12 bg-muted/30 border border-border/60 rounded-xl"
+                  className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
                   value={signupName}
                   onChange={(e) => setSignupName(e.target.value)}
                   disabled={isLoading}
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email address</label>
+
+              <div className="space-y-2.5">
+                <label className="text-sm font-semibold text-white/80 tracking-wide">
+                  Email address
+                </label>
                 <Input
                   type="email"
-                  placeholder="you@studio.dev"
-                  className="h-12 bg-muted/30 border border-border/60 rounded-xl"
+                  placeholder="you@example.com"
+                  className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
                   disabled={isLoading}
@@ -381,112 +417,105 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Password</label>
-                <div className="relative">
+              <div className="space-y-2.5">
+                <label className="text-sm font-semibold text-white/80 tracking-wide">
+                  Password
+                </label>
+                <div className="relative group">
                   <Input
                     type={showSignupPassword ? "text" : "password"}
                     placeholder="At least 8 characters"
-                    className="h-12 bg-muted/30 border border-border/60 rounded-xl pr-12"
+                    className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 pr-12 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
                     value={signupPassword}
                     onChange={(e) => setSignupPassword(e.target.value)}
                     disabled={isLoading}
                     required
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground h-8 w-8 p-0"
                     onClick={() => setShowSignupPassword(!showSignupPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-white/40 hover:text-white/70 hover:bg-white/[0.05] transition-all duration-200"
                   >
                     {showSignupPassword ? (
-                      <EyeOff className="h-4 w-4" />
+                      <EyeSlash className="w-5 h-5" weight="bold" />
                     ) : (
-                      <Eye className="h-4 w-4" />
+                      <Eye className="w-5 h-5" weight="bold" />
                     )}
-                  </Button>
+                  </button>
                 </div>
                 {showPasswordValidation && (
-                  <div className="flex items-center gap-2 text-xs">
-                    {passwordValid ? (
-                      <Check className="w-3 h-3 text-success-500" />
-                    ) : (
-                      <X className="w-3 h-3 text-destructive" />
-                    )}
-                    <span
-                      className={
-                        passwordValid ? "text-success-500" : "text-destructive"
-                      }
-                    >
+                  <div className="flex items-center gap-3 text-xs mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${passwordValid ? "bg-green-500/20" : "bg-red-500/20"}`}>
+                      {passwordValid ? (
+                        <Check className="w-3 h-3 text-green-400" weight="bold" />
+                      ) : (
+                        <X className="w-3 h-3 text-red-400" weight="bold" />
+                      )}
+                    </div>
+                    <span className={`font-medium ${passwordValid ? "text-green-400" : "text-red-400"}`}>
                       At least 8 characters
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Confirm password</label>
-                <div className="relative">
+              <div className="space-y-2.5">
+                <label className="text-sm font-semibold text-white/80 tracking-wide">
+                  Confirm password
+                </label>
+                <div className="relative group">
                   <Input
                     type={showSignupConfirmPassword ? "text" : "password"}
                     placeholder="Re-enter password"
-                    className="h-12 bg-muted/30 border border-border/60 rounded-xl pr-12"
+                    className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 pr-12 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
                     value={signupConfirm}
                     onChange={(e) => setSignupConfirm(e.target.value)}
                     disabled={isLoading}
                     required
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground h-8 w-8 p-0"
-                    onClick={() =>
-                      setShowSignupConfirmPassword(!showSignupConfirmPassword)
-                    }
+                    onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-white/40 hover:text-white/70 hover:bg-white/[0.05] transition-all duration-200"
                   >
                     {showSignupConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
+                      <EyeSlash className="w-5 h-5" weight="bold" />
                     ) : (
-                      <Eye className="h-4 w-4" />
+                      <Eye className="w-5 h-5" weight="bold" />
                     )}
-                  </Button>
+                  </button>
                 </div>
                 {signupConfirm.length > 0 && (
-                  <div className="flex items-center gap-2 text-xs">
-                    {passwordsMatch ? (
-                      <>
-                        <Check className="w-3 h-3 text-success-500" />
-                        <span className="text-success-500">
-                          Passwords match
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <X className="w-3 h-3 text-destructive" />
-                        <span className="text-destructive">
-                          Passwords do not match
-                        </span>
-                      </>
-                    )}
+                  <div className="flex items-center gap-3 text-xs mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${passwordsMatch ? "bg-green-500/20" : "bg-red-500/20"}`}>
+                      {passwordsMatch ? (
+                        <Check className="w-3 h-3 text-green-400" weight="bold" />
+                      ) : (
+                        <X className="w-3 h-3 text-red-400" weight="bold" />
+                      )}
+                    </div>
+                    <span className={`font-medium ${passwordsMatch ? "text-green-400" : "text-red-400"}`}>
+                      {passwordsMatch ? "Passwords match" : "Passwords do not match"}
+                    </span>
                   </div>
                 )}
               </div>
 
+              {/* Error Message */}
               {error && (
-                <div className="p-4 bg-destructive/10 backdrop-blur-sm border border-destructive/20 rounded-xl">
-                  <p
-                    className="text-destructive text-sm font-medium"
-                    role="alert"
-                  >
-                    {error}
-                  </p>
+                <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 backdrop-blur-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <X className="w-3 h-3 text-red-400" weight="bold" />
+                    </div>
+                    <p className="text-sm text-red-400 font-medium flex-1">{error}</p>
+                  </div>
                 </div>
               )}
 
-              <Button
-                className="w-full h-12 rounded-xl"
+              {/* Submit Button */}
+              <button
+                type="submit"
                 disabled={
                   !passwordsMatch ||
                   !signupEmail ||
@@ -494,17 +523,17 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
                   !passwordValid ||
                   isLoading
                 }
-                type="submit"
+                className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold text-sm hover:from-purple-400 hover:to-purple-500 hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center justify-center gap-2 overflow-hidden"
               >
-                {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Creating account...
+                {isLoading && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/90 to-purple-600/90 flex items-center justify-center">
+                    <SpinnerGap className="w-5 h-5 animate-spin text-white" weight="bold" />
                   </div>
-                ) : (
-                  "Create account"
                 )}
-              </Button>
+                <span className={isLoading ? "opacity-0" : "opacity-100"}>
+                  Create account
+                </span>
+              </button>
             </form>
           )}
         </TabsContent>

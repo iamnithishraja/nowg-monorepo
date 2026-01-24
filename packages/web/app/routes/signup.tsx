@@ -1,8 +1,7 @@
-import type { Route } from "./+types/signup";
-import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import AuthLayout from "~/components/AuthLayout";
 import AuthForm from "~/components/AuthForm";
+import AuthLayout from "~/components/AuthLayout";
+import type { Route } from "./+types/signup";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -18,11 +17,18 @@ export default function SignUp() {
   return (
     <AuthLayout
       title="Create your account"
-      subtitle={inviteToken ? "Create your account to accept the organization invitation" : "Start building with Nowgai in minutes."}
+      subtitle={
+        inviteToken
+          ? "Create your account to accept the organization invitation"
+          : "Start building with Nowgai in minutes."
+      }
       footer={
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-xs text-white/40 text-center">
           By creating an account, you agree to our{" "}
-          <Link to="/privacy-policy" className="underline underline-offset-2 hover:text-foreground">
+          <Link
+            to="/privacy-policy"
+            className="text-white/60 hover:text-white underline underline-offset-2 transition-colors"
+          >
             Privacy Policy
           </Link>
           .
