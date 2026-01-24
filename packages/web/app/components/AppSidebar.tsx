@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Users,
   Building2,
+  User,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -93,11 +94,72 @@ export function AppSidebar({ className }: AppSidebarProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<
     Record<string, boolean>
   >({});
+  const [userWithAccess, setUserWithAccess] = useState<any>(null);
+  const [sidebarContext, setSidebarContext] = useState<"personal" | "organization">("personal");
+
+  // Ensure sidebarContext is properly typed for TypeScript
+  const context: "personal" | "organization" = sidebarContext;
+
+  // Helper function to determine if separator should be shown
+  const shouldShowSeparator = () => {
+    const hasContextConversations = context === "personal"
+      ? Object.keys(groupedPersonalConversations).length > 0
+      : Object.keys(groupedOrganizationConversations).length > 0;
+    const hasVisibleTeamConversations = context === "personal" && Object.keys(groupedTeamConversations).length > 0;
+    return hasContextConversations && hasVisibleTeamConversations;
+  };
 
   const location = useLocation();
   const currentConversationId = new URLSearchParams(location.search).get(
     "conversationId"
   );
+
+  // Fetch user access info
+  useEffect(() => {
+    const fetchUserAccess = async () => {
+      try {
+        const res = await fetch("/api/admin/me", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUserWithAccess(data);
+          // Default to organization context for org_admins
+          const isOrgAdmin = data?.role === "ORG_ADMIN" || data?.hasOrgAdminAccess === true;
+          const defaultContext = isOrgAdmin ? "organization" : "personal";
+          console.log("AppSidebar: Setting initial context to", defaultContext);
+          setSidebarContext(defaultContext);
+        }
+      } catch (error) {
+        console.error("Error fetching user access:", error);
+      }
+    };
+    fetchUserAccess();
+  }, []);
+
+  // Check if user is org_admin
+  const isOrgAdmin =
+    userWithAccess?.role === "ORG_ADMIN" ||
+    userWithAccess?.hasOrgAdminAccess === true;
+
+  // Save context to localStorage and notify other components when it changes
+  useEffect(() => {
+    console.log("AppSidebar: Context changed to", sidebarContext);
+    localStorage.setItem("web-sidebar-context", sidebarContext);
+    // Dispatch custom event to notify other components in the same tab
+    window.dispatchEvent(new CustomEvent("sidebarContextChange", { detail: sidebarContext }));
+  }, [sidebarContext]);
+
+  // Listen for conversation creation events
+  useEffect(() => {
+    const handleConversationCreated = () => {
+      // Refetch conversations when a new one is created
+      fetchConversations();
+    };
+
+    window.addEventListener("conversationCreated", handleConversationCreated);
+    return () => window.removeEventListener("conversationCreated", handleConversationCreated);
+  }, []);
 
   // Fetch conversations
   const fetchConversations = async () => {
@@ -485,6 +547,51 @@ export function AppSidebar({ className }: AppSidebarProps) {
                   </p>
                 </div>
               </div>
+
+              {/* Context Switcher for Org Admins */}
+              {isOrgAdmin && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-8 px-3 text-xs gap-2 border-border/30 hover:bg-primary/5"
+                    >
+                      {context === "personal" ? (
+                        <User className="h-3 w-3" />
+                      ) : (
+                        <Building2 className="h-3 w-3" />
+                      )}
+                      <span className="hidden sm:inline">
+                        {context === "personal" ? "Personal" : "Organization"}
+                      </span>
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-48">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        console.log("Dropdown: Setting context to personal");
+                        setSidebarContext("personal");
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <User className="h-4 w-4" />
+                      Personal Projects
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        console.log("Dropdown: Setting context to organization");
+                        setSidebarContext("organization");
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Building2 className="h-4 w-4" />
+                      Organization Projects
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
               <div className="flex items-center gap-1">
                 {/* Filter button */}
                 <DropdownMenu>
@@ -577,7 +684,7 @@ export function AppSidebar({ className }: AppSidebarProps) {
                       )}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0 transition-colors duration-200">
+                        <div className="w-8 h-8 rounded-lg bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0 transition-colors duration-200">
                           <HomeIcon className="h-4 w-4 text-primary/80 group-hover:text-primary transition-colors duration-200" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -615,7 +722,7 @@ export function AppSidebar({ className }: AppSidebarProps) {
             ) : conversations.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-muted/30 to-muted/10 flex items-center justify-center border border-muted/20">
+                  <div className="w-12 h-12 rounded-xl bg-linear-to-br from-muted/30 to-muted/10 flex items-center justify-center border border-muted/20">
                     <MessageCircle className="h-6 w-6 opacity-50" />
                   </div>
                   <div>
@@ -630,11 +737,11 @@ export function AppSidebar({ className }: AppSidebarProps) {
               </div>
             ) : (
               <div className="space-y-2 pb-4 min-h-0">
-                {/* Organizations Section - Moved to top */}
-                {Object.keys(groupedOrganizationConversations).length > 0 && (
+                {/* Organizations Section - Only show when in organization context */}
+                {context === "organization" && Object.keys(groupedOrganizationConversations).length > 0 && (
                   <>
                     <SidebarGroup>
-                      <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-gradient-to-r from-transparent via-muted/20 to-transparent flex items-center gap-2">
+                      <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-linear-to-r from-transparent via-muted/20 to-transparent flex items-center gap-2">
                         <Building2 className="h-3 w-3" />
                         Organizations
                       </SidebarGroupLabel>
@@ -693,7 +800,7 @@ export function AppSidebar({ className }: AppSidebarProps) {
                                               }
                                             >
                                               <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0 transition-colors duration-200">
+                                                <div className="w-6 h-6 rounded-md bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0 transition-colors duration-200">
                                                   <MessageCircle className="h-3 w-3 text-primary/80 group-hover:text-primary transition-colors duration-200" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
@@ -721,20 +828,19 @@ export function AppSidebar({ className }: AppSidebarProps) {
                         )}
                       </SidebarGroupContent>
                     </SidebarGroup>
-                    {Object.keys(groupedPersonalConversations).length > 0 ||
-                    Object.keys(groupedTeamConversations).length > 0 ? (
+                    {shouldShowSeparator() ? (
                       <SidebarSeparator className="my-2 opacity-50" />
                     ) : null}
                   </>
                 )}
 
-                {/* Personal Conversations */}
-                {Object.keys(groupedPersonalConversations).length > 0 && (
+                {/* Personal Conversations - Only show when in personal context */}
+                {context === "personal" && Object.keys(groupedPersonalConversations).length > 0 && (
                   <>
                     {Object.entries(groupedPersonalConversations).map(
                       ([groupName, groupConversations]) => (
                         <SidebarGroup key={groupName}>
-                          <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-gradient-to-r from-transparent via-muted/20 to-transparent flex items-center justify-between">
+                          <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-linear-to-r from-transparent via-muted/20 to-transparent flex items-center justify-between">
                             <button
                               className="flex items-center gap-1 hover:text-foreground/80 transition-colors"
                               onClick={() =>
@@ -782,7 +888,7 @@ export function AppSidebar({ className }: AppSidebarProps) {
                                         }
                                       >
                                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0 transition-colors duration-200">
+                                          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0 transition-colors duration-200">
                                             <MessageCircle className="h-4 w-4 text-primary/80 group-hover:text-primary transition-colors duration-200" />
                                           </div>
                                           <div className="flex-1 min-w-0">
@@ -857,14 +963,14 @@ export function AppSidebar({ className }: AppSidebarProps) {
                   </>
                 )}
 
-                {/* Teams Section */}
-                {Object.keys(groupedTeamConversations).length > 0 && (
+                {/* Teams Section - Only show when in personal context */}
+                {context === "personal" && Object.keys(groupedTeamConversations).length > 0 && (
                   <>
                     {Object.keys(groupedPersonalConversations).length > 0 ? (
                       <SidebarSeparator className="my-2 opacity-50" />
                     ) : null}
                     <SidebarGroup>
-                      <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-gradient-to-r from-transparent via-muted/20 to-transparent flex items-center gap-2">
+                      <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-linear-to-r from-transparent via-muted/20 to-transparent flex items-center gap-2">
                         <Users className="h-3 w-3" />
                         Teams
                       </SidebarGroupLabel>
@@ -923,7 +1029,7 @@ export function AppSidebar({ className }: AppSidebarProps) {
                                               }
                                             >
                                               <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0 transition-colors duration-200">
+                                                <div className="w-6 h-6 rounded-md bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0 transition-colors duration-200">
                                                   <MessageCircle className="h-3 w-3 text-primary/80 group-hover:text-primary transition-colors duration-200" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
@@ -1005,12 +1111,17 @@ export function AppSidebar({ className }: AppSidebarProps) {
                 )}
 
                 {/* Show message if no conversations match filter */}
-                {Object.keys(groupedPersonalConversations).length === 0 &&
-                  Object.keys(groupedTeamConversations).length === 0 &&
-                  Object.keys(groupedOrganizationConversations).length ===
-                    0 && (
+                {((context === "personal" &&
+                   Object.keys(groupedPersonalConversations).length === 0 &&
+                   Object.keys(groupedTeamConversations).length === 0) ||
+                  (context === "organization" &&
+                   Object.keys(groupedOrganizationConversations).length === 0)) && (
                     <div className="p-4 text-center text-muted-foreground text-sm">
-                      No conversations match your filter.
+                      {filterQuery
+                        ? "No conversations match your filter."
+                        : context === "personal"
+                        ? "No personal conversations yet."
+                        : "No organization conversations yet."}
                     </div>
                   )}
               </div>
@@ -1029,12 +1140,12 @@ export function AppSidebar({ className }: AppSidebarProps) {
           }
         }}
       >
-        <DialogContent className="p-[1px] rounded-2xl bg-gradient-to-b from-white/15 via-white/5 to-transparent sm:max-w-[450px]">
+        <DialogContent className="p-px rounded-2xl bg-linear-to-b from-white/15 via-white/5 to-transparent sm:max-w-[450px]">
           <div className="bg-background/70 backdrop-blur-xl border border-border/50 rounded-2xl shadow-xl shadow-black/30 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300">
             <form onSubmit={handleEditSubmit}>
               <DialogHeader className="space-y-3 pb-4 px-6 pt-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
+                  <div className="w-10 h-10 rounded-lg bg-linear-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
                     <Edit2 className="h-5 w-5 text-primary" />
                   </div>
                   <div>
@@ -1092,7 +1203,7 @@ export function AppSidebar({ className }: AppSidebarProps) {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="p-[1px] rounded-2xl bg-gradient-to-b from-white/15 via-white/5 to-transparent max-w-md">
+        <DialogContent className="p-px rounded-2xl bg-linear-to-b from-white/15 via-white/5 to-transparent max-w-md">
           <div className="bg-background/70 backdrop-blur-xl border border-border/50 rounded-2xl shadow-xl shadow-black/30 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300">
             <DialogHeader className="pb-4 px-6 pt-6">
               <DialogTitle className="text-foreground flex items-center gap-2">
