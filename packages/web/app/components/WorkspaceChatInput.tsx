@@ -5,7 +5,7 @@ import {
   GithubLogo,
 SpinnerGap,
   Cursor,
-  Palette,
+    Palette,
   PaperPlaneRight,
   Sparkle,
     Square,
@@ -44,8 +44,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "./ui/tooltip";
-import { PlusCircle, SelectionPlus } from "phosphor-react";
-import { ArrowUp } from "lucide-react";
+import { SelectionPlus, ArrowUp } from "phosphor-react";
 
 interface WorkspaceChatInputProps {
   input: string;
@@ -656,7 +655,7 @@ export function WorkspaceChatInput({
                   <DropdownMenuItem
                     onClick={() => setChatMode("build")}
                     className={cn(
-                      "cursor-pointer",
+                      "cursor-pointer hover:!text-[#7b4cff]",
                       chatMode === "build" && "bg-primary/10"
                     )}
                   >
@@ -668,7 +667,7 @@ export function WorkspaceChatInput({
                   <DropdownMenuItem
                     onClick={() => setChatMode("ask")}
                     className={cn(
-                      "cursor-pointer",
+                      "cursor-pointer hover:!text-[#7b4cff]",
                       chatMode === "ask" && "bg-primary/10"
                     )}
                   >
@@ -712,7 +711,7 @@ export function WorkspaceChatInput({
                         key={model.id}
                         onClick={() => onModelChange(model.id)}
                         className={cn(
-                          "cursor-pointer",
+                          "cursor-pointer hover:!text-[#7b4cff]",
                           selectedModel === model.id && "bg-primary/10"
                         )}
                       >

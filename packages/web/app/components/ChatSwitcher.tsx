@@ -4,10 +4,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+DropdownMenuTrigger,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-} from "./ui/dropdown-menu";
+  } from "./ui/dropdown-menu";
 import { cn } from "../lib/utils";
 
 interface Chat {
@@ -97,7 +97,7 @@ export function ChatSwitcher({
             <DropdownMenuItem
               onClick={() => onChatChange(null)}
               className={cn(
-                "gap-2 cursor-pointer rounded-md mx-1 my-0.5",
+                "gap-2 cursor-pointer rounded-md mx-1 my-0.5 hover:!text-[#7b4cff]",
                 !currentChatId && "bg-purple-500/10 text-purple-400"
               )}
             >
@@ -133,7 +133,7 @@ export function ChatSwitcher({
                 key={chat.id}
                 onClick={() => onChatChange(chat.id)}
                 className={cn(
-                  "gap-2 cursor-pointer rounded-md mx-1 my-0.5",
+                  "gap-2 cursor-pointer rounded-md mx-1 my-0.5 hover:!text-[#7b4cff]",
                   currentChatId === chat.id &&
                     "bg-purple-500/10 text-purple-400"
                 )}
