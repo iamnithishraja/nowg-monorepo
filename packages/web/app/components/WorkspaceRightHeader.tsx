@@ -3,12 +3,12 @@ import { useNavigate } from "react-router";
 import { authClient } from "../lib/authClient";
 import { Button } from "./ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import {
   CaretDown,
@@ -477,17 +477,8 @@ export function WorkspaceRightHeader({
           </div>
         </div>
 
-        {/* Right: Agent, Deploy, Share, Avatar */}
+        {/* Right: Deploy, Share, Avatar */}
         <div className="flex items-center gap-2">
-          {/* Agent Button */}
-          <Button
-            onClick={onAgentClick}
-            variant="outline"
-            className="h-8 gap-1.5 px-3 rounded-lg text-xs font-medium bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/20 text-purple-400"
-          >
-            <Robot className="w-4 h-4" />
-            Agent
-          </Button>
 
           {/* Deploy Button - purple with dropdown arrow */}
           <DropdownMenu>

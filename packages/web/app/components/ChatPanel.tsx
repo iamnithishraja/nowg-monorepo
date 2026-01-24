@@ -877,7 +877,7 @@ export default function ChatPanel({
   return (
     <div className="flex-1 flex flex-col overflow-auto h-full modern-scrollbar">
       <div className="flex-1 h-full p-4 overflow-auto modern-scrollbar">
-        <div className="space-y-6">
+        <div className="space-y-6 h-full">
           {messages.map((message) => {
             // Use parseMessageSegments for assistant messages, simple text for user messages
             const segments =
@@ -1079,7 +1079,7 @@ export default function ChatPanel({
             !isLoading &&
             !isProcessingTemplate &&
             chatId && (
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] px-4">
+              <div className="flex flex-col items-center justify-center flex-1 h-full px-4">
                 <div className="flex flex-col items-center max-w-md text-center space-y-4">
                   {/* Icon */}
                   <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center">

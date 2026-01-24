@@ -1,14 +1,14 @@
 import {
-  BookOpen,
+    BookOpen,
   CaretRight,
   ArrowSquareOut,
   GithubLogo,
-  SpinnerGap,
+SpinnerGap,
   Cursor,
   Palette,
   PaperPlaneRight,
   Sparkle,
-  Square,
+    Square,
   Upload,
   ChatCircle
 } from "@phosphor-icons/react";
@@ -40,9 +40,9 @@ import {
 import { Switch } from "./ui/switch";
 import { Textarea } from "./ui/textarea";
 import {
-Tooltip,
-TooltipContent,
-TooltipTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "./ui/tooltip";
 import { PlusCircle, SelectionPlus } from "phosphor-react";
 import { ArrowUp } from "lucide-react";
@@ -626,37 +626,59 @@ export function WorkspaceChatInput({
 
             {/* Bottom Bar with Buttons */}
             <div className="absolute bottom-0 left-0 right-0 h-12 px-3 flex items-center gap-1.5 border-t border-border/20 bg-surface-2/50">
-              {/* Chat Mode Toggle - With Text */}
-              <div className="flex items-center rounded-md border border-border/40 bg-surface-1/50 p-0.5">
-                <Button
-                  onClick={() => setChatMode("build")}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-6 px-2 text-xs gap-1 transition-all rounded-sm",
-                    chatMode === "build"
-                      ? "accent-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-transparent"
-                  )}
+              {/* Chat Mode Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                  >
+                    <div className="flex items-center gap-1">
+                      {chatMode === "build" ? (
+                        <Cursor className="w-3 h-3" />
+                      ) : (
+                        <ChatCircle className="w-3 h-3" />
+                      )}
+                      <span className="capitalize">{chatMode}</span>
+                    </div>
+                    <CaretRight className="w-3 h-3 rotate-90" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="w-40 bg-surface-1 border-border/50"
                 >
-                  <Cursor className="w-3 h-3" />
-                  Build
-                </Button>
-                <Button
-                  onClick={() => setChatMode("ask")}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-6 px-2 text-xs gap-1 transition-all rounded-sm",
-                    chatMode === "ask"
-                      ? "accent-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-transparent"
-                  )}
-                >
-                  <ChatCircle className="w-3 h-3" />
-                  Ask
-                </Button>
-              </div>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Chat Mode
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setChatMode("build")}
+                    className={cn(
+                      "cursor-pointer",
+                      chatMode === "build" && "bg-primary/10"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Cursor className="w-3 h-3" />
+                      <span>Build</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setChatMode("ask")}
+                    className={cn(
+                      "cursor-pointer",
+                      chatMode === "ask" && "bg-primary/10"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <ChatCircle className="w-3 h-3" />
+                      <span>Ask</span>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               {/* Divider */}
               <div className="w-px h-5 bg-border/30" />
