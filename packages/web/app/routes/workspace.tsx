@@ -940,6 +940,18 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       currentToolCalls={(controller as any).currentToolCalls || []}
                       streamingSegments={(controller as any).streamingSegments || []}
                       chatId={currentChatId}
+                      onFileClick={(filePath) => {
+                        // Normalize path for the file tree (relative path without leading slash)
+                        let normalizedPath = filePath;
+                        if (normalizedPath.startsWith('/home/project/')) {
+                          normalizedPath = normalizedPath.replace('/home/project/', '');
+                        } else if (normalizedPath.startsWith('/')) {
+                          normalizedPath = normalizedPath.slice(1);
+                        }
+                        controller.setSelectedPath(normalizedPath);
+                        // Switch to files tab to show the file in editor
+                        controller.setActiveTab('files');
+                      }}
                     />
                   </div>
                   {/* Bottom Section with Balance and Input */}

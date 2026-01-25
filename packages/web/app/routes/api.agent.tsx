@@ -387,6 +387,9 @@ export async function action({ request }: ActionFunctionArgs) {
             args: any;
           }> = [];
           
+          // Track tool calls that have been announced (sent to frontend)
+          const announcedToolCalls = new Set<string>();
+          
           // Stream the response (single step - tools run client-side)
           let result;
           try {
@@ -396,17 +399,37 @@ export async function action({ request }: ActionFunctionArgs) {
             messages,
             tools,
             onStepFinish: async (step: any) => {
-              // Capture tool calls from each step
+              // Capture tool calls from each step and send immediately
               const stepToolCalls = step.toolCalls || [];
               console.log("[Agent API] Step finished, tool calls:", stepToolCalls.length);
               for (const toolCall of stepToolCalls) {
                 const args = toolCall.args || (toolCall as any).input || {};
-                collectedToolCalls.push({
-                  toolCallId: toolCall.toolCallId || toolCall.id,
-                  toolName: toolCall.toolName || toolCall.name,
-                  args,
-                });
-                console.log("[Agent API] Collected tool call:", toolCall.toolName || toolCall.name);
+                const toolCallId = toolCall.toolCallId || toolCall.id;
+                const toolName = toolCall.toolName || toolCall.name;
+                
+                // Only add if not already collected
+                if (!collectedToolCalls.some(tc => tc.toolCallId === toolCallId)) {
+                  collectedToolCalls.push({
+                    toolCallId,
+                    toolName,
+                    args,
+                  });
+                  
+                  // Send tool_call event immediately when step finishes
+                  // This happens before awaiting_tool_results, giving frontend earlier notice
+                  if (!announcedToolCalls.has(toolCallId)) {
+                    announcedToolCalls.add(toolCallId);
+                    console.log("[Agent API] Sending tool call event early:", toolName);
+                    sendChunk({
+                      type: "tool_call",
+                      id: toolCallId,
+                      name: toolName,
+                      args,
+                      step: stepCount,
+                      category: getToolCategory(toolName),
+                    });
+                  }
+                }
               }
             },
           });
@@ -433,10 +456,9 @@ export async function action({ request }: ActionFunctionArgs) {
             throw streamError;
           }
 
-          // Get tool calls - try both the collected ones and the result property
+          // Get tool calls - use collected ones (already sent via onStepFinish)
           let responseToolCalls: any[] = [];
           try {
-            // Use collected tool calls first (from onStepFinish)
             if (collectedToolCalls.length > 0) {
               responseToolCalls = collectedToolCalls;
               console.log("[Agent API] Using collected tool calls:", responseToolCalls.length);
@@ -452,7 +474,6 @@ export async function action({ request }: ActionFunctionArgs) {
             }
           } catch (toolCallsError) {
             console.error("[Agent API] Error getting tool calls:", toolCallsError);
-            // Use collected tool calls as fallback
             responseToolCalls = collectedToolCalls;
             console.log("[Agent API] Using collected tool calls as fallback:", responseToolCalls.length);
           }

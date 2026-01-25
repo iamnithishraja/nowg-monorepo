@@ -293,26 +293,32 @@ export function useChatHandlers({
                     // Also append to streaming segments for ordered rendering
                     chat.appendTextSegment?.(data.delta, isMountedRef);
                   } else if (data.type === "tool_call") {
-                    const toolCall = {
-                      id: data.id,
-                      name: data.name,
-                      args: data.args,
-                      status: "pending" as const,
-                      category: data.category,
-                      startTime: Date.now(),
-                    };
-                    allToolCalls.push(toolCall);
-                    // Use functional update to add to existing tool calls
-                    chat.setCurrentToolCalls((prev: any[]) => [
-                      ...prev,
-                      toolCall,
-                    ]);
-                    // Append to streaming segments for ordered rendering
-                    chat.appendToolCallSegment?.(toolCall, isMountedRef);
-                    console.log(
-                      "[ChatHandler] Tool call received:",
-                      toolCall.name
+                    // Check if tool call already exists (may be sent early via onStepFinish)
+                    const existingToolCall = allToolCalls.find(
+                      (t) => t.id === data.id
                     );
+                    
+                    if (!existingToolCall) {
+                      // New tool call - add it
+                      const toolCall = {
+                        id: data.id,
+                        name: data.name,
+                        args: data.args,
+                        status: "pending" as const,
+                        category: data.category,
+                        startTime: Date.now(),
+                      };
+                      allToolCalls.push(toolCall);
+                      chat.setCurrentToolCalls((prev: any[]) => [
+                        ...prev,
+                        toolCall,
+                      ]);
+                      chat.appendToolCallSegment?.(toolCall, isMountedRef);
+                      console.log(
+                        "[ChatHandler] Tool call received:",
+                        toolCall.name
+                      );
+                    }
                   } else if (data.type === "awaiting_tool_results") {
                     console.log(
                       "[ChatHandler] Awaiting tool results | Ack:",

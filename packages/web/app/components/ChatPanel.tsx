@@ -68,6 +68,7 @@ interface ChatPanelProps {
   currentToolCalls?: any[]; // Tool calls for current streaming message
   streamingSegments?: StreamingSegment[]; // Ordered streaming segments for interleaved rendering
   chatId?: string | null; // Chat ID to detect if we're in a chat
+  onFileClick?: (filePath: string) => void; // Callback when a file in tool call is clicked
 }
 
 export default function ChatPanel({
@@ -82,6 +83,7 @@ export default function ChatPanel({
   currentToolCalls = [],
   streamingSegments = [],
   chatId,
+  onFileClick,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [fileDataMap, setFileDataMap] = useState<Map<string, string>>(
@@ -946,6 +948,7 @@ export default function ChatPanel({
                             key={tc.id || `tc-${idx}`}
                             toolCall={tc}
                             isCompact
+                            onFileClick={onFileClick}
                           />
                         ))}
                       </div>
@@ -1071,6 +1074,7 @@ export default function ChatPanel({
                                     <ToolCallItem
                                       toolCall={segment.toolCall}
                                       isCompact
+                                      onFileClick={onFileClick}
                                     />
                                   </div>
                                 )}
@@ -1099,6 +1103,7 @@ export default function ChatPanel({
                                     <ToolCallItem
                                       toolCall={segment.toolCall}
                                       isCompact
+                                      onFileClick={onFileClick}
                                     />
                                   </div>
                                 )}
@@ -1183,6 +1188,7 @@ export default function ChatPanel({
                                   key={tc.id}
                                   toolCall={tc}
                                   isCompact
+                                  onFileClick={onFileClick}
                                 />
                               ))}
                             </div>
