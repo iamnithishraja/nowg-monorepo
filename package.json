@@ -13,6 +13,7 @@
     "dev:admin-server": "bun run --cwd packages/admin-server dev",
     "dev:datadock": "bun run --cwd packages/datadock-api dev",
     "build": "bun run --filter '*' build",
+    "build:shared": "bun run --cwd packages/shared build",
     "build:web": "bun run --cwd packages/web build",
     "build:admin-client": "bun run --cwd packages/admin-client build",
     "build:admin-server": "bun run --cwd packages/admin-server build",
@@ -20,7 +21,8 @@
     "start:web": "bun run --cwd packages/web start",
     "start:admin-server": "bun run --cwd packages/admin-server start",
     "start:datadock": "bun run --cwd packages/datadock-api start",
-    "typecheck": "bun run --filter '*' typecheck"
+    "typecheck": "bun run --filter '*' typecheck",
+    "preinstall": "bun run build:shared || true"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

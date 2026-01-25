@@ -33,6 +33,7 @@
     "@headlessui/react": "^2.2.9",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@nanostores/react": "^1.0.0",
+    "@nowgai/shared": "workspace:*",
     "@openrouter/ai-sdk-provider": "^1.2.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",

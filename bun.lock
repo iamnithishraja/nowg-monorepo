@@ -125,6 +125,7 @@
       "name": "@nowgai/admin-server",
       "version": "1.0.0",
       "dependencies": {
+        "@nowgai/shared": "workspace:*",
         "@types/cookie-parser": "^1.4.7",
         "@types/dotenv": "^8.2.3",
         "@types/express": "^5.0.6",
@@ -149,6 +150,7 @@
       "dependencies": {
         "@hono/node-server": "^1.19.7",
         "@neondatabase/serverless": "^1.0.2",
+        "@nowgai/shared": "workspace:*",
         "bcryptjs": "^3.0.3",
         "dotenv": "^17.2.3",
         "hono": "^4.11.1",
@@ -164,6 +166,17 @@
         "@types/uuid": "^10.0.0",
         "tsx": "^4.21.0",
         "typescript": "^5.9.3",
+      },
+    },
+    "packages/shared": {
+      "name": "@nowgai/shared",
+      "version": "1.0.0",
+      "dependencies": {
+        "mongoose": "^8.18.2",
+      },
+      "devDependencies": {
+        "@types/node": "^22.15.32",
+        "typescript": "^5.8.3",
       },
     },
     "packages/web": {
@@ -189,6 +202,7 @@
         "@headlessui/react": "^2.2.9",
         "@modelcontextprotocol/sdk": "^1.0.0",
         "@nanostores/react": "^1.0.0",
+        "@nowgai/shared": "workspace:*",
         "@openrouter/ai-sdk-provider": "^1.2.0",
         "@phosphor-icons/react": "^2.1.7",
         "@radix-ui/react-accordion": "^1.2.12",
@@ -550,6 +564,8 @@
     "@nowgai/admin-server": ["@nowgai/admin-server@workspace:packages/admin-server"],
 
     "@nowgai/datadock-api": ["@nowgai/datadock-api@workspace:packages/datadock-api"],
+
+    "@nowgai/shared": ["@nowgai/shared@workspace:packages/shared"],
 
     "@openrouter/ai-sdk-provider": ["@openrouter/ai-sdk-provider@1.5.4", "", { "dependencies": { "@openrouter/sdk": "^0.1.27" }, "peerDependencies": { "ai": "^5.0.0", "zod": "^3.24.1 || ^v4" } }, "sha512-xrSQPUIH8n9zuyYZR0XK7Ba0h2KsjJcMkxnwaYfmv13pKs3sDkjPzVPPhlhzqBGddHb5cFEwJ9VFuFeDcxCDSw=="],
 
@@ -2035,6 +2051,8 @@
 
     "@nowgai/datadock-api/@types/node": ["@types/node@25.0.3", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-W609buLVRVmeW693xKfzHeIV6nJGGz98uCPfeXI1ELMLXVeKYZ9m15fAMSaUPBHYLGFsVRcMmSCksQOrZV9BYA=="],
 
+    "@nowgai/shared/@types/node": ["@types/node@22.19.3", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-1N9SBnWYOJTrNZCdh/yJE+t910Y128BoyY+zBLWhL3r0TYzlTmFdXrPwHL9DyFZmlEXNQQolTZh3KHV31QDhyA=="],
+
     "@openrouter/sdk/zod": ["zod@4.3.5", "", {}, "sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g=="],
 
     "@radix-ui/react-alert-dialog/@radix-ui/react-slot": ["@radix-ui/react-slot@1.2.3", "", { "dependencies": { "@radix-ui/react-compose-refs": "1.1.2" }, "peerDependencies": { "@types/react": "*", "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc" }, "optionalPeers": ["@types/react"] }, "sha512-aeNmHnBxbi2St0au6VBVC7JXFlhLlOnvIIlePNniyUNAClzmtAUEY8/pBiK3iHjufOlwA+c20/8jngo7xcrg8A=="],
@@ -2366,6 +2384,8 @@
     "@nowgai/datadock-api/@neondatabase/serverless/@types/node": ["@types/node@22.19.3", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-1N9SBnWYOJTrNZCdh/yJE+t910Y128BoyY+zBLWhL3r0TYzlTmFdXrPwHL9DyFZmlEXNQQolTZh3KHV31QDhyA=="],
 
     "@nowgai/datadock-api/@types/node/undici-types": ["undici-types@7.16.0", "", {}, "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="],
+
+    "@nowgai/shared/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
     "@react-router/dev/chokidar/readdirp": ["readdirp@4.1.2", "", {}, "sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg=="],
 
