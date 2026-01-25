@@ -1,8 +1,7 @@
-import { OrganizationMember } from "@nowgai/shared/models";
+import { OrganizationMember, Project } from "@nowgai/shared/models";
 import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
 import mongoose from "mongoose";
 import type { Request } from "react-router";
-import Project from "../models/projectModel";
 import { auth } from "./auth";
 import {
     getUserOrganizations,

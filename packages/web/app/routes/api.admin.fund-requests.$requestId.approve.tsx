@@ -1,4 +1,4 @@
-import { OrgWallet } from "@nowgai/shared/models";
+import { OrgProjectWallet, OrgWallet, Project } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
@@ -7,8 +7,6 @@ import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
 import FundRequest from "~/models/fundRequestModel";
-import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import Project from "~/models/projectModel";
 
 function isValidObjectId(id: string): boolean {
   return ObjectId.isValid(id);

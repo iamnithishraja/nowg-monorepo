@@ -1,71 +1,63 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
 import {
-  Users,
-  ArrowLeft,
-  UserPlus,
-  Trash2,
-  FolderKanban,
-  Building2,
-  Shield,
-  Search,
-  Crown,
-  UserMinus,
-  MessageSquare,
-  Edit,
-  X,
-  Check,
-  DollarSign,
-} from "lucide-react";
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { client } from "@/lib/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
+import { client } from "@/lib/client";
+import { UserRole } from "@nowgai/shared/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+    ArrowLeft,
+    Building2,
+    Check,
+    Crown,
+    Edit,
+    FolderKanban,
+    MessageSquare,
+    Search,
+    Shield,
+    Trash2,
+    UserMinus,
+    UserPlus,
+    Users,
+    X
+} from "lucide-react";
+import { useState } from "react";
+import { useLocation, useParams } from "wouter";
 
 interface Member {
   id: string;

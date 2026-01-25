@@ -1,13 +1,10 @@
-import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, OrgUserInvitation, Project, ProjectMember } from "@nowgai/shared/models";
 import { hasAdminAccess, OrganizationRole } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
 import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import Organization from "~/models/organizationModel";
-import OrgUserInvitation from "~/models/orgUserInvitationModel";
-import Project from "~/models/projectModel";
 import type { Route } from "./+types/api.admin.organizations.$organizationId.users.$userId";
 
 // Handle OPTIONS preflight for CORS

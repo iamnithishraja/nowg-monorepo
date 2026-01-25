@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const organizationSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const organizationSchemaDefinition = {
   name: {
     type: String,
     required: true,
@@ -10,6 +11,11 @@ const organizationSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: "",
+  },
+  // Organization logo URL (stored in R2)
+  logoUrl: {
+    type: String,
+    default: null,
   },
   // Organization admin (assigned user)
   orgAdminId: {
@@ -80,19 +86,23 @@ const organizationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
+
+export const organizationSchema = new mongoose.Schema(organizationSchemaDefinition);
 
 // Indexes for faster queries
 organizationSchema.index({ orgAdminId: 1 });
 organizationSchema.index({ name: 1 });
 organizationSchema.index({ createdAt: -1 });
 
-let Organization: mongoose.Model<any>;
-
-if (mongoose.models.Organization) {
-  Organization = mongoose.models.Organization as mongoose.Model<any>;
-} else {
-  Organization = mongoose.model("Organization", organizationSchema);
+// Model getter function for consistent access
+export function getOrganizationModel(): mongoose.Model<any> {
+  if (mongoose.models.Organization) {
+    return mongoose.models.Organization as mongoose.Model<any>;
+  }
+  return mongoose.model("Organization", organizationSchema);
 }
+
+const Organization = getOrganizationModel();
 
 export default Organization;

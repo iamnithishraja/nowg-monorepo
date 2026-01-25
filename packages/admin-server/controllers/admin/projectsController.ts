@@ -1,4 +1,4 @@
-import { OrganizationMember, OrgWallet, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember } from "@nowgai/shared/models";
 import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
 import {
     createTransaction,
@@ -14,9 +14,6 @@ import {
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
 import { getUserProjects } from "../../lib/projectRoles";
 import Conversation from "../../models/conversationModel";
-import Organization from "../../models/organizationModel";
-import OrgProjectWallet from "../../models/orgProjectWalletModel";
-import Project from "../../models/projectModel";
 import UserProjectWallet from "../../models/userProjectWalletModel";
 
 /**
@@ -337,11 +334,7 @@ export async function createProject(req: Request, res: Response) {
       }
     }
 
-    // Import models
-    const OrgWallet = (await import("../../models/orgWalletModel")).default;
-    const OrgProjectWallet = (
-      await import("../../models/orgProjectWalletModel")
-    ).default;
+    // OrgWallet and OrgProjectWallet are already imported at the top from @nowgai/shared/models
     const mongoose = await import("mongoose");
 
     // Start a MongoDB session for atomic transaction

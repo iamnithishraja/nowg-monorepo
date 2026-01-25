@@ -1,8 +1,6 @@
-import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, Project, ProjectMember } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
-import Organization from "../../models/organizationModel";
-import Project from "../../models/projectModel";
 
 /**
  * Get current user with organization and project admin flags

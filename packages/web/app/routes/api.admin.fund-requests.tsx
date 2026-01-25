@@ -1,4 +1,4 @@
-import { OrganizationMember, OrgWallet, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, OrgWallet, Project, ProjectMember } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
@@ -8,8 +8,6 @@ import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
 import { isProjectAdmin } from "~/lib/projectRoles";
 import FundRequest from "~/models/fundRequestModel";
-import Organization from "~/models/organizationModel";
-import Project from "~/models/projectModel";
 
 function isValidObjectId(id: string): boolean {
   return ObjectId.isValid(id);

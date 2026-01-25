@@ -1,4 +1,4 @@
-import { ProjectWallet, Team, TeamMember } from "@nowgai/shared/models";
+import { OrgProjectWallet, Project, ProjectWallet, Team, TeamMember } from "@nowgai/shared/models";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { streamText } from "ai";
 import mongoose from "mongoose";
@@ -24,9 +24,7 @@ import { isWhitelistedEmail } from "~/lib/stripe";
 import { executeSQL } from "~/lib/supabaseManager";
 import Conversation from "~/models/conversationModel";
 import Markup from "~/models/markupModel";
-import OrgProjectWallet from "~/models/orgProjectWalletModel";
 import Profile from "~/models/profileModel";
-import Project from "~/models/projectModel";
 import UserProjectWallet from "~/models/userProjectWalletModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {

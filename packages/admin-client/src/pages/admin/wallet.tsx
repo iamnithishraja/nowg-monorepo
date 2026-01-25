@@ -1,40 +1,40 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Wallet,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  RefreshCw,
-  CreditCard,
-  Receipt,
-  Building2,
-} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { client } from "@/lib/client";
-import { useAuth } from "@/hooks/useAuth";
-import { UserRole, hasAdminAccess } from "@/types/roles";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { client } from "@/lib/client";
+import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+    ArrowDownCircle,
+    ArrowUpCircle,
+    Building2,
+    ChevronLeft,
+    ChevronRight,
+    CreditCard,
+    Receipt,
+    RefreshCw,
+    Search,
+    Wallet,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface Transaction {
   _id: string;

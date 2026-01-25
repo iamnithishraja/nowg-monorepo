@@ -1,4 +1,4 @@
-import { OrganizationMember, OrgWallet, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember } from "@nowgai/shared/models";
 import {
     OrganizationRole,
     ProjectRole
@@ -14,9 +14,6 @@ import { connectToDatabase } from "~/lib/mongo";
 import { getUserOrganizations } from "~/lib/organizationRoles";
 import { getUserProjects } from "~/lib/projectRoles";
 import Conversation from "~/models/conversationModel";
-import Organization from "~/models/organizationModel";
-import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import Project from "~/models/projectModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

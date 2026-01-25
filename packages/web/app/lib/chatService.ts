@@ -1,9 +1,8 @@
-import { OrganizationMember, ProjectMember, TeamMember } from "@nowgai/shared/models";
+import { OrganizationMember, Project, ProjectMember, TeamMember } from "@nowgai/shared/models";
 import mongoose from "mongoose";
 import Chat from "../models/chatModel";
 import Conversation from "../models/conversationModel";
 import Messages from "../models/messageModel";
-import Project from "../models/projectModel";
 import type { Message } from "../types/chat";
 import { getEnv } from "./env";
 import { FileService } from "./fileService";

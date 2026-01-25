@@ -1,9 +1,9 @@
-import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, OrgUserInvitation, Project, ProjectMember } from "@nowgai/shared/models";
 import {
+    hasAdminAccess,
     OrganizationRole,
     USER_ROLE_DISPLAY_NAMES,
-    UserRole,
-    hasAdminAccess
+    UserRole
 } from "@nowgai/shared/types";
 import { randomBytes } from "crypto";
 import type { Request, Response } from "express";
@@ -18,9 +18,6 @@ import {
     getUserOrganizations,
     isOrganizationAdmin,
 } from "../../lib/organizationRoles";
-import Organization from "../../models/organizationModel";
-import OrgUserInvitation from "../../models/orgUserInvitationModel";
-import Project from "../../models/projectModel";
 
 /**
  * GET /api/admin/organizations

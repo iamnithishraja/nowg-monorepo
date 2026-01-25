@@ -1,16 +1,21 @@
 // Organization models
-export { default as OrganizationMember, getOrganizationMemberModel, organizationMemberSchema, organizationMemberSchemaDefinition } from "./organizationMemberModel.js";
+export { getOrganizationMemberModel, default as OrganizationMember, organizationMemberSchema, organizationMemberSchemaDefinition } from "./organizationMemberModel.js";
+export { getOrganizationModel, default as Organization, organizationSchema, organizationSchemaDefinition } from "./organizationModel.js";
+export { getOrgUserInvitationModel, default as OrgUserInvitation, orgUserInvitationSchema, orgUserInvitationSchemaDefinition } from "./orgUserInvitationModel.js";
 
 // Project models
-export { default as ProjectMember, getProjectMemberModel, projectMemberSchema, projectMemberSchemaDefinition } from "./projectMemberModel.js";
+export { getProjectMemberModel, default as ProjectMember, projectMemberSchema, projectMemberSchemaDefinition } from "./projectMemberModel.js";
+export { getProjectModel, default as Project, projectSchema, projectSchemaDefinition } from "./projectModel.js";
 
 // Team models
-export { default as TeamInvitation, getTeamInvitationModel, teamInvitationSchema, teamInvitationSchemaDefinition } from "./teamInvitationModel.js";
-export { default as TeamMember, getTeamMemberModel, teamMemberSchema, teamMemberSchemaDefinition } from "./teamMemberModel.js";
-export { default as Team, getTeamModel, teamSchema, teamSchemaDefinition } from "./teamModel.js";
+export { getTeamInvitationModel, default as TeamInvitation, teamInvitationSchema, teamInvitationSchemaDefinition } from "./teamInvitationModel.js";
+export { getTeamMemberModel, default as TeamMember, teamMemberSchema, teamMemberSchemaDefinition } from "./teamMemberModel.js";
+export { getTeamModel, default as Team, teamSchema, teamSchemaDefinition } from "./teamModel.js";
 
 // Wallet models
-export { default as OrgWallet, getOrgWalletModel, orgWalletSchema, orgWalletSchemaDefinition, walletTransactionSchema, walletTransactionSchemaDefinition } from "./orgWalletModel.js";
+export { getOrgProjectWalletModel, default as OrgProjectWallet, orgProjectWalletSchema, orgProjectWalletSchemaDefinition, projectWalletTransactionSchema, projectWalletTransactionSchemaDefinition } from "./orgProjectWalletModel.js";
+export { getOrgWalletModel, default as OrgWallet, orgWalletSchema, orgWalletSchemaDefinition, walletTransactionSchema, walletTransactionSchemaDefinition } from "./orgWalletModel.js";
 export type { WalletType } from "./orgWalletModel.js";
-export { default as ProjectWallet, getProjectWalletModel, projectWalletSchema, projectWalletSchemaDefinition } from "./projectWalletModel.js";
+export { getProjectWalletModel, default as ProjectWallet, projectWalletSchema, projectWalletSchemaDefinition } from "./projectWalletModel.js";
+
 

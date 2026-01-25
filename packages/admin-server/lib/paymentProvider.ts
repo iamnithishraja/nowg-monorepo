@@ -1,5 +1,5 @@
+import { Organization } from "@nowgai/shared/models";
 import PaymentSettings from "../models/paymentSettingsModel";
-import Organization from "../models/organizationModel";
 
 export type PaymentProvider = "stripe" | "razorpay" | "payu";
 

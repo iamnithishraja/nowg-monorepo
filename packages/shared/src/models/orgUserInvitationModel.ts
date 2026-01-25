@@ -1,7 +1,8 @@
-import mongoose from "mongoose";
 import { randomBytes } from "crypto";
+import mongoose from "mongoose";
 
-const orgUserInvitationSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const orgUserInvitationSchemaDefinition = {
   organizationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Organization",
@@ -54,7 +55,9 @@ const orgUserInvitationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
+
+export const orgUserInvitationSchema = new mongoose.Schema(orgUserInvitationSchemaDefinition);
 
 // Indexes
 // Note: token already has unique: true which creates an index automatically
@@ -62,16 +65,14 @@ orgUserInvitationSchema.index({ organizationId: 1, email: 1 });
 orgUserInvitationSchema.index({ status: 1, expiresAt: 1 });
 orgUserInvitationSchema.index({ userId: 1 });
 
-let OrgUserInvitation: mongoose.Model<any>;
-
-if (mongoose.models.OrgUserInvitation) {
-  OrgUserInvitation = mongoose.models.OrgUserInvitation as mongoose.Model<any>;
-} else {
-  OrgUserInvitation = mongoose.model(
-    "OrgUserInvitation",
-    orgUserInvitationSchema
-  );
+// Model getter function for consistent access
+export function getOrgUserInvitationModel(): mongoose.Model<any> {
+  if (mongoose.models.OrgUserInvitation) {
+    return mongoose.models.OrgUserInvitation as mongoose.Model<any>;
+  }
+  return mongoose.model("OrgUserInvitation", orgUserInvitationSchema);
 }
 
-export default OrgUserInvitation;
+const OrgUserInvitation = getOrgUserInvitationModel();
 
+export default OrgUserInvitation;

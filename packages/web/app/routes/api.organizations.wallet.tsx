@@ -1,8 +1,7 @@
-import { OrganizationMember, OrgWallet } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, OrgWallet } from "@nowgai/shared/models";
 import type { LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import Organization from "~/models/organizationModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

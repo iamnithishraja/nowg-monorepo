@@ -1,55 +1,44 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import {
-  Building2,
-  Edit,
-  Wallet,
-  UserPlus,
-  UserCog,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  ArrowLeft,
-  Plus,
-  DollarSign,
-  Search,
-  Trash2,
-  CreditCard,
-  Save,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-    CardHeader,
-  CardTitle,
-CardDescription,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { RemoveUserFromOrgDialog } from "@/components/remove-user-from-org-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { client } from "@/lib/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
-import { RemoveUserFromOrgDialog } from "@/components/remove-user-from-org-dialog";
+import { client } from "@/lib/client";
+import { UserRole } from "@nowgai/shared/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+    ArrowLeft,
+    CheckCircle2,
+    Clock,
+    CreditCard,
+    DollarSign,
+    Plus,
+    Search,
+    Trash2,
+    UserPlus,
+    Wallet,
+    XCircle
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 interface OrganizationType {
   id: string;

@@ -1,3 +1,4 @@
+import { Organization, Project } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import crypto from "crypto";
 import { ObjectId } from "mongodb";
@@ -7,8 +8,6 @@ import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
 import { isProjectAdmin } from "~/lib/projectRoles";
-import Organization from "~/models/organizationModel";
-import Project from "~/models/projectModel";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

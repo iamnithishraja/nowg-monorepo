@@ -1,5 +1,5 @@
-import { OrgWallet } from "@nowgai/shared/models";
-import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
+import { Organization, OrgProjectWallet, OrgWallet, Project } from "@nowgai/shared/models";
+import { hasAdminAccess, UserRole } from "@nowgai/shared/types";
 import {
     calculateMaxCreditBack,
     calculateTotalCreditedBack,
@@ -13,10 +13,7 @@ import mongoose from "mongoose";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
 import { createPaymentCheckout } from "../../lib/paymentHandler";
 import { isProjectAdmin } from "../../lib/projectRoles";
-import { getBetterAuthUrl } from "../../lib/stripe";
-import Organization from "../../models/organizationModel";
-import OrgProjectWallet from "../../models/orgProjectWalletModel";
-import Project from "../../models/projectModel";
+import { getBetterAuthUrl, getStripe } from "../../lib/stripe";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {

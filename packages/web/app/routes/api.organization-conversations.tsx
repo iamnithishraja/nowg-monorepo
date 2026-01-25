@@ -1,11 +1,9 @@
-import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, Project, ProjectMember } from "@nowgai/shared/models";
 import mongoose from "mongoose";
 import type { LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
 import Conversation from "../models/conversationModel";
-import Organization from "../models/organizationModel";
-import Project from "../models/projectModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

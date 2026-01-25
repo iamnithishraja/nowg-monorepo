@@ -1,3 +1,4 @@
+import { Organization } from "@nowgai/shared/models";
 import { hasAdminAccess, UserRole } from "@nowgai/shared/types";
 import mongoose from "mongoose";
 import type { ActionFunctionArgs } from "react-router";
@@ -6,7 +7,6 @@ import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
 import { createPaymentCheckout } from "~/lib/paymentHandler";
-import Organization from "~/models/organizationModel";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {

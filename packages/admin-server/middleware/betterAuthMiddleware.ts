@@ -1,4 +1,4 @@
-import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, Project, ProjectMember } from "@nowgai/shared/models";
 import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
 import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
@@ -8,8 +8,6 @@ import {
     hasAnyOrganizationAdminRole,
 } from "../lib/organizationRoles";
 import { getUserProjects, hasAnyProjectAdminRole } from "../lib/projectRoles";
-import Organization from "../models/organizationModel";
-import Project from "../models/projectModel";
 
 // Extend Express Request type to include user
 declare global {
@@ -127,9 +125,6 @@ export async function getSession(
             user.projectId = firstProject.projectId;
             // Also set organizationId from the project if not already set
             if (!user.organizationId) {
-              const { default: Project } = await import(
-                "../models/projectModel"
-              );
               const project = await Project.findById(
                 firstProject.projectId
               ).lean();

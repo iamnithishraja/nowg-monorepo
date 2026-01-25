@@ -1,11 +1,10 @@
-import { OrganizationMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember } from "@nowgai/shared/models";
 import { hasAdminAccess, OrganizationRole } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
 import type { ActionFunctionArgs } from "react-router";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import Organization from "~/models/organizationModel";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {

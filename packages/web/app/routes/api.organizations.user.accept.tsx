@@ -1,9 +1,8 @@
-import { OrganizationMember } from "@nowgai/shared/models";
+import { OrganizationMember, OrgUserInvitation } from "@nowgai/shared/models";
 import { OrganizationRole } from "@nowgai/shared/types";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import OrgUserInvitation from "~/models/orgUserInvitationModel";
 
 // Handle OPTIONS preflight for CORS
 export async function OPTIONS() {

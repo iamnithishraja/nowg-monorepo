@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const projectSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const projectSchemaDefinition = {
   // Project name
   name: {
     type: String,
@@ -65,7 +66,9 @@ const projectSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
+
+export const projectSchema = new mongoose.Schema(projectSchemaDefinition);
 
 // Indexes for faster queries
 // Note: organizationId already has index: true in field definition
@@ -80,12 +83,14 @@ projectSchema.pre("save", function () {
   this.updatedAt = new Date();
 });
 
-let Project: mongoose.Model<any>;
-
-if (mongoose.models.Project) {
-  Project = mongoose.models.Project as mongoose.Model<any>;
-} else {
-  Project = mongoose.model("Project", projectSchema);
+// Model getter function for consistent access
+export function getProjectModel(): mongoose.Model<any> {
+  if (mongoose.models.Project) {
+    return mongoose.models.Project as mongoose.Model<any>;
+  }
+  return mongoose.model("Project", projectSchema);
 }
+
+const Project = getProjectModel();
 
 export default Project;

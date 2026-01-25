@@ -1,3 +1,4 @@
+import { Organization } from "@nowgai/shared/models";
 import { hasAdminAccess, OrganizationRole } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
 import type { LoaderFunctionArgs } from "react-router";
@@ -5,7 +6,6 @@ import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
 import { getUserOrganizations } from "~/lib/organizationRoles";
-import Organization from "~/models/organizationModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

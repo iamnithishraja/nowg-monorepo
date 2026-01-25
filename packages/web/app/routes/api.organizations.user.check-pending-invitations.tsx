@@ -1,14 +1,13 @@
-import type { ActionFunctionArgs } from "react-router";
+import { Organization, OrgUserInvitation } from "@nowgai/shared/models";
 import { ObjectId } from "mongodb";
-import { connectToDatabase } from "~/lib/mongo";
-import OrgUserInvitation from "~/models/orgUserInvitationModel";
-import Organization from "~/models/organizationModel";
+import type { ActionFunctionArgs } from "react-router";
+import { getUsersCollection } from "~/lib/adminHelpers";
 import { auth } from "~/lib/auth";
 import {
-  sendOrgUserInvitationEmail,
+    sendOrgUserInvitationEmail,
 } from "~/lib/email";
 import { getEnvWithDefault } from "~/lib/env";
-import { getUsersCollection } from "~/lib/adminHelpers";
+import { connectToDatabase } from "~/lib/mongo";
 
 /**
  * POST /api/organizations/user/check-pending-invitations

@@ -1,3 +1,4 @@
+import { Organization } from "@nowgai/shared/models";
 import { UserRole } from "@nowgai/shared/types";
 import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
@@ -5,7 +6,6 @@ import { getAdminSession } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
 import { getUserOrganizations, isOrganizationAdmin } from "~/lib/organizationRoles";
 import Markup from "~/models/markupModel";
-import Organization from "~/models/organizationModel";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {

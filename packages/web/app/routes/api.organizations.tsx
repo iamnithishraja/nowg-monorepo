@@ -1,8 +1,7 @@
-import { OrganizationMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import Organization from "../models/organizationModel";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {

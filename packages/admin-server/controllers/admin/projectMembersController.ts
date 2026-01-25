@@ -1,4 +1,4 @@
-import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, Project, ProjectMember } from "@nowgai/shared/models";
 import {
     OrganizationRole,
     ProjectRole,
@@ -12,8 +12,6 @@ import { sendProjectMemberInvitationEmail } from "../../lib/email";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
 import { isProjectAdmin } from "../../lib/projectRoles";
 import Conversation from "../../models/conversationModel";
-import Organization from "../../models/organizationModel";
-import Project from "../../models/projectModel";
 import UserProjectWallet from "../../models/userProjectWalletModel";
 
 /**

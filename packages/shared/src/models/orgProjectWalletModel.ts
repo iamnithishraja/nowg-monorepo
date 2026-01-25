@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
-// Transaction schema for project wallet transactions
-const projectWalletTransactionSchema = new mongoose.Schema({
+// Transaction schema definition for reuse
+export const projectWalletTransactionSchemaDefinition = {
   type: {
     type: String,
     enum: ["credit", "debit"],
@@ -80,9 +80,13 @@ const projectWalletTransactionSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
 
-const orgProjectWalletSchema = new mongoose.Schema({
+// Transaction schema for project wallet transactions
+export const projectWalletTransactionSchema = new mongoose.Schema(projectWalletTransactionSchemaDefinition);
+
+// Schema definition for reuse
+export const orgProjectWalletSchemaDefinition = {
   // Reference to the project
   projectId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -110,19 +114,23 @@ const orgProjectWalletSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
+
+export const orgProjectWalletSchema = new mongoose.Schema(orgProjectWalletSchemaDefinition);
 
 // Update the updatedAt field on save
 orgProjectWalletSchema.pre("save", function () {
   this.updatedAt = new Date();
 });
 
-let OrgProjectWallet: mongoose.Model<any>;
-
-if (mongoose.models.OrgProjectWallet) {
-  OrgProjectWallet = mongoose.models.OrgProjectWallet as mongoose.Model<any>;
-} else {
-  OrgProjectWallet = mongoose.model("OrgProjectWallet", orgProjectWalletSchema);
+// Model getter function for consistent access
+export function getOrgProjectWalletModel(): mongoose.Model<any> {
+  if (mongoose.models.OrgProjectWallet) {
+    return mongoose.models.OrgProjectWallet as mongoose.Model<any>;
+  }
+  return mongoose.model("OrgProjectWallet", orgProjectWalletSchema);
 }
+
+const OrgProjectWallet = getOrgProjectWalletModel();
 
 export default OrgProjectWallet;

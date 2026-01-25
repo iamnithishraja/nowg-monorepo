@@ -1,4 +1,4 @@
-import { OrganizationMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, OrgUserInvitation } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import { randomBytes } from "crypto";
 import { ObjectId } from "mongodb";
@@ -12,8 +12,6 @@ import {
 import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import Organization from "~/models/organizationModel";
-import OrgUserInvitation from "~/models/orgUserInvitationModel";
 
 // Handle OPTIONS preflight for CORS
 export async function OPTIONS() {

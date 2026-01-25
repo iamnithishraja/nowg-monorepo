@@ -1,13 +1,13 @@
-import { useEffect } from "react";
-import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
-import { UserRole, hasAdminAccess } from "@/types/roles";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useQuery } from "@tanstack/react-query";
-import { client } from "@/lib/client";
 import { OrganizationAnalyticsView } from "@/components/analytics/OrganizationAnalyticsView";
 import { ProjectAnalyticsView } from "@/components/analytics/ProjectAnalyticsView";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/useAuth";
+import { client } from "@/lib/client";
+import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 
 interface OrganizationsResponse {
   organizations: Array<{ id: string; name: string }>;
