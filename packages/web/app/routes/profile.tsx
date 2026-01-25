@@ -1,4 +1,3 @@
-import { Profile as ProfileModel } from "@nowgai/shared/models";
 import { ArrowLeft, DollarSign, User as UserIcon, Zap } from "lucide-react";
 import { Link, redirect } from "react-router";
 import GradientGlow from "../components/GradientGlow";
@@ -11,6 +10,8 @@ import { isWhitelistedEmail } from "../lib/stripe";
 import type { Route } from "./+types/profile";
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const { Profile: ProfileModel } = await import("@nowgai/shared/models");
+  
   const authInstance = await auth;
   const session = await authInstance.api.getSession({
     headers: request.headers,

@@ -1,22 +1,21 @@
-import { Conversation, ProjectWallet, Team, TeamInvitation, TeamMember } from "@nowgai/shared/models";
 import {
-    ArrowLeft,
-    CreditCard,
-    Database,
-    DollarSign,
-    FolderKanban,
-    Github,
-    Loader2,
-    Palette,
-    Plus,
-    Send,
-    Settings,
-    Trash2,
-    Upload,
-    UserPlus,
-    Users,
-    Wallet,
-    XCircle
+  ArrowLeft,
+  CreditCard,
+  Database,
+  DollarSign,
+  FolderKanban,
+  Github,
+  Loader2,
+  Palette,
+  Plus,
+  Send,
+  Settings,
+  Trash2,
+  Upload,
+  UserPlus,
+  Users,
+  Wallet,
+  XCircle
 } from "lucide-react";
 import { MongoClient, ObjectId } from "mongodb";
 import * as React from "react";
@@ -30,20 +29,20 @@ import GitHubImportModal from "~/components/GitHubImportModal";
 import { Button } from "~/components/ui/button";
 import { ColorSchemeDialog } from "~/components/ui/ColorSchemeDialog";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "~/components/ui/select";
 import { SidebarProvider } from "~/components/ui/sidebar";
 import { Switch } from "~/components/ui/switch";
@@ -59,6 +58,8 @@ import { cn } from "~/lib/utils";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
+    const { Conversation, ProjectWallet, Team, TeamInvitation, TeamMember } = await import("@nowgai/shared/models");
+    
     const authInstance = await auth;
     const session = await authInstance.api.getSession({
       headers: request.headers,

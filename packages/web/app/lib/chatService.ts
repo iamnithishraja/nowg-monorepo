@@ -8,7 +8,7 @@ import { FileService } from "./fileService";
 import { connectToDatabase } from "./mongo";
 import { ProfileService } from "./profileService";
 import { deleteSupabaseProject } from "./supabaseManager";
-import { callLLMChat } from "./utils";
+import { callLLMChat } from "./utils.server";
 
 export class ChatService {
   private async ensureConnection() {

@@ -1,14 +1,13 @@
-import { Team, TeamInvitation, TeamMember } from "@nowgai/shared/models";
 import {
-    ArrowLeft,
-    CheckCircle2,
-    Loader2,
-    Mail,
-    Plus,
-    Settings,
-    UserPlus,
-    Users,
-    XCircle
+  ArrowLeft,
+  CheckCircle2,
+  Loader2,
+  Mail,
+  Plus,
+  Settings,
+  UserPlus,
+  Users,
+  XCircle
 } from "lucide-react";
 import * as React from "react";
 import type { LoaderFunctionArgs } from "react-router";
@@ -19,11 +18,11 @@ import Background from "~/components/Background";
 import { TeamOnboardingDialog } from "~/components/TeamOnboardingDialog";
 import { Button } from "~/components/ui/button";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { SidebarProvider } from "~/components/ui/sidebar";
@@ -32,6 +31,8 @@ import { connectToDatabase } from "~/lib/mongo";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
+    const { Team, TeamInvitation, TeamMember } = await import("@nowgai/shared/models");
+    
     const authInstance = await auth;
     const session = await authInstance.api.getSession({
       headers: request.headers,
