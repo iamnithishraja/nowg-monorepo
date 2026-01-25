@@ -397,19 +397,31 @@ export class ChatService {
         $push: { messages: result._id },
       });
 
-      // Update user profile with message data
-      try {
-        const profileService = new ProfileService();
-        await profileService.updateOnMessage(conversation.userId, {
-          role: message.role,
-          model: modelToUse,
-          tokensUsed: tokensUsed,
-          inputTokens: inputTokens,
-          outputTokens: outputTokens,
-        });
-      } catch (profileError) {
-        console.error("Error updating profile:", profileError);
-        // Don't fail the message creation if profile update fails
+      // Update user profile with message data (only for valid roles)
+      if (message.role === "user" || message.role === "assistant" || message.role === "system") {
+        try {
+          const profileService = new ProfileService();
+          await profileService.updateOnMessage(conversation.userId, {
+            role: message.role,
+            model: modelToUse,
+            tokensUsed: tokensUsed,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+          });
+        } catch (profileError) {
+          console.error("Error updating profile:", profileError);
+          // Don't fail the message creation if profile update fails
+        }
+      }
+
+      // Sync conversation to R2 after assistant messages (when LLM responds)
+      if (message.role === "assistant") {
+        try {
+          await this.syncConversationToR2(conversationId, conversation.userId);
+        } catch (syncError) {
+          console.error("[ChatService] Error syncing conversation to R2:", syncError);
+          // Don't fail message creation if sync fails
+        }
       }
 
       return result._id.toString();
@@ -595,18 +607,20 @@ export class ChatService {
         $set: { updatedAt: new Date() },
       });
 
-      // Update user profile with message data
-      try {
-        const profileService = new ProfileService();
-        await profileService.updateOnMessage(conversation.userId, {
-          role: message.role,
-          model: (message as any).model,
-          tokensUsed: (message as any).tokensUsed,
-          inputTokens: (message as any).inputTokens,
-          outputTokens: (message as any).outputTokens,
-        });
-      } catch (profileError) {
-        console.error("[ChatService] Error updating profile:", profileError);
+      // Update user profile with message data (only for valid roles)
+      if (message.role === "user" || message.role === "assistant" || message.role === "system") {
+        try {
+          const profileService = new ProfileService();
+          await profileService.updateOnMessage(conversation.userId, {
+            role: message.role,
+            model: (message as any).model,
+            tokensUsed: (message as any).tokensUsed,
+            inputTokens: (message as any).inputTokens,
+            outputTokens: (message as any).outputTokens,
+          });
+        } catch (profileError) {
+          console.error("[ChatService] Error updating profile:", profileError);
+        }
       }
 
       // Generate title from first user message synchronously so it's immediately visible in UI
@@ -875,6 +889,14 @@ export class ChatService {
           updatedAt: new Date(),
         },
       });
+
+      // Sync conversation to R2 after update
+      try {
+        await this.syncConversationToR2(conversationId, userId);
+      } catch (syncError) {
+        console.error("[ChatService] Error syncing conversation to R2:", syncError);
+        // Don't fail update if sync fails
+      }
     } catch (error) {
       console.error("Error updating message model:", error);
       throw error;
@@ -1199,6 +1221,90 @@ export class ChatService {
     } catch (error) {
       console.error("Error adding additional tokens:", error);
       throw error;
+    }
+  }
+
+  // Sync conversation data to R2 (updates same location, doesn't create new buckets)
+  private async syncConversationToR2(
+    conversationId: string,
+    userId: string
+  ): Promise<void> {
+    try {
+      await this.ensureConnection();
+
+      // Get full conversation with all messages
+      const conversation = await Conversation.findById(conversationId)
+        .select("_id title model userId createdAt updatedAt adminProjectId")
+        .lean();
+
+      if (!conversation) {
+        console.warn(`[ChatService] Conversation ${conversationId} not found for R2 sync`);
+        return;
+      }
+
+      // Get all messages for the conversation
+      const messages = await Messages.find({
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+      })
+        .sort({ timestamp: 1 })
+        .lean();
+
+      // Format messages for R2
+      const formattedMessages = messages.map((msg: any) => ({
+        id: msg._id.toString(),
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        model: msg.model,
+        tokensUsed: msg.tokensUsed,
+        inputTokens: msg.inputTokens,
+        outputTokens: msg.outputTokens,
+        toolCalls: msg.toolCalls || [],
+        r2Files: msg.r2Files || [],
+      }));
+
+      // Prepare conversation data for R2
+      const conversationData = {
+        id: conversation._id.toString(),
+        title: conversation.title,
+        model: conversation.model,
+        userId: conversation.userId,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+        adminProjectId: conversation.adminProjectId
+          ? conversation.adminProjectId.toString()
+          : null,
+        messages: formattedMessages,
+        syncedAt: new Date().toISOString(),
+      };
+
+      // Get projectId if available
+      const projectId = conversation.adminProjectId
+        ? conversation.adminProjectId.toString()
+        : undefined;
+
+      // Import and call sync function
+      const { syncConversationToR2 } = await import("./r2Storage");
+      const result = await syncConversationToR2(
+        userId,
+        conversationId,
+        conversationData,
+        projectId
+      );
+
+      if (result.success) {
+        console.log(
+          `[ChatService] Successfully synced conversation ${conversationId} to R2`
+        );
+      } else {
+        console.error(
+          `[ChatService] Failed to sync conversation ${conversationId} to R2:`,
+          result.error
+        );
+      }
+    } catch (error) {
+      console.error("[ChatService] Error in syncConversationToR2:", error);
+      // Don't throw - sync failures shouldn't break the main flow
     }
   }
 

@@ -228,6 +228,71 @@ async function uploadToR2({
 }
 
 /**
+ * Sync conversation data to R2 bucket
+ * Structure: users/{userId}/conversations/{conversationId}/conversation.json
+ * If projectId is provided, uses: users/{userId}/projects/{projectId}/conversations/{conversationId}/conversation.json
+ * This always updates the same location (sync) instead of creating new buckets
+ */
+export async function syncConversationToR2(
+  userId: string,
+  conversationId: string,
+  conversationData: any,
+  projectId?: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    // Get R2 configuration
+    const r2Endpoint = getEnvWithDefault("R2_ENDPOINT", "");
+    const r2AccessKey = getEnvWithDefault("R2_ACCESS_KEY", "");
+    const r2SecretKey = getEnvWithDefault("R2_SECRET_KEY", "");
+    const r2BucketName = getEnvWithDefault("R2_BUCKET_NAME", "");
+    const r2PublicBaseUrl = getEnvWithDefault("R2_PUBLIC_BASE_URL", "");
+
+    if (!r2Endpoint || !r2AccessKey || !r2SecretKey || !r2BucketName) {
+      console.error("R2 configuration is incomplete");
+      return { success: false, error: "R2 configuration is incomplete" };
+    }
+
+    // Build object key with consistent location (same for all updates)
+    const objectKey = projectId
+      ? `users/${userId}/projects/${projectId}/conversations/${conversationId}/conversation.json`
+      : `users/${userId}/conversations/${conversationId}/conversation.json`;
+
+    // Serialize conversation data to JSON
+    const jsonData = JSON.stringify(conversationData, null, 2);
+    const fileBuffer = Buffer.from(jsonData, "utf-8");
+
+    // Upload to R2 using S3-compatible API (PUT will overwrite existing object)
+    const uploadResult = await uploadToR2({
+      endpoint: r2Endpoint,
+      accessKey: r2AccessKey,
+      secretKey: r2SecretKey,
+      bucketName: r2BucketName,
+      objectKey,
+      fileBuffer,
+      contentType: "application/json",
+    });
+
+    if (!uploadResult.success) {
+      console.error("Failed to sync conversation to R2:", uploadResult.error);
+      return { success: false, error: uploadResult.error };
+    }
+
+    // Construct public URL
+    const publicUrl = r2PublicBaseUrl
+      ? `${r2PublicBaseUrl.replace(/\/$/, "")}/${objectKey}`
+      : `${r2Endpoint}/${r2BucketName}/${objectKey}`;
+
+    return { success: true, url: publicUrl };
+  } catch (error: any) {
+    console.error("Error syncing conversation to R2:", error.message);
+    return {
+      success: false,
+      error: error.message || "Unknown error during sync",
+    };
+  }
+}
+
+/**
  * Check if a file should be ignored (node_modules, package-lock.json, etc.)
  */
 export function shouldIgnoreFile(fileName: string): boolean {
