@@ -106,12 +106,70 @@ export function useChatHandlers({
             "| ChatId:",
             chatId
           );
+
+          // Convert existing chat messages to format the agent API expects
+          // Pass the FULL conversation history including complete tool calls and results
+          // This ensures the agent has context of all files read, edits made, etc.
+          const conversationHistory: any[] = [];
+          
+          for (const msg of chat.messages) {
+            if (msg.role === "user") {
+              // User messages - pass full content
+              conversationHistory.push({
+                role: "user",
+                content: msg.content || "",
+              });
+            } else if (msg.role === "assistant") {
+              const toolCalls = (msg as any).toolCalls;
+              
+              // If assistant has tool calls, include them with full results
+              if (toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0) {
+                // Build content with full tool call details and results
+                let fullContent = msg.content || "";
+                
+                // Add full tool calls with their complete results
+                const toolCallDetails: string[] = [];
+                for (const tc of toolCalls) {
+                  let toolDetail = `\n\n=== Tool Call: ${tc.name} (ID: ${tc.id}) ===\n`;
+                  toolDetail += `Arguments: ${JSON.stringify(tc.args, null, 2)}\n`;
+                  
+                  // Include the FULL result - this is critical for context
+                  if (tc.result) {
+                    const resultOutput = tc.result.output || tc.result.error || JSON.stringify(tc.result);
+                    toolDetail += `Result:\n${resultOutput}`;
+                  }
+                  toolCallDetails.push(toolDetail);
+                }
+                
+                fullContent += toolCallDetails.join("\n");
+                
+                conversationHistory.push({
+                  role: "assistant",
+                  content: fullContent,
+                });
+              } else {
+                // No tool calls - just pass the content
+                conversationHistory.push({
+                  role: "assistant",
+                  content: msg.content || "",
+                });
+              }
+            }
+          }
+
+          console.log(
+            "[ChatHandler] Including",
+            conversationHistory.length,
+            "previous messages with full tool call results in context"
+          );
+
           const response = await fetch("/api/agent", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               requestType: "prompt",
               prompt: messageContent,
+              messages: conversationHistory, // Include conversation history for context
               model: effectiveModel,
               agent: agentName,
               files: files.filesMap || {},
@@ -807,7 +865,22 @@ export function useChatHandlers({
                   }))
                 : (lastAssistantMessage as any).toolCalls || [];
 
-            // Update message with toolCalls
+            // Build finalized segments from streaming segments
+            // This preserves the correct interleaved order of text and tool calls
+            const currentStreamingSegments = chat.streamingSegments || [];
+            const finalizedSegments = currentStreamingSegments.map((segment: any) => {
+              if (segment.type === 'toolCall') {
+                // Find the finalized version of this tool call
+                const finalizedTc = finalizedToolCalls.find((tc: any) => tc.id === segment.toolCall.id);
+                return {
+                  type: 'toolCall' as const,
+                  toolCall: finalizedTc || { ...segment.toolCall, status: 'completed' as const },
+                };
+              }
+              return segment;
+            });
+
+            // Update message with toolCalls AND segments (preserves order)
             chat.setMessages((prev: Message[]) => {
               const updated = prev.map((msg: Message) =>
                 msg.id === lastAssistantMessage.id
@@ -815,6 +888,7 @@ export function useChatHandlers({
                       ...msg,
                       content: finalContent,
                       toolCalls: finalizedToolCalls,
+                      segments: finalizedSegments,
                     }
                   : msg
               );
@@ -823,9 +897,10 @@ export function useChatHandlers({
               const updatedMessage = updated.find(
                 (m: Message) => m.id === lastAssistantMessage.id
               );
-              console.log("[ChatHandler] Updated message with toolCalls:", {
+              console.log("[ChatHandler] Updated message with toolCalls and segments:", {
                 messageId: lastAssistantMessage.id,
                 toolCallsCount: finalizedToolCalls.length,
+                segmentsCount: finalizedSegments.length,
                 fileChangesCount: finalizedToolCalls.filter((tc: any) =>
                   ["edit", "write", "multiedit"].includes(tc.name)
                 ).length,
@@ -868,6 +943,9 @@ export function useChatHandlers({
       }
 
       // Regular conversation flow (not a chat)
+      // Add user message to UI immediately for better UX
+      chat.addMessage(userMessage, isMountedRef);
+      
       chat.setIsLoading(true);
       chat.setIsStreaming(true);
       chat.setError(null);
@@ -963,7 +1041,12 @@ export function useChatHandlers({
 
       const messageContent = input.trim();
 
-      if (!hasHandledInitialPrompt) {
+      // For chats (with chatId), always use handleSend which handles the agent API
+      // handleInitialPrompt is for workspace template flows only
+      if (chatId) {
+        await handleSend(messageContent);
+        setHasHandledInitialPrompt(true);
+      } else if (!hasHandledInitialPrompt) {
         await handleInitialPrompt(messageContent, conversationId || undefined);
         setHasHandledInitialPrompt(true);
       } else {
@@ -974,6 +1057,7 @@ export function useChatHandlers({
       chat.isLoading,
       hasHandledInitialPrompt,
       conversationId,
+      chatId,
       handleInitialPrompt,
       setHasHandledInitialPrompt,
       handleSend,

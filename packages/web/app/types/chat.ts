@@ -44,6 +44,19 @@ export interface ToolResult {
   };
 }
 
+// Segment types for preserving interleaved order of text and tool calls
+export interface MessageTextSegment {
+  type: 'text';
+  content: string;
+}
+
+export interface MessageToolCallSegment {
+  type: 'toolCall';
+  toolCall: ToolCall;
+}
+
+export type MessageSegment = MessageTextSegment | MessageToolCallSegment;
+
 export interface Message {
   id: string;
   role: "user" | "assistant" | "system" | "toolcall";
@@ -58,6 +71,8 @@ export interface Message {
   // Agent message fields
   toolCalls?: ToolCall[];
   toolResults?: ToolResult[];
+  // Ordered segments preserving interleaved text and tool calls
+  segments?: MessageSegment[];
   timestamp?: string | Date;
 }
 

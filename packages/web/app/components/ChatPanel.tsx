@@ -1046,8 +1046,9 @@ export default function ChatPanel({
                               .map((s) => s.content)
                               .join("\n");
 
-                      // Get tool calls (from message or currentToolCalls for streaming)
+                      // Get tool calls and segments (from message or currentToolCalls for streaming)
                       const messageToolCalls = (message as any).toolCalls;
+                      const messageSegments = (message as any).segments;
                       const isLastMessage =
                         message.id === messages[messages.length - 1]?.id;
                       
@@ -1079,7 +1080,35 @@ export default function ChatPanel({
                         );
                       }
 
-                      // Fallback for non-streaming messages (loaded from DB)
+                      // Check if message has saved segments (preserves correct order)
+                      const hasSavedSegments = messageSegments && Array.isArray(messageSegments) && messageSegments.length > 0;
+                      
+                      if (hasSavedSegments) {
+                        // Render saved segments in their correct order (interleaved text and tool calls)
+                        return (
+                          <>
+                            {messageSegments.map((segment: any, idx: number) => (
+                              <div key={`saved-segment-${idx}`}>
+                                {segment.type === 'text' && segment.content && (
+                                  <div className="text-sm leading-relaxed text-foreground/90">
+                                    {renderRichContent(segment.content)}
+                                  </div>
+                                )}
+                                {segment.type === 'toolCall' && segment.toolCall && (
+                                  <div className="my-1">
+                                    <ToolCallItem
+                                      toolCall={segment.toolCall}
+                                      isCompact
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </>
+                        );
+                      }
+
+                      // Fallback for messages without saved segments (legacy or loaded from DB without segments)
                       // Combine message tool calls with current tool calls for the last message
                       let toolCallsToUse: any[] = [];
                       const messageToolCallsArray =
@@ -1117,7 +1146,7 @@ export default function ChatPanel({
                         toolCallsToUse = messageToolCallsArray;
                       }
 
-                      // Render segments normally, then tool calls at end
+                      // Render segments normally, then tool calls at end (legacy fallback)
                       return (
                         <>
                           {segments.map((segment, idx) => (
@@ -1146,7 +1175,7 @@ export default function ChatPanel({
                               )}
                             </div>
                           ))}
-                          {/* Tool calls at end if no textIndex */}
+                          {/* Tool calls at end only if no saved segments (legacy fallback) */}
                           {toolCallsToUse.length > 0 && (
                             <div className="space-y-0.5 mt-2">
                               {toolCallsToUse.map((tc: any) => (
