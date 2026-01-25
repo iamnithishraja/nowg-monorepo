@@ -22,6 +22,12 @@ function getToolDescription(name: string, args?: any): string {
       ? `Installing ${args.package}`
       : "Installing packages",
     mkdir: args?.path ? `Creating folder: ${args.path}` : "Creating folder",
+    glob: args?.pattern ? `Finding files matching: ${args.pattern}` : "Finding files",
+    lsp: args?.command ? `Running LSP command: ${args.command}` : "Running LSP command",
+    grep: args?.pattern ? `Searching files for: ${args.pattern}` : "Searching files",
+    codesearch: args?.pattern ? `Searching code for: ${args.pattern}` : "Searching code",
+    websearch: args?.query ? `Searching web for: ${args.query}` : "Searching web",
+    webfetch: args?.url ? `Fetching web content from: ${args.url}` : "Fetching web content",
   };
 
   return descriptions[name] || "Working...";
