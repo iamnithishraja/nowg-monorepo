@@ -47,6 +47,16 @@ const agentMessageSchema = new mongoose.Schema({
     required: false,
     index: true,
   },
+  // R2 files stored for this message (similar to Messages model)
+  r2Files: [
+    {
+      name: String,
+      type: String,
+      size: Number,
+      url: String,
+      uploadedAt: Date,
+    },
+  ],
   createdAt: {
     type: Date,
     default: Date.now,

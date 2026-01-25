@@ -596,6 +596,36 @@ export class ChatService {
 
       const result = await messageDoc.save();
 
+      // Automatically extract files from message content and store in R2 (for assistant messages)
+      if (message.role === "assistant" && message.content) {
+        try {
+          const { extractAndStoreFilesFromMessage } = await import("./extractAndStoreFiles");
+          const uploadedFiles = await extractAndStoreFilesFromMessage(
+            result._id.toString(),
+            conversationId,
+            conversation.userId,
+            message.content,
+            message.role
+          );
+
+          // Update AgentMessage with R2 file references
+          if (uploadedFiles.length > 0) {
+            await AgentMessage.findByIdAndUpdate(result._id, {
+              $set: { r2Files: uploadedFiles },
+            });
+            console.log(
+              `[ChatService] Automatically stored ${uploadedFiles.length} files in R2 for chat message ${result._id}`
+            );
+          }
+        } catch (fileExtractionError) {
+          console.error(
+            "[ChatService] Error extracting and storing files from chat message:",
+            fileExtractionError
+          );
+          // Don't fail message creation if file extraction fails
+        }
+      }
+
       // Add message reference to chat (but NOT to conversation.messages)
       await Chat.findByIdAndUpdate(chatId, {
         $push: { messages: result._id },
@@ -620,6 +650,16 @@ export class ChatService {
           });
         } catch (profileError) {
           console.error("[ChatService] Error updating profile:", profileError);
+        }
+      }
+
+      // Sync conversation to R2 after assistant messages in chats (when LLM responds)
+      if (message.role === "assistant") {
+        try {
+          await this.syncConversationToR2(conversationId, conversation.userId);
+        } catch (syncError) {
+          console.error("[ChatService] Error syncing chat conversation to R2:", syncError);
+          // Don't fail message creation if sync fails
         }
       }
 
@@ -1224,6 +1264,14 @@ export class ChatService {
     }
   }
 
+  // Public method to sync conversation to R2 (for use in API routes like revert)
+  async syncConversationToR2Public(
+    conversationId: string,
+    userId: string
+  ): Promise<void> {
+    return this.syncConversationToR2(conversationId, userId);
+  }
+
   // Sync conversation data to R2 (updates same location, doesn't create new buckets)
   private async syncConversationToR2(
     conversationId: string,
@@ -1263,6 +1311,45 @@ export class ChatService {
         r2Files: msg.r2Files || [],
       }));
 
+      // Get all chats with their messages for R2
+      const chats = await Chat.find({
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+      })
+        .populate("messages")
+        .lean();
+
+      const formattedChats = chats.map((chat: any) => {
+        const chatMessages = Array.isArray(chat.messages) ? chat.messages : [];
+        return {
+          id: chat._id.toString(),
+          title: chat.title,
+          createdAt: chat.createdAt,
+          updatedAt: chat.updatedAt,
+          messages: chatMessages
+            .filter((msg: any) => msg && msg._id)
+            .map((msg: any) => ({
+              id: msg._id.toString(),
+              role: msg.role,
+              content: msg.content || "",
+              toolCalls: msg.toolCalls || [],
+              toolResults: msg.toolResults || [],
+              model: msg.model,
+              tokensUsed: msg.tokensUsed,
+              inputTokens: msg.inputTokens,
+              outputTokens: msg.outputTokens,
+              createdAt: msg.createdAt,
+              timestamp: msg.createdAt,
+              // AgentMessage might have r2Files if files were added
+              r2Files: (msg as any).r2Files || [],
+            }))
+            .sort(
+              (a: any, b: any) =>
+                new Date(a.createdAt).getTime() -
+                new Date(b.createdAt).getTime()
+            ),
+        };
+      });
+
       // Prepare conversation data for R2
       const conversationData = {
         id: conversation._id.toString(),
@@ -1275,6 +1362,7 @@ export class ChatService {
           ? conversation.adminProjectId.toString()
           : null,
         messages: formattedMessages,
+        chats: formattedChats,
         syncedAt: new Date().toISOString(),
       };
 

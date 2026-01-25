@@ -4,6 +4,7 @@ import { auth } from "~/lib/auth";
 import { extractNowgaiActions } from "~/utils/workspaceApi";
 import { createClientFileStorageService } from "~/lib/clientFileStorage";
 import { EnhancedChatPersistence } from "~/lib/enhancedPersistence";
+import { getConversationFromR2 } from "~/lib/r2Storage";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -55,6 +56,36 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
       // Convert Mongoose document to plain object
       const conversationObj = conversation.toObject();
+      const projectId = (conversationObj as any).adminProjectId
+        ? (conversationObj as any).adminProjectId.toString()
+        : undefined;
+
+      // Try to fetch files from R2 first (faster, no message loop needed)
+      let r2FilesMap: Map<string, any[]> = new Map();
+      try {
+        const r2Result = await getConversationFromR2(
+          userId,
+          conversationId,
+          projectId
+        );
+
+        if (r2Result.success && r2Result.data && r2Result.data.messages) {
+          // Build a map of messageId -> r2Files from R2 data
+          for (const msg of r2Result.data.messages) {
+            if (msg.r2Files && msg.r2Files.length > 0) {
+              r2FilesMap.set(msg.id, msg.r2Files);
+            }
+          }
+          console.log(
+            `[API] Loaded ${r2FilesMap.size} messages with files from R2 for conversation ${conversationId}`
+          );
+        }
+      } catch (r2Error) {
+        console.warn(
+          `[API] Failed to fetch from R2, using database files:`,
+          r2Error
+        );
+      }
 
       const responseData = {
         conversation: {
@@ -62,48 +93,63 @@ export async function loader({ request }: LoaderFunctionArgs) {
           deploymentUrl: (conversationObj as any).deploymentUrl || null,
           adminProjectId: (conversationObj as any).adminProjectId || null,
         },
-        messages: sortedMessages.map((msg: any) => ({
-          id: msg._id.toString(),
-          role: msg.role,
-          content: msg.content,
-          timestamp: msg.timestamp,
-          model: msg.model,
-          // Tool calls for assistant messages
-          toolCalls: msg.toolCalls && msg.toolCalls.length > 0
-            ? msg.toolCalls.map((tc: any) => ({
-                id: tc.id,
-                name: tc.name,
-                args: tc.args,
-                status: tc.status,
-                result: tc.result,
-                startTime: tc.startTime,
-                endTime: tc.endTime,
-                category: tc.category,
+        messages: sortedMessages.map((msg: any) => {
+          const messageId = msg._id.toString();
+          // Use files from R2 if available, otherwise fall back to database
+          const r2Files = r2FilesMap.get(messageId);
+          const files = r2Files
+            ? r2Files.map((f: any) => ({
+                id: f.url || f.id || `${messageId}-${f.name}`,
+                name: f.name,
+                type: f.type,
+                size: f.size,
+                url: f.url,
+                uploadedAt: f.uploadedAt,
               }))
-            : undefined,
-          // R2 files (preferred)
-          files:
+            : // Fallback to database files
             msg.r2Files && msg.r2Files.length > 0
-              ? msg.r2Files.map((f: any) => ({
-                  id: f.url || f._id?.toString(),
-                  name: f.name,
-                  type: f.type,
-                  size: f.size,
-                  url: f.url,
-                  uploadedAt: f.uploadedAt,
-                }))
-              : // Fallback to legacy files
-              msg.files && msg.files.length > 0
-              ? msg.files.map((f: any) => ({
-                  id: f._id ? f._id.toString() : f.id,
-                  name: f.name,
-                  type: f.type,
-                  size: f.size,
-                  uploadedAt: f.uploadedAt,
-                  base64Data: f.base64Data, // Include file content for persistence
+            ? msg.r2Files.map((f: any) => ({
+                id: f.url || f._id?.toString(),
+                name: f.name,
+                type: f.type,
+                size: f.size,
+                url: f.url,
+                uploadedAt: f.uploadedAt,
+              }))
+            : // Legacy files
+            msg.files && msg.files.length > 0
+            ? msg.files.map((f: any) => ({
+                id: f._id ? f._id.toString() : f.id,
+                name: f.name,
+                type: f.type,
+                size: f.size,
+                uploadedAt: f.uploadedAt,
+                base64Data: f.base64Data, // Include file content for persistence
+              }))
+            : undefined;
+
+          return {
+            id: messageId,
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp,
+            model: msg.model,
+            // Tool calls for assistant messages
+            toolCalls: msg.toolCalls && msg.toolCalls.length > 0
+              ? msg.toolCalls.map((tc: any) => ({
+                  id: tc.id,
+                  name: tc.name,
+                  args: tc.args,
+                  status: tc.status,
+                  result: tc.result,
+                  startTime: tc.startTime,
+                  endTime: tc.endTime,
+                  category: tc.category,
                 }))
               : undefined,
-        })),
+            files,
+          };
+        }),
       };
 
       return new Response(JSON.stringify(responseData), {
@@ -707,6 +753,14 @@ export async function action({ request }: ActionFunctionArgs) {
           }
         }
 
+        // Sync conversation to R2 after revert (to update with deleted messages)
+        try {
+          await chatService.syncConversationToR2Public(conversationId, userId);
+        } catch (syncError) {
+          console.error("[API] Error syncing to R2 after revert:", syncError);
+          // Don't fail revert if sync fails
+        }
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -805,17 +859,68 @@ export async function action({ request }: ActionFunctionArgs) {
           );
         }
 
+        // Get conversation to get userId and projectId for R2 fetch
+        const conversationForR2 = await chatService.getConversation(conversationId, userId);
+        if (!conversationForR2) {
+          return new Response(
+            JSON.stringify({ error: "Conversation not found" }),
+            { status: 404, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        const conversationObjForR2 = conversationForR2.toObject();
+        const projectIdForR2 = (conversationObjForR2 as any).adminProjectId
+          ? (conversationObjForR2 as any).adminProjectId.toString()
+          : undefined;
+
+        // Try to fetch from R2 first
+        let r2ChatMessages: any[] | null = null;
+        try {
+          const r2Result = await getConversationFromR2(
+            userId,
+            conversationId,
+            projectIdForR2
+          );
+
+          if (r2Result.success && r2Result.data) {
+            // If chatId is provided, get messages from that chat
+            if (requestBody.chatId && requestBody.chatId !== "undefined" && requestBody.chatId !== "null") {
+              const chats = r2Result.data.chats || [];
+              const chat = chats.find((c: any) => c.id === requestBody.chatId);
+              if (chat && chat.messages) {
+                r2ChatMessages = chat.messages;
+                console.log(
+                  `[API] Loaded ${r2ChatMessages.length} messages from R2 for chat ${requestBody.chatId}`
+                );
+              }
+            } else {
+              // Main conversation messages
+              r2ChatMessages = r2Result.data.messages || [];
+              console.log(
+                `[API] Loaded ${r2ChatMessages.length} messages from R2 for main conversation`
+              );
+            }
+          }
+        } catch (r2Error) {
+          console.warn(
+            `[API] Failed to fetch from R2, using database:`,
+            r2Error
+          );
+        }
+
+        // If we got messages from R2, use them
+        if (r2ChatMessages && r2ChatMessages.length > 0) {
+          return new Response(JSON.stringify({ success: true, messages: r2ChatMessages }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        // Fallback to database
         // If chatId is not provided or invalid, return empty array (main chat)
         if (!requestBody.chatId || requestBody.chatId === "undefined" || requestBody.chatId === "null") {
           // Return all conversation messages (main chat)
           try {
-            const conversation = await chatService.getConversation(conversationId, userId);
-            if (!conversation) {
-              return new Response(
-                JSON.stringify({ error: "Conversation not found" }),
-                { status: 404, headers: { "Content-Type": "application/json" } }
-              );
-            }
             const messages = await chatService.getMessages(conversationId, 1000);
             return new Response(JSON.stringify({ success: true, messages }), {
               status: 200,

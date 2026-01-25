@@ -3,6 +3,7 @@ import Conversation from "../models/conversationModel";
 
 /**
  * Extract files from message content (nowgaiAction tags) and store them in R2
+ * Works for both Messages and AgentMessage models (caller updates the message)
  */
 export async function extractAndStoreFilesFromMessage(
   messageId: string,
