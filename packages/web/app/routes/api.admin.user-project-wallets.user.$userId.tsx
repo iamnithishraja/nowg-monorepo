@@ -1,14 +1,12 @@
-import type { LoaderFunctionArgs } from "react-router";
+import { ProjectMember } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
+import type { LoaderFunctionArgs } from "react-router";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
+import Organization from "~/models/organizationModel";
 import Project from "~/models/projectModel";
 import UserProjectWallet from "~/models/userProjectWalletModel";
-import Organization from "~/models/organizationModel";
-import ProjectMember from "~/models/projectMemberModel";
-import { isProjectAdmin } from "~/lib/projectRoles";
-import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import { hasAdminAccess } from "~/lib/types/roles";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {

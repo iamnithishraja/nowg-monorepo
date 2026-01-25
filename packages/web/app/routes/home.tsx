@@ -1,3 +1,4 @@
+import { UserRole } from "@nowgai/shared/types";
 import {
     ArrowSquareOut,
     ArrowUp,
@@ -72,7 +73,6 @@ import { useSupabaseAuth } from "../hooks/useSupabaseAuth";
 import { auth } from "../lib/auth";
 import { authClient } from "../lib/authClient";
 import { preloadNodeModulesCache } from "../lib/nodeModulesPreloader";
-import { UserRole } from "../lib/types/roles";
 import { cn } from "../lib/utils";
 import type { DesignScheme } from "../types/design-scheme";
 import { getShortcutLabel } from "../utils/platform";

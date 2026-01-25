@@ -64,11 +64,11 @@ organizationMemberSchema.pre("save", function () {
   this.updatedAt = new Date();
 });
 
-function getOrganizationMemberModel() {
+function getOrganizationMemberModel(): mongoose.Model<any> {
   if (mongoose.models.OrganizationMember) {
     return mongoose.models.OrganizationMember as mongoose.Model<any>;
   }
-  return mongoose.model("OrganizationMember", organizationMemberSchema);
+  return mongoose.model("OrganizationMember", organizationMemberSchema) as mongoose.Model<any>;
 }
 
 export default getOrganizationMemberModel();

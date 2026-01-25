@@ -1,5 +1,5 @@
-import type { Request, Response, NextFunction } from "express";
-import { UserRole } from "../types/roles";
+import { UserRole } from "@nowgai/shared/types";
+import type { NextFunction, Request, Response } from "express";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "tech@nowg.ai";
 

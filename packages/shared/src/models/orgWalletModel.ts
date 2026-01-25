@@ -106,11 +106,11 @@ orgWalletSchema.pre("save", function () {
   this.updatedAt = new Date();
 });
 
-function getOrgWalletModel() {
+function getOrgWalletModel(): mongoose.Model<any> {
   if (mongoose.models.OrgWallet) {
     return mongoose.models.OrgWallet as mongoose.Model<any>;
   }
-  return mongoose.model("OrgWallet", orgWalletSchema);
+  return mongoose.model("OrgWallet", orgWalletSchema) as mongoose.Model<any>;
 }
 
 export default getOrgWalletModel();

@@ -76,11 +76,11 @@ export const teamSchema = new Schema(teamSchemaDefinition);
 teamSchema.index({ adminId: 1 });
 teamSchema.index({ createdAt: -1 });
 
-function getTeamModel() {
+function getTeamModel(): mongoose.Model<any> {
   if (mongoose.models.Team) {
     return mongoose.models.Team as mongoose.Model<any>;
   }
-  return mongoose.model("Team", teamSchema);
+  return mongoose.model("Team", teamSchema) as mongoose.Model<any>;
 }
 
 export default getTeamModel();

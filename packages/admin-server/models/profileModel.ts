@@ -1,5 +1,5 @@
+import { TEAM_ROLES } from "@nowgai/shared/types";
 import mongoose from "mongoose";
-import { TEAM_ROLES } from "../types/roles";
 
 const profileSchema = new mongoose.Schema({
   userId: { type: String, required: true },

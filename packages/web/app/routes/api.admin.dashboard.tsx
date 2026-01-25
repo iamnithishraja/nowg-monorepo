@@ -1,12 +1,12 @@
-import type { LoaderFunctionArgs } from "react-router";
+import { OrganizationMember } from "@nowgai/shared/models";
 import { ObjectId } from "mongodb";
-import Profile from "~/models/profileModel";
-import OrganizationMember from "~/models/organizationMemberModel";
-import { connectToDatabase } from "~/lib/mongo";
-import { getEnvWithDefault } from "~/lib/env";
-import { requireAdmin } from "~/lib/adminMiddleware";
-import { getUserOrganizations } from "~/lib/organizationRoles";
+import type { LoaderFunctionArgs } from "react-router";
 import { getUsersCollection } from "~/lib/adminHelpers";
+import { requireAdmin } from "~/lib/adminMiddleware";
+import { getEnvWithDefault } from "~/lib/env";
+import { connectToDatabase } from "~/lib/mongo";
+import { getUserOrganizations } from "~/lib/organizationRoles";
+import Profile from "~/models/profileModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // CORS headers

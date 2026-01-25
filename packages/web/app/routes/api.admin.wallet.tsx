@@ -1,23 +1,22 @@
-import type { LoaderFunctionArgs } from "react-router";
+import { OrgWallet, OrganizationMember } from "@nowgai/shared/models";
+import {
+    OrganizationRole,
+    ProjectRole,
+    UserRole,
+    hasAdminAccess,
+} from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
-import Profile from "~/models/profileModel";
-import OrgWallet from "~/models/orgWalletModel";
-import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import OrganizationMember from "~/models/organizationMemberModel";
-import Organization from "~/models/organizationModel";
-import Project from "~/models/projectModel";
-import { connectToDatabase } from "~/lib/mongo";
-import { getEnvWithDefault } from "~/lib/env";
+import type { LoaderFunctionArgs } from "react-router";
+import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
+import { getEnvWithDefault } from "~/lib/env";
+import { connectToDatabase } from "~/lib/mongo";
 import { getUserOrganizations } from "~/lib/organizationRoles";
 import { getUserProjects } from "~/lib/projectRoles";
-import {
-  UserRole,
-  OrganizationRole,
-  ProjectRole,
-  hasAdminAccess,
-} from "~/lib/types/roles";
-import { getUsersCollection } from "~/lib/adminHelpers";
+import OrgProjectWallet from "~/models/orgProjectWalletModel";
+import Organization from "~/models/organizationModel";
+import Profile from "~/models/profileModel";
+import Project from "~/models/projectModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // CORS headers

@@ -1,17 +1,17 @@
+import { ProjectMember } from "@nowgai/shared/models";
+import {
+    ProjectRole,
+    UserRole,
+    getInvalidUserRoleError,
+    hasAdminAccess,
+    isValidUserRole,
+} from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
-import Profile from "../../models/profileModel";
-import ProjectMember from "../../models/projectMemberModel";
-import {
-  UserRole,
-  ProjectRole,
-  isValidUserRole,
-  getInvalidUserRoleError,
-  hasAdminAccess,
-} from "../../types/roles";
-import { getUserProjects } from "../../lib/projectRoles";
 import { getUserOrganizations } from "../../lib/organizationRoles";
+import { getUserProjects } from "../../lib/projectRoles";
+import Profile from "../../models/profileModel";
 
 export async function getUsers(req: Request, res: Response) {
   try {

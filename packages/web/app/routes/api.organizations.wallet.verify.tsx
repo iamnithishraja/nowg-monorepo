@@ -1,10 +1,9 @@
+import { OrganizationMember, OrgWallet } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
-import { stripe } from "~/lib/stripe";
 import { connectToDatabase } from "~/lib/mongo";
+import { stripe } from "~/lib/stripe";
 import Organization from "~/models/organizationModel";
-import OrganizationMember from "~/models/organizationMemberModel";
-import OrgWallet from "~/models/orgWalletModel";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

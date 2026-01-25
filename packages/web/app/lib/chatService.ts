@@ -1,21 +1,16 @@
-import type { Message } from "../types/chat";
+import { OrganizationMember, ProjectMember, TeamMember } from "@nowgai/shared/models";
+import mongoose from "mongoose";
+import Chat from "../models/chatModel";
 import Conversation from "../models/conversationModel";
 import Messages from "../models/messageModel";
-import Chat from "../models/chatModel";
+import Project from "../models/projectModel";
+import type { Message } from "../types/chat";
+import { getEnv } from "./env";
+import { FileService } from "./fileService";
 import { connectToDatabase } from "./mongo";
 import { ProfileService } from "./profileService";
-import { FileService } from "./fileService";
-import { callLLMChat } from "./utils";
 import { deleteSupabaseProject } from "./supabaseManager";
-import mongoose from "mongoose";
-import { getEnv } from "./env";
-import TeamMember from "../models/teamMemberModel";
-import Team from "../models/teamModel";
-import type TeamModel from "../models/teamModel";
-import ProjectWallet from "../models/projectWalletModel";
-import OrganizationMember from "../models/organizationMemberModel";
-import ProjectMember from "../models/projectMemberModel";
-import Project from "../models/projectModel";
+import { callLLMChat } from "./utils";
 
 export class ChatService {
   private async ensureConnection() {

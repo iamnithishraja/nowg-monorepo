@@ -1,23 +1,23 @@
+import { UserRole } from "@nowgai/shared/types";
+import { useQuery } from "@tanstack/react-query";
 import {
-  BookOpen,
-  RefreshCw,
-  Clock,
-  DollarSign,
-  FileText,
-  Building2,
-  FolderKanban,
-  User,
-  Zap,
-  ChevronUp,
-  ChevronDown,
-  Search,
-  Download,
-  Globe,
+    ArrowRight,
+    Building2,
+    ChevronDown,
+    ChevronUp,
+    Clock,
+    DollarSign,
+    Download,
+    FileText,
+    FolderKanban,
+    Globe,
+    Search,
+    User,
+    Zap
 } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { redirect } from "react-router";
-import { ArrowRight } from "lucide-react";
 import {
     type LedgerTransaction,
 } from "~/components/admin/transaction-ledger";
@@ -26,15 +26,14 @@ import { Button } from "~/components/ui/button";
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
-    CardTitle,
+    CardTitle
 } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import {
     Table,
     TableBody,
-  TableCell,
+    TableCell,
     TableHead,
     TableHeader,
     TableRow,
@@ -44,8 +43,6 @@ import { useAuth } from "~/hooks/useAuth";
 import { useOrganization } from "~/hooks/useDashboard";
 import { adminClient } from "~/lib/adminClient";
 import { getAdminSession } from "~/lib/adminMiddleware";
-import { UserRole } from "~/lib/types/roles";
-import { useQuery } from "@tanstack/react-query";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { user } = await getAdminSession(request);

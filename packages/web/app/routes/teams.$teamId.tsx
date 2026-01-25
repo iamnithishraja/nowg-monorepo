@@ -1,3 +1,4 @@
+import { ProjectWallet, Team, TeamInvitation, TeamMember } from "@nowgai/shared/models";
 import {
     ArrowLeft,
     CreditCard,
@@ -56,10 +57,6 @@ import { createClientFileStorageService } from "~/lib/clientFileStorage";
 import { connectToDatabase } from "~/lib/mongo";
 import { cn } from "~/lib/utils";
 import Conversation from "~/models/conversationModel";
-import ProjectWallet from "~/models/projectWalletModel";
-import TeamInvitation from "~/models/teamInvitationModel";
-import TeamMember from "~/models/teamMemberModel";
-import Team from "~/models/teamModel";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {

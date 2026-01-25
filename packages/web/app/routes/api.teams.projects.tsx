@@ -1,10 +1,8 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { ProjectWallet, Team, TeamMember } from "@nowgai/shared/models";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import Team from "~/models/teamModel";
-import TeamMember from "~/models/teamMemberModel";
 import Conversation from "~/models/conversationModel";
-import ProjectWallet from "~/models/projectWalletModel";
 
 // Helper to get authenticated user
 async function getAuthenticatedUser(request: Request) {

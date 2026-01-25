@@ -73,11 +73,11 @@ teamMemberSchema.pre("save", function () {
   this.updatedAt = new Date();
 });
 
-function getTeamMemberModel() {
+function getTeamMemberModel(): mongoose.Model<any> {
   if (mongoose.models.TeamMember) {
     return mongoose.models.TeamMember as mongoose.Model<any>;
   }
-  return mongoose.model("TeamMember", teamMemberSchema);
+  return mongoose.model("TeamMember", teamMemberSchema) as mongoose.Model<any>;
 }
 
 export default getTeamMemberModel();

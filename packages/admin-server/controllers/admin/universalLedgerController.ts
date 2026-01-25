@@ -1,14 +1,14 @@
+import { OrgWallet } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
+import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
 import PDFDocument from "pdfkit";
-import OrgWallet from "../../models/orgWalletModel";
-import OrgProjectWallet from "../../models/orgProjectWalletModel";
-import UserProjectWallet from "../../models/userProjectWalletModel";
-import Organization from "../../models/organizationModel";
-import Project from "../../models/projectModel";
-import { UserRole, hasAdminAccess } from "../../types/roles";
 import { getUsersCollection } from "../../config/db";
-import { ObjectId } from "mongodb";
+import Organization from "../../models/organizationModel";
+import OrgProjectWallet from "../../models/orgProjectWalletModel";
+import Project from "../../models/projectModel";
+import UserProjectWallet from "../../models/userProjectWalletModel";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {

@@ -68,11 +68,11 @@ projectWalletSchema.index({ conversationId: 1 });
 projectWalletSchema.index({ teamId: 1 });
 projectWalletSchema.index({ userId: 1 });
 
-function getProjectWalletModel() {
+function getProjectWalletModel(): mongoose.Model<any> {
   if (mongoose.models.ProjectWallet) {
     return mongoose.models.ProjectWallet as mongoose.Model<any>;
   }
-  return mongoose.model("ProjectWallet", projectWalletSchema);
+  return mongoose.model("ProjectWallet", projectWalletSchema) as mongoose.Model<any>;
 }
 
 export default getProjectWalletModel();

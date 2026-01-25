@@ -1,28 +1,23 @@
+import { OrganizationMember, OrgWallet, ProjectMember } from "@nowgai/shared/models";
+import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
+import {
+    createTransaction,
+    getLastTransactionId,
+} from "@nowgai/shared/utils";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
-import { randomBytes } from "crypto";
-import Project from "../../models/projectModel";
-import Organization from "../../models/organizationModel";
-import ProjectMember from "../../models/projectMemberModel";
-import OrganizationMember from "../../models/organizationMemberModel";
-import UserProjectWallet from "../../models/userProjectWalletModel";
-import OrgProjectWallet from "../../models/orgProjectWalletModel";
-import OrgWallet from "../../models/orgWalletModel";
-import Conversation from "../../models/conversationModel";
 import { getUsersCollection } from "../../config/db";
 import {
-  sendProjectAdminInvitationEmail,
-  sendOrgUserInvitationEmail,
-  sendProjectCreatedEmail,
+    sendProjectCreatedEmail
 } from "../../lib/email";
-import { UserRole, ProjectRole, hasAdminAccess } from "../../types/roles";
-import { getUserProjects, isProjectAdmin } from "../../lib/projectRoles";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
-import {
-  createTransaction,
-  getLastTransactionId,
-} from "../../lib/walletHelpers";
+import { getUserProjects } from "../../lib/projectRoles";
+import Conversation from "../../models/conversationModel";
+import Organization from "../../models/organizationModel";
+import OrgProjectWallet from "../../models/orgProjectWalletModel";
+import Project from "../../models/projectModel";
+import UserProjectWallet from "../../models/userProjectWalletModel";
 
 /**
  * GET /api/admin/projects

@@ -1,12 +1,12 @@
+import { Team } from "@nowgai/shared/models";
 import mongoose from "mongoose";
-import { connectToDatabase } from "./mongo";
-import { getEnvWithDefault } from "./env";
-import NeonUsageBilling from "~/models/neonUsageBillingModel";
 import Conversation from "~/models/conversationModel";
+import NeonUsageBilling from "~/models/neonUsageBillingModel";
 import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import Project from "~/models/projectModel";
 import Profile from "~/models/profileModel";
-import Team from "~/models/teamModel";
+import Project from "~/models/projectModel";
+import { getEnvWithDefault } from "./env";
+import { connectToDatabase } from "./mongo";
 
 /**
  * Neon Billing Pricing Constants

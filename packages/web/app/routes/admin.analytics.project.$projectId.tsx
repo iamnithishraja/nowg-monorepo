@@ -2,7 +2,6 @@ import type { LoaderFunctionArgs } from "react-router";
 import { redirect, useLoaderData } from "react-router";
 import { useAuth } from "~/hooks/useAuth";
 import { requireAdmin } from "~/lib/adminMiddleware";
-import { UserRole } from "~/lib/types/roles";
 import { AdminLayout } from "../components/AdminLayout";
 import { ProjectAnalyticsView } from "../components/admin/analytics";
 import { auth } from "../lib/auth";

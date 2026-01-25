@@ -1,3 +1,4 @@
+import { Team, TeamInvitation, TeamMember } from "@nowgai/shared/models";
 import {
     ArrowLeft,
     CheckCircle2,
@@ -28,9 +29,6 @@ import { Input } from "~/components/ui/input";
 import { SidebarProvider } from "~/components/ui/sidebar";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import TeamInvitation from "~/models/teamInvitationModel";
-import TeamMember from "~/models/teamMemberModel";
-import Team from "~/models/teamModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

@@ -1,15 +1,15 @@
+import { OrgWallet } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
+import { ObjectId } from "mongodb";
+import mongoose from "mongoose";
 import type { ActionFunctionArgs } from "react-router";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import Project from "~/models/projectModel";
-import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import OrgWallet from "~/models/orgWalletModel";
-import Organization from "~/models/organizationModel";
-import { isProjectAdmin } from "~/lib/projectRoles";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import { hasAdminAccess } from "~/lib/types/roles";
-import mongoose from "mongoose";
-import { ObjectId } from "mongodb";
+import { isProjectAdmin } from "~/lib/projectRoles";
+import Organization from "~/models/organizationModel";
+import OrgProjectWallet from "~/models/orgProjectWalletModel";
+import Project from "~/models/projectModel";
 
 /**
  * POST /api/admin/project-wallets/:projectId/transfer-from-org

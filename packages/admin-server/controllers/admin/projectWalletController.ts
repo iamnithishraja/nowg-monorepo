@@ -1,22 +1,22 @@
+import { OrgWallet } from "@nowgai/shared/models";
+import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
+import {
+    calculateMaxCreditBack,
+    calculateTotalCreditedBack,
+    calculateTotalReceivedFromOrg,
+    createTransaction,
+    getLastTransactionId,
+    validateCreditBackAmount,
+} from "@nowgai/shared/utils";
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
-import OrgWallet from "../../models/orgWalletModel";
-import OrgProjectWallet from "../../models/orgProjectWalletModel";
-import Project from "../../models/projectModel";
-import Organization from "../../models/organizationModel";
-import { UserRole, hasAdminAccess } from "../../types/roles";
-import { getBetterAuthUrl } from "../../lib/stripe";
+import { isOrganizationAdmin } from "../../lib/organizationRoles";
 import { createPaymentCheckout } from "../../lib/paymentHandler";
 import { isProjectAdmin } from "../../lib/projectRoles";
-import { isOrganizationAdmin } from "../../lib/organizationRoles";
-import {
-  calculateTotalReceivedFromOrg,
-  calculateTotalCreditedBack,
-  calculateMaxCreditBack,
-  validateCreditBackAmount,
-  createTransaction,
-  getLastTransactionId,
-} from "../../lib/walletHelpers";
+import { getBetterAuthUrl } from "../../lib/stripe";
+import Organization from "../../models/organizationModel";
+import OrgProjectWallet from "../../models/orgProjectWalletModel";
+import Project from "../../models/projectModel";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {

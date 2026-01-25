@@ -1,3 +1,4 @@
+import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
 import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
 import { getUsersCollection } from "~/lib/adminHelpers";
@@ -5,9 +6,7 @@ import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
 import Conversation from "~/models/conversationModel";
 import Deployment from "~/models/deploymentModel";
-import OrganizationMember from "~/models/organizationMemberModel";
 import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import ProjectMember from "~/models/projectMemberModel";
 import Project from "~/models/projectModel";
 import type { Route } from "./+types/api.admin.analytics.organization.$organizationId";
 

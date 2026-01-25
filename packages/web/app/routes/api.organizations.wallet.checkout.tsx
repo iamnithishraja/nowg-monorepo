@@ -1,10 +1,10 @@
+import { OrganizationMember } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
 import { createPaymentCheckout } from "~/lib/paymentHandler";
 import Organization from "~/models/organizationModel";
-import OrganizationMember from "~/models/organizationMemberModel";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

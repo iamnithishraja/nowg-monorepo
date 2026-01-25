@@ -62,11 +62,11 @@ teamInvitationSchema.index({ teamId: 1, email: 1 });
 teamInvitationSchema.index({ status: 1, expiresAt: 1 });
 teamInvitationSchema.index({ email: 1, status: 1 });
 
-function getTeamInvitationModel() {
+function getTeamInvitationModel(): mongoose.Model<any> {
   if (mongoose.models.TeamInvitation) {
     return mongoose.models.TeamInvitation as mongoose.Model<any>;
   }
-  return mongoose.model("TeamInvitation", teamInvitationSchema);
+  return mongoose.model("TeamInvitation", teamInvitationSchema) as mongoose.Model<any>;
 }
 
 export default getTeamInvitationModel();

@@ -1,12 +1,12 @@
+import { OrgWallet } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
-import OrgProjectWallet from "../../models/orgProjectWalletModel";
-import OrgWallet from "../../models/orgWalletModel";
-import Project from "../../models/projectModel";
-import Organization from "../../models/organizationModel";
-import { isProjectAdmin } from "../../lib/projectRoles";
-import { isOrganizationAdmin } from "../../lib/organizationRoles";
-import { hasAdminAccess } from "../../types/roles";
 import mongoose from "mongoose";
+import { isOrganizationAdmin } from "../../lib/organizationRoles";
+import { isProjectAdmin } from "../../lib/projectRoles";
+import Organization from "../../models/organizationModel";
+import OrgProjectWallet from "../../models/orgProjectWalletModel";
+import Project from "../../models/projectModel";
 
 const isValidObjectId = (id: string): boolean => {
   return mongoose.Types.ObjectId.isValid(id);

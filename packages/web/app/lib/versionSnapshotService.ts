@@ -1,15 +1,13 @@
+import { OrganizationMember, ProjectMember, TeamMember } from "@nowgai/shared/models";
 import mongoose from "mongoose";
-import { connectToDatabase } from "./mongo";
 import Conversation from "../models/conversationModel";
+import Project from "../models/projectModel";
 import VersionSnapshot from "../models/versionSnapshotModel";
 import type {
-  TemplateFileSnapshot,
-  VersionSnapshotPayload,
+    TemplateFileSnapshot,
+    VersionSnapshotPayload,
 } from "../types/versioning";
-import TeamMember from "../models/teamMemberModel";
-import ProjectMember from "../models/projectMemberModel";
-import OrganizationMember from "../models/organizationMemberModel";
-import Project from "../models/projectModel";
+import { connectToDatabase } from "./mongo";
 
 interface VersionSnapshotLean {
   _id: mongoose.Types.ObjectId;

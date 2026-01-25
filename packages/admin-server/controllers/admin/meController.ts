@@ -1,8 +1,6 @@
+import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
-import { requireAuth } from "../../middleware/betterAuthMiddleware";
-import { hasAdminAccess } from "../../types/roles";
-import OrganizationMember from "../../models/organizationMemberModel";
-import ProjectMember from "../../models/projectMemberModel";
 import Organization from "../../models/organizationModel";
 import Project from "../../models/projectModel";
 

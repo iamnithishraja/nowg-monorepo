@@ -1,15 +1,13 @@
-import type { Request, Response, NextFunction } from "express";
+import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
+import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
 import { auth } from "../lib/auth";
-import { UserRole, hasAdminAccess, ProjectRole } from "../types/roles";
-import { getUsersCollection } from "../config/db";
-import { hasAnyProjectAdminRole, getUserProjects } from "../lib/projectRoles";
 import {
-  hasAnyOrganizationAdminRole,
-  getUserOrganizations,
+    getUserOrganizations,
+    hasAnyOrganizationAdminRole,
 } from "../lib/organizationRoles";
-import OrganizationMember from "../models/organizationMemberModel";
-import ProjectMember from "../models/projectMemberModel";
+import { getUserProjects, hasAnyProjectAdminRole } from "../lib/projectRoles";
 import Organization from "../models/organizationModel";
 import Project from "../models/projectModel";
 

@@ -66,11 +66,11 @@ projectMemberSchema.pre("save", function () {
   this.updatedAt = new Date();
 });
 
-function getProjectMemberModel() {
+function getProjectMemberModel(): mongoose.Model<any> {
   if (mongoose.models.ProjectMember) {
     return mongoose.models.ProjectMember as mongoose.Model<any>;
   }
-  return mongoose.model("ProjectMember", projectMemberSchema);
+  return mongoose.model("ProjectMember", projectMemberSchema) as mongoose.Model<any>;
 }
 
 export default getProjectMemberModel();

@@ -1,24 +1,18 @@
-import type { Request, Response } from "express";
-import mongoose from "mongoose";
-import UserProjectWallet from "../../models/userProjectWalletModel";
-import OrgProjectWallet from "../../models/orgProjectWalletModel";
-import OrgWallet from "../../models/orgWalletModel";
-import Project from "../../models/projectModel";
-import ProjectMember from "../../models/projectMemberModel";
-import Organization from "../../models/organizationModel";
-import { UserRole, hasAdminAccess } from "../../types/roles";
-import { isProjectAdmin } from "../../lib/projectRoles";
-import { isOrganizationAdmin } from "../../lib/organizationRoles";
-import { getUsersCollection } from "../../config/db";
-import { ObjectId } from "mongodb";
+import { ProjectMember } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
 import {
-  calculateTotalReceived,
-  calculateTotalCreditedBack,
-  calculateMaxCreditBack,
-  validateCreditBackAmount,
-  createTransaction,
-  getLastTransactionId,
-} from "../../lib/walletHelpers";
+    getLastTransactionId
+} from "@nowgai/shared/utils";
+import type { Request, Response } from "express";
+import { ObjectId } from "mongodb";
+import mongoose from "mongoose";
+import { getUsersCollection } from "../../config/db";
+import { isOrganizationAdmin } from "../../lib/organizationRoles";
+import { isProjectAdmin } from "../../lib/projectRoles";
+import Organization from "../../models/organizationModel";
+import OrgProjectWallet from "../../models/orgProjectWalletModel";
+import Project from "../../models/projectModel";
+import UserProjectWallet from "../../models/userProjectWalletModel";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {
