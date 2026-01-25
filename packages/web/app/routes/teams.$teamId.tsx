@@ -1,4 +1,4 @@
-import { ProjectWallet, Team, TeamInvitation, TeamMember } from "@nowgai/shared/models";
+import { Conversation, ProjectWallet, Team, TeamInvitation, TeamMember } from "@nowgai/shared/models";
 import {
     ArrowLeft,
     CreditCard,
@@ -56,7 +56,6 @@ import { auth } from "~/lib/auth";
 import { createClientFileStorageService } from "~/lib/clientFileStorage";
 import { connectToDatabase } from "~/lib/mongo";
 import { cn } from "~/lib/utils";
-import Conversation from "~/models/conversationModel";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {

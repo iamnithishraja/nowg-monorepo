@@ -1,8 +1,8 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { SupabaseOAuthManager } from "../lib/supabase-oauth-manager";
+import SupabaseIntegration from "~/models/supabaseIntegrationModel";
 import { auth } from "../lib/auth";
 import { connectToDatabase } from "../lib/mongo";
-import SupabaseIntegration from "../models/supabaseIntegrationModel";
+import { SupabaseOAuthManager } from "../lib/supabase-oauth-manager";
 
 /**
  * API Route: Supabase OAuth Callback

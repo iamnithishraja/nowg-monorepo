@@ -1,4 +1,4 @@
-import { OrgProjectWallet, Project, ProjectWallet, Team, TeamMember } from "@nowgai/shared/models";
+import { Conversation, Markup, OrgProjectWallet, Profile, Project, ProjectWallet, Team, TeamMember, UserProjectWallet } from "@nowgai/shared/models";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { streamText } from "ai";
 import mongoose from "mongoose";
@@ -22,10 +22,6 @@ import { CONTINUE_PROMPT, getSystemPrompt } from "~/lib/prompt";
 import { createFilesContext, selectContext } from "~/lib/select-context";
 import { isWhitelistedEmail } from "~/lib/stripe";
 import { executeSQL } from "~/lib/supabaseManager";
-import Conversation from "~/models/conversationModel";
-import Markup from "~/models/markupModel";
-import Profile from "~/models/profileModel";
-import UserProjectWallet from "~/models/userProjectWalletModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   return new Response("LLM Chat API - GET not supported", { status: 405 });

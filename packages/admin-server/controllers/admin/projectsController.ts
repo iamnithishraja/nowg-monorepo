@@ -1,4 +1,4 @@
-import { Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember } from "@nowgai/shared/models";
+import { Conversation, Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember, UserProjectWallet } from "@nowgai/shared/models";
 import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
 import {
     createTransaction,
@@ -13,8 +13,6 @@ import {
 } from "../../lib/email";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
 import { getUserProjects } from "../../lib/projectRoles";
-import Conversation from "../../models/conversationModel";
-import UserProjectWallet from "../../models/userProjectWalletModel";
 
 /**
  * GET /api/admin/projects

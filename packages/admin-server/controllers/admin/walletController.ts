@@ -1,11 +1,10 @@
-import { Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Profile, Project } from "@nowgai/shared/models";
 import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
 import { getUserOrganizations } from "../../lib/organizationRoles";
 import { getUserProjects } from "../../lib/projectRoles";
-import Profile from "../../models/profileModel";
 
 export async function getWalletTransactions(req: Request, res: Response) {
   try {

@@ -1,11 +1,10 @@
-import { Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember } from "@nowgai/shared/models";
+import { FundRequest, Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
 import { isProjectAdmin } from "../../lib/projectRoles";
-import FundRequest from "../../models/fundRequestModel";
 
 function isValidObjectId(id: string): boolean {
   return ObjectId.isValid(id);

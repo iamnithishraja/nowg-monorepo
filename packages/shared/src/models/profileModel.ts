@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const profileSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const profileSchemaDefinition = {
   userId: { type: String, required: true },
   totalMessages: { type: Number, required: true, default: 0 },
   totalTokens: { type: Number, required: true, default: 0 },
@@ -104,7 +105,18 @@ const profileSchema = new mongoose.Schema({
   ],
 
   lastUpdated: { type: Date, default: Date.now },
-});
+};
 
-const Profile = mongoose.model("Profile", profileSchema);
+export const profileSchema = new mongoose.Schema(profileSchemaDefinition);
+
+// Model getter function for consistent access
+export function getProfileModel(): mongoose.Model<any> {
+  if (mongoose.models.Profile) {
+    return mongoose.models.Profile as mongoose.Model<any>;
+  }
+  return mongoose.model("Profile", profileSchema);
+}
+
+const Profile = getProfileModel();
+
 export default Profile;

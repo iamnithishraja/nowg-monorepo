@@ -1,4 +1,4 @@
-import { Organization, OrganizationMember, Project, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, Project, ProjectMember, UserProjectWallet } from "@nowgai/shared/models";
 import { hasAdminAccess, UserRole } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
 import type { LoaderFunctionArgs } from "react-router";
@@ -6,7 +6,6 @@ import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import UserProjectWallet from "~/models/userProjectWalletModel";
 
 // Handle OPTIONS preflight for CORS
 export async function OPTIONS() {

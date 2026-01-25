@@ -1,5 +1,5 @@
+import { EnvConfig } from "@nowgai/shared/models";
 import Stripe from "stripe";
-import EnvConfig from "../models/envConfigModel";
 
 let stripeInstance: Stripe | null = null;
 
@@ -33,4 +33,5 @@ async function getBetterAuthUrl(): Promise<string> {
   return normalizedUrl;
 }
 
-export { getStripe, getBetterAuthUrl };
+export { getBetterAuthUrl, getStripe };
+

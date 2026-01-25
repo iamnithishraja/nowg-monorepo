@@ -1,9 +1,8 @@
-import { TeamMember } from "@nowgai/shared/models";
+import { Conversation, TeamMember } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
 import { provisionSupabaseForConversation } from "~/lib/supabaseManager";
-import Conversation from "~/models/conversationModel";
 import SupabaseIntegration from "~/models/supabaseIntegrationModel";
 export async function action({ request }: ActionFunctionArgs) {
   try {

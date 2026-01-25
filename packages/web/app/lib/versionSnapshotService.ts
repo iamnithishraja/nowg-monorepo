@@ -1,10 +1,9 @@
-import { OrganizationMember, Project, ProjectMember, TeamMember } from "@nowgai/shared/models";
+import { Conversation, OrganizationMember, Project, ProjectMember, TeamMember } from "@nowgai/shared/models";
 import mongoose from "mongoose";
-import Conversation from "../models/conversationModel";
-import VersionSnapshot from "../models/versionSnapshotModel";
+import VersionSnapshot from "~/models/versionSnapshotModel";
 import type {
-    TemplateFileSnapshot,
-    VersionSnapshotPayload,
+  TemplateFileSnapshot,
+  VersionSnapshotPayload,
 } from "../types/versioning";
 import { connectToDatabase } from "./mongo";
 

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const fileSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const fileSchemaDefinition = {
   messageId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Message",
@@ -33,10 +34,21 @@ const fileSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
+
+export const fileSchema = new mongoose.Schema(fileSchemaDefinition);
 
 // Index for efficient lookups
 fileSchema.index({ messageId: 1, conversationId: 1 });
 
-const File = mongoose.model("File", fileSchema);
+// Model getter function for consistent access
+export function getFileModel(): mongoose.Model<any> {
+  if (mongoose.models.File) {
+    return mongoose.models.File as mongoose.Model<any>;
+  }
+  return mongoose.model("File", fileSchema);
+}
+
+const File = getFileModel();
+
 export default File;

@@ -1,11 +1,10 @@
-import { Organization, OrgProjectWallet, OrgWallet, Project } from "@nowgai/shared/models";
+import { Organization, OrgProjectWallet, OrgWallet, Project, UserProjectWallet } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
 import PDFDocument from "pdfkit";
 import { getUsersCollection } from "../../config/db";
-import UserProjectWallet from "../../models/userProjectWalletModel";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {

@@ -1,4 +1,4 @@
-import { Organization, OrgProjectWallet, Project, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrgProjectWallet, Project, ProjectMember, UserProjectWallet } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import {
     getLastTransactionId
@@ -9,7 +9,6 @@ import mongoose from "mongoose";
 import { getUsersCollection } from "../../config/db";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
 import { isProjectAdmin } from "../../lib/projectRoles";
-import UserProjectWallet from "../../models/userProjectWalletModel";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {

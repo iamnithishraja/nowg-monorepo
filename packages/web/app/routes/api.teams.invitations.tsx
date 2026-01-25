@@ -1,8 +1,7 @@
-import { Team, TeamInvitation, TeamMember } from "@nowgai/shared/models";
+import { Profile, Team, TeamInvitation, TeamMember } from "@nowgai/shared/models";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import Profile from "~/models/profileModel";
 
 // Helper to get authenticated user
 async function getAuthenticatedUser(request: Request) {

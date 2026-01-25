@@ -1,8 +1,6 @@
-import { OrgProjectWallet, Project, Team } from "@nowgai/shared/models";
+import { Conversation, OrgProjectWallet, Profile, Project, Team } from "@nowgai/shared/models";
 import mongoose from "mongoose";
-import Conversation from "~/models/conversationModel";
 import NeonUsageBilling from "~/models/neonUsageBillingModel";
-import Profile from "~/models/profileModel";
 import { getEnvWithDefault } from "./env";
 import { connectToDatabase } from "./mongo";
 

@@ -1,4 +1,4 @@
-import { OrgProjectWallet, Project, ProjectMember } from "@nowgai/shared/models";
+import { OrgProjectWallet, Project, ProjectMember, UserProjectWallet } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
 import type { ActionFunctionArgs } from "react-router";
@@ -6,7 +6,6 @@ import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
 import { isProjectAdmin } from "~/lib/projectRoles";
-import UserProjectWallet from "~/models/userProjectWalletModel";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {

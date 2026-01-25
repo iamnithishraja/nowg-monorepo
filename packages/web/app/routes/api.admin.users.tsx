@@ -1,4 +1,4 @@
-import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { OrganizationMember, Profile, ProjectMember } from "@nowgai/shared/models";
 import { hasAdminAccess, OrganizationRole, ProjectRole } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
@@ -8,7 +8,6 @@ import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
 import { getUserOrganizations } from "~/lib/organizationRoles";
 import { getUserProjects } from "~/lib/projectRoles";
-import Profile from "~/models/profileModel";
 
 // Handle OPTIONS preflight for CORS
 export async function OPTIONS() {

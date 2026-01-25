@@ -1,4 +1,4 @@
-import { OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember } from "@nowgai/shared/models";
+import { Conversation, Deployment, OrganizationMember, OrgProjectWallet, OrgWallet, Profile, Project, ProjectMember } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
@@ -8,9 +8,6 @@ import {
   isOrganizationAdmin
 } from "../../lib/organizationRoles";
 import { isProjectAdmin } from "../../lib/projectRoles";
-import Conversation from "../../models/conversationModel";
-import Deployment from "../../models/deploymentModel";
-import Profile from "../../models/profileModel";
 
 /**
  * GET /api/admin/analytics/user/:userId

@@ -1,9 +1,9 @@
-import File from "../models/fileModel";
-import Messages from "../models/messageModel";
-import Conversation from "../models/conversationModel";
-import { connectToDatabase } from "./mongo";
+import { Conversation } from "@nowgai/shared/models";
 import mongoose from "mongoose";
-import { uploadFileToR2, shouldIgnoreFile } from "./r2Storage";
+import File from "~/models/fileModel";
+import Messages from "~/models/messageModel";
+import { connectToDatabase } from "./mongo";
+import { shouldIgnoreFile, uploadFileToR2 } from "./r2Storage";
 
 export class FileService {
   private async ensureConnection() {

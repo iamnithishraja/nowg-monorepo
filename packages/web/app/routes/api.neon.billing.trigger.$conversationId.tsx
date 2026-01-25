@@ -1,10 +1,9 @@
-import { TeamMember } from "@nowgai/shared/models";
+import { Conversation, TeamMember } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
 import { processBillingForConversation } from "~/lib/neonBillingService";
-import Conversation from "~/models/conversationModel";
 
 /**
  * API Route: Manually Trigger Billing for a Conversation

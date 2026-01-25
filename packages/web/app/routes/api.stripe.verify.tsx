@@ -1,8 +1,8 @@
+import { Profile } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
-import { stripe } from "~/lib/stripe";
 import { connectToDatabase } from "~/lib/mongo";
-import Profile from "~/models/profileModel";
+import { stripe } from "~/lib/stripe";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

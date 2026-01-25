@@ -1,6 +1,5 @@
-import { Organization } from "@nowgai/shared/models";
+import { Organization, PaymentSettings } from "@nowgai/shared/models";
 import { connectToDatabase } from "~/lib/mongo";
-import PaymentSettings from "~/models/paymentSettingsModel";
 
 export type PaymentProvider = "stripe" | "razorpay" | "payu";
 

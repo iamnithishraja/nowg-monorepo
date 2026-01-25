@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
-// Transaction schema for user project wallet transactions
-const userProjectWalletTransactionSchema = new mongoose.Schema({
+// Transaction schema definition for reuse
+export const userProjectWalletTransactionSchemaDefinition = {
   type: {
     type: String,
     enum: ["credit", "debit"],
@@ -65,9 +65,12 @@ const userProjectWalletTransactionSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
 
-const userProjectWalletSchema = new mongoose.Schema({
+export const userProjectWalletTransactionSchema = new mongoose.Schema(userProjectWalletTransactionSchemaDefinition);
+
+// Schema definition for reuse
+export const userProjectWalletSchemaDefinition = {
   // Reference to the user
   userId: {
     type: String,
@@ -121,28 +124,26 @@ const userProjectWalletSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
+
+export const userProjectWalletSchema = new mongoose.Schema(userProjectWalletSchemaDefinition);
 
 // Compound index to ensure one wallet per user per project
 userProjectWalletSchema.index({ userId: 1, projectId: 1 }, { unique: true });
-// Note: Individual indexes for userId, projectId, and organizationId are already
-// defined in the schema with "index: true", so we don't need to define them again here
 
 // Update the updatedAt field on save
 userProjectWalletSchema.pre("save", function () {
   this.updatedAt = new Date();
 });
 
-let UserProjectWallet: mongoose.Model<any>;
-
-if (mongoose.models.UserProjectWallet) {
-  UserProjectWallet = mongoose.models.UserProjectWallet as mongoose.Model<any>;
-} else {
-  UserProjectWallet = mongoose.model(
-    "UserProjectWallet",
-    userProjectWalletSchema
-  );
+// Model getter function for consistent access
+export function getUserProjectWalletModel(): mongoose.Model<any> {
+  if (mongoose.models.UserProjectWallet) {
+    return mongoose.models.UserProjectWallet as mongoose.Model<any>;
+  }
+  return mongoose.model("UserProjectWallet", userProjectWalletSchema);
 }
 
-export default UserProjectWallet;
+const UserProjectWallet = getUserProjectWalletModel();
 
+export default UserProjectWallet;

@@ -1,5 +1,5 @@
+import { EnvConfig } from "@nowgai/shared/models";
 import Razorpay from "razorpay";
-import EnvConfig from "../models/envConfigModel";
 
 let razorpayInstance: Razorpay | null = null;
 

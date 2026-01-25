@@ -1,9 +1,8 @@
-import { TeamMember } from "@nowgai/shared/models";
+import { Conversation, TeamMember } from "@nowgai/shared/models";
 import type { LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
 import { getBillingSummary } from "~/lib/neonBillingService";
-import Conversation from "~/models/conversationModel";
 
 /**
  * API Route: Get Neon Billing Status for a Conversation

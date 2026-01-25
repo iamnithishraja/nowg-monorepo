@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const messageSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const messageSchemaDefinition = {
   conversationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Conversation",
@@ -98,7 +99,9 @@ const messageSchema = new mongoose.Schema({
       },
     },
   ],
-});
+};
+
+export const messageSchema = new mongoose.Schema(messageSchemaDefinition);
 
 // Ensure uniqueness of client request within a conversation if provided
 try {
@@ -108,5 +111,14 @@ try {
   );
 } catch {}
 
-const Messages = mongoose.model("Message", messageSchema);
-export default Messages;
+// Model getter function for consistent access
+export function getMessageModel(): mongoose.Model<any> {
+  if (mongoose.models.Message) {
+    return mongoose.models.Message as mongoose.Model<any>;
+  }
+  return mongoose.model("Message", messageSchema);
+}
+
+const Message = getMessageModel();
+
+export default Message;

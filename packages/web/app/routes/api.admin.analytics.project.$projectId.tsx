@@ -1,11 +1,9 @@
-import { Organization, OrgProjectWallet, Project, ProjectMember } from "@nowgai/shared/models";
+import { Conversation, Deployment, Organization, OrgProjectWallet, Project, ProjectMember } from "@nowgai/shared/models";
 import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
 import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import Conversation from "~/models/conversationModel";
-import Deployment from "~/models/deploymentModel";
 import type { Route } from "./+types/api.admin.analytics.project.$projectId";
 
 export async function loader({ request, params }: Route.LoaderArgs) {

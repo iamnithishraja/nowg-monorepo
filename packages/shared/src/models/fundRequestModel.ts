@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const fundRequestSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const fundRequestSchemaDefinition = {
   // Reference to the project requesting funds
   projectId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -63,7 +64,9 @@ const fundRequestSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
-});
+};
+
+export const fundRequestSchema = new mongoose.Schema(fundRequestSchemaDefinition);
 
 // Update the updatedAt field on save
 fundRequestSchema.pre("save", function () {
@@ -74,13 +77,14 @@ fundRequestSchema.pre("save", function () {
 fundRequestSchema.index({ projectId: 1, status: 1 });
 fundRequestSchema.index({ organizationId: 1, status: 1 });
 
-let FundRequest: mongoose.Model<any>;
-
-if (mongoose.models.FundRequest) {
-  FundRequest = mongoose.models.FundRequest as mongoose.Model<any>;
-} else {
-  FundRequest = mongoose.model("FundRequest", fundRequestSchema);
+// Model getter function for consistent access
+export function getFundRequestModel(): mongoose.Model<any> {
+  if (mongoose.models.FundRequest) {
+    return mongoose.models.FundRequest as mongoose.Model<any>;
+  }
+  return mongoose.model("FundRequest", fundRequestSchema);
 }
 
-export default FundRequest;
+const FundRequest = getFundRequestModel();
 
+export default FundRequest;

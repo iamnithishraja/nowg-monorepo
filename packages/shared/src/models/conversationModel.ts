@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const conversationSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const conversationSchemaDefinition = {
   userId: {
     type: String,
     required: true,
@@ -126,7 +127,18 @@ const conversationSchema = new mongoose.Schema({
     default: null,
     index: true,
   },
-});
+};
 
-const Conversation = mongoose.model("Conversation", conversationSchema);
+export const conversationSchema = new mongoose.Schema(conversationSchemaDefinition);
+
+// Model getter function for consistent access
+export function getConversationModel(): mongoose.Model<any> {
+  if (mongoose.models.Conversation) {
+    return mongoose.models.Conversation as mongoose.Model<any>;
+  }
+  return mongoose.model("Conversation", conversationSchema);
+}
+
+const Conversation = getConversationModel();
+
 export default Conversation;

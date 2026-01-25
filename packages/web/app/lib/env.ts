@@ -1,5 +1,5 @@
+import { EnvConfig } from "@nowgai/shared/models";
 import mongoose from "mongoose";
-import EnvConfig from "../models/envConfigModel";
 
 /**
  * Environment variables cache loaded from MongoDB

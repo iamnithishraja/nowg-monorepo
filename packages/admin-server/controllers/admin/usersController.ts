@@ -1,4 +1,4 @@
-import { OrganizationMember, ProjectMember } from "@nowgai/shared/models";
+import { OrganizationMember, Profile, ProjectMember } from "@nowgai/shared/models";
 import {
   ProjectRole,
   UserRole,
@@ -11,7 +11,6 @@ import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
 import { getUserOrganizations } from "../../lib/organizationRoles";
 import { getUserProjects } from "../../lib/projectRoles";
-import Profile from "../../models/profileModel";
 
 export async function getUsers(req: Request, res: Response) {
   try {

@@ -1,8 +1,7 @@
-import { ProjectWallet, Team, TeamMember } from "@nowgai/shared/models";
+import { Conversation, ProjectWallet, Team, TeamMember } from "@nowgai/shared/models";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import Conversation from "~/models/conversationModel";
 
 // Helper to get authenticated user
 async function getAuthenticatedUser(request: Request) {

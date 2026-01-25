@@ -1,12 +1,10 @@
+import { Conversation, Deployment, Profile } from "@nowgai/shared/models";
 import type { LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import Profile from "~/models/profileModel";
-import Conversation from "~/models/conversationModel";
-import Messages from "~/models/messageModel";
-import Deployment from "~/models/deploymentModel";
-import NeonUsageBilling from "~/models/neonUsageBillingModel";
 import { ProfileService } from "~/lib/profileService";
+import Messages from "~/models/messageModel";
+import NeonUsageBilling from "~/models/neonUsageBillingModel";
 
 // Model pricing per 1M tokens (in USD) - OpenRouter pricing + 20% profit margin
 const MODEL_PRICING = {

@@ -1,7 +1,6 @@
-import { OrganizationMember } from "@nowgai/shared/models";
+import { OrganizationMember, Profile } from "@nowgai/shared/models";
 import type { Request, Response } from "express";
 import { getUserOrganizations } from "../../lib/organizationRoles";
-import Profile from "../../models/profileModel";
 
 export async function getTokenUsage(req: Request, res: Response) {
   try {

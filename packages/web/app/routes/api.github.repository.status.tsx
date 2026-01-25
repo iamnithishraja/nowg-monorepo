@@ -1,8 +1,8 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { GitHubRepositoryService } from "~/lib/githubRepositoryService";
-import GitHubRepository from "~/models/githubRepositoryModel";
 import { connectToDatabase } from "~/lib/mongo";
+import GitHubRepository from "~/models/githubRepositoryModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

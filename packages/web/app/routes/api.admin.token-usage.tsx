@@ -1,7 +1,7 @@
+import { Profile } from "@nowgai/shared/models";
 import type { LoaderFunctionArgs } from "react-router";
-import Profile from "~/models/profileModel";
-import { connectToDatabase } from "~/lib/mongo";
 import { getEnvWithDefault } from "~/lib/env";
+import { connectToDatabase } from "~/lib/mongo";
 
 async function requireAdmin(request: Request) {
   // Check for hardcoded admin session cookie

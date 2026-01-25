@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const deploymentSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const deploymentSchemaDefinition = {
   conversationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Conversation",
@@ -14,9 +15,9 @@ const deploymentSchema = new mongoose.Schema({
   },
   deploymentUrl: { type: String, required: true },
   deploymentId: { type: String, required: true },
-  // NEW: Store Vercel project ID for reuse
+  // Store Vercel project ID for reuse
   vercelProjectId: { type: String },
-  // NEW: Store Netlify site ID for reuse
+  // Store Netlify site ID for reuse
   netlifySiteId: { type: String },
   status: {
     type: String,
@@ -32,10 +33,21 @@ const deploymentSchema = new mongoose.Schema({
     branch: String,
     commitHash: String,
   },
-});
+};
+
+export const deploymentSchema = new mongoose.Schema(deploymentSchemaDefinition);
 
 // Index for faster lookups
 deploymentSchema.index({ conversationId: 1, platform: 1 });
 
-const Deployment = mongoose.model("Deployment", deploymentSchema);
+// Model getter function for consistent access
+export function getDeploymentModel(): mongoose.Model<any> {
+  if (mongoose.models.Deployment) {
+    return mongoose.models.Deployment as mongoose.Model<any>;
+  }
+  return mongoose.model("Deployment", deploymentSchema);
+}
+
+const Deployment = getDeploymentModel();
+
 export default Deployment;

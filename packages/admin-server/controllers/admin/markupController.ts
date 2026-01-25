@@ -1,9 +1,8 @@
-import { Organization } from "@nowgai/shared/models";
+import { Markup, Organization } from "@nowgai/shared/models";
 import { UserRole } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { getUserOrganizations, isOrganizationAdmin } from "../../lib/organizationRoles";
-import Markup from "../../models/markupModel";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {

@@ -1,9 +1,8 @@
-import { OrganizationMember } from "@nowgai/shared/models";
+import { OrganizationMember, Profile } from "@nowgai/shared/models";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
 import { getUserOrganizations } from "../../lib/organizationRoles";
-import Profile from "../../models/profileModel";
 
 export async function getTransactions(req: Request, res: Response) {
   try {

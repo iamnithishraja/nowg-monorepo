@@ -1,14 +1,14 @@
-import type { Route } from "./+types/profile";
-import { redirect, Link } from "react-router";
-import { ProjectSidebar } from "../components/ProjectSidebar";
+import { Profile as ProfileModel } from "@nowgai/shared/models";
+import { ArrowLeft, DollarSign, User as UserIcon, Zap } from "lucide-react";
+import { Link, redirect } from "react-router";
 import GradientGlow from "../components/GradientGlow";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { ProjectSidebar } from "../components/ProjectSidebar";
 import { Button } from "../components/ui/button";
-import { DollarSign, User as UserIcon, Zap, ArrowLeft } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { auth } from "../lib/auth";
 import { connectToDatabase } from "../lib/mongo";
-import ProfileModel from "../models/profileModel";
 import { isWhitelistedEmail } from "../lib/stripe";
+import type { Route } from "./+types/profile";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const authInstance = await auth;
