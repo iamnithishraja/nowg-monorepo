@@ -5,6 +5,7 @@ import { auth } from "~/lib/auth";
 import { getEnv } from "~/lib/env";
 import { Agent, AgentTools, SystemPrompt } from "~/agent";
 import type { FileMap, FileNode } from "~/utils/constants";
+import { ChatService } from "~/lib/chatService";
 
 /**
  * Agent API Endpoint
@@ -111,6 +112,10 @@ interface AgentRequest {
   sessionId?: string;
   /** Current step count (for multi-turn) */
   currentStep?: number;
+  /** Conversation ID for persisting messages */
+  conversationId?: string;
+  /** Chat ID for persisting messages to a specific chat */
+  chatId?: string;
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -144,10 +149,16 @@ export async function action({ request }: ActionFunctionArgs) {
       toolResults,
       sessionId: inputSessionId,
       currentStep = 0,
+      conversationId,
+      chatId,
     } = body;
 
     const requestType = body.requestType || "prompt";
-    console.log("[Agent API] Request type:", requestType, "| Step:", currentStep, "| Prompt:", prompt?.substring(0, 100));
+    const userId = session.user.id;
+    console.log("[Agent API] Request type:", requestType, "| Step:", currentStep, "| Prompt:", prompt?.substring(0, 100), "| ConvId:", conversationId, "| ChatId:", chatId);
+    
+    // Initialize chat service for message persistence
+    const chatService = new ChatService();
 
     // Validate request based on type
     if (requestType === "prompt" && !prompt && inputMessages.length === 0) {
@@ -206,6 +217,32 @@ export async function action({ request }: ActionFunctionArgs) {
 
           sendChunk({ type: "session_start", sessionId, messageId, step: stepCount });
           console.log("[Agent API] Session started:", sessionId, "| Message:", messageId, "| Step:", stepCount);
+
+          // Save user message to database on first step (only for prompt requests)
+          if (requestType === "prompt" && prompt && conversationId && chatId && currentStep === 0) {
+            try {
+              const result = await chatService.addMessageToChat(
+                conversationId,
+                chatId,
+                {
+                  role: "user",
+                  content: prompt,
+                  clientRequestId: `user-${sessionId}-${Date.now()}`,
+                } as any,
+                userId
+              );
+              console.log("[Agent API] User message saved:", result.messageId, "| Chat title:", result.chatTitle);
+              sendChunk({ type: "user_message_saved", messageId: result.messageId });
+              
+              // If a new chat title was generated (first message), send it to the client
+              if (result.chatTitle) {
+                sendChunk({ type: "chat_title_updated", chatTitle: result.chatTitle });
+              }
+            } catch (saveError) {
+              console.error("[Agent API] Failed to save user message:", saveError);
+              // Don't fail the request, just log the error
+            }
+          }
 
           // Get the agent
           const agent = Agent.get(agentName) || Agent.defaultAgent();
@@ -472,6 +509,41 @@ export async function action({ request }: ActionFunctionArgs) {
           });
           console.log("[Agent API] Step complete:", stepCount, "| Tool calls:", pendingToolCalls.length);
 
+          // Save assistant message to database if we have conversationId and chatId
+          const tokensUsed = usage ? ((usage as any).totalTokens || 0) : 0;
+          const inputTokens = usage ? ((usage as any).promptTokens || 0) : 0;
+          const outputTokens = usage ? ((usage as any).completionTokens || 0) : 0;
+          
+          if (conversationId && chatId && (fullText || pendingToolCalls.length > 0)) {
+            try {
+              const assistantMessageId = await chatService.addMessageToChat(
+                conversationId,
+                chatId,
+                {
+                  role: "assistant",
+                  content: fullText || "",
+                  toolCalls: pendingToolCalls.map(tc => ({
+                    id: tc.id,
+                    name: tc.name,
+                    args: tc.args,
+                    status: "pending", // Will be updated by frontend after execution
+                  })),
+                  model: model,
+                  tokensUsed: tokensUsed,
+                  inputTokens: inputTokens,
+                  outputTokens: outputTokens,
+                  clientRequestId: `assistant-${sessionId}-${stepCount}`,
+                } as any,
+                userId
+              );
+              console.log("[Agent API] Assistant message saved:", assistantMessageId, "| Tokens:", tokensUsed);
+              sendChunk({ type: "assistant_message_saved", messageId: assistantMessageId });
+            } catch (saveError) {
+              console.error("[Agent API] Failed to save assistant message:", saveError);
+              // Don't fail the request, just log the error
+            }
+          }
+
           // If there are pending tool calls, tell client to execute and send results back
           if (pendingToolCalls.length > 0) {
             console.log("[Agent API] Sending awaiting_tool_results event | Pending:", pendingToolCalls.length, "| Ack:", ackTools.length, "| Auto:", autoTools.length);
@@ -527,9 +599,9 @@ export async function action({ request }: ActionFunctionArgs) {
               steps: stepCount,
               usage: usage
                 ? {
-                    promptTokens: (usage as any).promptTokens || 0,
-                    completionTokens: (usage as any).completionTokens || 0,
-                    totalTokens: (usage as any).totalTokens || 0,
+                    promptTokens: inputTokens,
+                    completionTokens: outputTokens,
+                    totalTokens: tokensUsed,
                   }
                 : undefined,
               sessionId,

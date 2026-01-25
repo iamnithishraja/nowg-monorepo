@@ -7,12 +7,27 @@ import type {
 } from "../types/chat";
 import type { FileMap } from "../utils/constants";
 
+// Streaming segment types for ordered rendering
+export interface StreamingTextSegment {
+  type: 'text';
+  content: string;
+}
+
+export interface StreamingToolCallSegment {
+  type: 'toolCall';
+  toolCall: any;
+}
+
+export type StreamingSegment = StreamingTextSegment | StreamingToolCallSegment;
+
 export function useWorkspaceChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentToolCalls, setCurrentToolCalls] = useState<any[]>([]); // Tool calls for current assistant message
+  // Track streaming segments in order (text and tool calls interleaved)
+  const [streamingSegments, setStreamingSegments] = useState<StreamingSegment[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const userCancelledRef = useRef(false);
   const processedFiles = useRef(new Set<string>());
@@ -63,6 +78,11 @@ export function useWorkspaceChat() {
 
     // Clear processed files when starting a new assistant message
     processedFiles.current.clear();
+    
+    // Clear streaming segments for new message
+    setStreamingSegments([]);
+    // Clear tool calls
+    setCurrentToolCalls([]);
 
     setMessages((prev) => [
       ...prev,
@@ -773,6 +793,57 @@ export function useWorkspaceChat() {
     setMessages(finalMessages);
   };
 
+  // Append text to streaming segments (updates last text segment or creates new one)
+  const appendTextSegment = (text: string, mountedRef?: React.RefObject<boolean>) => {
+    if (mountedRef?.current === false) return;
+    
+    setStreamingSegments((prev) => {
+      const lastSegment = prev[prev.length - 1];
+      
+      // If last segment is text, append to it
+      if (lastSegment && lastSegment.type === 'text') {
+        return [
+          ...prev.slice(0, -1),
+          { type: 'text' as const, content: lastSegment.content + text }
+        ];
+      }
+      
+      // Otherwise create new text segment
+      return [...prev, { type: 'text' as const, content: text }];
+    });
+  };
+
+  // Append a tool call segment
+  const appendToolCallSegment = (toolCall: any, mountedRef?: React.RefObject<boolean>) => {
+    if (mountedRef?.current === false) return;
+    
+    setStreamingSegments((prev) => [
+      ...prev,
+      { type: 'toolCall' as const, toolCall }
+    ]);
+  };
+
+  // Update a tool call in streaming segments
+  const updateToolCallInSegments = (
+    toolCallId: string, 
+    updates: Partial<any>,
+    mountedRef?: React.RefObject<boolean>
+  ) => {
+    if (mountedRef?.current === false) return;
+    
+    setStreamingSegments((prev) => 
+      prev.map((segment) => {
+        if (segment.type === 'toolCall' && segment.toolCall.id === toolCallId) {
+          return {
+            ...segment,
+            toolCall: { ...segment.toolCall, ...updates }
+          };
+        }
+        return segment;
+      })
+    );
+  };
+
   return {
     messages,
     setMessages: setMessagesWithDeduplication,
@@ -784,6 +855,11 @@ export function useWorkspaceChat() {
     setError,
     currentToolCalls,
     setCurrentToolCalls,
+    streamingSegments,
+    setStreamingSegments,
+    appendTextSegment,
+    appendToolCallSegment,
+    updateToolCallInSegments,
     addMessage,
     beginAssistantMessage,
     updateLastAssistantMessage,

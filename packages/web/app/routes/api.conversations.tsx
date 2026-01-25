@@ -911,15 +911,20 @@ export async function action({ request }: ActionFunctionArgs) {
             );
           }
 
-          const messageId = await chatService.addMessageToChat(
+          const result = await chatService.addMessageToChat(
             conversationId,
             requestBody.chatId,
             messageObj,
             userId
           );
 
+          // Return messageId and optionally the generated chat title
           return new Response(
-            JSON.stringify({ success: true, messageId }),
+            JSON.stringify({ 
+              success: true, 
+              messageId: result.messageId,
+              chatTitle: result.chatTitle, // Will be populated for first user message
+            }),
             {
               status: 200,
               headers: { "Content-Type": "application/json" },

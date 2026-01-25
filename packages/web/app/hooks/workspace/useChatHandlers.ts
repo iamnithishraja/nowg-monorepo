@@ -22,6 +22,8 @@ interface ChatDeps {
   figmaUrl?: string;
   enableFigmaMCP?: boolean;
   chatMode?: "build" | "ask";
+  /** Callback when chat title is updated (from first message) */
+  onChatTitleUpdated?: (title: string) => void;
 }
 
 export function useChatHandlers({
@@ -41,6 +43,7 @@ export function useChatHandlers({
   figmaUrl,
   enableFigmaMCP,
   chatMode = "build",
+  onChatTitleUpdated,
 }: ChatDeps) {
   const sendingRef = useRef(false);
 
@@ -78,28 +81,8 @@ export function useChatHandlers({
           };
           chat.addMessage(userMessage, isMountedRef);
 
-          // Store user message in chat (async, don't block)
-          // Don't reload messages here as it would overwrite streaming assistant message
-          // The messages will be synced when the assistant response completes
-          fetch("/api/conversations?conversationId=" + conversationId, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "addChatMessage",
-              chatId: chatId,
-              message: {
-                role: "user",
-                content: messageContent,
-              },
-            }),
-          })            .then(async (response) => {
-              if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.error("Failed to store user message:", errorData);
-              }
-            })            .catch((error) => {
-              console.error("Error storing user message:", error);
-            });
+          // Note: User message is now saved by the agent API directly
+          // This ensures proper ordering and avoids race conditions
 
           chat.setIsLoading(true);
           chat.setIsStreaming(true);
@@ -117,7 +100,11 @@ export function useChatHandlers({
             "[ChatHandler] Sending request to agent API | Mode:",
             chatMode,
             "| Agent:",
-            agentName
+            agentName,
+            "| ConvId:",
+            conversationId,
+            "| ChatId:",
+            chatId
           );
           const response = await fetch("/api/agent", {
             method: "POST",
@@ -130,6 +117,9 @@ export function useChatHandlers({
               files: files.filesMap || {},
               fileTree: files.fileTree,
               maxSteps: 10,
+              // Pass conversationId and chatId for message persistence
+              conversationId: conversationId,
+              chatId: chatId,
             }),
             signal: abortController.signal,
           });
@@ -167,15 +157,27 @@ export function useChatHandlers({
             );
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
+            
+            // For continuations, start with existing message content to append to
+            // This preserves previous text and tool calls in the streaming flow
             let assistantText = "";
+            if (isContinuation && chat.messages.length > 0) {
+              const lastMessage = chat.messages[chat.messages.length - 1];
+              if (lastMessage?.role === "assistant" && lastMessage.content) {
+                assistantText = lastMessage.content;
+                console.log("[ChatHandler] Continuation: starting with existing content length:", assistantText.length);
+              }
+            }
+            
             let allToolCalls: any[] = [];
+            // For continuations, also preserve existing tool calls
+            if (isContinuation && chat.currentToolCalls && chat.currentToolCalls.length > 0) {
+              allToolCalls = [...chat.currentToolCalls];
+              console.log("[ChatHandler] Continuation: preserving", allToolCalls.length, "existing tool calls");
+            }
+            
             let currentSessionId = sessionId;
             let messagesForContinuation: any[] = [];
-
-            // If this is a continuation, start a new assistant message
-            if (isContinuation) {
-              chat.beginAssistantMessage(isMountedRef);
-            }
 
             if (!reader) {
               throw new Error("No response stream");
@@ -216,12 +218,22 @@ export function useChatHandlers({
                       "[ChatHandler] Session started:",
                       currentSessionId
                     );
+                  } else if (data.type === "chat_title_updated") {
+                    // Chat title was generated from first user message
+                    console.log("[ChatHandler] Chat title updated:", data.chatTitle);
+                    onChatTitleUpdated?.(data.chatTitle);
+                  } else if (data.type === "user_message_saved") {
+                    // User message was saved to database
+                    console.log("[ChatHandler] User message saved:", data.messageId);
                   } else if (data.type === "text_delta") {
                     assistantText += data.delta;
+                    // Update message content
                     chat.updateLastAssistantMessage(
                       assistantText,
                       isMountedRef
                     );
+                    // Also append to streaming segments for ordered rendering
+                    chat.appendTextSegment?.(data.delta, isMountedRef);
                   } else if (data.type === "tool_call") {
                     const toolCall = {
                       id: data.id,
@@ -237,6 +249,8 @@ export function useChatHandlers({
                       ...prev,
                       toolCall,
                     ]);
+                    // Append to streaming segments for ordered rendering
+                    chat.appendToolCallSegment?.(toolCall, isMountedRef);
                     console.log(
                       "[ChatHandler] Tool call received:",
                       toolCall.name
@@ -363,6 +377,8 @@ export function useChatHandlers({
                                 : tc
                             )
                           );
+                          // Update streaming segments too
+                          chat.updateToolCallInSegments?.(toolCall.id, { status: "executing" as const }, isMountedRef);
                         }
 
                         // Execute with better error context
@@ -440,6 +456,12 @@ export function useChatHandlers({
                                 : tc
                             )
                           );
+                          // Update streaming segments too
+                          chat.updateToolCallInSegments?.(toolCall.id, { 
+                            status: "completed" as const, 
+                            result, 
+                            endTime 
+                          }, isMountedRef);
                         }
 
                         // If this is a file-writing tool (edit, write, multiedit), update UI files state
@@ -608,6 +630,12 @@ export function useChatHandlers({
                                 : tc
                             )
                           );
+                          // Update streaming segments too
+                          chat.updateToolCallInSegments?.(toolCall.id, { 
+                            status: "error" as const, 
+                            result: errorResult, 
+                            endTime 
+                          }, isMountedRef);
                         }
 
                         toolResults.push({
@@ -657,6 +685,9 @@ export function useChatHandlers({
                           files: files.filesMap || {},
                           fileTree: files.fileTree,
                           maxSteps: 10,
+                          // Pass conversationId and chatId for message persistence
+                          conversationId: conversationId,
+                          chatId: chatId,
                         }),
                         signal: abortController.signal,
                       });
@@ -679,7 +710,7 @@ export function useChatHandlers({
                         );
                       }
 
-                      // Recursively process the continuation stream (create new message for continuation)
+                      // Recursively process the continuation stream (appends to same message)
                       console.log(
                         "[ChatHandler] Processing continuation stream"
                       );
@@ -689,20 +720,15 @@ export function useChatHandlers({
                         (data.step || currentStep) + 1,
                         true
                       );
-                      // Don't accumulate continuation text into previous message - it's already in a new message
-                      // Just collect tool calls
-                      allToolCalls = [
-                        ...allToolCalls,
-                        ...continuationResult.toolCalls,
-                      ];
+                      // Continuation already updates streaming segments and tool calls directly
+                      // Return the accumulated values from the continuation (which includes everything)
                       console.log(
-                        "[ChatHandler] Continuation complete | Continuation text:",
+                        "[ChatHandler] Continuation complete | Total text:",
                         continuationResult.text.length,
                         "| Total tool calls:",
-                        allToolCalls.length
+                        continuationResult.toolCalls.length
                       );
-                      // Return accumulated text from this step only (continuation text is in separate message)
-                      return { text: assistantText, toolCalls: allToolCalls };
+                      return continuationResult;
                     } else {
                       // No tools to execute or max steps reached - return current state
                       console.log(
@@ -814,48 +840,9 @@ export function useChatHandlers({
             // Small delay to ensure React has re-rendered with the new message state
             await new Promise((resolve) => setTimeout(resolve, 100));
 
-            // Store assistant message in chat with final content
-            if (finalContent) {
-              const assistantMessage = {
-                role: "assistant",
-                content: finalContent,
-                model: effectiveModel,
-                // Use finalized toolCalls (with completed status) for storage
-                toolCalls: finalizedToolCalls.map((tc: any) => ({
-                  id: tc.id,
-                  name: tc.name,
-                  args: tc.args,
-                  status: tc.status === "error" ? "error" : "completed", // Ensure completed status
-                  result: tc.result,
-                  startTime: tc.startTime,
-                  endTime: tc.endTime,
-                  category: tc.category,
-                })),
-              };
-
-              const assistantMessageResponse = await fetch(
-                "/api/conversations?conversationId=" + conversationId,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    action: "addChatMessage",
-                    chatId: chatId,
-                    message: assistantMessage,
-                  }),
-                }
-              );
-
-              if (!assistantMessageResponse.ok) {
-                const errorData = await assistantMessageResponse
-                  .json()
-                  .catch(() => ({}));
-                console.error("Failed to store assistant message:", errorData);
-                // Don't throw - we still want to show the message in UI even if storage fails
-              }
-              // Don't reload from DB - it would overwrite our streaming content
-              // The UI already has the complete content, no need to sync
-            }
+            // Note: Assistant message is now saved by the agent API directly
+            // This ensures proper ordering and includes token usage info
+            // The UI state is updated above with the final content and tool calls
           }
 
           chat.setIsLoading(false);

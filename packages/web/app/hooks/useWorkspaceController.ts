@@ -134,7 +134,8 @@ function useConversationVersions(conversationId: string | null) {
 
 export function useWorkspaceController(
   designScheme?: any,
-  onInsufficientBalance?: (errorData?: any) => void
+  onInsufficientBalance?: (errorData?: any) => void,
+  onChatTitleUpdated?: (title: string) => void
 ) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -937,6 +938,7 @@ conversationId
     figmaUrl,
     enableFigmaMCP,
     chatMode,
+    onChatTitleUpdated,
   });
 
   const handleSend = async (messageContent: string) => {
@@ -1419,6 +1421,7 @@ conversationId
     chatIsStreaming: chat.isStreaming,
     chatError: chat.error,
     currentToolCalls: chat.currentToolCalls || [],
+    streamingSegments: chat.streamingSegments || [],
 
     // files state
     templateFilesState: files.templateFilesState,

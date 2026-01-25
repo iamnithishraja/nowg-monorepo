@@ -21,6 +21,8 @@ interface WorkspaceLeftHeaderProps {
   currentChatId?: string | null;
   onChatChange?: (chatId: string | null) => void;
   isCreatingNewChat?: boolean;
+  /** Title of the current chat (for ChatSwitcher when title is updated from first message) */
+  currentChatTitle?: string | null;
 }
 
 export function WorkspaceLeftHeader({
@@ -30,6 +32,7 @@ export function WorkspaceLeftHeader({
   currentChatId,
   onChatChange,
   isCreatingNewChat = false,
+  currentChatTitle,
 }: WorkspaceLeftHeaderProps) {
   const navigate = useNavigate();
 
@@ -97,6 +100,7 @@ export function WorkspaceLeftHeader({
             conversationId={conversationId}
             currentChatId={currentChatId}
             onChatChange={onChatChange}
+            currentChatTitle={currentChatTitle}
           />
         )}
       </div>

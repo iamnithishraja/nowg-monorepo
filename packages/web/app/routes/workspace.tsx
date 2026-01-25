@@ -142,7 +142,16 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
 
   const controller = useWorkspaceController(
     enableDesignScheme ? designScheme : undefined,
-    handleInsufficientBalance
+    handleInsufficientBalance,
+    // Update chat title immediately when generated from first message
+    (title: string) => {
+      setCurrentChatTitle(title);
+      // Clear polling since we have the title now
+      if (chatTitlePollIntervalRef.current) {
+        clearTimeout(chatTitlePollIntervalRef.current);
+        chatTitlePollIntervalRef.current = null;
+      }
+    }
   );
 
   const [selectedElementInfo, setSelectedElementInfo] = useState<any | null>(
@@ -844,6 +853,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     chatTitle={getChatTitle()} 
                     conversationId={controller.conversationId || undefined}
                     isCreatingNewChat={isCreatingNewChat}
+                    currentChatTitle={currentChatTitle}
                     onCreateNewChat={async () => {
                       if (!controller.conversationId || isCreatingNewChat) return;
                       
@@ -928,6 +938,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       onInspectorEnable={() => setSelectedElementInfo(null)}
                       conversationId={controller.conversationId || undefined}
                       currentToolCalls={(controller as any).currentToolCalls || []}
+                      streamingSegments={(controller as any).streamingSegments || []}
                       chatId={currentChatId}
                     />
                   </div>

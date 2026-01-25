@@ -22,12 +22,15 @@ interface ChatSwitcherProps {
   conversationId: string;
   currentChatId?: string | null;
   onChatChange: (chatId: string | null) => void;
+  /** Override title for the current chat (e.g., when title is updated from first message) */
+  currentChatTitle?: string | null;
 }
 
 export function ChatSwitcher({
   conversationId,
   currentChatId,
   onChatChange,
+  currentChatTitle: externalChatTitle,
 }: ChatSwitcherProps) {
   const [chats, setChats] = useState<Chat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,10 +62,24 @@ export function ChatSwitcher({
     loadChats();
   }, [conversationId, currentChatId]);
 
+  // Update local chat title when external title changes (from first message)
+  useEffect(() => {
+    if (externalChatTitle && currentChatId) {
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === currentChatId ? { ...chat, title: externalChatTitle } : chat
+        )
+      );
+    }
+  }, [externalChatTitle, currentChatId]);
+
   const currentChat = currentChatId
     ? chats.find((c) => c.id === currentChatId)
     : null;
-  const currentTitle = currentChat?.title || "Main";
+  // Use external title if provided, otherwise use the chat's title from the list
+  const currentTitle = (currentChatId && externalChatTitle) 
+    ? externalChatTitle 
+    : (currentChat?.title || "Main");
 
   if (!isLoading && chats.length === 0) {
     return null;
