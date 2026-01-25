@@ -140,11 +140,35 @@ export const WriteTool = Tool.define<
     }
 
     if (!params.filePath) {
-      throw new Error("filePath is required");
+      throw new Error("filePath is required. Use 'filePath' parameter to specify the file path.");
     }
 
     if (params.content === undefined) {
-      throw new Error("content is required");
+      // Check for common incorrect parameter names and provide helpful error
+      const paramsObj = params as Record<string, unknown>;
+      if (paramsObj.newString !== undefined) {
+        throw new Error(
+          "Invalid parameter 'newString'. Use 'content' parameter instead. Example: { filePath: 'file.ts', content: '...' }"
+        );
+      }
+      if (paramsObj.contents !== undefined) {
+        throw new Error(
+          "Invalid parameter 'contents'. Use 'content' (singular) parameter instead. Example: { filePath: 'file.ts', content: '...' }"
+        );
+      }
+      if (paramsObj.text !== undefined) {
+        throw new Error(
+          "Invalid parameter 'text'. Use 'content' parameter instead. Example: { filePath: 'file.ts', content: '...' }"
+        );
+      }
+      if (paramsObj.data !== undefined) {
+        throw new Error(
+          "Invalid parameter 'data'. Use 'content' parameter instead. Example: { filePath: 'file.ts', content: '...' }"
+        );
+      }
+      throw new Error(
+        "content is required. Use 'content' parameter to specify the file contents. Example: { filePath: 'file.ts', content: '...' }"
+      );
     }
 
     const fullPath = getFullPath(params.filePath);
