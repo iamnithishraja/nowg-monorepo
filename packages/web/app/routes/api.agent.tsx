@@ -120,8 +120,6 @@ interface AgentRequest {
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    console.log("[Agent API] Request received");
-    
     // Authenticate user
     const authInstance = await auth;
     const session = await authInstance.api.getSession({
@@ -155,7 +153,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const requestType = body.requestType || "prompt";
     const userId = session.user.id;
-    console.log("[Agent API] Request type:", requestType, "| Step:", currentStep, "| Prompt:", prompt?.substring(0, 100), "| ConvId:", conversationId, "| ChatId:", chatId);
     
     // Initialize chat service for message persistence
     const chatService = new ChatService();
@@ -196,8 +193,6 @@ export async function action({ request }: ActionFunctionArgs) {
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
-    
-    console.log("[Agent API] Starting stream processing");
 
     // Create streaming response
     const encoder = new TextEncoder();
@@ -205,7 +200,6 @@ export async function action({ request }: ActionFunctionArgs) {
       async start(controller) {
         const sendChunk = (data: any) => {
           const chunk = `data: ${JSON.stringify(data)}\n\n`;
-          console.log("[Agent API] Sending chunk:", data.type, "| Size:", chunk.length, "bytes");
           controller.enqueue(encoder.encode(chunk));
         };
 
@@ -216,7 +210,6 @@ export async function action({ request }: ActionFunctionArgs) {
           const stepCount = currentStep + 1;
 
           sendChunk({ type: "session_start", sessionId, messageId, step: stepCount });
-          console.log("[Agent API] Session started:", sessionId, "| Message:", messageId, "| Step:", stepCount);
 
           // Save user message to database on first step (only for prompt requests)
           if (requestType === "prompt" && prompt && conversationId && chatId && currentStep === 0) {
@@ -231,7 +224,6 @@ export async function action({ request }: ActionFunctionArgs) {
                 } as any,
                 userId
               );
-              console.log("[Agent API] User message saved:", result.messageId, "| Chat title:", result.chatTitle);
               sendChunk({ type: "user_message_saved", messageId: result.messageId });
               
               // If a new chat title was generated (first message), send it to the client
@@ -246,7 +238,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
           // Get the agent
           const agent = Agent.get(agentName) || Agent.defaultAgent();
-          console.log("[Agent API] Using agent:", agentName, "| Agent found:", !!agent);
 
           // Build system prompt
           const systemParts = SystemPrompt.build({
@@ -257,7 +248,6 @@ export async function action({ request }: ActionFunctionArgs) {
             userMessage: prompt,
           });
           const systemPrompt = systemParts.join("\n\n");
-          console.log("[Agent API] System prompt built:", systemPrompt.length, "chars |", systemParts.length, "parts");
 
           // Resolve tools for the agent (for schema only, execution happens client-side)
           const tools = AgentTools.resolve(agent, {
@@ -265,7 +255,6 @@ export async function action({ request }: ActionFunctionArgs) {
             messageID: messageId,
             agent,
           });
-          console.log("[Agent API] Tools resolved:", Object.keys(tools || {}).length, "tools");
 
           // Build messages array
           // Convert inputMessages to proper CoreMessage format, filtering out invalid formats
@@ -319,8 +308,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
           // If we have tool results from client, add them to continue the loop
           if (toolResults && toolResults.length > 0) {
-            console.log("[Agent API] Processing", toolResults.length, "tool results");
-            
             // Build a single combined tool results message for the LLM
             // This format works better with OpenRouter and various model providers
             // Each tool result is clearly labeled with its tool call ID and name
@@ -330,8 +317,6 @@ export async function action({ request }: ActionFunctionArgs) {
               const toolResultContent = tr.result.success 
                 ? tr.result.output 
                 : `Error: ${tr.result.error || "Tool execution failed"}`;
-              
-              console.log("[Agent API] Creating tool result for:", tr.toolName, "| ID:", tr.toolCallId, "| Success:", tr.result.success, "| Content length:", toolResultContent.length);
               
               // Format each tool result with clear identification
               toolResultsParts.push(
@@ -349,7 +334,6 @@ export async function action({ request }: ActionFunctionArgs) {
               content: toolResultsParts.join("\n\n" + "=".repeat(50) + "\n\n"),
             };
             
-            console.log("[Agent API] Combined tool results message | Parts:", toolResultsParts.length, "| Total length:", (combinedToolResults.content as string).length);
             messages.push(combinedToolResults);
           }
           
@@ -357,8 +341,6 @@ export async function action({ request }: ActionFunctionArgs) {
           if (prompt && currentStep === 0) {
             messages.push({ role: "user", content: prompt });
           }
-          console.log("[Agent API] Messages prepared:", messages.length, "messages");
-          console.log("[Agent API] Message roles:", messages.map(m => ({ role: m.role, contentType: typeof m.content === "string" ? "string" : Array.isArray(m.content) ? "array" : "other" })));
 
           // Create OpenRouter client
           const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
@@ -370,15 +352,6 @@ export async function action({ request }: ActionFunctionArgs) {
           }> = [];
 
           console.log("[Agent API] Starting LLM stream with model:", model);
-          console.log("[Agent API] Messages being sent to LLM:", JSON.stringify(messages.map(m => ({
-            role: m.role,
-            contentType: typeof m.content === "string" ? "string" : Array.isArray(m.content) ? `array[${m.content.length}]` : "other",
-            contentPreview: typeof m.content === "string" 
-              ? m.content.substring(0, 100)
-              : Array.isArray(m.content) && m.content.length > 0
-                ? JSON.stringify(m.content[0]).substring(0, 200)
-                : "N/A"
-          })), null, 2));
           
           // Collect tool calls as they're generated
           const collectedToolCalls: Array<{
@@ -401,7 +374,6 @@ export async function action({ request }: ActionFunctionArgs) {
             onStepFinish: async (step: any) => {
               // Capture tool calls from each step and send immediately
               const stepToolCalls = step.toolCalls || [];
-              console.log("[Agent API] Step finished, tool calls:", stepToolCalls.length);
               for (const toolCall of stepToolCalls) {
                 const args = toolCall.args || (toolCall as any).input || {};
                 const toolCallId = toolCall.toolCallId || toolCall.id;
@@ -419,7 +391,6 @@ export async function action({ request }: ActionFunctionArgs) {
                   // This happens before awaiting_tool_results, giving frontend earlier notice
                   if (!announcedToolCalls.has(toolCallId)) {
                     announcedToolCalls.add(toolCallId);
-                    console.log("[Agent API] Sending tool call event early:", toolName);
                     sendChunk({
                       type: "tool_call",
                       id: toolCallId,
@@ -461,21 +432,14 @@ export async function action({ request }: ActionFunctionArgs) {
           try {
             if (collectedToolCalls.length > 0) {
               responseToolCalls = collectedToolCalls;
-              console.log("[Agent API] Using collected tool calls:", responseToolCalls.length);
             } else {
               // Fallback to result.toolCalls if available
               const resultToolCalls = await result.toolCalls || [];
               responseToolCalls = Array.isArray(resultToolCalls) ? resultToolCalls : [];
-              console.log("[Agent API] Using result.toolCalls:", responseToolCalls.length);
-            }
-            
-            if (responseToolCalls.length > 0) {
-              console.log("[Agent API] Tool call names:", responseToolCalls.map(tc => tc.toolName || tc.name));
             }
           } catch (toolCallsError) {
             console.error("[Agent API] Error getting tool calls:", toolCallsError);
             responseToolCalls = collectedToolCalls;
-            console.log("[Agent API] Using collected tool calls as fallback:", responseToolCalls.length);
           }
           // Process tool calls and categorize them
           const autoTools: typeof pendingToolCalls = [];
@@ -486,8 +450,6 @@ export async function action({ request }: ActionFunctionArgs) {
             const toolCallId = toolCall.toolCallId || toolCall.id;
             const args = toolCall.args || {};
             const category = getToolCategory(toolName);
-            
-            console.log("[Agent API] Processing tool call:", toolName, "| Category:", category);
             
             sendChunk({
               type: "tool_call",
@@ -528,7 +490,6 @@ export async function action({ request }: ActionFunctionArgs) {
             step: stepCount,
             hasToolCalls: pendingToolCalls.length > 0,
           });
-          console.log("[Agent API] Step complete:", stepCount, "| Tool calls:", pendingToolCalls.length);
 
           // Save assistant message to database if we have conversationId and chatId
           const tokensUsed = usage ? ((usage as any).totalTokens || 0) : 0;
@@ -557,7 +518,6 @@ export async function action({ request }: ActionFunctionArgs) {
                 } as any,
                 userId
               );
-              console.log("[Agent API] Assistant message saved:", assistantMessageId, "| Tokens:", tokensUsed);
               sendChunk({ type: "assistant_message_saved", messageId: assistantMessageId });
             } catch (saveError) {
               console.error("[Agent API] Failed to save assistant message:", saveError);
@@ -567,8 +527,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
           // If there are pending tool calls, tell client to execute and send results back
           if (pendingToolCalls.length > 0) {
-            console.log("[Agent API] Sending awaiting_tool_results event | Pending:", pendingToolCalls.length, "| Ack:", ackTools.length, "| Auto:", autoTools.length);
-            
             // Need to include the assistant message with tool calls for continuation
             // Build content array with proper types
             const assistantContent: Array<any> = [];
@@ -608,11 +566,8 @@ export async function action({ request }: ActionFunctionArgs) {
               messages: [...messages, assistantMessageWithToolCalls],
             };
             
-            console.log("[Agent API] Awaiting event payload:", JSON.stringify(awaitingEvent, null, 2).substring(0, 500));
             sendChunk(awaitingEvent);
-            console.log("[Agent API] awaiting_tool_results event sent");
           } else {
-            console.log("[Agent API] No tool calls, sending complete event");
             // No tool calls, we're done
             sendChunk({
               type: "complete",
@@ -630,7 +585,6 @@ export async function action({ request }: ActionFunctionArgs) {
           }
 
           sendChunk({ type: "done" });
-          console.log("[Agent API] Stream completed successfully");
         } catch (error) {
           console.error("[Agent API] Error in stream processing:", error);
           if (error instanceof Error) {
@@ -648,7 +602,6 @@ export async function action({ request }: ActionFunctionArgs) {
       },
     });
 
-    console.log("[Agent API] Returning streaming response");
     return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",

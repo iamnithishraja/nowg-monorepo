@@ -66,9 +66,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
         if (r2Result.success && r2Result.data && r2Result.data.messages) {
           r2Messages = r2Result.data.messages;
-          console.log(
-            `[API] Loaded ${r2Messages?.length || 0} messages from R2 for conversation ${conversationId}`
-          );
         }
       } catch (r2Error) {
         console.warn(
@@ -225,8 +222,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    console.log("[API Conversations] POST request received");
-    
     // Get authenticated user session
     const authInstance = await auth;
     const session = await authInstance.api.getSession({
@@ -285,11 +280,8 @@ export async function action({ request }: ActionFunctionArgs) {
     // Get conversationId from URL params or request body (URL takes precedence for consistency)
     const conversationId = url.searchParams.get("conversationId") || bodyConversationId;
 
-    console.log(`[API Conversations] Processing action: ${actionType}, conversationId: ${conversationId || 'none'}`);
-
     // Debug action for client-side logging visibility
     if (actionType === "debug") {
-      console.log(`[DEBUG CLIENT] ${requestBody.debug}`);
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
@@ -901,16 +893,10 @@ export async function action({ request }: ActionFunctionArgs) {
               const chat = chats.find((c: any) => c.id === requestBody.chatId);
               if (chat && chat.messages) {
                 r2ChatMessages = chat.messages;
-                console.log(
-                  `[API] Loaded ${r2ChatMessages?.length || 0} messages from R2 for chat ${requestBody.chatId}`
-                );
               }
             } else {
               // Main conversation messages
               r2ChatMessages = r2Result.data.messages || [];
-              console.log(
-                `[API] Loaded ${r2ChatMessages?.length || 0} messages from R2 for main conversation`
-              );
             }
           }
         } catch (r2Error) {
@@ -1219,8 +1205,6 @@ export async function action({ request }: ActionFunctionArgs) {
             }
           }
 
-          console.log(`[syncFilesToR2] Uploaded ${uploadedFiles.length} files to R2 for conversation ${conversationId}`);
-
           // If chatId is provided, update the last assistant message in that chat with r2Files
           if (requestBody.chatId && uploadedFiles.length > 0) {
             try {
@@ -1234,8 +1218,6 @@ export async function action({ request }: ActionFunctionArgs) {
                 await AgentMessage.findByIdAndUpdate(lastMessageId, {
                   $push: { r2Files: { $each: uploadedFiles } },
                 });
-                
-                console.log(`[syncFilesToR2] Updated message ${lastMessageId} with ${uploadedFiles.length} r2Files`);
               }
             } catch (updateError: any) {
               console.error("[syncFilesToR2] Error updating message with r2Files:", updateError.message);
@@ -1245,7 +1227,6 @@ export async function action({ request }: ActionFunctionArgs) {
           // Sync conversation to R2 to update conversation.json with latest files
           try {
             await chatService.syncConversationToR2Public(conversationId, userId);
-            console.log(`[syncFilesToR2] Synced conversation.json to R2`);
           } catch (syncError: any) {
             console.error("[syncFilesToR2] Error syncing conversation to R2:", syncError.message);
           }
@@ -1304,7 +1285,6 @@ export async function action({ request }: ActionFunctionArgs) {
             : undefined;
 
           // Fetch conversation data from R2
-          console.log(`[getFilesFromR2] Fetching conversation data from R2 for ${conversationId}...`);
           const r2Result = await getConversationFromR2(userId, conversationId, projId);
 
           if (!r2Result.success || !r2Result.data) {
@@ -1323,7 +1303,6 @@ export async function action({ request }: ActionFunctionArgs) {
           }
 
           const conversationData = r2Result.data;
-          console.log(`[getFilesFromR2] Fetched conversation data. Main messages: ${conversationData.messages?.length || 0}, Chats: ${conversationData.chats?.length || 0}`);
 
           // Collect all r2Files from main conversation messages with message timestamp
           interface R2FileInfo {
@@ -1358,7 +1337,6 @@ export async function action({ request }: ActionFunctionArgs) {
               }
             }
           }
-          console.log(`[getFilesFromR2] Found ${mainFilesCount} files in main conversation messages`);
 
           // Get files from all chat messages
           const chats = conversationData.chats || [];
@@ -1384,10 +1362,8 @@ export async function action({ request }: ActionFunctionArgs) {
               }
             }
           }
-          console.log(`[getFilesFromR2] Found ${chatFilesCount} files in chat messages (${chats.length} chats)`);
 
           if (allR2Files.length === 0) {
-            console.log("[getFilesFromR2] No files found in R2");
             return new Response(
               JSON.stringify({ success: true, files: [] }),
               {
@@ -1424,8 +1400,6 @@ export async function action({ request }: ActionFunctionArgs) {
             }
           }
 
-          console.log(`[getFilesFromR2] Grouped to ${filesByPath.size} unique files`);
-
           // Fetch actual file content from R2
           const filesWithContent: Array<{ path: string; name: string; content: string; type: string }> = [];
           const fetchPromises = Array.from(filesByPath.entries()).map(async ([filePath, fileInfo]) => {
@@ -1447,8 +1421,6 @@ export async function action({ request }: ActionFunctionArgs) {
           });
 
           await Promise.all(fetchPromises);
-
-          console.log(`[getFilesFromR2] Successfully fetched ${filesWithContent.length}/${filesByPath.size} files from R2`);
 
           return new Response(
             JSON.stringify({

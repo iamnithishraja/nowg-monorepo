@@ -64,7 +64,6 @@ async function ensureWebContainerBooted(): Promise<WebContainer> {
   // Start boot process
   bootPromise = (async () => {
     try {
-      console.log("[WebContainer] 🚀 Booting WebContainer...");
       const container = await WebContainer.boot({
         coep: "credentialless",
         workdirName: WORK_DIR_NAME,
@@ -75,11 +74,9 @@ async function ensureWebContainerBooted(): Promise<WebContainer> {
       
       // Connect to WebContainerProvider for tool execution
       connectWebContainerToProvider(container);
-      console.log("[WebContainer] ✅ WebContainer booted and connected to provider");
 
       // Set up event listeners
       container.on("server-ready", (port, url) => {
-        console.log("[WebContainer] 🌐 Server ready:", port, url);
         previewUrl = url;
         updateContext();
         notifyPreviewUrl(previewUrl);
@@ -251,8 +248,6 @@ export async function runShellCommand(
   command: string,
   onOutput?: (line: string) => void
 ): Promise<number> {
-  console.log("[WebContainer] 🐚 Running shell command:", command);
-  
   // Ensure WebContainer is booted (with lock to prevent concurrent boots)
   await ensureWebContainerBooted();
 
@@ -299,7 +294,6 @@ export async function runShellCommand(
     const exitCode = await proc.exit;
     currentShellProcess = null;
     updateContext();
-    console.log("[WebContainer] ✅ Shell command completed with exit code:", exitCode);
     return exitCode;
   };
 
@@ -344,8 +338,6 @@ export async function runShellCommandBackground(
   onOutput?: (line: string) => void,
   onExit?: (code: number) => void
 ): Promise<void> {
-  console.log("[WebContainer] 🐚 Running background shell command:", command);
-  
   // Ensure WebContainer is booted (with lock to prevent concurrent boots)
   await ensureWebContainerBooted();
 
@@ -382,7 +374,6 @@ export async function runShellCommandBackground(
       .then((code: number) => {
         currentShellProcess = null;
         updateContext();
-        console.log("[WebContainer] ✅ Background command completed with exit code:", code);
         onExit?.(code);
       })
       .catch(() => {
@@ -437,7 +428,6 @@ export async function killAllProcesses(): Promise<void> {
     previewUrl = null;
     updateContext();
     notifyPreviewUrl(previewUrl);
-    console.log("[WebContainer] 🛑 All processes killed");
   } catch (e) {
     console.error("[WebContainer] Error killing processes:", e);
   }

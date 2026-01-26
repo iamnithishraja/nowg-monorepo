@@ -264,7 +264,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       if (e.key === "web-sidebar-context") {
         const saved = e.newValue;
         if (saved === "personal" || saved === "organization") {
-          console.log("Context changed via storage event:", saved);
           setSidebarContext(saved);
         }
       }
@@ -290,7 +289,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     const handleContextChange = (e: CustomEvent) => {
       const newContext = e.detail;
       if (newContext === "personal" || newContext === "organization") {
-        console.log("Context changed via custom event:", newContext);
         setSidebarContext(newContext);
       }
     };
@@ -305,7 +303,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       const saved = localStorage.getItem("web-sidebar-context");
       if (saved === "personal" || saved === "organization") {
         if (saved !== sidebarContext) {
-          console.log("Context sync via polling:", saved);
           setSidebarContext(saved);
         }
       }
@@ -314,10 +311,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     return () => clearInterval(pollInterval);
   }, [sidebarContext]);
 
-  // Debug: Log context changes
-  useEffect(() => {
-    console.log("Home component context changed to:", sidebarContext);
-  }, [sidebarContext]);
 
   // Use hooks for org admin data and project creation
   const { organizations, availableUsers, isLoadingUsers } = useOrgAdminData(
@@ -539,7 +532,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
     // Wait for user access to be loaded
     if (isLoadingUserAccess) {
-      console.log("Waiting for user access to load...");
       // Wait a bit and try again
       setTimeout(() => sendPrompt(), 100);
       return;
@@ -548,18 +540,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     // Determine project type based on sidebar context
     const shouldCreateOrgProject = isOrgAdmin && sidebarContext === "organization" && organizations.length > 0;
 
-    console.log("Creating project:", {
-      isOrgAdmin,
-      sidebarContext,
-      organizationsCount: organizations.length,
-      shouldCreateOrgProject,
-      userWithAccess: !!userWithAccess,
-      currentLocalStorage: localStorage.getItem("web-sidebar-context")
-    });
-
     // If user is org_admin and in organization context and has organizations, show project admin assignment dialog
     if (shouldCreateOrgProject) {
-      console.log("Showing project admin dialog for organization project");
       setPendingPrompt(currentPrompt);
       setPendingFiles([...uploadedFiles]);
       // Pre-fill project title with a suggestion from the prompt
@@ -576,7 +558,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     // - Non-org-admin users
     // - Org_admin users in personal context
     // - Org_admin users without organizations
-    console.log("Creating personal conversation");
     await createConversation(currentPrompt, uploadedFiles);
   };
 

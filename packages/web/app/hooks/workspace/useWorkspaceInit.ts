@@ -180,11 +180,9 @@ export async function restoreFilesFromR2(
   saveFile: any,
   runLinear: any
 ): Promise<boolean> {
-  console.log(`[R2 Restore] Starting file restoration for conversation: ${conversationId}`);
   try {
     // Use the server-side API to fetch all files from R2
     // This is more efficient and secure than doing R2 fetching client-side
-    console.log(`[R2 Restore] Fetching files from R2 via API...`);
     const response = await fetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -208,10 +206,8 @@ export async function restoreFilesFromR2(
     }
 
     const fetchedFiles = result.files || [];
-    console.log(`[R2 Restore] API returned ${fetchedFiles.length} files (${result.totalFound} total found, ${result.uniqueFiles} unique)`);
 
     if (fetchedFiles.length === 0) {
-      console.log("[R2 Restore] No files found in R2");
       return false;
     }
 
@@ -226,9 +222,6 @@ export async function restoreFilesFromR2(
         content: file.content,
       });
     }
-
-    console.log(`[R2 Restore] Successfully fetched ${wcFiles.length} files from R2`);
-    console.log(`[R2 Restore] Files to restore:`, wcFiles.map(f => f.path));
 
     // Update UI file state
     files.setTemplateFilesState(wcFiles);
@@ -805,7 +798,6 @@ export function useWorkspaceInit({
         } else if (isChatChange) {
           // When switching between chats in the same conversation, preserve WebContainer state
           // Don't kill processes or clear terminal - keep the preview running
-          console.log("[useWorkspaceInit] Switching chats, preserving WebContainer state and preview");
         }
 
         if (urlConversationId) {
@@ -869,7 +861,6 @@ export function useWorkspaceInit({
                   setIsReconstructingFiles(true);
                   
                   // Try R2 restore first - it has the authoritative latest state
-                  console.log("[File Restore] Restoring files for conversation with initialPrompt...");
                   const r2Restored = await restoreFilesFromR2(
                     urlConversationId,
                     files,
@@ -879,7 +870,6 @@ export function useWorkspaceInit({
                   
                   if (!r2Restored) {
                     // Fall back to snapshot
-                    console.log("[File Restore] R2 restore failed, trying snapshot...");
                     const snapshotRestored = await restoreFilesFromSnapshot(
                       urlConversationId,
                       uiMessages,
@@ -890,7 +880,6 @@ export function useWorkspaceInit({
                     
                     if (!snapshotRestored) {
                       // Fall back to message reconstruction
-                      console.log("[File Restore] Snapshot not found, falling back to message reconstruction...");
                       await reconstructFilesFromMessages(
                         uiMessages,
                         files,
@@ -982,14 +971,12 @@ export function useWorkspaceInit({
                 if (isNewEmptyChat) {
                   // New chat created - restore files from main conversation so tools can work
                   // Prefer R2 restore first (has latest files from all chats), then snapshot, then message reconstruction
-                  console.log(`[R2 Restore] New empty chat detected, restoring files from main conversation...`);
                   await new Promise((resolve) => setTimeout(resolve, 100));
                   try {
                     const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
                     setIsReconstructingFiles(true);
 
                     // Try R2 restore first - it has the authoritative latest state from all chats
-                    console.log("[R2 Restore] Trying R2 restore first for new chat (has latest files from all chats)...");
                     const r2Restored = await restoreFilesFromR2(
                       urlConversationId,
                       files,
@@ -999,7 +986,6 @@ export function useWorkspaceInit({
 
                     if (!r2Restored) {
                       // If R2 restore failed, try snapshot (fast fallback)
-                      console.log("[R2 Restore] R2 restore failed, trying snapshot for new chat...");
                       const snapshotRestored = await restoreFilesFromSnapshot(
                         urlConversationId,
                         [],
@@ -1010,7 +996,6 @@ export function useWorkspaceInit({
 
                       if (!snapshotRestored) {
                         // If snapshot also failed, fall back to message reconstruction (legacy)
-                        console.log("[R2 Restore] Snapshot not found, falling back to message reconstruction for new chat...");
                         // Get all messages from main conversation for reconstruction
                         const mainData = await loadConversation(urlConversationId, null);
                         const mainMessages = convertToUIMessages(mainData.messages || []);
@@ -1032,7 +1017,6 @@ export function useWorkspaceInit({
                   }
                 } else {
                   // Existing chat with messages - preserve WebContainer state, don't restore files
-                  console.log(`[useWorkspaceInit] Opening existing chat ${chatId} with ${messages.length} messages, preserving WebContainer state`);
                 }
                 setHasHandledInitialPrompt(true);
               } else {
@@ -1041,9 +1025,6 @@ export function useWorkspaceInit({
                 // This keeps the dev server alive and avoids re-running npm install
 
                 const hasActivePreview = !!getPreviewUrl();
-                
-                // Debug logging - make an API call so it shows in server terminal
-                console.log(`[useWorkspaceInit] Main conversation branch - isSameConversation: ${isSameConversation}, hasActivePreview: ${hasActivePreview}, uiMessages.length: ${uiMessages?.length || 0}`);
                 
                 // Also log to server for debugging
                 fetch("/api/conversations", {
@@ -1094,7 +1075,6 @@ export function useWorkspaceInit({
 
                       // If snapshot also failed, fall back to message reconstruction (legacy)
                       if (!snapshotRestored) {
-                        console.log("[File Restore] Snapshot not found, falling back to message reconstruction...");
                         await reconstructFilesFromMessages(
                           uiMessages,
                           files,

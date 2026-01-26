@@ -96,16 +96,6 @@ export function useChatHandlers({
           // Use "general" agent for ask mode, "build" for build mode
           const agentName = chatMode === "ask" ? "general" : "build";
 
-          console.log(
-            "[ChatHandler] Sending request to agent API | Mode:",
-            chatMode,
-            "| Agent:",
-            agentName,
-            "| ConvId:",
-            conversationId,
-            "| ChatId:",
-            chatId
-          );
 
           // Convert existing chat messages to format the agent API expects
           // Pass the FULL conversation history including complete tool calls and results
@@ -157,11 +147,6 @@ export function useChatHandlers({
             }
           }
 
-          console.log(
-            "[ChatHandler] Including",
-            conversationHistory.length,
-            "previous messages with full tool call results in context"
-          );
 
           const response = await fetch("/api/agent", {
             method: "POST",
@@ -219,14 +204,6 @@ export function useChatHandlers({
             
             // Use accumulated tool calls passed directly (not relying on React state which is async)
             let allToolCalls: any[] = [...accumulatedToolCalls];
-            if (isContinuation && accumulatedToolCalls.length > 0) {
-              console.log(
-                "[ChatHandler] Continuation started with",
-                accumulatedToolCalls.length,
-                "accumulated tool calls:",
-                accumulatedToolCalls.map((tc) => tc.name)
-              );
-            }
             
             let currentSessionId = sessionId;
             let messagesForContinuation: any[] = [];
@@ -288,10 +265,6 @@ export function useChatHandlers({
                         toolCall,
                       ]);
                       chat.appendToolCallSegment?.(toolCall, isMountedRef);
-                      console.log(
-                        "[ChatHandler] Tool call received:",
-                        toolCall.name
-                      );
                     }
                   } else if (data.type === "awaiting_tool_results") {
                     // Update tool calls from event if provided
@@ -514,10 +487,6 @@ export function useChatHandlers({
                                       content,
                                       isMountedRef
                                     );
-                                    console.log(
-                                      "[ChatHandler] Updated UI files state for multiedit:",
-                                      filePath
-                                    );
                                   } catch (readError) {
                                     console.warn(
                                       "[ChatHandler] Could not read file to update UI state:",
@@ -557,11 +526,6 @@ export function useChatHandlers({
                                       content,
                                       isMountedRef
                                     );
-                                    console.log(
-                                      "[ChatHandler] Updated UI files state for:",
-                                      toolCall.name,
-                                      filePath
-                                    );
                                   } catch (readError) {
                                     console.warn(
                                       "[ChatHandler] Could not read file to update UI state:",
@@ -598,12 +562,6 @@ export function useChatHandlers({
                             output: output || "",
                           },
                         });
-                        console.log(
-                          "[ChatHandler] Tool result prepared:",
-                          toolCall.name,
-                          "| Output length:",
-                          output?.length || 0
-                        );
                       } catch (toolError) {
                         console.error(
                           "[ChatHandler] Tool execution error:",
@@ -663,22 +621,6 @@ export function useChatHandlers({
 
                     // Continue agent loop with tool results
                     if (toolResults.length > 0 && currentStep < 10) {
-                      console.log(
-                        "[ChatHandler] Continuing agent loop with",
-                        toolResults.length,
-                        "tool results | Step:",
-                        data.step || currentStep,
-                        "| Messages:",
-                        messagesForContinuation.length
-                      );
-                      console.log(
-                        "[ChatHandler] Tool results summary:",
-                        toolResults.map((tr) => ({
-                          name: tr.toolName,
-                          success: tr.result.success,
-                          outputLength: tr.result.output?.length || 0,
-                        }))
-                      );
 
                       const continuationResponse = await fetch("/api/agent", {
                         method: "POST",
@@ -701,10 +643,6 @@ export function useChatHandlers({
                         signal: abortController.signal,
                       });
 
-                      console.log(
-                        "[ChatHandler] Continuation response status:",
-                        continuationResponse.status
-                      );
                       if (!continuationResponse.ok) {
                         const errorText = await continuationResponse
                           .text()
@@ -720,11 +658,6 @@ export function useChatHandlers({
                       }
 
                       // Recursively process the continuation stream (appends to same message)
-                      console.log(
-                        "[ChatHandler] Processing continuation stream | Passing",
-                        allToolCalls.length,
-                        "accumulated tool calls"
-                      );
                       const continuationResult = await processAgentStream(
                         continuationResponse,
                         currentSessionId,
@@ -734,33 +667,13 @@ export function useChatHandlers({
                       );
                       // Continuation already updates streaming segments and tool calls directly
                       // Return the accumulated values from the continuation (which includes everything)
-                      console.log(
-                        "[ChatHandler] Continuation complete | Total text:",
-                        continuationResult.text.length,
-                        "| Total tool calls:",
-                        continuationResult.toolCalls.length
-                      );
                       return continuationResult;
                     } else {
                       // No tools to execute or max steps reached - return current state
-                      console.log(
-                        "[ChatHandler] No continuation needed | Tool results:",
-                        toolResults.length,
-                        "| Step:",
-                        currentStep,
-                        "| Max steps:",
-                        currentStep >= 10
-                      );
                       return { text: assistantText, toolCalls: allToolCalls };
                     }
                   } else if (data.type === "complete") {
                     // Agent finished
-                    console.log(
-                      "[ChatHandler] Stream complete | Text:",
-                      assistantText.length,
-                      "chars | Tool calls:",
-                      allToolCalls.length
-                    );
                     assistantText = assistantText || data.text || "";
                     return { text: assistantText, toolCalls: allToolCalls };
                   }
@@ -770,12 +683,6 @@ export function useChatHandlers({
               }
             }
 
-            console.log(
-              "[ChatHandler] Stream ended without complete event | Text:",
-              assistantText.length,
-              "chars | Tool calls:",
-              allToolCalls.length
-            );
             return { text: assistantText, toolCalls: allToolCalls };
           };
 
@@ -840,22 +747,6 @@ export function useChatHandlers({
                   : msg
               );
 
-              // Verify the update worked
-              const updatedMessage = updated.find(
-                (m: Message) => m.id === lastAssistantMessage.id
-              );
-              console.log("[ChatHandler] Updated message with toolCalls and segments:", {
-                messageId: lastAssistantMessage.id,
-                toolCallsCount: finalizedToolCalls.length,
-                segmentsCount: finalizedSegments.length,
-                fileChangesCount: finalizedToolCalls.filter((tc: any) =>
-                  ["edit", "write", "multiedit"].includes(tc.name)
-                ).length,
-                messageHasToolCalls: !!(updatedMessage as any)?.toolCalls,
-                messageToolCallsCount:
-                  (updatedMessage as any)?.toolCalls?.length || 0,
-              });
-
               return updated;
             });
 
@@ -869,14 +760,6 @@ export function useChatHandlers({
 
           // After tool calls complete, sync files to R2 and save IndexedDB snapshot
           // This ensures files modified in sub-chats are available when returning to main conversation
-          console.log(
-            "[ChatHandler] Final result | Text:",
-            result.text.length,
-            "chars | Tool calls:",
-            result.toolCalls.length,
-            "| Tool names:",
-            result.toolCalls.map((tc) => tc.name)
-          );
           if (result.toolCalls.length > 0) {
             try {
               // Check if any tool calls modified files
@@ -886,8 +769,6 @@ export function useChatHandlers({
               );
               
               if (fileModifyingTools.length > 0) {
-                console.log(`[ChatHandler] ${fileModifyingTools.length} file-modifying tool calls completed, syncing files...`);
-                
                 // Get current files from WebContainer
                 const { WebContainerProvider } = await import("../../tools/webcontainer-provider");
                 const { WORK_DIR } = await import("../../utils/constants");
@@ -937,7 +818,6 @@ export function useChatHandlers({
                   
                   if (filesToSync.length > 0) {
                     // Sync files to R2
-                    console.log(`[ChatHandler] Syncing ${filesToSync.length} files to R2...`);
                     try {
                       const syncResponse = await fetch("/api/conversations", {
                         method: "POST",
@@ -952,7 +832,6 @@ export function useChatHandlers({
                       
                       if (syncResponse.ok) {
                         const syncResult = await syncResponse.json();
-                        console.log(`[ChatHandler] Synced ${syncResult.uploadedCount} files to R2`);
                       } else {
                         console.warn("[ChatHandler] Failed to sync files to R2:", await syncResponse.text());
                       }
@@ -976,7 +855,6 @@ export function useChatHandlers({
                           }))
                         );
                         await saveSnapshot(conversationId, snapshot);
-                        console.log(`[ChatHandler] Saved IndexedDB snapshot for main conversation ${conversationId} (${allFiles.length} files)`);
                       }
                     } catch (snapshotError) {
                       console.error("[ChatHandler] Error saving IndexedDB snapshot:", snapshotError);

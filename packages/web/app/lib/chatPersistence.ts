@@ -48,7 +48,6 @@ export async function openSnapshotDB(): Promise<IDBDatabase | null> {
 
     request.onsuccess = () => {
       db = request.result;
-      console.log("[ChatPersistence] Database opened successfully");
       resolve(db);
     };
 
@@ -84,7 +83,6 @@ export async function saveSnapshot(
       const request = store.put(snapshot);
 
       request.onsuccess = () => {
-        console.log(`[ChatPersistence] Snapshot saved for chat ${chatId} (${Object.keys(files).length} files)`);
         resolve(true);
       };
 
@@ -114,11 +112,6 @@ export async function loadSnapshot(chatId: string): Promise<ChatSnapshot | null>
 
       request.onsuccess = () => {
         const snapshot = request.result as ChatSnapshot | undefined;
-        if (snapshot) {
-          console.log(`[ChatPersistence] Snapshot loaded for chat ${chatId} (${Object.keys(snapshot.files).length} files)`);
-        } else {
-          console.log(`[ChatPersistence] No snapshot found for chat ${chatId}`);
-        }
         resolve(snapshot || null);
       };
 
@@ -147,7 +140,6 @@ export async function deleteSnapshot(chatId: string): Promise<boolean> {
       const request = store.delete(chatId);
 
       request.onsuccess = () => {
-        console.log(`[ChatPersistence] Snapshot deleted for chat ${chatId}`);
         resolve(true);
       };
 

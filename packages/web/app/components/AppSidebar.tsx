@@ -129,7 +129,6 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
           const isOrgAdmin =
             data?.role === "ORG_ADMIN" || data?.hasOrgAdminAccess === true;
           const defaultContext = isOrgAdmin ? "organization" : "personal";
-          console.log("AppSidebar: Setting initial context to", defaultContext);
           setSidebarContext(defaultContext);
         }
       } catch (error) {
@@ -146,7 +145,6 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
 
   // Save context to localStorage and notify other components when it changes
   useEffect(() => {
-    console.log("AppSidebar: Context changed to", sidebarContext);
     localStorage.setItem("web-sidebar-context", sidebarContext);
     // Dispatch custom event to notify other components in the same tab
     window.dispatchEvent(
@@ -615,7 +613,6 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
                   <DropdownMenuContent align="start" className="w-48">
                     <DropdownMenuItem
                       onClick={() => {
-                        console.log("Dropdown: Setting context to personal");
                         setSidebarContext("personal");
                       }}
                       className="flex items-center gap-2"
@@ -625,9 +622,6 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
-                        console.log(
-                          "Dropdown: Setting context to organization"
-                        );
                         setSidebarContext("organization");
                       }}
                       className="flex items-center gap-2"
