@@ -1,43 +1,33 @@
-import type { Route } from "./+types/workspace";
-import { redirect } from "react-router";
-import { auth } from "../lib/auth";
+import {
+  ArrowUp,
+  Check,
+  Database,
+  Gear,
+  GithubLogo,
+  Palette,
+  SpinnerGap,
+  Upload
+} from "@phosphor-icons/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { redirect, useLocation, useSearchParams } from "react-router";
+import { AgentModal, InsufficientBalanceModal, ProjectSidebar } from "../components";
 import ChatPanel from "../components/ChatPanel";
-import RightPanel from "../components/RightPanel";
-import { WorkspaceChatInput } from "../components/WorkspaceChatInput";
-import GradientGlow from "../components/GradientGlow";
-import WorkspaceLoader from "../components/WorkspaceLoader";
-import { WorkspaceLeftHeader } from "../components/WorkspaceLeftHeader";
-import { WorkspaceRightHeader } from "../components/WorkspaceRightHeader";
-import { useWorkspaceController } from "../hooks/useWorkspaceController";
-import { useWorkspaceStore } from "../stores/useWorkspaceStore";
-import { useEffect, useState, useRef } from "react";
-import { useLocation, useSearchParams } from "react-router";
-import { usePreventBrowserDragDrop } from "../hooks/usePreventBrowserDragDrop";
-import { useFileHandling } from "../hooks/useFileHandling";
-import type { DesignScheme } from "../types/design-scheme";
-import { InsufficientBalanceModal, ProjectSidebar, AgentModal } from "../components";
-import GitHubImportModal from "../components/GitHubImportModal";
-import FigmaImportModal from "../components/FigmaImportModal";
-import { ColorSchemeDialog } from "../components/ui/ColorSchemeDialog";
 import {
   DatabaseConnectionDialog,
   type DbProvider,
 } from "../components/DatabaseConnectionDialog";
-import { useSupabaseAuth } from "../hooks/useSupabaseAuth";
-import {
-  Database,
-  Palette,
-  Upload,
-  GithubLogo,
-  SpinnerGap,
-  Sparkle,
-  ArrowUp,
-  CurrencyDollar,
-  Gear,
-} from "@phosphor-icons/react";
-import { Button } from "../components/ui/button";
-import { Label } from "../components/ui/label";
+import FigmaImportModal from "../components/FigmaImportModal";
 import { FilePreview } from "../components/FileUpload";
+import GitHubImportModal from "../components/GitHubImportModal";
+import RightPanel from "../components/RightPanel";
+import { Button } from "../components/ui/button";
+import { ColorSchemeDialog } from "../components/ui/ColorSchemeDialog";
+import { Label } from "../components/ui/label";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "../components/ui/resizable";
 import {
   Select,
   SelectContent,
@@ -51,14 +41,21 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "../components/ui/tooltip";
-import { cn } from "../lib/utils";
+import { WorkspaceChatInput } from "../components/WorkspaceChatInput";
+import { WorkspaceLeftHeader } from "../components/WorkspaceLeftHeader";
+import WorkspaceLoader from "../components/WorkspaceLoader";
+import { WorkspaceRightHeader } from "../components/WorkspaceRightHeader";
 import { OPENROUTER_MODELS } from "../consts/models";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "../components/ui/resizable";
-import { Check } from "phosphor-react";
+import { useFileHandling } from "../hooks/useFileHandling";
+import { usePreventBrowserDragDrop } from "../hooks/usePreventBrowserDragDrop";
+import { useSupabaseAuth } from "../hooks/useSupabaseAuth";
+import { useWorkspaceController } from "../hooks/useWorkspaceController";
+import { auth } from "../lib/auth";
+import { cn } from "../lib/utils";
+import { useIsReconstructingFiles } from "../stores/useWorkspaceStore";
+import type { DesignScheme } from "../types/design-scheme";
+import { getShortcutLabel } from "../utils/platform";
+import type { Route } from "./+types/workspace";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const authInstance = await auth;
@@ -106,7 +103,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     useState(false);
   const [messagesLoadedForConversation, setMessagesLoadedForConversation] =
     useState<string | null>(null);
-  const [shortcutLabel, setShortcutLabel] = useState("⌘ Return");
+  const shortcutLabel = getShortcutLabel();
   const lastConversationIdRef = useRef<string | null>(null);
   const messagesCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [shouldShowLoader, setShouldShowLoader] = useState(true); // Latch to prevent flicker
@@ -158,10 +155,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     null
   );
 
-  // Get file reconstruction state from store
-  const isReconstructingFiles = useWorkspaceStore(
-    (state) => state.isReconstructingFiles
-  );
+  // Get file reconstruction state from store - use optimized selector
+  const isReconstructingFiles = useIsReconstructingFiles();
 
   // Track when messages have been loaded for the current conversation
   // This ensures we don't show empty UI before messages have a chance to load
@@ -295,18 +290,6 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     uploadedFiles: controller.uploadedFiles,
     setUploadedFiles: controller.setUploadedFiles,
   });
-
-  // Platform-aware shortcut label
-  useEffect(() => {
-    try {
-      const ua = navigator.userAgent || "";
-      const platform = (navigator.platform || "").toLowerCase();
-      const isApple =
-        /mac|iphone|ipad|ipod/.test(platform) ||
-        /Mac|iPhone|iPad|iPod/.test(ua);
-      setShortcutLabel(isApple ? "⌘ Return" : "Ctrl+Enter");
-    } catch {}
-  }, []);
 
   // Simulate initial loading
   useEffect(() => {
@@ -517,8 +500,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     };
   }, [currentChatId, controller.conversationId, controller.messages.length]);
 
-  // Use backend-generated title or fallback to first user message
-  const getChatTitle = () => {
+  // Use backend-generated title or fallback to first user message - MEMOIZED
+  const getChatTitle = useMemo(() => {
     // If we're in a chat, use the chat title
     if (currentChatId) {
       // If we have a chat title, use it
@@ -556,7 +539,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     }
 
     return undefined;
-  };
+  }, [currentChatId, currentChatTitle, controller.messages.length, controller.conversationTitle, controller.conversationId]);
 
   usePreventBrowserDragDrop();
 
@@ -570,7 +553,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
       hasConversation;
 
   if (showLoader) {
-    return <WorkspaceLoader title={getChatTitle()} />;
+    return <WorkspaceLoader title={getChatTitle} />;
   }
 
   return (
@@ -850,7 +833,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                 <div className="flex flex-col h-full min-h-0 max-h-full bg-canvas py-2">
                   {/* Left Panel Header */}
                   <WorkspaceLeftHeader 
-                    chatTitle={getChatTitle()} 
+                    chatTitle={getChatTitle} 
                     conversationId={controller.conversationId || undefined}
                     isCreatingNewChat={isCreatingNewChat}
                     currentChatTitle={currentChatTitle}
@@ -940,6 +923,18 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       currentToolCalls={(controller as any).currentToolCalls || []}
                       streamingSegments={(controller as any).streamingSegments || []}
                       chatId={currentChatId}
+                      onFileClick={(filePath) => {
+                        // Normalize path for the file tree (relative path without leading slash)
+                        let normalizedPath = filePath;
+                        if (normalizedPath.startsWith('/home/project/')) {
+                          normalizedPath = normalizedPath.replace('/home/project/', '');
+                        } else if (normalizedPath.startsWith('/')) {
+                          normalizedPath = normalizedPath.slice(1);
+                        }
+                        controller.setSelectedPath(normalizedPath);
+                        // Switch to files tab to show the file in editor
+                        controller.setActiveTab('files');
+                      }}
                     />
                   </div>
                   {/* Bottom Section with Balance and Input */}

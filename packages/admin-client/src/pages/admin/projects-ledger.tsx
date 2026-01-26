@@ -1,30 +1,29 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BookOpen, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { X } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { client } from "@/lib/client";
-import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
 import { TransactionRow } from "@/components/transaction-ledger/TransactionRow";
 import { LedgerTransaction } from "@/components/transaction-ledger/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Table,
+    TableBody,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { client } from "@/lib/client";
+import { UserRole } from "@nowgai/shared/types";
+import { useQuery } from "@tanstack/react-query";
+import { BookOpen, RefreshCw, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface LedgerTransactionResponse {
   id: string;

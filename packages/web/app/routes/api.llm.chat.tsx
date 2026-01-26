@@ -1,3 +1,4 @@
+import { Conversation, Markup, OrgProjectWallet, Profile, Project, ProjectWallet, Team, TeamMember, UserProjectWallet } from "@nowgai/shared/models";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { streamText } from "ai";
 import mongoose from "mongoose";
@@ -9,28 +10,18 @@ import { scrapeWebsite } from "~/lib/clone/scraper";
 import { createSummary } from "~/lib/create-summary";
 import { EnhancedLLMContextProcessor } from "~/lib/enhancedContextOptimization";
 import { EnhancedMessageParser } from "~/lib/enhancedMessageParser";
-import { getEnv } from "~/lib/env";
-import { getEnvWithDefault } from "~/lib/env";
+import { getEnv, getEnvWithDefault } from "~/lib/env";
 import { figmaMCPPool } from "~/lib/figma-mcp-client";
 import {
-  createFigmaMCPTools,
-  extractFigmaUrls,
-  getFigmaMCPSystemPromptAddition,
+    createFigmaMCPTools,
+    extractFigmaUrls,
+    getFigmaMCPSystemPromptAddition,
 } from "~/lib/figma-mcp-tools";
 import { connectToDatabase } from "~/lib/mongo";
 import { CONTINUE_PROMPT, getSystemPrompt } from "~/lib/prompt";
 import { createFilesContext, selectContext } from "~/lib/select-context";
 import { isWhitelistedEmail } from "~/lib/stripe";
 import { executeSQL } from "~/lib/supabaseManager";
-import Conversation from "~/models/conversationModel";
-import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import Profile from "~/models/profileModel";
-import Project from "~/models/projectModel";
-import ProjectWallet from "~/models/projectWalletModel";
-import TeamMember from "~/models/teamMemberModel";
-import Team from "~/models/teamModel";
-import UserProjectWallet from "~/models/userProjectWalletModel";
-import Markup from "~/models/markupModel";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   return new Response("LLM Chat API - GET not supported", { status: 405 });

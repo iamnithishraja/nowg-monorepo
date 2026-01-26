@@ -1,5 +1,5 @@
-import { uploadFileToR2, shouldIgnoreFile } from "./r2Storage";
-import Conversation from "../models/conversationModel";
+import { Conversation } from "@nowgai/shared/models";
+import { shouldIgnoreFile, uploadFileToR2 } from "./r2Storage";
 
 // Content type mapping shared between functions
 const contentTypeMap: Record<string, string> = {

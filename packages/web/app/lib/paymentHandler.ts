@@ -1,12 +1,10 @@
-import { stripe } from "~/lib/stripe";
-import { razorpay } from "~/lib/razorpay";
-import { getPayUConfig, generatePayUHash } from "~/lib/payu";
+import { convertUSDToINR } from "@nowgai/shared/utils";
 import {
-  getPaymentProviderForCountry,
-  getPaymentProviderForOrganization,
+    getPaymentProviderForOrganization
 } from "~/lib/paymentProvider";
-import { getEnvWithDefault } from "~/lib/env";
-import { convertUSDToINR } from "~/lib/currencyConverter";
+import { generatePayUHash, getPayUConfig } from "~/lib/payu";
+import { razorpay } from "~/lib/razorpay";
+import { stripe } from "~/lib/stripe";
 
 export type PaymentProvider = "stripe" | "razorpay" | "payu";
 

@@ -1,58 +1,55 @@
+import { UserRole } from "@nowgai/shared/types";
+import { useQuery } from "@tanstack/react-query";
 import {
-  BookOpen,
-  Clock,
-  DollarSign,
-  FileText,
-  Building2,
-  FolderKanban,
-  User,
-  Zap,
-  ChevronUp,
-  ChevronDown,
-  Search,
-  Download,
+    Building2,
+    ChevronDown,
+    ChevronUp,
+    Clock,
+    DollarSign,
+    Download,
+    FileText,
+    FolderKanban,
+    Search,
+    User,
+    Zap
 } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { redirect } from "react-router";
 import {
-  TransactionRow,
-  type LedgerTransaction,
+    type LedgerTransaction
 } from "~/components/admin/transaction-ledger";
 import { AdminLayout } from "~/components/AdminLayout";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Checkbox } from "~/components/ui/checkbox";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle
 } from "~/components/ui/card";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "~/components/ui/select";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "~/components/ui/table";
 import { useToast } from "~/hooks/use-toast";
 import { useAuth } from "~/hooks/useAuth";
 import { useProject } from "~/hooks/useDashboard";
 import { adminClient } from "~/lib/adminClient";
 import { getAdminSession } from "~/lib/adminMiddleware";
-import { UserRole } from "~/lib/types/roles";
-import { useQuery } from "@tanstack/react-query";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { user } = await getAdminSession(request);

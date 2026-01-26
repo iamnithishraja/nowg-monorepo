@@ -1,43 +1,37 @@
-import {
-  Users,
-  DollarSign,
-  FileText,
-  Globe,
-  Settings,
-  Shield,
-  Zap,
-  // Code,
-  TrendingUp,
-  Award,
-  LayoutDashboard,
-  LogOut,
-  // Home,
-  Wallet,
-  Key,
-  Building2,
-  FolderKanban,
-  BookOpen,
-  BarChart3,
-} from "lucide-react";
-import { SiVercel, SiNetlify, SiSupabase, SiGithub } from "react-icons/si";
-import { Link, useLocation } from "wouter";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-} from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { signOut } from "@/lib/auth-client";
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+} from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole, hasAdminAccess } from "@/types/roles";
+import { signOut } from "@/lib/auth-client";
+import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
+import {
+    BarChart3,
+    BookOpen,
+    Building2,
+    DollarSign,
+    FolderKanban,
+    Key,
+    LayoutDashboard,
+    LogOut,
+    Settings,
+    Users,
+    // Home,
+    Wallet,
+    Zap
+} from "lucide-react";
+import { SiGithub, SiNetlify, SiSupabase, SiVercel } from "react-icons/si";
+import { Link, useLocation } from "wouter";
 
 // Menu items configuration - some are admin-only
 // Note: For project admin check, we check userRole for backward compatibility.

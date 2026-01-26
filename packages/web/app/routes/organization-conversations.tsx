@@ -1,12 +1,18 @@
-import { useEffect, useState } from "react";
 import {
-  MessageSquare,
-  FolderKanban,
   Building2,
   Calendar,
+  FolderKanban,
   Loader2,
+  MessageSquare,
   Search,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
+import { Header } from "../components";
+import { AppSidebar } from "../components/AppSidebar";
+import Background from "../components/Background";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import {
   Card,
   CardContent,
@@ -14,15 +20,8 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { SidebarProvider } from "../components/ui/sidebar";
-import { AppSidebar } from "../components/AppSidebar";
-import { Header } from "../components";
-import Background from "../components/Background";
-import GlowEffects from "../components/GlowEffects";
 import { Input } from "../components/ui/input";
-import { Badge } from "../components/ui/badge";
-import { useNavigate } from "react-router";
+import { SidebarProvider } from "../components/ui/sidebar";
 
 interface Conversation {
   id: string;
@@ -138,7 +137,6 @@ export default function OrganizationConversations() {
     <SidebarProvider defaultOpen={false}>
       <div className="min-h-screen bg-background">
         <Background />
-        <GlowEffects />
         <div className="flex flex-col h-screen">
           <Header showSidebarToggle={true} showAuthButtons={false} />
           <div className="flex flex-1 overflow-hidden">

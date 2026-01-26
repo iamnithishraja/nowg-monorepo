@@ -1,41 +1,40 @@
-import { useState, useEffect, useMemo } from "react";
-import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Building2, FolderKanban, UserPlus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { UserRole } from "@/types/roles";
-import { useAuth } from "@/hooks/useAuth";
-import {
-  UsersHeader,
-  AllUsersTable,
-  ProjectMembersTable,
-  OrgUsersList,
-  UserDetailDialog,
-  InviteAdminDialog,
-  InviteOrgUserDialog,
-  InviteToProjectDialog,
-  RoleChangeDialog,
-  UserType,
+    AllUsersTable,
+    InviteAdminDialog,
+    InviteOrgUserDialog,
+    InviteToProjectDialog,
+    OrgUsersList,
+    ProjectMembersTable,
+    RoleChangeDialog,
+    UserDetailDialog,
+    UsersHeader,
+    UserType,
 } from "@/components/users";
 import {
-  useUsers,
-  useUserDetail,
-  useOrganizations,
-  useAvailableOrgUsers,
-  useInviteAdmin,
-  useUpdateRole,
-  useSearchUser,
-  useInviteOrgUser,
-  useAddToProject,
+    useAddToProject,
+    useAvailableOrgUsers,
+    useInviteAdmin,
+    useInviteOrgUser,
+    useOrganizations,
+    useSearchUser,
+    useUpdateRole,
+    useUserDetail,
+    useUsers,
 } from "@/components/users/hooks";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { UserRole } from "@nowgai/shared/types";
+import { Building2, FolderKanban, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function Users() {
   const [searchQuery, setSearchQuery] = useState("");

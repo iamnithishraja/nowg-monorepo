@@ -1,14 +1,13 @@
-import type { Route } from "./+types/support";
 import { useState } from "react";
 import { Header } from "../components";
-import { SidebarProvider } from "../components/ui/sidebar";
 import { AppSidebar } from "../components/AppSidebar";
 import Background from "../components/Background";
-import GlowEffects from "../components/GlowEffects";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import { SidebarProvider } from "../components/ui/sidebar";
 import { Textarea } from "../components/ui/textarea";
+import type { Route } from "./+types/support";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -43,7 +42,6 @@ export default function Support() {
       <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <Background />
-          <GlowEffects />
         </div>
 
         <AppSidebar className="flex-shrink-0" />

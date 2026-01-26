@@ -1,27 +1,27 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Download, RefreshCw } from "lucide-react";
+import {
+    BalanceFilters,
+    BalanceSummary,
+    BalanceTable,
+    TransactionFilters,
+    TransactionSummary,
+    TransactionTable,
+    WalletSummaryCards,
+    type FilterOrganization,
+    type FilterProject,
+    type LedgerResponse,
+    type UserBalancesResponse,
+    type WalletSummaryResponse,
+} from "@/components/transaction-ledger";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { client } from "@/lib/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
+import { client } from "@/lib/client";
+import { UserRole } from "@nowgai/shared/types";
+import { useQuery } from "@tanstack/react-query";
+import { BookOpen, Download, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import {
-  WalletSummaryCards,
-  TransactionSummary,
-  TransactionFilters,
-  TransactionTable,
-  BalanceSummary,
-  BalanceFilters,
-  BalanceTable,
-  type LedgerResponse,
-  type UserBalancesResponse,
-  type WalletSummaryResponse,
-  type FilterOrganization,
-  type FilterProject,
-} from "@/components/transaction-ledger";
 
 export default function TransactionLedgerPage() {
   const { toast } = useToast();

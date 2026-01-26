@@ -1,13 +1,18 @@
-import type { Route } from "./+types/recharge";
+import {
+  ArrowRight,
+  CreditCard,
+  DollarSign,
+  Loader2,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { redirect } from "react-router";
-import { auth } from "../lib/auth";
 import { getEnvWithDefault } from "~/lib/env";
-import { useState, useEffect } from "react";
 import { Header } from "../components";
+import { AppSidebar } from "../components/AppSidebar";
 import Background from "../components/Background";
-import GlowEffects from "../components/GlowEffects";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 import {
   Card,
   CardContent,
@@ -15,17 +20,10 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import { Input } from "../components/ui/input";
 import { SidebarProvider } from "../components/ui/sidebar";
-import { AppSidebar } from "../components/AppSidebar";
-import {
-  CreditCard,
-  Loader2,
-  Zap,
-  TrendingUp,
-  DollarSign,
-  ArrowRight,
-} from "lucide-react";
-import { loadStripe } from "@stripe/stripe-js";
+import { auth } from "../lib/auth";
+import type { Route } from "./+types/recharge";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const authInstance = await auth;
@@ -124,7 +122,6 @@ export default function Recharge({ loaderData }: Route.ComponentProps) {
       <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <Background />
-          <GlowEffects />
         </div>
 
         <AppSidebar className="flex-shrink-0" />

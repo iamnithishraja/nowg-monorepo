@@ -1,6 +1,6 @@
+import { OrganizationMember } from "@nowgai/shared/models";
+import { OrganizationRole } from "@nowgai/shared/types";
 import mongoose from "mongoose";
-import OrganizationMember from "../models/organizationMemberModel";
-import { OrganizationRole } from "../types/roles";
 
 /**
  * Get user's role in a specific organization

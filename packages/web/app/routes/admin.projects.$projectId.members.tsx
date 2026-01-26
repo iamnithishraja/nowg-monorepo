@@ -1,67 +1,65 @@
-import type { LoaderFunctionArgs } from "react-router";
-import { redirect, useParams, useNavigate } from "react-router";
-import { auth } from "~/lib/auth";
-import { AdminLayout } from "~/components/AdminLayout";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import React, { useState } from "react";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
+    ArrowLeft,
+    Building2,
+    Check,
+    Crown,
+    Edit,
+    FolderKanban,
+    RotateCcw,
+    Search,
+    Shield,
+    Trash2,
+    UserMinus,
+    UserPlus,
+    Users,
+    X,
+} from "lucide-react";
+import { useState } from "react";
+import type { LoaderFunctionArgs } from "react-router";
+import { redirect, useNavigate, useParams } from "react-router";
+import { useCurrentUser } from "~/components/admin/users/hooks";
+import { AdminLayout } from "~/components/AdminLayout";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from "~/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
-import { Badge } from "~/components/ui/badge";
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "~/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
-import {
-  Users,
-  ArrowLeft,
-  UserPlus,
-  Trash2,
-  FolderKanban,
-  Building2,
-  Shield,
-  Search,
-  Crown,
-  UserMinus,
-  Edit,
-  X,
-  Check,
-  RotateCcw,
-} from "lucide-react";
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "~/components/ui/table";
 import { useToast } from "~/hooks/use-toast";
 import { adminClient } from "~/lib/adminClient";
-import { getRoleBadgeVariant } from "~/lib/types/roles";
-import { UserRole } from "~/lib/types/roles";
-import { useCurrentUser } from "~/components/admin/users/hooks";
+import { auth } from "~/lib/auth";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const authInstance = await auth;

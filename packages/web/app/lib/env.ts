@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import EnvConfig from "../models/envConfigModel";
 
 /**
  * Environment variables cache loaded from MongoDB
@@ -48,6 +47,9 @@ export async function loadEnvFromDatabase(): Promise<void> {
       });
     }
 
+    // Dynamic import to avoid bundling models in client
+    const { EnvConfig } = await import("@nowgai/shared/models");
+    
     // Load all environment variables from MongoDB
     const envVars = await EnvConfig.find({}).lean();
 

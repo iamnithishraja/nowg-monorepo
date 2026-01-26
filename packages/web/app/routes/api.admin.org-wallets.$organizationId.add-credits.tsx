@@ -1,11 +1,10 @@
+import { Organization, OrgWallet } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
+import mongoose from "mongoose";
 import type { ActionFunctionArgs } from "react-router";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import Organization from "~/models/organizationModel";
-import OrgWallet from "~/models/orgWalletModel";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import { hasAdminAccess } from "~/lib/types/roles";
-import mongoose from "mongoose";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {

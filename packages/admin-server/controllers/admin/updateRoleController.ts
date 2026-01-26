@@ -1,10 +1,10 @@
+import {
+    getInvalidUserRoleError,
+    isValidUserRole,
+} from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
-import {
-  isValidUserRole,
-  getInvalidUserRoleError,
-} from "../../types/roles";
 
 export async function updateRole(req: Request, res: Response) {
   try {

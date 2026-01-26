@@ -1,55 +1,55 @@
-import type { LoaderFunctionArgs } from "react-router";
-import { redirect, useParams, useNavigate } from "react-router";
-import { auth } from "~/lib/auth";
-import { AdminLayout } from "~/components/AdminLayout";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import React, { useState, useEffect } from "react";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Textarea } from "~/components/ui/textarea";
+import { UserRole } from "@nowgai/shared/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
+    ArrowDownCircle,
+    ArrowLeft,
+    ArrowRight,
+    ArrowUpCircle,
+    Building2,
+    DollarSign,
+    FolderKanban,
+    History,
+    Plus,
+    Users,
+    Wallet,
+} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import type { LoaderFunctionArgs } from "react-router";
+import { redirect, useNavigate, useParams } from "react-router";
+import { AdminLayout } from "~/components/AdminLayout";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from "~/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "~/components/ui/table";
-import { Badge } from "~/components/ui/badge";
-import {
-  Wallet,
-  ArrowRight,
-  ArrowLeft,
-  DollarSign,
-  History,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  FolderKanban,
-  Building2,
-  Users,
-  Plus,
-} from "lucide-react";
+import { Textarea } from "~/components/ui/textarea";
 import { useToast } from "~/hooks/use-toast";
-import { adminClient } from "~/lib/adminClient";
-import { useProjectWallet } from "~/hooks/useDashboard";
-import { UserRole } from "~/lib/types/roles";
 import { useAuth } from "~/hooks/useAuth";
+import { useProjectWallet } from "~/hooks/useDashboard";
+import { adminClient } from "~/lib/adminClient";
+import { auth } from "~/lib/auth";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const authInstance = await auth;

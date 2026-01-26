@@ -1,27 +1,25 @@
+import { UserRole } from "@nowgai/shared/types";
+import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { redirect } from "react-router";
+import {
+    FullAdminDashboard,
+    OrgAdminDashboard,
+    ProjectAdminGeneralSettings
+} from "~/components/admin/dashboard";
+import { AdminLayout } from "~/components/AdminLayout";
+import { useAuth } from "~/hooks/useAuth";
+import {
+    useDashboardStats,
+    useOrganization,
+    useOrgWallet,
+    useProject,
+    useProjectMembers,
+    useProjectWallet,
+    useStripeCheckout,
+    useStripeVerify,
+} from "~/hooks/useDashboard";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import { AdminLayout } from "~/components/AdminLayout";
-import { useState, useEffect } from "react";
-import {
-  FullAdminDashboard,
-  OrgAdminDashboard,
-  ProjectAdminDashboard,
-  ProjectAdminGeneralSettings,
-} from "~/components/admin/dashboard";
-import { UserRole } from "~/lib/types/roles";
-import {
-  useDashboardStats,
-  useOrganization,
-  useOrgWallet,
-  useProject,
-  useProjectWallet,
-  useProjectMembers,
-  useStripeCheckout,
-  useStripeVerify,
-} from "~/hooks/useDashboard";
-import { useAuth } from "~/hooks/useAuth";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Ensure database connection

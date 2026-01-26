@@ -1,12 +1,10 @@
-import { getStripe } from "./stripe";
-import { getRazorpay } from "./razorpay";
-import { getPayUConfig, generatePayUHash } from "./payu";
+import { convertUSDToINR } from "@nowgai/shared/utils";
 import {
-  getPaymentProviderForCountry,
-  getPaymentProviderForOrganization,
+    getPaymentProviderForOrganization
 } from "./paymentProvider";
-import { getBetterAuthUrl } from "./stripe";
-import { convertUSDToINR } from "./currencyConverter";
+import { generatePayUHash, getPayUConfig } from "./payu";
+import { getRazorpay } from "./razorpay";
+import { getStripe } from "./stripe";
 
 export type PaymentProvider = "stripe" | "razorpay" | "payu";
 
@@ -133,7 +131,7 @@ async function createRazorpayCheckout(
   });
 
   // Get key ID from env for frontend integration
-  const EnvConfig = (await import("../models/envConfigModel")).default;
+  const { EnvConfig } = await import("@nowgai/shared/models");
   const keyIdConfig = await EnvConfig.findOne({ key: "RAZORPAY_KEY_ID" });
   const keyId = keyIdConfig?.value || "";
 

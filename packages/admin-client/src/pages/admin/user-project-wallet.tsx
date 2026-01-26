@@ -1,45 +1,45 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
-import {
-  Wallet,
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  FolderKanban,
-  DollarSign,
-  History,
-  Building2,
-  User,
-  Edit,
-  X,
-  Check,
-} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { client } from "@/lib/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
+import { client } from "@/lib/client";
+import { UserRole } from "@nowgai/shared/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+    ArrowDownCircle,
+    ArrowLeft,
+    ArrowUpCircle,
+    Building2,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    DollarSign,
+    Edit,
+    FolderKanban,
+    History,
+    User,
+    Wallet,
+    X,
+} from "lucide-react";
+import { useState } from "react";
+import { useLocation, useParams } from "wouter";
 
 interface WalletData {
   id: string;

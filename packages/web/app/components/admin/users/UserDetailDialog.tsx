@@ -1,3 +1,4 @@
+import { getRoleBadgeVariant } from "@nowgai/shared/types";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
@@ -7,7 +8,6 @@ import {
     DialogTitle,
 } from "~/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { getRoleBadgeVariant } from "~/lib/types/roles";
 import type { UserDetailType } from "./types";
 import { UserStatsCards } from "./UserStatsCards";
 

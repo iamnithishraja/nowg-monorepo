@@ -1,20 +1,20 @@
-import { Home, Code, Wallet, Settings, LogOut, Shield } from "lucide-react";
-import { Link, useLocation } from "wouter";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-} from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+} from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
-import { hasAdminAccess } from "@/types/roles";
+import { hasAdminAccess } from "@nowgai/shared/types";
+import { Code, Home, LogOut, Settings, Shield, Wallet } from "lucide-react";
+import { Link, useLocation } from "wouter";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5173";
 

@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
+import SupabaseIntegration from "~/models/supabaseIntegrationModel";
 import { auth } from "../lib/auth";
 import { connectToDatabase } from "../lib/mongo";
-import SupabaseIntegration from "../models/supabaseIntegrationModel";
 
 /**
  * API Route: Get Supabase Integration Token

@@ -1,22 +1,21 @@
-import type { Message } from "../types/chat";
-import Conversation from "../models/conversationModel";
-import Messages from "../models/messageModel";
+import {
+  Conversation,
+  OrganizationMember,
+  Project,
+  ProjectMember,
+  TeamMember,
+} from "@nowgai/shared/models";
+import mongoose from "mongoose";
 import AgentMessage from "../models/agentMessageModel";
 import Chat from "../models/chatModel";
+import Messages from "../models/messageModel";
+import type { Message } from "../types/chat";
+import { getEnv } from "./env";
+import { FileService } from "./fileService";
 import { connectToDatabase } from "./mongo";
 import { ProfileService } from "./profileService";
-import { FileService } from "./fileService";
-import { callLLMChat } from "./utils";
 import { deleteSupabaseProject } from "./supabaseManager";
-import mongoose from "mongoose";
-import { getEnv } from "./env";
-import TeamMember from "../models/teamMemberModel";
-import Team from "../models/teamModel";
-import type TeamModel from "../models/teamModel";
-import ProjectWallet from "../models/projectWalletModel";
-import OrganizationMember from "../models/organizationMemberModel";
-import ProjectMember from "../models/projectMemberModel";
-import Project from "../models/projectModel";
+import { callLLMChat } from "./utils.server";
 
 export class ChatService {
   private async ensureConnection() {
@@ -318,7 +317,7 @@ export class ChatService {
       const modelToUse =
         message.model ||
         (message.role === "assistant" ? conversation.model : undefined);
-      
+
       const tokensUsed =
         message.role === "assistant" ? message.tokensUsed || 0 : undefined;
       const inputTokens =
@@ -332,7 +331,7 @@ export class ChatService {
 
       // Extract tool calls if present (for assistant messages)
       const toolCalls = (message as any).toolCalls || undefined;
-      
+
       const messageDoc = new Messages({
         conversationId,
         role: message.role,
@@ -345,16 +344,18 @@ export class ChatService {
         outputTokens: outputTokens,
         files: [], // Initialize empty files array (legacy)
         r2Files: [], // Initialize empty R2 files array
-        toolCalls: toolCalls ? toolCalls.map((tc: any) => ({
-          id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
-          name: tc.name || tc.toolName,
-          args: tc.args || {},
-          status: tc.status || "completed",
-          result: tc.result,
-          startTime: tc.startTime,
-          endTime: tc.endTime,
-          category: tc.category,
-        })) : undefined,
+        toolCalls: toolCalls
+          ? toolCalls.map((tc: any) => ({
+              id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
+              name: tc.name || tc.toolName,
+              args: tc.args || {},
+              status: tc.status || "completed",
+              result: tc.result,
+              startTime: tc.startTime,
+              endTime: tc.endTime,
+              category: tc.category,
+            }))
+          : undefined,
       });
 
       const result = await messageDoc.save();
@@ -362,7 +363,8 @@ export class ChatService {
       // Automatically extract files from message content and store in R2 (for assistant messages)
       if (message.role === "assistant" && message.content) {
         try {
-          const { extractAndStoreFilesFromMessage } = await import("./extractAndStoreFiles");
+          const { extractAndStoreFilesFromMessage } =
+            await import("./extractAndStoreFiles");
           const uploadedFiles = await extractAndStoreFilesFromMessage(
             result._id.toString(),
             conversationId,
@@ -459,8 +461,8 @@ export class ChatService {
 
       // Count existing chats to generate title
       const conversationObjectId = new mongoose.Types.ObjectId(conversationId);
-      const existingChatsCount = await ChatModel.countDocuments({ 
-        conversationId: conversationObjectId 
+      const existingChatsCount = await ChatModel.countDocuments({
+        conversationId: conversationObjectId,
       });
       const chatTitle = title || `Chat ${existingChatsCount + 1}`;
 
@@ -516,13 +518,21 @@ export class ChatService {
       await this.ensureConnection();
 
       // Verify access using the same logic as getConversation
-      const conversationAccess = await this.getConversation(conversationId, userId);
+      const conversationAccess = await this.getConversation(
+        conversationId,
+        userId
+      );
       if (!conversationAccess) {
         throw new Error("Conversation not found or unauthorized");
       }
 
       // Validate chatId is a valid ObjectId
-      if (!chatId || chatId === "undefined" || chatId === "null" || !mongoose.Types.ObjectId.isValid(chatId)) {
+      if (
+        !chatId ||
+        chatId === "undefined" ||
+        chatId === "null" ||
+        !mongoose.Types.ObjectId.isValid(chatId)
+      ) {
         throw new Error("Invalid chatId");
       }
 
@@ -545,17 +555,20 @@ export class ChatService {
       // Extract tool calls and tool results if present
       const toolCalls = (message as any).toolCalls || undefined;
       const toolResults = (message as any).toolResults || undefined;
-      
+
       // Determine role - support "toolcall" role for tool call messages
-      const role = (message as any).role === "toolcall" ? "toolcall" : message.role;
-      
+      const role =
+        (message as any).role === "toolcall" ? "toolcall" : message.role;
+
       // Extract model and token info (only for assistant messages)
-      const model = (message as any).model || (role === "assistant" ? conversation.model : undefined);
+      const model =
+        (message as any).model ||
+        (role === "assistant" ? conversation.model : undefined);
       const tokensUsed = (message as any).tokensUsed;
       const inputTokens = (message as any).inputTokens;
       const outputTokens = (message as any).outputTokens;
       const clientRequestId = (message as any).clientRequestId;
-      
+
       // Check for duplicate message using clientRequestId
       if (clientRequestId) {
         const existingMessage = await AgentMessage.findOne({
@@ -563,26 +576,30 @@ export class ChatService {
           clientRequestId: clientRequestId,
         });
         if (existingMessage) {
-          console.log(`[ChatService] Duplicate message with clientRequestId ${clientRequestId}, returning existing`);
+          console.log(
+            `[ChatService] Duplicate message with clientRequestId ${clientRequestId}, returning existing`
+          );
           return existingMessage._id.toString();
         }
       }
-      
+
       // Create AgentMessage - uses simpler schema designed for agent chat
       const messageDoc = new AgentMessage({
         conversationId: new mongoose.Types.ObjectId(conversationId),
         role: role,
         content: message.content || "",
-        toolCalls: toolCalls ? toolCalls.map((tc: any) => ({
-          id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
-          name: tc.name || tc.toolName,
-          args: tc.args || {},
-          status: tc.status || "completed",
-          result: tc.result,
-          startTime: tc.startTime,
-          endTime: tc.endTime,
-          category: tc.category,
-        })) : undefined,
+        toolCalls: toolCalls
+          ? toolCalls.map((tc: any) => ({
+              id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
+              name: tc.name || tc.toolName,
+              args: tc.args || {},
+              status: tc.status || "completed",
+              result: tc.result,
+              startTime: tc.startTime,
+              endTime: tc.endTime,
+              category: tc.category,
+            }))
+          : undefined,
         toolResults: toolResults,
         // Model and token info (assistant messages only)
         model: model,
@@ -665,13 +682,18 @@ export class ChatService {
 
       // Generate title from first user message synchronously so it's immediately visible in UI
       let generatedChatTitle: string | undefined;
-      if (message.role === "user" && typeof message.content === "string" && message.content.trim()) {
+      if (
+        message.role === "user" &&
+        typeof message.content === "string" &&
+        message.content.trim()
+      ) {
         // Check if chat has a default/generic title that should be replaced
-        const isDefaultTitle = /^Chat \d+$/.test(chat.title) || 
-                               chat.title === "New Chat" || 
-                               !chat.title || 
-                               chat.title.trim() === "";
-        
+        const isDefaultTitle =
+          /^Chat \d+$/.test(chat.title) ||
+          chat.title === "New Chat" ||
+          !chat.title ||
+          chat.title.trim() === "";
+
         if (isDefaultTitle) {
           // Check if this is the first user message in the chat using AgentMessage model
           const existingUserMessages = await AgentMessage.countDocuments({
@@ -684,13 +706,18 @@ export class ChatService {
               return chatDoc.messages?.length || 0;
             });
           });
-          
+
           // Check if this is the first message (we just added one, so count should be 1)
           const isFirstMessage = existingUserMessages <= 1;
-          
+
           if (isFirstMessage) {
             // Generate title synchronously so it's available immediately
-            console.log("[ChatService] Generating title for chat:", chatId, "| Message:", message.content.substring(0, 50));
+            console.log(
+              "[ChatService] Generating title for chat:",
+              chatId,
+              "| Message:",
+              message.content.substring(0, 50)
+            );
             try {
               generatedChatTitle = await this.generateTitle(message.content);
               console.log("[ChatService] Title generated:", generatedChatTitle);
@@ -699,14 +726,20 @@ export class ChatService {
               });
               console.log("[ChatService] Chat title updated successfully");
             } catch (titleError) {
-              console.error("[ChatService] Error generating chat title:", titleError);
+              console.error(
+                "[ChatService] Error generating chat title:",
+                titleError
+              );
               // Don't fail message creation if title generation fails
             }
           }
         }
       }
 
-      return { messageId: result._id.toString(), chatTitle: generatedChatTitle };
+      return {
+        messageId: result._id.toString(),
+        chatTitle: generatedChatTitle,
+      };
     } catch (error) {
       console.error("Error adding message to chat:", error);
       throw error;
@@ -725,12 +758,20 @@ export class ChatService {
       await this.ensureConnection();
 
       // Validate chatId is a valid ObjectId
-      if (!chatId || chatId === "undefined" || chatId === "null" || !mongoose.Types.ObjectId.isValid(chatId)) {
+      if (
+        !chatId ||
+        chatId === "undefined" ||
+        chatId === "null" ||
+        !mongoose.Types.ObjectId.isValid(chatId)
+      ) {
         throw new Error("Invalid chatId");
       }
 
       // Verify access using the same logic as getConversation
-      const conversationAccess = await this.getConversation(conversationId, userId);
+      const conversationAccess = await this.getConversation(
+        conversationId,
+        userId
+      );
       if (!conversationAccess) {
         throw new Error("Conversation not found or unauthorized");
       }
@@ -745,13 +786,15 @@ export class ChatService {
 
       if (!chat) {
         // Chat doesn't exist, return empty array
-        console.log(`[ChatService] Chat ${chatId} not found, returning empty array`);
+        console.log(
+          `[ChatService] Chat ${chatId} not found, returning empty array`
+        );
         return [];
       }
 
       // Ensure messages is an array (defensive check)
-      const messages = Array.isArray((chat as any).messages) 
-        ? ((chat as any).messages || []) 
+      const messages = Array.isArray((chat as any).messages)
+        ? (chat as any).messages || []
         : [];
 
       // Filter out any null/undefined messages that might have been populated incorrectly
@@ -759,7 +802,9 @@ export class ChatService {
 
       // If chat has no messages, return empty array (don't fall back to conversation messages)
       if (validMessages.length === 0) {
-        console.log(`[ChatService] Chat ${chatId} has no messages, returning empty array`);
+        console.log(
+          `[ChatService] Chat ${chatId} has no messages, returning empty array`
+        );
         return [];
       }
 
@@ -795,19 +840,30 @@ export class ChatService {
   async getConversationChats(
     conversationId: string,
     userId: string
-  ): Promise<Array<{ id: string; title: string; messageCount: number; createdAt: Date; updatedAt: Date }>> {
+  ): Promise<
+    Array<{
+      id: string;
+      title: string;
+      messageCount: number;
+      createdAt: Date;
+      updatedAt: Date;
+    }>
+  > {
     try {
       await this.ensureConnection();
 
       // Verify access using the same logic as getConversation
-      const conversationAccess = await this.getConversation(conversationId, userId);
+      const conversationAccess = await this.getConversation(
+        conversationId,
+        userId
+      );
       if (!conversationAccess) {
         throw new Error("Conversation not found or unauthorized");
       }
 
       // Get all chats for this conversation
-      const chats = await Chat.find({ 
-        conversationId: new mongoose.Types.ObjectId(conversationId) 
+      const chats = await Chat.find({
+        conversationId: new mongoose.Types.ObjectId(conversationId),
       })
         .select("title messages createdAt updatedAt")
         .lean();
@@ -831,7 +887,7 @@ export class ChatService {
       await this.ensureConnection();
 
       // Only get messages that don't belong to a chat (main conversation messages)
-      const messages = await Messages.find({ 
+      const messages = await Messages.find({
         conversationId,
         chatId: null, // Exclude chat messages
       })

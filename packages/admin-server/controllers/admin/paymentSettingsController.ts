@@ -1,5 +1,5 @@
+import { PaymentSettings } from "@nowgai/shared/models";
 import type { Request, Response } from "express";
-import PaymentSettings from "../../models/paymentSettingsModel";
 
 /**
  * GET /api/admin/payment-settings

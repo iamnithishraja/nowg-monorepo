@@ -1,77 +1,75 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import {
-  Building2,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Edit,
-  Trash2,
-  UserPlus,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Wallet,
-  AlertTriangle,
-  Users,
-  BarChart3,
-  Percent,
-  Globe,
-  Server,
-  Database,
-  Save,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { client } from "@/lib/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
+import { client } from "@/lib/client";
+import { UserRole } from "@nowgai/shared/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+    AlertTriangle,
+    BarChart3,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    Database,
+    Edit,
+    Globe,
+    Percent,
+    Plus,
+    Save,
+    Search,
+    Server,
+    Trash2,
+    UserPlus,
+    Wallet,
+    XCircle
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 interface OrganizationType {
   id: string;

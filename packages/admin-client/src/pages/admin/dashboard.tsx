@@ -1,22 +1,22 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
-import { useToast } from "@/hooks/use-toast";
 import {
-  FullAdminDashboard,
-  OrgAdminDashboard,
-  ProjectAdminDashboard,
+    FullAdminDashboard,
+    OrgAdminDashboard,
+    ProjectAdminDashboard,
 } from "@/components/dashboard";
 import {
-  useDashboardStats,
-  useOrganization,
-  useOrgWallet,
-  useProject,
-  useProjectWallet,
-  useProjectMembers,
-  useStripeCheckout,
-  useStripeVerify,
+    useDashboardStats,
+    useOrganization,
+    useOrgWallet,
+    useProject,
+    useProjectMembers,
+    useProjectWallet,
+    useStripeCheckout,
+    useStripeVerify,
 } from "@/components/dashboard/hooks";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { UserRole } from "@nowgai/shared/types";
+import { useEffect, useState } from "react";
 
 export default function AdminDashboard() {
   const { toast } = useToast();

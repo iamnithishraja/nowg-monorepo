@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const messageSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const messageSchemaDefinition = {
   conversationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Conversation",
@@ -27,18 +28,75 @@ const messageSchema = new mongoose.Schema({
       ref: "File",
     },
   ],
-  // R2 files stored for this message (inline storage for R2 URLs)
-  r2Files: [
+  // Tool calls made by assistant (for agent messages)
+  toolCalls: [
     {
-      name: { type: String },
-      filePath: { type: String }, // Full file path for restoration
-      contentType: { type: String }, // Renamed from 'type' to avoid Mongoose reserved keyword
-      size: { type: Number },
-      url: { type: String },
-      uploadedAt: { type: Date },
+      id: {
+        type: String,
+        required: true,
+      },
+      name: {
+        type: String,
+        required: true,
+      },
+      args: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {},
+      },
+      status: {
+        type: String,
+        enum: ["pending", "executing", "completed", "error"],
+        default: "completed",
+      },
+      result: {
+        type: mongoose.Schema.Types.Mixed,
+        default: undefined,
+      },
+      startTime: {
+        type: Number,
+        default: undefined,
+      },
+      endTime: {
+        type: Number,
+        default: undefined,
+      },
+      category: {
+        type: String,
+        enum: ["auto", "ack"],
+        default: undefined,
+      },
     },
   ],
-});
+  // File references stored in R2 (replaces files array)
+  r2Files: [
+    {
+      name: {
+        type: String,
+        required: true,
+      },
+      type: {
+        type: String,
+        required: true,
+      },
+      filePath: { type: String }, // Full file path for restoration (from HEAD)
+      contentType: { type: String }, // Additional content type field (from HEAD)
+      size: {
+        type: Number,
+        required: true,
+      },
+      url: {
+        type: String,
+        required: true, // R2 URL
+      },
+      uploadedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
+};
+
+export const messageSchema = new mongoose.Schema(messageSchemaDefinition);
 
 // Ensure uniqueness of client request within a conversation if provided
 try {
@@ -48,6 +106,14 @@ try {
   );
 } catch {}
 
-// Use existing model if already compiled (for hot reload), otherwise create new one
-const Messages = mongoose.models.Message || mongoose.model("Message", messageSchema);
+// Model getter function for consistent access
+export function getMessageModel(): mongoose.Model<any> {
+  if (mongoose.models.Message) {
+    return mongoose.models.Message as mongoose.Model<any>;
+  }
+  return mongoose.model("Message", messageSchema);
+}
+
+const Messages = getMessageModel();
+
 export default Messages;

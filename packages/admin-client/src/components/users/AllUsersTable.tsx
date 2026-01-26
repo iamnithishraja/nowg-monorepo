@@ -1,29 +1,28 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  User,
-  Search,
-  Eye,
-  Shield,
-  ShieldOff,
-  UserPlus,
-  BarChart3,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { getRoleBadgeVariant, UserRole } from "@nowgai/shared/types";
+import {
+    BarChart3,
+    Eye,
+    Search,
+    Shield,
+    ShieldOff,
+    User,
+    UserPlus,
 } from "lucide-react";
-import { UsersResponse, UserType } from "./types";
-import { getRoleBadgeVariant } from "@/types/roles";
-import { UserRole } from "@/types/roles";
-import { Pagination } from "./Pagination";
 import { useLocation } from "wouter";
+import { Pagination } from "./Pagination";
+import { UsersResponse, UserType } from "./types";
 
 interface AllUsersTableProps {
   data: UsersResponse | undefined;

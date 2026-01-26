@@ -1,17 +1,13 @@
-import type { Request, Response, NextFunction } from "express";
+import { Organization, OrganizationMember, Project, ProjectMember } from "@nowgai/shared/models";
+import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
+import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
 import { auth } from "../lib/auth";
-import { UserRole, hasAdminAccess, ProjectRole } from "../types/roles";
-import { getUsersCollection } from "../config/db";
-import { hasAnyProjectAdminRole, getUserProjects } from "../lib/projectRoles";
 import {
-  hasAnyOrganizationAdminRole,
-  getUserOrganizations,
+    getUserOrganizations,
+    hasAnyOrganizationAdminRole,
 } from "../lib/organizationRoles";
-import OrganizationMember from "../models/organizationMemberModel";
-import ProjectMember from "../models/projectMemberModel";
-import Organization from "../models/organizationModel";
-import Project from "../models/projectModel";
+import { getUserProjects, hasAnyProjectAdminRole } from "../lib/projectRoles";
 
 // Extend Express Request type to include user
 declare global {
@@ -129,9 +125,6 @@ export async function getSession(
             user.projectId = firstProject.projectId;
             // Also set organizationId from the project if not already set
             if (!user.organizationId) {
-              const { default: Project } = await import(
-                "../models/projectModel"
-              );
               const project = await Project.findById(
                 firstProject.projectId
               ).lean();

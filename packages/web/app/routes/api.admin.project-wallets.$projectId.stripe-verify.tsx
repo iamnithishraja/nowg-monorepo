@@ -1,13 +1,12 @@
+import { OrgProjectWallet, Project } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
+import mongoose from "mongoose";
 import type { ActionFunctionArgs } from "react-router";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import { stripe } from "~/lib/stripe";
-import Project from "~/models/projectModel";
-import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import { isProjectAdmin } from "~/lib/projectRoles";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import { hasAdminAccess, UserRole } from "~/lib/types/roles";
-import mongoose from "mongoose";
+import { isProjectAdmin } from "~/lib/projectRoles";
+import { stripe } from "~/lib/stripe";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {

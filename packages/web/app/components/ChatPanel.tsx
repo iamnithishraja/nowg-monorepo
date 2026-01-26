@@ -1,16 +1,16 @@
-import { useRef, useEffect, Fragment, useState } from "react";
+import { ChatCircle } from "@phosphor-icons/react";
+import { Bot, Download, FileText, Loader2, RotateCcw, X } from "lucide-react";
 import type React from "react";
-import { Bot, Loader2, RotateCcw, Download, X, FileText } from "lucide-react";
-import SelectedElementCard from "./SelectedElementCard";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createClientFileStorageService } from "../lib/clientFileStorage";
 import { cn } from "../lib/utils";
 import type { Message } from "../types/chat";
-import { Button } from "./ui/button";
 import { FileCreationChecklist } from "./FileCreationChecklist";
-import { createClientFileStorageService } from "../lib/clientFileStorage";
-import { ChatCircle } from "phosphor-react";
+import SelectedElementCard from "./SelectedElementCard";
 import { ToolCallItem } from "./ToolCallItem";
+import { Button } from "./ui/button";
 
-// Format timestamp for messages
+// Format timestamp for messages - MEMOIZED outside component
 const formatMessageTime = (timestamp?: string | Date) => {
   if (!timestamp) return "";
   const date = new Date(timestamp);
@@ -68,9 +68,111 @@ interface ChatPanelProps {
   currentToolCalls?: any[]; // Tool calls for current streaming message
   streamingSegments?: StreamingSegment[]; // Ordered streaming segments for interleaved rendering
   chatId?: string | null; // Chat ID to detect if we're in a chat
+  onFileClick?: (filePath: string) => void; // Callback when a file in tool call is clicked
 }
 
-export default function ChatPanel({
+// Memoized file attachment component
+const FileAttachmentItem = memo(function FileAttachmentItem({
+  file,
+  fileData,
+  isImage,
+}: {
+  file: any;
+  fileData: string | undefined;
+  isImage: boolean;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleDownload = useCallback(() => {
+    if (!fileData) return;
+
+    const link = document.createElement("a");
+    link.href = fileData;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [fileData, file.name]);
+
+  return (
+    <>
+      <div className="relative rounded-lg border border-primary-foreground/20 overflow-hidden bg-primary-foreground/10 group">
+        {isImage && fileData ? (
+          <div
+            className="h-16 w-16 relative cursor-pointer"
+            onClick={() => setIsExpanded(true)}
+          >
+            <img
+              src={fileData}
+              alt={file.name}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+              <Download
+                className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownload();
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+          <div
+            className="h-16 w-16 flex flex-col items-center justify-center gap-1 p-2 cursor-pointer"
+            onClick={handleDownload}
+          >
+            <FileText className="w-5 h-5 text-primary-foreground" />
+            <span className="text-[9px] text-center text-primary-foreground truncate w-full">
+              {file.name}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Expanded image modal */}
+      {isExpanded && isImage && fileData && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setIsExpanded(false)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <img
+              src={fileData}
+              alt={file.name}
+              className="max-w-full max-h-[90vh] object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="absolute top-2 right-2 flex gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownload();
+                }}
+                className="p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                title="Download"
+              >
+                <Download className="w-5 h-5 text-white" />
+              </button>
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                title="Close"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            <div className="absolute bottom-2 left-2 bg-black/50 px-3 py-1 rounded-full">
+              <span className="text-white text-sm">{file.name}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+});
+
+function ChatPanelComponent({
   messages,
   isLoading,
   isProcessingTemplate,
@@ -82,6 +184,7 @@ export default function ChatPanel({
   currentToolCalls = [],
   streamingSegments = [],
   chatId,
+  onFileClick,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [fileDataMap, setFileDataMap] = useState<Map<string, string>>(
@@ -163,119 +266,23 @@ export default function ChatPanel({
   }, [messages]);
 
   // Clear element selection
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     onInspectorEnable?.();
-  };
+  }, [onInspectorEnable]);
 
-  const getModelDisplayName = (modelId: string) => {
+  const getModelDisplayName = useCallback((modelId: string) => {
     return modelId;
-  };
+  }, []);
 
-  const getIsLastUserMessage = (messageId: string) => {
-    const userMessages = messages.filter((m) => m.role === "user");
+  // Memoize user messages for revert check
+  const userMessages = useMemo(() => 
+    messages.filter((m) => m.role === "user"),
+    [messages]
+  );
+
+  const getIsLastUserMessage = useCallback((messageId: string) => {
     return userMessages[userMessages.length - 1]?.id === messageId;
-  };
-
-  // File attachment component with download functionality
-  const FileAttachmentItem = ({
-    file,
-    fileData,
-    isImage,
-  }: {
-    file: any;
-    fileData: string | undefined;
-    isImage: boolean;
-  }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-
-    const handleDownload = () => {
-      if (!fileData) return;
-
-      const link = document.createElement("a");
-      link.href = fileData;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    };
-
-    return (
-      <>
-        <div className="relative rounded-lg border border-primary-foreground/20 overflow-hidden bg-primary-foreground/10 group">
-          {isImage && fileData ? (
-            <div
-              className="h-16 w-16 relative cursor-pointer"
-              onClick={() => setIsExpanded(true)}
-            >
-              <img
-                src={fileData}
-                alt={file.name}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                <Download
-                  className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownload();
-                  }}
-                />
-              </div>
-            </div>
-          ) : (
-            <div
-              className="h-16 w-16 flex flex-col items-center justify-center gap-1 p-2 cursor-pointer"
-              onClick={handleDownload}
-            >
-              <FileText className="w-5 h-5 text-primary-foreground" />
-              <span className="text-[9px] text-center text-primary-foreground truncate w-full">
-                {file.name}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Expanded image modal */}
-        {isExpanded && isImage && fileData && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setIsExpanded(false)}
-          >
-            <div className="relative max-w-4xl max-h-[90vh]">
-              <img
-                src={fileData}
-                alt={file.name}
-                className="max-w-full max-h-[90vh] object-contain"
-                onClick={(e) => e.stopPropagation()}
-              />
-              <div className="absolute top-2 right-2 flex gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownload();
-                  }}
-                  className="p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
-                  title="Download"
-                >
-                  <Download className="w-5 h-5 text-white" />
-                </button>
-                <button
-                  onClick={() => setIsExpanded(false)}
-                  className="p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
-                  title="Close"
-                >
-                  <X className="w-5 h-5 text-white" />
-                </button>
-              </div>
-              <div className="absolute bottom-2 left-2 bg-black/50 px-3 py-1 rounded-full">
-                <span className="text-white text-sm">{file.name}</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    );
-  };
+  }, [userMessages]);
 
   // Clean message content by removing artifacts and handling special components
   const cleanMessageContent = (message: Message) => {
@@ -946,6 +953,7 @@ export default function ChatPanel({
                             key={tc.id || `tc-${idx}`}
                             toolCall={tc}
                             isCompact
+                            onFileClick={onFileClick}
                           />
                         ))}
                       </div>
@@ -1046,8 +1054,9 @@ export default function ChatPanel({
                               .map((s) => s.content)
                               .join("\n");
 
-                      // Get tool calls (from message or currentToolCalls for streaming)
+                      // Get tool calls and segments (from message or currentToolCalls for streaming)
                       const messageToolCalls = (message as any).toolCalls;
+                      const messageSegments = (message as any).segments;
                       const isLastMessage =
                         message.id === messages[messages.length - 1]?.id;
                       
@@ -1070,6 +1079,7 @@ export default function ChatPanel({
                                     <ToolCallItem
                                       toolCall={segment.toolCall}
                                       isCompact
+                                      onFileClick={onFileClick}
                                     />
                                   </div>
                                 )}
@@ -1079,7 +1089,36 @@ export default function ChatPanel({
                         );
                       }
 
-                      // Fallback for non-streaming messages (loaded from DB)
+                      // Check if message has saved segments (preserves correct order)
+                      const hasSavedSegments = messageSegments && Array.isArray(messageSegments) && messageSegments.length > 0;
+                      
+                      if (hasSavedSegments) {
+                        // Render saved segments in their correct order (interleaved text and tool calls)
+                        return (
+                          <>
+                            {messageSegments.map((segment: any, idx: number) => (
+                              <div key={`saved-segment-${idx}`}>
+                                {segment.type === 'text' && segment.content && (
+                                  <div className="text-sm leading-relaxed text-foreground/90">
+                                    {renderRichContent(segment.content)}
+                                  </div>
+                                )}
+                                {segment.type === 'toolCall' && segment.toolCall && (
+                                  <div className="my-1">
+                                    <ToolCallItem
+                                      toolCall={segment.toolCall}
+                                      isCompact
+                                      onFileClick={onFileClick}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </>
+                        );
+                      }
+
+                      // Fallback for messages without saved segments (legacy or loaded from DB without segments)
                       // Combine message tool calls with current tool calls for the last message
                       let toolCallsToUse: any[] = [];
                       const messageToolCallsArray =
@@ -1117,7 +1156,7 @@ export default function ChatPanel({
                         toolCallsToUse = messageToolCallsArray;
                       }
 
-                      // Render segments normally, then tool calls at end
+                      // Render segments normally, then tool calls at end (legacy fallback)
                       return (
                         <>
                           {segments.map((segment, idx) => (
@@ -1146,7 +1185,7 @@ export default function ChatPanel({
                               )}
                             </div>
                           ))}
-                          {/* Tool calls at end if no textIndex */}
+                          {/* Tool calls at end only if no saved segments (legacy fallback) */}
                           {toolCallsToUse.length > 0 && (
                             <div className="space-y-0.5 mt-2">
                               {toolCallsToUse.map((tc: any) => (
@@ -1154,6 +1193,7 @@ export default function ChatPanel({
                                   key={tc.id}
                                   toolCall={tc}
                                   isCompact
+                                  onFileClick={onFileClick}
                                 />
                               ))}
                             </div>
@@ -1235,3 +1275,7 @@ export default function ChatPanel({
     </div>
   );
 }
+
+// Export memoized component for performance
+const ChatPanel = memo(ChatPanelComponent);
+export default ChatPanel;

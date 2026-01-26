@@ -1,12 +1,9 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { Team, TeamInvitation, TeamMember } from "@nowgai/shared/models";
+import { randomBytes } from "crypto";
+import { MongoClient, ObjectId } from "mongodb";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import Team from "~/models/teamModel";
-import TeamMember from "~/models/teamMemberModel";
-import TeamInvitation from "~/models/teamInvitationModel";
-import Profile from "~/models/profileModel";
-import { MongoClient, ObjectId } from "mongodb";
-import { randomBytes } from "crypto";
 
 // Helper to get authenticated user
 async function getAuthenticatedUser(request: Request) {

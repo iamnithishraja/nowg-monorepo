@@ -1,23 +1,23 @@
 import {
-  ChevronRight,
-  File as FileIcon,
-  Folder as FolderIcon,
-  FileCode,
-  FileText,
-  Image as ImageIcon,
-  Video as VideoIcon,
-  Music as MusicIcon,
-  Archive as ArchiveIcon,
-  Database as DatabaseIcon,
-  Package as PackageIcon,
-  Terminal as TerminalIcon,
-  Atom,
+    Archive as ArchiveIcon,
+    Atom,
+    ChevronRight,
+    Database as DatabaseIcon,
+    FileCode,
+    File as FileIcon,
+    FileText,
+    Folder as FolderIcon,
+    Image as ImageIcon,
+    Music as MusicIcon,
+    Package as PackageIcon,
+    Terminal as TerminalIcon,
+    Video as VideoIcon,
 } from "lucide-react";
-import React, { useMemo } from "react";
+import React, { memo, useCallback, useMemo } from "react";
 import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
 } from "./ui/collapsible";
 
 type FileItem = { name: string; path: string; content: string };
@@ -431,7 +431,8 @@ function buildTree(files: FileItem[]): TreeNode[] {
   return toArray(root);
 }
 
-export default function FileTree({
+// Memoize main FileTree component
+function FileTreeComponent({
   files = [],
   selectedPath,
   onSelect,
@@ -457,12 +458,12 @@ export default function FileTree({
     if (selectedPath) writeSelectedToCookie(selectedPath);
   }, [selectedPath]);
 
-  const isExpanded = React.useCallback(
+  const isExpanded = useCallback(
     (path: string) => expanded.has(path),
     [expanded]
   );
 
-  const setNodeExpanded = React.useCallback((path: string, open: boolean) => {
+  const setNodeExpanded = useCallback((path: string, open: boolean) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (open) next.add(path);
@@ -471,6 +472,11 @@ export default function FileTree({
       return next;
     });
   }, []);
+
+  // Memoize the header click handler
+  const handleSearchClick = useCallback(() => {
+    onOpenSearch?.();
+  }, [onOpenSearch]);
 
   return (
     <div className="h-full flex flex-col">
@@ -484,7 +490,7 @@ export default function FileTree({
             </div>
             <button
               type="button"
-              onClick={() => onOpenSearch?.()}
+              onClick={handleSearchClick}
               className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
               title="Search (Ctrl/Cmd+K)"
             >
@@ -527,7 +533,12 @@ export default function FileTree({
   );
 }
 
-function Tree({
+// Export memoized FileTree
+const FileTree = memo(FileTreeComponent);
+export default FileTree;
+
+// Memoized Tree node component to prevent re-renders when siblings change
+const Tree = memo(function Tree({
   node,
   selectedPath,
   onSelect,
@@ -541,17 +552,25 @@ function Tree({
   setNodeExpanded: (path: string, open: boolean) => void;
 }) {
   const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+  const isSelected = selectedPath === node.path;
+
+  // Memoize click handler
+  const handleClick = useCallback(() => {
+    writeSelectedToCookie(node.path);
+    onSelect?.(node.path);
+  }, [node.path, onSelect]);
+
+  const handleOpenChange = useCallback((open: boolean) => {
+    setNodeExpanded(node.path, open);
+  }, [node.path, setNodeExpanded]);
 
   if (!hasChildren) {
     return (
       <div>
         <button
-          onClick={() => {
-            writeSelectedToCookie(node.path);
-            onSelect?.(node.path);
-          }}
+          onClick={handleClick}
           className={`w-full flex items-center gap-2 px-2 py-1 text-left text-sm rounded hover:bg-muted transition-colors ${
-            selectedPath === node.path
+            isSelected
               ? "bg-primary/20 text-primary"
               : "text-foreground"
           }`}
@@ -568,7 +587,7 @@ function Tree({
       <Collapsible
         className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
         open={isExpanded(node.path)}
-        onOpenChange={(open) => setNodeExpanded(node.path, open)}
+        onOpenChange={handleOpenChange}
       >
         <CollapsibleTrigger asChild>
           <button className="w-full flex items-center gap-2 px-2 py-1 text-left text-sm rounded hover:bg-muted transition-colors text-foreground">
@@ -594,4 +613,4 @@ function Tree({
       </Collapsible>
     </div>
   );
-}
+});

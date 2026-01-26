@@ -1,3 +1,4 @@
+import { hasAdminAccess } from "@nowgai/shared/types";
 import { useQuery } from "@tanstack/react-query";
 import { BookOpen, Download, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -19,7 +20,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useToast } from "~/hooks/use-toast";
 import { adminClient } from "~/lib/adminClient";
 import { auth } from "~/lib/auth";
-import { hasAdminAccess } from "~/lib/types/roles";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const authInstance = await auth;

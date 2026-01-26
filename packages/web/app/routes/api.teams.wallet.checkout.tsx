@@ -1,10 +1,9 @@
+import { Team, TeamMember } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
 import { createPaymentCheckout } from "~/lib/paymentHandler";
-import Team from "~/models/teamModel";
-import TeamMember from "~/models/teamMemberModel";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

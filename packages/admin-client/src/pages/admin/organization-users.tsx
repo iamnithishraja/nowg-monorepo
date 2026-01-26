@@ -1,60 +1,59 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
 import {
-  Users,
-  ArrowLeft,
-  UserPlus,
-  Trash2,
-  Building2,
-  Search,
-  CheckCircle2,
-  AlertTriangle,
-  Mail,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { client } from "@/lib/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
+import { client } from "@/lib/client";
+import { UserRole } from "@nowgai/shared/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Building2,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Search,
+    Trash2,
+    UserPlus,
+    Users
+} from "lucide-react";
+import { useState } from "react";
+import { useLocation, useParams } from "wouter";
 
 interface OrganizationType {
   id: string;

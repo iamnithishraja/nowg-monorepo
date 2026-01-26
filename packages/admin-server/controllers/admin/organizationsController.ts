@@ -1,27 +1,22 @@
+import { Organization, OrganizationMember, OrgUserInvitation, Project, ProjectMember } from "@nowgai/shared/models";
+import {
+    hasAdminAccess,
+    OrganizationRole,
+    USER_ROLE_DISPLAY_NAMES,
+    UserRole
+} from "@nowgai/shared/types";
+import { randomBytes } from "crypto";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
-import { randomBytes } from "crypto";
-import Organization from "../../models/organizationModel";
-import OrganizationMember from "../../models/organizationMemberModel";
-import OrgUserInvitation from "../../models/orgUserInvitationModel";
-import ProjectMember from "../../models/projectMemberModel";
-import Project from "../../models/projectModel";
 import { getUsersCollection } from "../../config/db";
 import {
-  sendOrgAdminInvitationEmail,
-  sendUserRoleUpdateEmail,
-  sendOrgUserInvitationEmail,
+    sendOrgAdminInvitationEmail,
+    sendOrgUserInvitationEmail,
+    sendUserRoleUpdateEmail,
 } from "../../lib/email";
 import {
-  UserRole,
-  OrganizationRole,
-  ProjectRole,
-  USER_ROLE_DISPLAY_NAMES,
-  hasAdminAccess,
-} from "../../types/roles";
-import {
-  isOrganizationAdmin,
-  getUserOrganizations,
+    getUserOrganizations,
+    isOrganizationAdmin,
 } from "../../lib/organizationRoles";
 
 /**

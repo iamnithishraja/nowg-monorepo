@@ -1,34 +1,35 @@
 import {
-  CreditCard,
-  DotsThree,
-  MagnifyingGlass,
-  Trash,
-  UserPlus,
-  Users,
+    CaretUpDown,
+    CreditCard,
+    DotsThree,
+    MagnifyingGlass,
+    Trash,
+    UserGear,
+    UserPlus,
+    Users,
 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "~/components/ui/table";
 import { cn } from "~/lib/utils";
-import { Icon } from "~/components/Icon";
 
 export interface TeamMember {
   id: string;
@@ -279,37 +280,37 @@ export function TeamMembersTable({
                 <TableHead className="text-[12px] font-medium text-secondary tracking-[-0.24px] uppercase py-3 px-4">
                   <div className="flex items-center gap-1">
                     Member
-                    <Icon name="CaretUpDown" size="xs" color="#727279" />
+                    <CaretUpDown size={12} color="#727279" />
                   </div>
                 </TableHead>
                 <TableHead className="text-[12px] font-medium text-secondary tracking-[-0.24px] uppercase py-3 px-4">
                   <div className="flex items-center gap-1">
                     Role
-                    <Icon name="CaretUpDown" size="xs" color="#727279" />
+                    <CaretUpDown size={12} color="#727279" />
                   </div>
                 </TableHead>
                 <TableHead className="text-[12px] font-medium text-secondary tracking-[-0.24px] uppercase py-3 px-4">
                   <div className="flex items-center gap-1">
                     Status
-                    <Icon name="CaretUpDown" size="xs" color="#727279" />
+                    <CaretUpDown size={12} color="#727279" />
                   </div>
                 </TableHead>
                 <TableHead className="text-[12px] font-medium text-secondary tracking-[-0.24px] uppercase py-3 px-4">
                   <div className="flex items-center gap-1">
                     Joined
-                    <Icon name="CaretUpDown" size="xs" color="#727279" />
+                    <CaretUpDown size={12} color="#727279" />
                   </div>
                 </TableHead>
                 <TableHead className="text-[12px] font-medium text-secondary tracking-[-0.24px] uppercase py-3 px-4">
                   <div className="flex items-center gap-1">
                     Projects
-                    <Icon name="CaretUpDown" size="xs" color="#727279" />
+                    <CaretUpDown size={12} color="#727279" />
                   </div>
                 </TableHead>
                 <TableHead className="text-[12px] font-medium text-secondary tracking-[-0.24px] uppercase py-3 px-4">
                   <div className="flex items-center gap-1">
                     Credits Used
-                    <Icon name="CaretUpDown" size="xs" color="#727279" />
+                    <CaretUpDown size={12} color="#727279" />
                   </div>
                 </TableHead>
                 <TableHead className="w-[60px]"></TableHead>
@@ -444,7 +445,7 @@ export function TeamMembersTable({
                               onClick={() => onManageRole(member)}
                               className="text-[13px] text-primary hover:bg-surface-2 cursor-pointer gap-2"
                             >
-                              <Icon name="UserGear" size="sm" />
+                              <UserGear size={16} />
                               Manage Role
                             </DropdownMenuItem>
                           )}

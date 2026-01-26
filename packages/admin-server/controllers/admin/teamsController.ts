@@ -1,9 +1,7 @@
+import { Team } from "@nowgai/shared/models";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
-import Team from "../../models/teamModel";
-import OrganizationMember from "../../models/organizationMemberModel";
-import { UserRole } from "../../types/roles";
 import { getUserOrganizations } from "../../lib/organizationRoles";
 
 export async function getTeams(req: Request, res: Response) {

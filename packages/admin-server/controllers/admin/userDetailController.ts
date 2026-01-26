@@ -1,7 +1,7 @@
+import { Profile } from "@nowgai/shared/models";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
-import Profile from "../../models/profileModel";
 
 export async function getUserDetail(req: Request, res: Response) {
   try {

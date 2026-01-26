@@ -1,5 +1,4 @@
-import mongoose from "mongoose";
-import Profile from "../models/profileModel";
+import { Profile } from "@nowgai/shared/models";
 import { connectToDatabase } from "./mongo";
 
 // Model pricing per 1K tokens (in USD) - OpenRouter pricing + 20% profit margin

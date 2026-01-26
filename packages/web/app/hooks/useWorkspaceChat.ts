@@ -1,9 +1,7 @@
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import type {
-  Message,
-  Attachment,
-  TextUIPart,
-  FileUIPart,
+    Attachment,
+    Message
 } from "../types/chat";
 import type { FileMap } from "../utils/constants";
 
@@ -71,27 +69,83 @@ export function useWorkspaceChat() {
     });
   };
 
+  // Refs to capture current streaming state for atomic updates in beginAssistantMessage
+  const currentToolCallsRef = useRef<any[]>([]);
+  const streamingSegmentsRef = useRef<StreamingSegment[]>([]);
+
   // Begin a new assistant message and remember its id so all updates target it
   const beginAssistantMessage = (mountedRef?: React.RefObject<boolean>) => {
     if (mountedRef?.current === false) return null;
     const id = `assistant-${Date.now()}`;
+    const prevMsgId = currentAssistantMessageId.current;
 
     // Clear processed files when starting a new assistant message
     processedFiles.current.clear();
     
-    // Clear streaming segments for new message
-    setStreamingSegments([]);
-    // Clear tool calls
+    // Capture current state from refs before clearing (avoids nested callback issues)
+    const prevToolCalls = [...currentToolCallsRef.current];
+    const prevSegments = [...streamingSegmentsRef.current];
+    
+    // IMPORTANT: Update messages in a single atomic operation
+    // This prevents race conditions and ensures all previous message data is preserved
+    setMessages((prevMessages) => {
+      let updatedMessages = [...prevMessages];
+      
+      // Save tool calls and segments to the previous assistant message if they exist
+      if ((prevToolCalls.length > 0 || prevSegments.length > 0) && prevMsgId) {
+        updatedMessages = prevMessages.map((msg) => {
+          if (msg.id === prevMsgId && msg.role === "assistant") {
+            const existingToolCalls = (msg as any).toolCalls;
+            const existingSegments = (msg as any).segments;
+            // Only save if the message doesn't already have them persisted
+            if ((!existingToolCalls || existingToolCalls.length === 0) || 
+                (!existingSegments || existingSegments.length === 0)) {
+              // Finalize tool calls with completed status
+              const finalizedToolCalls = prevToolCalls.map((tc) => ({
+                ...tc,
+                status: tc.status === "error" ? "error" : "completed",
+              }));
+              
+              // Finalize segments with updated tool call statuses
+              const finalizedSegments = prevSegments.map((segment) => {
+                if (segment.type === 'toolCall') {
+                  const finalizedTc = finalizedToolCalls.find((tc) => tc.id === segment.toolCall.id);
+                  return {
+                    type: 'toolCall' as const,
+                    toolCall: finalizedTc || { ...segment.toolCall, status: 'completed' as const },
+                  };
+                }
+                return segment;
+              });
+              
+              return {
+                ...msg,
+                toolCalls: existingToolCalls?.length > 0 ? existingToolCalls : finalizedToolCalls,
+                segments: existingSegments?.length > 0 ? existingSegments : finalizedSegments,
+              };
+            }
+          }
+          return msg;
+        });
+      }
+      
+      // Add the new assistant message
+      return [
+        ...updatedMessages,
+        {
+          id,
+          role: "assistant" as const,
+          content: "",
+        },
+      ];
+    });
+    
+    // Clear streaming state for the new message (after messages are updated)
     setCurrentToolCalls([]);
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id,
-        role: "assistant",
-        content: "",
-      },
-    ]);
+    setStreamingSegments([]);
+    currentToolCallsRef.current = [];
+    streamingSegmentsRef.current = [];
+    
     currentAssistantMessageId.current = id;
     return id;
   };
@@ -747,57 +801,73 @@ export function useWorkspaceChat() {
 
   // Wrapper function to prevent duplicate messages when setting the entire array
   const setMessagesWithDeduplication = (newMessages: Message[] | ((prev: Message[]) => Message[])) => {
-    // Handle both direct array and function updater
-    let messagesArray: Message[];
-    
-    if (typeof newMessages === 'function') {
-      // Function updater - call it with current messages
-      messagesArray = newMessages(messages);
-    } else if (Array.isArray(newMessages)) {
-      // Direct array
-      messagesArray = newMessages;
-    } else {
-      // Invalid input - log error and return
-      console.error("[useWorkspaceChat] setMessages received non-array:", typeof newMessages, newMessages);
-      return;
-    }
-    
-    // Ensure it's still an array after function call
-    if (!Array.isArray(messagesArray)) {
-      console.error("[useWorkspaceChat] setMessages function returned non-array:", typeof messagesArray, messagesArray);
-      return;
-    }
-    
-    messagesArray.forEach((msg, i) => {
-      if (msg.role === "assistant") {
+    // Use functional update to ensure we always have the latest state
+    setMessages((prevMessages) => {
+      // Handle both direct array and function updater
+      let messagesArray: Message[];
+      
+      if (typeof newMessages === 'function') {
+        // Function updater - call it with the LATEST state from React
+        messagesArray = newMessages(prevMessages);
+      } else if (Array.isArray(newMessages)) {
+        // Direct array
+        messagesArray = newMessages;
+      } else {
+        // Invalid input - log error and return previous state
+        console.error("[useWorkspaceChat] setMessages received non-array:", typeof newMessages, newMessages);
+        return prevMessages;
       }
-    });
-
-    // Deduplicate messages by id before setting
-    const seenIds = new Set<string>();
-    const deduplicatedMessages = messagesArray.filter((msg) => {
-      if (seenIds.has(msg.id)) {
-        return false;
+      
+      // Ensure it's still an array after function call
+      if (!Array.isArray(messagesArray)) {
+        console.error("[useWorkspaceChat] setMessages function returned non-array:", typeof messagesArray, messagesArray);
+        return prevMessages;
       }
-      seenIds.add(msg.id);
-      return true;
+
+      // Deduplicate messages by id before setting
+      const seenIds = new Set<string>();
+      const deduplicatedMessages = messagesArray.filter((msg) => {
+        if (seenIds.has(msg.id)) {
+          return false;
+        }
+        seenIds.add(msg.id);
+        return true;
+      });
+
+      // Reconstruct file creation state from the deduplicated messages
+      reconstructFileCreationState(deduplicatedMessages);
+
+      // Process messages to add checklists in a single pass
+      const finalMessages = processMessagesWithChecklists(deduplicatedMessages);
+
+      // Return the final messages
+      return finalMessages;
     });
+  };
 
-    // Reconstruct file creation state from the deduplicated messages
-    reconstructFileCreationState(deduplicatedMessages);
+  // Wrapper for setCurrentToolCalls that also syncs the ref
+  const setCurrentToolCallsWithSync = (updater: any[] | ((prev: any[]) => any[])) => {
+    setCurrentToolCalls((prev) => {
+      const newValue = typeof updater === 'function' ? updater(prev) : updater;
+      currentToolCallsRef.current = newValue;
+      return newValue;
+    });
+  };
 
-    // Process messages to add checklists in a single pass
-    const finalMessages = processMessagesWithChecklists(deduplicatedMessages);
-
-    // Set messages once with all checklists already included
-    setMessages(finalMessages);
+  // Wrapper for setStreamingSegments that also syncs the ref
+  const setStreamingSegmentsWithSync = (updater: StreamingSegment[] | ((prev: StreamingSegment[]) => StreamingSegment[])) => {
+    setStreamingSegments((prev) => {
+      const newValue = typeof updater === 'function' ? updater(prev) : updater;
+      streamingSegmentsRef.current = newValue;
+      return newValue;
+    });
   };
 
   // Append text to streaming segments (updates last text segment or creates new one)
   const appendTextSegment = (text: string, mountedRef?: React.RefObject<boolean>) => {
     if (mountedRef?.current === false) return;
     
-    setStreamingSegments((prev) => {
+    setStreamingSegmentsWithSync((prev) => {
       const lastSegment = prev[prev.length - 1];
       
       // If last segment is text, append to it
@@ -817,7 +887,7 @@ export function useWorkspaceChat() {
   const appendToolCallSegment = (toolCall: any, mountedRef?: React.RefObject<boolean>) => {
     if (mountedRef?.current === false) return;
     
-    setStreamingSegments((prev) => [
+    setStreamingSegmentsWithSync((prev) => [
       ...prev,
       { type: 'toolCall' as const, toolCall }
     ]);
@@ -831,7 +901,7 @@ export function useWorkspaceChat() {
   ) => {
     if (mountedRef?.current === false) return;
     
-    setStreamingSegments((prev) => 
+    setStreamingSegmentsWithSync((prev) => 
       prev.map((segment) => {
         if (segment.type === 'toolCall' && segment.toolCall.id === toolCallId) {
           return {
@@ -844,7 +914,9 @@ export function useWorkspaceChat() {
     );
   };
 
-  return {
+  // Memoize the return object to prevent unnecessary re-renders in consumers
+  // The object reference only changes when state values change
+  return useMemo(() => ({
     messages,
     setMessages: setMessagesWithDeduplication,
     isLoading,
@@ -854,9 +926,9 @@ export function useWorkspaceChat() {
     error,
     setError,
     currentToolCalls,
-    setCurrentToolCalls,
+    setCurrentToolCalls: setCurrentToolCallsWithSync,
     streamingSegments,
-    setStreamingSegments,
+    setStreamingSegments: setStreamingSegmentsWithSync,
     appendTextSegment,
     appendToolCallSegment,
     updateToolCallInSegments,
@@ -872,5 +944,12 @@ export function useWorkspaceChat() {
     interruptGeneration,
     resetFileIndicators,
     userCancelledRef,
-  };
+  }), [
+    messages,
+    isLoading,
+    isStreaming,
+    error,
+    currentToolCalls,
+    // Functions are stable references, but include for completeness
+  ]);
 }

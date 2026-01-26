@@ -1,8 +1,8 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { FileService } from "~/lib/fileService";
+import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
-import Messages from "~/models/messageModel";
+import { FileService } from "~/lib/fileService";
 import { connectToDatabase } from "~/lib/mongo";
+import Messages from "~/models/messageModel";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

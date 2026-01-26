@@ -1,3 +1,4 @@
+import { UserRole } from "@nowgai/shared/types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
     Database,
@@ -27,7 +28,6 @@ import { useAuth } from "~/hooks/useAuth";
 import { adminClient } from "~/lib/adminClient";
 import { getAdminSession } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import { UserRole } from "~/lib/types/roles";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await connectToDatabase();

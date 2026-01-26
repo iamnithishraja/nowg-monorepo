@@ -1,43 +1,38 @@
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Loader2,
+  Mail,
+  Plus,
+  Settings,
+  UserPlus,
+  Users,
+  XCircle
+} from "lucide-react";
 import * as React from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate } from "react-router";
-import { auth } from "~/lib/auth";
-import { connectToDatabase } from "~/lib/mongo";
-import Team from "~/models/teamModel";
-import TeamMember from "~/models/teamMemberModel";
-import TeamInvitation from "~/models/teamInvitationModel";
+import { Header } from "~/components";
+import { AppSidebar } from "~/components/AppSidebar";
+import Background from "~/components/Background";
 import { TeamOnboardingDialog } from "~/components/TeamOnboardingDialog";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 import { SidebarProvider } from "~/components/ui/sidebar";
-import { AppSidebar } from "~/components/AppSidebar";
-import { Header } from "~/components";
-import Background from "~/components/Background";
-import GlowEffects from "~/components/GlowEffects";
-import {
-  Users,
-  Plus,
-  Mail,
-  Wallet,
-  Settings,
-  Trash2,
-  UserPlus,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ArrowLeft,
-} from "lucide-react";
-import { cn } from "~/lib/utils";
+import { auth } from "~/lib/auth";
+import { connectToDatabase } from "~/lib/mongo";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
+    const { Team, TeamInvitation, TeamMember } = await import("@nowgai/shared/models");
+    
     const authInstance = await auth;
     const session = await authInstance.api.getSession({
       headers: request.headers,
@@ -254,7 +249,6 @@ export default function TeamsPage() {
       <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <Background />
-          <GlowEffects />
         </div>
 
         <AppSidebar className="shrink-0" />
