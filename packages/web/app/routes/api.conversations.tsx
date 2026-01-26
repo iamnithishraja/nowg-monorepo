@@ -5,7 +5,7 @@ import { extractNowgaiActions } from "~/utils/workspaceApi";
 import { createClientFileStorageService } from "~/lib/clientFileStorage";
 import { EnhancedChatPersistence } from "~/lib/enhancedPersistence";
 import { getConversationFromR2, uploadFileToR2, fetchFileFromR2 } from "~/lib/r2Storage";
-import Conversation from "~/models/conversationModel";
+import { Conversation } from "@nowgai/shared/models";
 import AgentMessage from "~/models/agentMessageModel";
 import { connectToDatabase } from "~/lib/mongo";
 
