@@ -1308,7 +1308,14 @@ export class ChatService {
         inputTokens: msg.inputTokens,
         outputTokens: msg.outputTokens,
         toolCalls: msg.toolCalls || [],
-        r2Files: msg.r2Files || [],
+        r2Files: msg.r2Files ? msg.r2Files.map((f: any) => ({
+          name: f.name,
+          filePath: f.filePath || f.name, // Preserve filePath
+          type: f.contentType || f.type, // Read from new 'contentType' field, fallback to old 'type'
+          size: f.size,
+          url: f.url,
+          uploadedAt: f.uploadedAt,
+        })) : [],
       }));
 
       // Get all chats with their messages for R2
@@ -1339,8 +1346,15 @@ export class ChatService {
               outputTokens: msg.outputTokens,
               createdAt: msg.createdAt,
               timestamp: msg.createdAt,
-              // AgentMessage might have r2Files if files were added
-              r2Files: (msg as any).r2Files || [],
+              // AgentMessage r2Files (includes filePath for restoration)
+              r2Files: (msg as any).r2Files ? (msg as any).r2Files.map((f: any) => ({
+                name: f.name,
+                filePath: f.filePath || f.name, // Preserve filePath
+                type: f.contentType || f.type, // Read from new 'contentType' field, fallback to old 'type'
+                size: f.size,
+                url: f.url,
+                uploadedAt: f.uploadedAt,
+              })) : [],
             }))
             .sort(
               (a: any, b: any) =>

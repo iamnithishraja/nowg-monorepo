@@ -12,7 +12,8 @@ export async function uploadFileToR2(
   fileData: Buffer,
   fileName: string,
   contentType: string,
-  projectId?: string
+  projectId?: string,
+  filePath?: string // Optional file path - if provided, uses this for consistent object key (overwrites)
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     // Get R2 configuration
@@ -27,15 +28,19 @@ export async function uploadFileToR2(
       return { success: false, error: "R2 configuration is incomplete" };
     }
 
-    // Generate unique filename to avoid collisions
-    const timestamp = Date.now();
-    const randomId = crypto.randomBytes(8).toString("hex");
-    const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_").substring(0, 100);
+    // Use filePath if provided (for overwriting), otherwise use fileName
+    // Normalize the path: remove leading slashes, normalize separators, sanitize special chars
+    const pathToUse = filePath || fileName;
+    const sanitizedPath = pathToUse
+      .replace(/^\/+/, "") // Remove leading slashes
+      .replace(/\/+/g, "/") // Normalize multiple slashes to single
+      .replace(/[^a-zA-Z0-9./_-]/g, "_") // Replace special chars with underscore
+      .substring(0, 200); // Limit length
     
-    // Build object key with project structure if projectId is provided
+    // Build object key using the file path (same path = same key = overwrites existing file)
     const objectKey = projectId
-      ? `users/${userId}/projects/${projectId}/conversations/${conversationId}/files/${timestamp}-${randomId}-${sanitizedName}`
-      : `users/${userId}/conversations/${conversationId}/files/${timestamp}-${randomId}-${sanitizedName}`;
+      ? `users/${userId}/projects/${projectId}/conversations/${conversationId}/files/${sanitizedPath}`
+      : `users/${userId}/conversations/${conversationId}/files/${sanitizedPath}`;
 
     // Upload to R2 using S3-compatible API
     const uploadResult = await uploadToR2({
@@ -500,6 +505,66 @@ async function getFromR2({
     return {
       success: false,
       error: error.message || "Unknown error during fetch",
+    };
+  }
+}
+
+/**
+ * Fetch file content from R2 using the file URL
+ */
+export async function fetchFileFromR2(
+  fileUrl: string
+): Promise<{ success: boolean; content?: string; error?: string }> {
+  try {
+    // Get R2 configuration
+    const r2Endpoint = getEnvWithDefault("R2_ENDPOINT", "");
+    const r2AccessKey = getEnvWithDefault("R2_ACCESS_KEY", "");
+    const r2SecretKey = getEnvWithDefault("R2_SECRET_KEY", "");
+    const r2BucketName = getEnvWithDefault("R2_BUCKET_NAME", "");
+    const r2PublicBaseUrl = getEnvWithDefault("R2_PUBLIC_BASE_URL", "");
+
+    if (!r2Endpoint || !r2AccessKey || !r2SecretKey || !r2BucketName) {
+      return { success: false, error: "R2 configuration is incomplete" };
+    }
+
+    // Extract object key from URL
+    // URL format: {r2PublicBaseUrl}/{objectKey} or {r2Endpoint}/{bucketName}/{objectKey}
+    let objectKey = "";
+    if (r2PublicBaseUrl && fileUrl.startsWith(r2PublicBaseUrl)) {
+      objectKey = fileUrl.replace(r2PublicBaseUrl, "").replace(/^\//, "");
+    } else if (fileUrl.includes(`/${r2BucketName}/`)) {
+      objectKey = fileUrl.split(`/${r2BucketName}/`)[1];
+    } else {
+      // Try to extract from URL path
+      const urlObj = new URL(fileUrl);
+      const pathParts = urlObj.pathname.split("/");
+      const bucketIndex = pathParts.findIndex((p) => p === r2BucketName);
+      if (bucketIndex !== -1 && bucketIndex < pathParts.length - 1) {
+        objectKey = pathParts.slice(bucketIndex + 1).join("/");
+      } else {
+        return { success: false, error: "Could not extract object key from URL" };
+      }
+    }
+
+    // Fetch from R2
+    const result = await getFromR2({
+      endpoint: r2Endpoint,
+      accessKey: r2AccessKey,
+      secretKey: r2SecretKey,
+      bucketName: r2BucketName,
+      objectKey,
+    });
+
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || "Failed to fetch file" };
+    }
+
+    return { success: true, content: result.data };
+  } catch (error: any) {
+    console.error("Error fetching file from R2:", error.message);
+    return {
+      success: false,
+      error: error.message || "Unknown error during file fetch",
     };
   }
 }

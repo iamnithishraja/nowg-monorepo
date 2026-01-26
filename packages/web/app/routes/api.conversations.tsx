@@ -4,7 +4,10 @@ import { auth } from "~/lib/auth";
 import { extractNowgaiActions } from "~/utils/workspaceApi";
 import { createClientFileStorageService } from "~/lib/clientFileStorage";
 import { EnhancedChatPersistence } from "~/lib/enhancedPersistence";
-import { getConversationFromR2 } from "~/lib/r2Storage";
+import { getConversationFromR2, uploadFileToR2, fetchFileFromR2 } from "~/lib/r2Storage";
+import Conversation from "~/models/conversationModel";
+import AgentMessage from "~/models/agentMessageModel";
+import { connectToDatabase } from "~/lib/mongo";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -31,6 +34,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     // If conversationId is provided, get specific conversation with messages
     if (conversationId) {
+      // Get conversation metadata from database (for title, model, etc.)
       const conversation = await chatService.getConversation(
         conversationId,
         userId
@@ -45,23 +49,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
         );
       }
 
-      // Use the populated messages from the conversation instead of fetching separately
-      const messages = conversation.messages || [];
-
-      // Sort messages by timestamp to ensure proper order
-      const sortedMessages = messages.sort(
-        (a: any, b: any) =>
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
-
       // Convert Mongoose document to plain object
       const conversationObj = conversation.toObject();
       const projectId = (conversationObj as any).adminProjectId
         ? (conversationObj as any).adminProjectId.toString()
         : undefined;
 
-      // Try to fetch files from R2 first (faster, no message loop needed)
-      let r2FilesMap: Map<string, any[]> = new Map();
+      // Try to fetch entire conversation (messages + files) from R2 first
+      let r2Messages: any[] | null = null;
       try {
         const r2Result = await getConversationFromR2(
           userId,
@@ -70,22 +65,35 @@ export async function loader({ request }: LoaderFunctionArgs) {
         );
 
         if (r2Result.success && r2Result.data && r2Result.data.messages) {
-          // Build a map of messageId -> r2Files from R2 data
-          for (const msg of r2Result.data.messages) {
-            if (msg.r2Files && msg.r2Files.length > 0) {
-              r2FilesMap.set(msg.id, msg.r2Files);
-            }
-          }
+          r2Messages = r2Result.data.messages;
           console.log(
-            `[API] Loaded ${r2FilesMap.size} messages with files from R2 for conversation ${conversationId}`
+            `[API] Loaded ${r2Messages?.length || 0} messages from R2 for conversation ${conversationId}`
           );
         }
       } catch (r2Error) {
         console.warn(
-          `[API] Failed to fetch from R2, using database files:`,
+          `[API] Failed to fetch from R2, falling back to database:`,
           r2Error
         );
       }
+
+      // Use R2 messages if available, otherwise fall back to database messages
+      let messages: any[] = [];
+      if (r2Messages && r2Messages.length > 0) {
+        // Use R2 messages (they already have r2Files included)
+        messages = r2Messages;
+      } else {
+        // Fallback to database messages
+        const dbMessages = conversation.messages || [];
+        messages = dbMessages;
+      }
+
+      // Sort messages by timestamp to ensure proper order
+      const sortedMessages = messages.sort(
+        (a: any, b: any) =>
+          new Date(a.timestamp || a.createdAt).getTime() -
+          new Date(b.timestamp || b.createdAt).getTime()
+      );
 
       const responseData = {
         conversation: {
@@ -94,45 +102,39 @@ export async function loader({ request }: LoaderFunctionArgs) {
           adminProjectId: (conversationObj as any).adminProjectId || null,
         },
         messages: sortedMessages.map((msg: any) => {
-          const messageId = msg._id.toString();
-          // Use files from R2 if available, otherwise fall back to database
-          const r2Files = r2FilesMap.get(messageId);
-          const files = r2Files
-            ? r2Files.map((f: any) => ({
-                id: f.url || f.id || `${messageId}-${f.name}`,
-                name: f.name,
-                type: f.type,
-                size: f.size,
-                url: f.url,
-                uploadedAt: f.uploadedAt,
-              }))
-            : // Fallback to database files
-            msg.r2Files && msg.r2Files.length > 0
-            ? msg.r2Files.map((f: any) => ({
-                id: f.url || f._id?.toString(),
-                name: f.name,
-                type: f.type,
-                size: f.size,
-                url: f.url,
-                uploadedAt: f.uploadedAt,
-              }))
-            : // Legacy files
-            msg.files && msg.files.length > 0
-            ? msg.files.map((f: any) => ({
-                id: f._id ? f._id.toString() : f.id,
-                name: f.name,
-                type: f.type,
-                size: f.size,
-                uploadedAt: f.uploadedAt,
-                base64Data: f.base64Data, // Include file content for persistence
-              }))
-            : undefined;
+          const messageId = msg.id || msg._id?.toString();
+          
+          // Files: prefer r2Files from R2, then database r2Files, then legacy files
+          let files: any[] | undefined = undefined;
+          
+          if (msg.r2Files && msg.r2Files.length > 0) {
+            // R2 files (from R2 or database)
+            files = msg.r2Files.map((f: any) => ({
+              id: f.url || f.id || `${messageId}-${f.name}`,
+              name: f.name,
+              type: f.type,
+              size: f.size,
+              url: f.url,
+              uploadedAt: f.uploadedAt,
+              filePath: f.filePath, // Include filePath for restoration
+            }));
+          } else if (msg.files && msg.files.length > 0) {
+            // Legacy database files
+            files = msg.files.map((f: any) => ({
+              id: f._id ? f._id.toString() : f.id,
+              name: f.name,
+              type: f.type,
+              size: f.size,
+              uploadedAt: f.uploadedAt,
+              base64Data: f.base64Data, // Include file content for persistence
+            }));
+          }
 
           return {
             id: messageId,
             role: msg.role,
-            content: msg.content,
-            timestamp: msg.timestamp,
+            content: msg.content || "",
+            timestamp: msg.timestamp || msg.createdAt,
             model: msg.model,
             // Tool calls for assistant messages
             toolCalls: msg.toolCalls && msg.toolCalls.length > 0
@@ -223,6 +225,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
+    console.log("[API Conversations] POST request received");
+    
     // Get authenticated user session
     const authInstance = await auth;
     const session = await authInstance.api.getSession({
@@ -280,6 +284,14 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Get conversationId from URL params or request body (URL takes precedence for consistency)
     const conversationId = url.searchParams.get("conversationId") || bodyConversationId;
+
+    console.log(`[API Conversations] Processing action: ${actionType}, conversationId: ${conversationId || 'none'}`);
+
+    // Debug action for client-side logging visibility
+    if (actionType === "debug") {
+      console.log(`[DEBUG CLIENT] ${requestBody.debug}`);
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
 
     const chatService = new ChatService();
 
@@ -890,14 +902,14 @@ export async function action({ request }: ActionFunctionArgs) {
               if (chat && chat.messages) {
                 r2ChatMessages = chat.messages;
                 console.log(
-                  `[API] Loaded ${r2ChatMessages.length} messages from R2 for chat ${requestBody.chatId}`
+                  `[API] Loaded ${r2ChatMessages?.length || 0} messages from R2 for chat ${requestBody.chatId}`
                 );
               }
             } else {
               // Main conversation messages
               r2ChatMessages = r2Result.data.messages || [];
               console.log(
-                `[API] Loaded ${r2ChatMessages.length} messages from R2 for main conversation`
+                `[API] Loaded ${r2ChatMessages?.length || 0} messages from R2 for main conversation`
               );
             }
           }
@@ -908,9 +920,50 @@ export async function action({ request }: ActionFunctionArgs) {
           );
         }
 
-        // If we got messages from R2, use them
+        // If we got messages from R2, format and return them
         if (r2ChatMessages && r2ChatMessages.length > 0) {
-          return new Response(JSON.stringify({ success: true, messages: r2ChatMessages }), {
+          // Format R2 messages for frontend (ensure files are properly structured)
+          const formattedMessages = r2ChatMessages.map((msg: any) => {
+            const messageId = msg.id;
+            
+            // Files: use r2Files from R2
+            let files: any[] | undefined = undefined;
+            if (msg.r2Files && msg.r2Files.length > 0) {
+              files = msg.r2Files.map((f: any) => ({
+                id: f.url || f.id || `${messageId}-${f.name}`,
+                name: f.name,
+                type: f.type,
+                size: f.size,
+                url: f.url,
+                uploadedAt: f.uploadedAt,
+                filePath: f.filePath, // Include filePath for restoration
+              }));
+            }
+
+            return {
+              id: messageId,
+              role: msg.role,
+              content: msg.content || "",
+              timestamp: msg.timestamp || msg.createdAt,
+              model: msg.model,
+              // Tool calls for assistant messages
+              toolCalls: msg.toolCalls && msg.toolCalls.length > 0
+                ? msg.toolCalls.map((tc: any) => ({
+                    id: tc.id,
+                    name: tc.name,
+                    args: tc.args,
+                    status: tc.status,
+                    result: tc.result,
+                    startTime: tc.startTime,
+                    endTime: tc.endTime,
+                    category: tc.category,
+                  }))
+                : undefined,
+              files,
+            };
+          });
+
+          return new Response(JSON.stringify({ success: true, messages: formattedMessages }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
@@ -1040,6 +1093,381 @@ export async function action({ request }: ActionFunctionArgs) {
           return new Response(
             JSON.stringify({
               error: error.message || "Failed to add chat message",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+      case "syncFilesToR2":
+        // Sync files from WebContainer to R2 after tool calls complete in a sub-chat
+        // This ensures files modified in sub-chats are available when returning to main conversation
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        if (!requestBody.files || !Array.isArray(requestBody.files)) {
+          return new Response(
+            JSON.stringify({ error: "Files array is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          await connectToDatabase();
+          
+          // Verify conversation belongs to user
+          const conversation = await Conversation.findById(conversationId);
+          if (!conversation || conversation.userId.toString() !== userId) {
+            return new Response(
+              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              {
+                status: 404,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          const projectId = conversation.adminProjectId
+            ? conversation.adminProjectId.toString()
+            : undefined;
+
+          // Content type mapping
+          const contentTypeMap: Record<string, string> = {
+            js: "application/javascript",
+            ts: "application/typescript",
+            tsx: "application/typescript",
+            jsx: "application/javascript",
+            json: "application/json",
+            html: "text/html",
+            css: "text/css",
+            md: "text/markdown",
+            txt: "text/plain",
+            py: "text/x-python",
+            java: "text/x-java-source",
+            cpp: "text/x-c++src",
+            c: "text/x-csrc",
+            go: "text/x-go",
+            rs: "text/x-rust",
+            php: "text/x-php",
+            rb: "text/x-ruby",
+            sh: "text/x-shellscript",
+            yml: "text/yaml",
+            yaml: "text/yaml",
+            xml: "application/xml",
+            svg: "image/svg+xml",
+          };
+
+          const uploadedFiles: Array<{
+            name: string;
+            filePath: string;
+            contentType: string; // Renamed from 'type' to avoid Mongoose reserved keyword
+            size: number;
+            url: string;
+            uploadedAt: Date;
+          }> = [];
+
+          // Upload each file to R2
+          for (const file of requestBody.files) {
+            if (!file.path || !file.content) continue;
+            
+            // Skip node_modules and other ignored files
+            if (file.path.includes("node_modules") || 
+                file.path.includes("package-lock.json") ||
+                file.path.includes(".git/")) {
+              continue;
+            }
+
+            try {
+              const extension = file.path.split(".").pop()?.toLowerCase() || "";
+              const contentType = contentTypeMap[extension] || "text/plain";
+              const fileName = file.path.split("/").pop() || file.path;
+              const filePath = file.path.replace(/^\/+/, ""); // Remove leading slashes
+
+              const fileBuffer = Buffer.from(file.content, "utf-8");
+
+              const uploadResult = await uploadFileToR2(
+                userId,
+                conversationId,
+                fileBuffer,
+                fileName,
+                contentType,
+                projectId,
+                filePath
+              );
+
+              if (uploadResult.success && uploadResult.url) {
+                uploadedFiles.push({
+                  name: fileName,
+                  filePath: filePath,
+                  contentType: contentType, // Renamed from 'type' to avoid Mongoose reserved keyword
+                  size: fileBuffer.length,
+                  url: uploadResult.url,
+                  uploadedAt: new Date(),
+                });
+              }
+            } catch (fileError: any) {
+              console.error(`[syncFilesToR2] Error uploading ${file.path}:`, fileError.message);
+            }
+          }
+
+          console.log(`[syncFilesToR2] Uploaded ${uploadedFiles.length} files to R2 for conversation ${conversationId}`);
+
+          // If chatId is provided, update the last assistant message in that chat with r2Files
+          if (requestBody.chatId && uploadedFiles.length > 0) {
+            try {
+              // Find the last assistant message in this chat
+              const chat = await (await import("~/models/chatModel")).default.findById(requestBody.chatId);
+              if (chat && chat.messages && chat.messages.length > 0) {
+                // Get the last message ID
+                const lastMessageId = chat.messages[chat.messages.length - 1];
+                
+                // Update the message with r2Files
+                await AgentMessage.findByIdAndUpdate(lastMessageId, {
+                  $push: { r2Files: { $each: uploadedFiles } },
+                });
+                
+                console.log(`[syncFilesToR2] Updated message ${lastMessageId} with ${uploadedFiles.length} r2Files`);
+              }
+            } catch (updateError: any) {
+              console.error("[syncFilesToR2] Error updating message with r2Files:", updateError.message);
+            }
+          }
+
+          // Sync conversation to R2 to update conversation.json with latest files
+          try {
+            await chatService.syncConversationToR2Public(conversationId, userId);
+            console.log(`[syncFilesToR2] Synced conversation.json to R2`);
+          } catch (syncError: any) {
+            console.error("[syncFilesToR2] Error syncing conversation to R2:", syncError.message);
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              uploadedCount: uploadedFiles.length,
+              files: uploadedFiles.map(f => ({ path: f.filePath, url: f.url })),
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        } catch (error: any) {
+          console.error("[syncFilesToR2] Error:", error);
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to sync files to R2",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+      case "getFilesFromR2":
+        // Get all files for a conversation directly from R2 storage
+        // This fetches actual file content from R2, not reconstructing from messages
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          await connectToDatabase();
+          
+          // Verify conversation belongs to user
+          const convForFiles = await Conversation.findById(conversationId);
+          if (!convForFiles || convForFiles.userId.toString() !== userId) {
+            return new Response(
+              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              {
+                status: 404,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          const projId = convForFiles.adminProjectId
+            ? convForFiles.adminProjectId.toString()
+            : undefined;
+
+          // Fetch conversation data from R2
+          console.log(`[getFilesFromR2] Fetching conversation data from R2 for ${conversationId}...`);
+          const r2Result = await getConversationFromR2(userId, conversationId, projId);
+
+          if (!r2Result.success || !r2Result.data) {
+            console.warn("[getFilesFromR2] Failed to fetch conversation from R2:", r2Result.error);
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: r2Result.error || "Conversation not found in R2",
+                files: [] 
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          const conversationData = r2Result.data;
+          console.log(`[getFilesFromR2] Fetched conversation data. Main messages: ${conversationData.messages?.length || 0}, Chats: ${conversationData.chats?.length || 0}`);
+
+          // Collect all r2Files from main conversation messages with message timestamp
+          interface R2FileInfo {
+            url: string;
+            name: string;
+            filePath: string;
+            type: string;
+            uploadedAt: Date | string;
+            messageTimestamp: Date | string;
+          }
+          
+          const allR2Files: R2FileInfo[] = [];
+
+          // Get files from main conversation messages
+          const mainMessages = conversationData.messages || [];
+          let mainFilesCount = 0;
+          for (const msg of mainMessages) {
+            if (msg.r2Files && Array.isArray(msg.r2Files)) {
+              for (const file of msg.r2Files) {
+                if (file.url && file.name) {
+                  const filePath = file.filePath || file.name;
+                  allR2Files.push({
+                    url: file.url,
+                    name: file.name,
+                    filePath: filePath,
+                    type: file.contentType || file.type || "text/plain", // Support both old 'type' and new 'contentType'
+                    uploadedAt: file.uploadedAt || msg.timestamp || new Date(),
+                    messageTimestamp: msg.timestamp || msg.createdAt || new Date(),
+                  });
+                  mainFilesCount++;
+                }
+              }
+            }
+          }
+          console.log(`[getFilesFromR2] Found ${mainFilesCount} files in main conversation messages`);
+
+          // Get files from all chat messages
+          const chats = conversationData.chats || [];
+          let chatFilesCount = 0;
+          for (const chat of chats) {
+            const chatMessages = chat.messages || [];
+            for (const msg of chatMessages) {
+              if (msg.r2Files && Array.isArray(msg.r2Files)) {
+                for (const file of msg.r2Files) {
+                  if (file.url && file.name) {
+                    const filePath = file.filePath || file.name;
+                    allR2Files.push({
+                      url: file.url,
+                      name: file.name,
+                      filePath: filePath,
+                      type: file.contentType || file.type || "text/plain", // Support both old 'type' and new 'contentType'
+                      uploadedAt: file.uploadedAt || msg.timestamp || msg.createdAt || new Date(),
+                      messageTimestamp: msg.timestamp || msg.createdAt || new Date(),
+                    });
+                    chatFilesCount++;
+                  }
+                }
+              }
+            }
+          }
+          console.log(`[getFilesFromR2] Found ${chatFilesCount} files in chat messages (${chats.length} chats)`);
+
+          if (allR2Files.length === 0) {
+            console.log("[getFilesFromR2] No files found in R2");
+            return new Response(
+              JSON.stringify({ success: true, files: [] }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          // Group files by path, keeping the latest version
+          const filesByPath = new Map<string, R2FileInfo>();
+          
+          for (const file of allR2Files) {
+            const normalizedPath = file.filePath.replace(/^\/+/, "");
+            const existing = filesByPath.get(normalizedPath);
+            
+            if (!existing) {
+              filesByPath.set(normalizedPath, file);
+            } else {
+              // Keep the latest version by message timestamp
+              const existingMsgTime = new Date(existing.messageTimestamp).getTime();
+              const currentMsgTime = new Date(file.messageTimestamp).getTime();
+              
+              if (currentMsgTime > existingMsgTime) {
+                filesByPath.set(normalizedPath, file);
+              } else if (currentMsgTime === existingMsgTime) {
+                // Use uploadedAt as tiebreaker
+                const existingTime = new Date(existing.uploadedAt).getTime();
+                const currentTime = new Date(file.uploadedAt).getTime();
+                if (currentTime > existingTime) {
+                  filesByPath.set(normalizedPath, file);
+                }
+              }
+            }
+          }
+
+          console.log(`[getFilesFromR2] Grouped to ${filesByPath.size} unique files`);
+
+          // Fetch actual file content from R2
+          const filesWithContent: Array<{ path: string; name: string; content: string; type: string }> = [];
+          const fetchPromises = Array.from(filesByPath.entries()).map(async ([filePath, fileInfo]) => {
+            try {
+              const fetchResult = await fetchFileFromR2(fileInfo.url);
+              if (fetchResult.success && fetchResult.content) {
+                filesWithContent.push({
+                  path: filePath,
+                  name: fileInfo.name,
+                  content: fetchResult.content,
+                  type: fileInfo.type,
+                });
+              } else {
+                console.warn(`[getFilesFromR2] Failed to fetch file ${filePath}:`, fetchResult.error);
+              }
+            } catch (fetchError: any) {
+              console.error(`[getFilesFromR2] Error fetching file ${filePath}:`, fetchError.message);
+            }
+          });
+
+          await Promise.all(fetchPromises);
+
+          console.log(`[getFilesFromR2] Successfully fetched ${filesWithContent.length}/${filesByPath.size} files from R2`);
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              files: filesWithContent,
+              totalFound: allR2Files.length,
+              uniqueFiles: filesByPath.size,
+              fetchedFiles: filesWithContent.length,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        } catch (error: any) {
+          console.error("[getFilesFromR2] Error:", error);
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to get files from R2",
             }),
             { status: 400, headers: { "Content-Type": "application/json" } }
           );

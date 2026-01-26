@@ -96,16 +96,6 @@ export function useChatHandlers({
           // Use "general" agent for ask mode, "build" for build mode
           const agentName = chatMode === "ask" ? "general" : "build";
 
-          console.log(
-            "[ChatHandler] Sending request to agent API | Mode:",
-            chatMode,
-            "| Agent:",
-            agentName,
-            "| ConvId:",
-            conversationId,
-            "| ChatId:",
-            chatId
-          );
           const response = await fetch("/api/agent", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -124,10 +114,6 @@ export function useChatHandlers({
             signal: abortController.signal,
           });
 
-          console.log(
-            "[ChatHandler] Agent API response status:",
-            response.status
-          );
           if (!response.ok) {
             const errorText = await response
               .text()
@@ -147,14 +133,9 @@ export function useChatHandlers({
             response: Response,
             sessionId?: string,
             currentStep = 0,
-            isContinuation = false
+            isContinuation = false,
+            accumulatedToolCalls: any[] = [] // Pass tool calls directly instead of relying on React state
           ): Promise<{ text: string; toolCalls: any[] }> => {
-            console.log(
-              "[ChatHandler] Starting to process agent stream, step:",
-              currentStep,
-              "| Continuation:",
-              isContinuation
-            );
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
             
@@ -165,15 +146,18 @@ export function useChatHandlers({
               const lastMessage = chat.messages[chat.messages.length - 1];
               if (lastMessage?.role === "assistant" && lastMessage.content) {
                 assistantText = lastMessage.content;
-                console.log("[ChatHandler] Continuation: starting with existing content length:", assistantText.length);
               }
             }
             
-            let allToolCalls: any[] = [];
-            // For continuations, also preserve existing tool calls
-            if (isContinuation && chat.currentToolCalls && chat.currentToolCalls.length > 0) {
-              allToolCalls = [...chat.currentToolCalls];
-              console.log("[ChatHandler] Continuation: preserving", allToolCalls.length, "existing tool calls");
+            // Use accumulated tool calls passed directly (not relying on React state which is async)
+            let allToolCalls: any[] = [...accumulatedToolCalls];
+            if (isContinuation && accumulatedToolCalls.length > 0) {
+              console.log(
+                "[ChatHandler] Continuation started with",
+                accumulatedToolCalls.length,
+                "accumulated tool calls:",
+                accumulatedToolCalls.map((tc) => tc.name)
+              );
             }
             
             let currentSessionId = sessionId;
@@ -186,14 +170,6 @@ export function useChatHandlers({
             while (true) {
               const { done, value } = await reader.read();
               if (done) {
-                console.log(
-                  "[ChatHandler] Stream done, step:",
-                  currentStep,
-                  "| Text length:",
-                  assistantText.length,
-                  "| Tool calls:",
-                  allToolCalls.length
-                );
                 break;
               }
 
@@ -205,26 +181,14 @@ export function useChatHandlers({
 
                 try {
                   const data = JSON.parse(line.slice(6));
-                  console.log(
-                    "[ChatHandler] Stream event:",
-                    data.type,
-                    "| Step:",
-                    currentStep
-                  );
 
                   if (data.type === "session_start") {
                     currentSessionId = data.sessionId;
-                    console.log(
-                      "[ChatHandler] Session started:",
-                      currentSessionId
-                    );
                   } else if (data.type === "chat_title_updated") {
                     // Chat title was generated from first user message
-                    console.log("[ChatHandler] Chat title updated:", data.chatTitle);
                     onChatTitleUpdated?.(data.chatTitle);
                   } else if (data.type === "user_message_saved") {
                     // User message was saved to database
-                    console.log("[ChatHandler] User message saved:", data.messageId);
                   } else if (data.type === "text_delta") {
                     assistantText += data.delta;
                     // Update message content
@@ -251,17 +215,7 @@ export function useChatHandlers({
                     ]);
                     // Append to streaming segments for ordered rendering
                     chat.appendToolCallSegment?.(toolCall, isMountedRef);
-                    console.log(
-                      "[ChatHandler] Tool call received:",
-                      toolCall.name
-                    );
                   } else if (data.type === "awaiting_tool_results") {
-                    console.log(
-                      "[ChatHandler] Awaiting tool results | Ack:",
-                      data.ackTools?.length || 0,
-                      "| Auto:",
-                      data.autoTools?.length || 0
-                    );
                     // Update tool calls from event if provided
                     if (data.toolCalls && Array.isArray(data.toolCalls)) {
                       const newToolCalls: any[] = [];
@@ -296,10 +250,6 @@ export function useChatHandlers({
                     const ackTools = data.ackTools || [];
                     const allToolsToExecute = [...autoTools, ...ackTools];
 
-                    console.log(
-                      "[ChatHandler] Tools to execute:",
-                      allToolsToExecute.length
-                    );
 
                     // Ensure WebContainer is available before executing tools
                     // WebContainer is booted when runWebContainer is called, but in chats we might not have files
@@ -315,9 +265,6 @@ export function useChatHandlers({
                         WebContainerProvider.getInstance().getContainerSync();
                       if (!container) {
                         // Boot WebContainer by running with empty files (this will boot but not write anything)
-                        console.log(
-                          "[ChatHandler] Booting WebContainer for tool execution"
-                        );
                         await runWebContainer([]);
                         // Wait a bit for container to be set
                         await new Promise((resolve) =>
@@ -326,10 +273,6 @@ export function useChatHandlers({
                         container =
                           WebContainerProvider.getInstance().getContainerSync();
                       }
-                      console.log(
-                        "[ChatHandler] WebContainer available:",
-                        !!container
-                      );
                     } catch (wcError) {
                       console.error(
                         "[ChatHandler] Failed to ensure WebContainer:",
@@ -342,12 +285,6 @@ export function useChatHandlers({
                     const toolResults = [];
                     for (const toolCall of allToolsToExecute) {
                       try {
-                        console.log(
-                          "[ChatHandler] Executing tool:",
-                          toolCall.name,
-                          "| Args:",
-                          JSON.stringify(toolCall.args).substring(0, 200)
-                        );
                         const { ToolRegistry } =
                           await import("../../tools/registry");
                         const tool = ToolRegistry.get(toolCall.name);
@@ -413,12 +350,6 @@ export function useChatHandlers({
                             );
                           }
 
-                          console.log(
-                            "[ChatHandler] Tool executed successfully:",
-                            toolCall.name,
-                            "| Has output:",
-                            hasOutput
-                          );
                         } catch (executeError) {
                           console.error(
                             "[ChatHandler] Tool execution failed:",
@@ -712,13 +643,16 @@ export function useChatHandlers({
 
                       // Recursively process the continuation stream (appends to same message)
                       console.log(
-                        "[ChatHandler] Processing continuation stream"
+                        "[ChatHandler] Processing continuation stream | Passing",
+                        allToolCalls.length,
+                        "accumulated tool calls"
                       );
                       const continuationResult = await processAgentStream(
                         continuationResponse,
                         currentSessionId,
                         (data.step || currentStep) + 1,
-                        true
+                        true,
+                        allToolCalls // Pass accumulated tool calls directly
                       );
                       // Continuation already updates streaming segments and tool calls directly
                       // Return the accumulated values from the continuation (which includes everything)
@@ -767,14 +701,7 @@ export function useChatHandlers({
             return { text: assistantText, toolCalls: allToolCalls };
           };
 
-          console.log("[ChatHandler] Starting agent stream processing");
           const result = await processAgentStream(response);
-          console.log(
-            "[ChatHandler] Agent stream processing complete | Text:",
-            result.text.length,
-            "chars | Tool calls:",
-            result.toolCalls.length
-          );
 
           // Get current messages snapshot
           const currentMessages = [...chat.messages];
@@ -823,16 +750,7 @@ export function useChatHandlers({
               const updatedMessage = updated.find(
                 (m: Message) => m.id === lastAssistantMessage.id
               );
-              console.log("[ChatHandler] Updated message with toolCalls:", {
-                messageId: lastAssistantMessage.id,
-                toolCallsCount: finalizedToolCalls.length,
-                fileChangesCount: finalizedToolCalls.filter((tc: any) =>
-                  ["edit", "write", "multiedit"].includes(tc.name)
-                ).length,
-                messageHasToolCalls: !!(updatedMessage as any)?.toolCalls,
-                messageToolCallsCount:
-                  (updatedMessage as any)?.toolCalls?.length || 0,
-              });
+              // Message updated with tool calls (debug log disabled)
 
               return updated;
             });
@@ -843,6 +761,128 @@ export function useChatHandlers({
             // Note: Assistant message is now saved by the agent API directly
             // This ensures proper ordering and includes token usage info
             // The UI state is updated above with the final content and tool calls
+          }
+
+          // After tool calls complete, sync files to R2 and save IndexedDB snapshot
+          // This ensures files modified in sub-chats are available when returning to main conversation
+          console.log(
+            "[ChatHandler] Final result | Text:",
+            result.text.length,
+            "chars | Tool calls:",
+            result.toolCalls.length,
+            "| Tool names:",
+            result.toolCalls.map((tc) => tc.name)
+          );
+          if (result.toolCalls.length > 0) {
+            try {
+              // Check if any tool calls modified files
+              const fileModifyingTools = result.toolCalls.filter(
+                (tc) => ["edit", "write", "multiedit"].includes(tc.name) && 
+                        tc.status !== "error"
+              );
+              
+              if (fileModifyingTools.length > 0) {
+                console.log(`[ChatHandler] ${fileModifyingTools.length} file-modifying tool calls completed, syncing files...`);
+                
+                // Get current files from WebContainer
+                const { WebContainerProvider } = await import("../../tools/webcontainer-provider");
+                const { WORK_DIR } = await import("../../utils/constants");
+                const container = WebContainerProvider.getInstance().getContainerSync();
+                
+                if (container) {
+                  // Read all files from WebContainer
+                  const filesToSync: Array<{ path: string; content: string }> = [];
+                  
+                  // Get the list of files that were modified
+                  const modifiedPaths = new Set<string>();
+                  for (const tc of fileModifyingTools) {
+                    const filePath = tc.args?.filePath || tc.args?.path;
+                    if (filePath) {
+                      modifiedPaths.add(filePath);
+                    }
+                    // Handle multiedit operations
+                    if (tc.name === "multiedit" && tc.args?.operations) {
+                      for (const op of tc.args.operations) {
+                        const opPath = op.filePath || op.path;
+                        if (opPath) modifiedPaths.add(opPath);
+                      }
+                    }
+                  }
+                  
+                  // Read each modified file from WebContainer
+                  for (const filePath of modifiedPaths) {
+                    try {
+                      let normalizedPath = filePath;
+                      if (!normalizedPath.startsWith("/")) {
+                        normalizedPath = `/${normalizedPath}`;
+                      }
+                      if (!normalizedPath.startsWith(WORK_DIR)) {
+                        normalizedPath = `${WORK_DIR}${normalizedPath.startsWith("/") ? "" : "/"}${normalizedPath}`;
+                      }
+                      
+                      const bytes = await container.fs.readFile(normalizedPath);
+                      const content = new TextDecoder().decode(bytes);
+                      
+                      // Store with relative path (without WORK_DIR prefix)
+                      const relativePath = normalizedPath.replace(WORK_DIR, "").replace(/^\/+/, "");
+                      filesToSync.push({ path: relativePath, content });
+                    } catch (readError) {
+                      console.warn(`[ChatHandler] Could not read file ${filePath} for sync:`, readError);
+                    }
+                  }
+                  
+                  if (filesToSync.length > 0) {
+                    // Sync files to R2
+                    console.log(`[ChatHandler] Syncing ${filesToSync.length} files to R2...`);
+                    try {
+                      const syncResponse = await fetch("/api/conversations", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "syncFilesToR2",
+                          conversationId,
+                          chatId,
+                          files: filesToSync,
+                        }),
+                      });
+                      
+                      if (syncResponse.ok) {
+                        const syncResult = await syncResponse.json();
+                        console.log(`[ChatHandler] Synced ${syncResult.uploadedCount} files to R2`);
+                      } else {
+                        console.warn("[ChatHandler] Failed to sync files to R2:", await syncResponse.text());
+                      }
+                    } catch (syncError) {
+                      console.error("[ChatHandler] Error syncing files to R2:", syncError);
+                    }
+                    
+                    // Also save IndexedDB snapshot for the MAIN conversation (not the chat)
+                    // This ensures fast restore when returning to main conversation
+                    try {
+                      const { saveSnapshot, filesToSnapshot } = await import("../../lib/chatPersistence");
+                      
+                      // Get ALL current files from files state (not just modified ones)
+                      // This ensures the snapshot has the complete current state
+                      const allFiles = files.templateFilesState || [];
+                      if (allFiles.length > 0) {
+                        const snapshot = filesToSnapshot(
+                          allFiles.map((f: any) => ({
+                            path: f.path,
+                            content: f.content,
+                          }))
+                        );
+                        await saveSnapshot(conversationId, snapshot);
+                        console.log(`[ChatHandler] Saved IndexedDB snapshot for main conversation ${conversationId} (${allFiles.length} files)`);
+                      }
+                    } catch (snapshotError) {
+                      console.error("[ChatHandler] Error saving IndexedDB snapshot:", snapshotError);
+                    }
+                  }
+                }
+              }
+            } catch (syncError) {
+              console.error("[ChatHandler] Error in post-tool-call sync:", syncError);
+            }
           }
 
           chat.setIsLoading(false);

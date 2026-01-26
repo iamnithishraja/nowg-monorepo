@@ -50,11 +50,12 @@ const agentMessageSchema = new mongoose.Schema({
   // R2 files stored for this message (similar to Messages model)
   r2Files: [
     {
-      name: String,
-      type: String,
-      size: Number,
-      url: String,
-      uploadedAt: Date,
+      name: { type: String },
+      filePath: { type: String }, // Full file path for restoration
+      contentType: { type: String }, // Renamed from 'type' to avoid Mongoose reserved keyword
+      size: { type: Number },
+      url: { type: String },
+      uploadedAt: { type: Date },
     },
   ],
   createdAt: {

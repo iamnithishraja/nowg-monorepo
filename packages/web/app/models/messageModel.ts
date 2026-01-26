@@ -27,6 +27,17 @@ const messageSchema = new mongoose.Schema({
       ref: "File",
     },
   ],
+  // R2 files stored for this message (inline storage for R2 URLs)
+  r2Files: [
+    {
+      name: { type: String },
+      filePath: { type: String }, // Full file path for restoration
+      contentType: { type: String }, // Renamed from 'type' to avoid Mongoose reserved keyword
+      size: { type: Number },
+      url: { type: String },
+      uploadedAt: { type: Date },
+    },
+  ],
 });
 
 // Ensure uniqueness of client request within a conversation if provided
@@ -37,5 +48,6 @@ try {
   );
 } catch {}
 
-const Messages = mongoose.model("Message", messageSchema);
+// Use existing model if already compiled (for hot reload), otherwise create new one
+const Messages = mongoose.models.Message || mongoose.model("Message", messageSchema);
 export default Messages;

@@ -60,14 +60,15 @@ export class FileService {
         // Convert base64 to buffer
         const fileBuffer = Buffer.from(base64Data, "base64");
 
-        // Upload to R2
+        // Upload to R2 (pass file.name as filePath to allow overwriting)
         const uploadResult = await uploadFileToR2(
           userId,
           conversationId,
           fileBuffer,
           file.name,
           file.type,
-          projectId
+          projectId,
+          file.name // Use filename as path for overwriting
         );
 
         if (uploadResult.success && uploadResult.url) {
@@ -228,7 +229,7 @@ export class FileService {
         );
 
         if (r2Result.success && r2Result.data) {
-          // Extract all files from messages in R2 data
+          // Extract all files from messages in R2 data (main conversation + all chats)
           const allFiles: Array<{
             id: string;
             messageId: string;
@@ -240,6 +241,7 @@ export class FileService {
             uploadedAt: Date;
           }> = [];
 
+          // Get files from main conversation messages
           const messages = r2Result.data.messages || [];
           for (const message of messages) {
             if (message.r2Files && message.r2Files.length > 0) {
@@ -257,6 +259,27 @@ export class FileService {
             }
           }
 
+          // Get files from all chat messages
+          const chats = r2Result.data.chats || [];
+          for (const chat of chats) {
+            const chatMessages = chat.messages || [];
+            for (const message of chatMessages) {
+              if (message.r2Files && message.r2Files.length > 0) {
+                for (const file of message.r2Files) {
+                  allFiles.push({
+                    id: file.url || file.id || `${message.id}-${file.name}`,
+                    messageId: message.id,
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    url: file.url,
+                    uploadedAt: new Date(file.uploadedAt),
+                  });
+                }
+              }
+            }
+          }
+
           // Sort by uploadedAt
           allFiles.sort(
             (a, b) =>
@@ -265,7 +288,7 @@ export class FileService {
           );
 
           console.log(
-            `[FileService] Fetched ${allFiles.length} files from R2 for conversation ${conversationId}`
+            `[FileService] Fetched ${allFiles.length} files from R2 for conversation ${conversationId} (main: ${messages.length} messages, chats: ${chats.length})`
           );
           return allFiles;
         }
