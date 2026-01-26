@@ -659,6 +659,92 @@ export class ChatService {
     }
   }
 
+  // Update an existing message in a chat (for continuations)
+  // Used when the agent loop continues and we need to update the same message
+  // instead of creating a new one
+  async updateChatMessage(
+    conversationId: string,
+    chatId: string,
+    messageId: string,
+    updates: {
+      content?: string;
+      toolCalls?: any[];
+      segments?: any[];
+      tokensUsed?: number;
+      inputTokens?: number;
+      outputTokens?: number;
+    },
+    userId: string
+  ): Promise<{ messageId: string }> {
+    try {
+      await this.ensureConnection();
+
+      // Verify access
+      const conversationAccess = await this.getConversation(conversationId, userId);
+      if (!conversationAccess) {
+        throw new Error("Conversation not found or unauthorized");
+      }
+
+      // Validate IDs
+      if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) {
+        throw new Error("Invalid chatId");
+      }
+      if (!messageId || !mongoose.Types.ObjectId.isValid(messageId)) {
+        throw new Error("Invalid messageId");
+      }
+
+      // Build update object
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+
+      if (updates.content !== undefined) {
+        updateData.content = updates.content;
+      }
+      if (updates.toolCalls !== undefined) {
+        updateData.toolCalls = updates.toolCalls.map((tc: any) => ({
+          id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
+          name: tc.name || tc.toolName,
+          args: tc.args || {},
+          status: tc.status || "completed",
+          result: tc.result,
+          startTime: tc.startTime,
+          endTime: tc.endTime,
+          category: tc.category,
+        }));
+      }
+      if (updates.segments !== undefined) {
+        updateData.segments = updates.segments;
+      }
+      if (updates.tokensUsed !== undefined) {
+        updateData.tokensUsed = updates.tokensUsed;
+      }
+      if (updates.inputTokens !== undefined) {
+        updateData.inputTokens = updates.inputTokens;
+      }
+      if (updates.outputTokens !== undefined) {
+        updateData.outputTokens = updates.outputTokens;
+      }
+
+      // Update the message
+      const result = await AgentMessage.findByIdAndUpdate(
+        messageId,
+        { $set: updateData },
+        { new: true }
+      );
+
+      if (!result) {
+        throw new Error("Message not found");
+      }
+
+      console.log(`[ChatService] Updated message ${messageId} with`, Object.keys(updates).join(", "));
+      return { messageId: result._id.toString() };
+    } catch (error) {
+      console.error("Error updating chat message:", error);
+      throw error;
+    }
+  }
+
   // Get messages for a specific chat
   // Get messages for a specific chat
   // Uses AgentMessage model which supports tool calls and tool results
@@ -720,6 +806,8 @@ export class ChatService {
         id: msg._id.toString(),
         role: msg.role,
         content: msg.content || "",
+        // Segments preserve interleaved order of text and tool calls
+        segments: msg.segments || [],
         toolCalls: msg.toolCalls || [],
         toolResults: msg.toolResults || [],
         // Model and token info (for assistant messages)

@@ -16,6 +16,13 @@ const agentMessageSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
+  // Segments array stores interleaved text and tool calls in order
+  // Each segment is either { type: "text", content: string } or { type: "toolCall", toolCall: {...} }
+  // This preserves the exact order of text and tool calls as they were streamed
+  segments: {
+    type: [Object],
+    required: false,
+  },
   toolCalls: {
     type: [Object],
     required: false,

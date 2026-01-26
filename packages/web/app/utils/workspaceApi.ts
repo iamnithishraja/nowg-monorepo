@@ -123,6 +123,10 @@ export const convertToUIMessages = (messages: any[]): Message[] => {
       role: msg.role,
       content: msg.content || "", // Ensure content is never undefined
       files: msg.files || undefined, // Preserve file metadata
+      // Preserve segments for interleaved text and tool call rendering
+      ...(msg.segments && Array.isArray(msg.segments) && msg.segments.length > 0 
+        ? { segments: msg.segments } 
+        : {}),
       // Preserve toolCalls for assistant messages (needed for file changes display)
       ...(msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0 
         ? { toolCalls: msg.toolCalls } 

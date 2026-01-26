@@ -116,6 +116,14 @@ interface AgentRequest {
   conversationId?: string;
   /** Chat ID for persisting messages to a specific chat */
   chatId?: string;
+  /** Assistant message ID for continuations (update instead of create new) */
+  assistantMessageId?: string;
+  /** Accumulated text content from previous steps */
+  accumulatedText?: string;
+  /** Accumulated tool calls from previous steps */
+  accumulatedToolCalls?: any[];
+  /** Accumulated segments from previous steps (interleaved text and tool calls) */
+  accumulatedSegments?: any[];
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -151,6 +159,10 @@ export async function action({ request }: ActionFunctionArgs) {
       currentStep = 0,
       conversationId,
       chatId,
+      assistantMessageId: inputAssistantMessageId,
+      accumulatedText: inputAccumulatedText = "",
+      accumulatedToolCalls: inputAccumulatedToolCalls = [],
+      accumulatedSegments: inputAccumulatedSegments = [],
     } = body;
 
     const requestType = body.requestType || "prompt";
@@ -187,36 +199,44 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    // Get API key
-    const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
-    if (!openRouterApiKey) {
-      console.error("[Agent API] OPENROUTER_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "OPENROUTER_API_KEY not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
-    
-    console.log("[Agent API] Starting stream processing");
+          // Get API key
+          const openRouterApiKey = getEnv("OPENROUTER_API_KEY");
+          if (!openRouterApiKey) {
+            console.error("[Agent API] OPENROUTER_API_KEY not configured");
+            return new Response(
+              JSON.stringify({ error: "OPENROUTER_API_KEY not configured" }),
+              { status: 500, headers: { "Content-Type": "application/json" } }
+            );
+          }
+          
+          console.log("[Agent API] Starting stream processing");
 
-    // Create streaming response
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        const sendChunk = (data: any) => {
-          const chunk = `data: ${JSON.stringify(data)}\n\n`;
-          console.log("[Agent API] Sending chunk:", data.type, "| Size:", chunk.length, "bytes");
-          controller.enqueue(encoder.encode(chunk));
-        };
+          // Create streaming response
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            async start(controller) {
+              const sendChunk = (data: any) => {
+                const chunk = `data: ${JSON.stringify(data)}\n\n`;
+                console.log("[Agent API] Sending chunk:", data.type, "| Size:", chunk.length, "bytes");
+                controller.enqueue(encoder.encode(chunk));
+              };
 
-        try {
-          // Generate session ID
-          const sessionId = inputSessionId || `agent-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-          const messageId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-          const stepCount = currentStep + 1;
+              try {
+                // Generate session ID
+                const sessionId = inputSessionId || `agent-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                const messageId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                const stepCount = currentStep + 1;
+                
+                // Track assistant message ID for continuations (reuse if provided)
+                let assistantMessageId = inputAssistantMessageId || null;
+                
+                // Track accumulated content across steps
+                let accumulatedText = inputAccumulatedText || "";
+                let accumulatedToolCalls: any[] = [...(inputAccumulatedToolCalls || [])];
+                let accumulatedSegments: any[] = [...(inputAccumulatedSegments || [])];
 
-          sendChunk({ type: "session_start", sessionId, messageId, step: stepCount });
-          console.log("[Agent API] Session started:", sessionId, "| Message:", messageId, "| Step:", stepCount);
+                sendChunk({ type: "session_start", sessionId, messageId, step: stepCount, assistantMessageId });
+                console.log("[Agent API] Session started:", sessionId, "| Message:", messageId, "| Step:", stepCount, "| AssistantMsgId:", assistantMessageId);
 
           // Save user message to database on first step (only for prompt requests)
           if (requestType === "prompt" && prompt && conversationId && chatId && currentStep === 0) {
@@ -267,98 +287,107 @@ export async function action({ request }: ActionFunctionArgs) {
           });
           console.log("[Agent API] Tools resolved:", Object.keys(tools || {}).length, "tools");
 
-          // Build messages array
-          // Convert inputMessages to proper CoreMessage format, filtering out invalid formats
+          // Build messages array as simple CoreMessage[] with string content
+          // This is the most compatible format that works with all providers
+          // Tool calls and results are formatted as clear text so the LLM has full context
           const messages: CoreMessage[] = [];
           
-          // Process input messages and convert to proper format
+          // Process input messages
           for (const msg of inputMessages) {
-            // Handle assistant messages with tool calls
+            // Handle assistant messages with tool calls - format as rich text
             if (msg.role === "assistant" && Array.isArray(msg.content)) {
               const hasToolCalls = msg.content.some((item: any) => item.type === "tool-call");
               if (hasToolCalls) {
-                // Extract text content and tool call info for the assistant message
-                const textItem = msg.content.find((item: any) => item.type === "text");
-                const toolCallItems = msg.content.filter((item: any) => item.type === "tool-call");
+                // Build text content - ONLY include text, NOT raw JSON tool call args
+                // Including raw JSON confuses the LLM and causes it to output JSON as text
+                let textContent = "";
+                const toolCallSummaries: string[] = [];
                 
-                // Build a text representation of what the assistant did
-                // This helps the LLM understand the context of tool results
-                let assistantText = textItem && "text" in textItem ? textItem.text : "";
-                
-                // Add tool call information so LLM knows what tools were called
-                if (toolCallItems.length > 0) {
-                  const toolCallsDesc = toolCallItems.map((tc: any) => 
-                    `- Called tool "${tc.toolName}" (ID: ${tc.toolCallId})`
-                  ).join("\n");
-                  
-                  if (assistantText) {
-                    assistantText += "\n\n[Tool calls made:]\n" + toolCallsDesc;
-                  } else {
-                    assistantText = "[Tool calls made:]\n" + toolCallsDesc;
+                for (const item of msg.content) {
+                  if (item.type === "text" && (item as any).text) {
+                    textContent += (item as any).text;
+                  } else if (item.type === "tool-call") {
+                    // Just note which tool was called, don't include raw JSON args
+                    const toolName = (item as any).toolName || "unknown";
+                    const filePath = (item as any).args?.filePath || (item as any).args?.path || "";
+                    toolCallSummaries.push(filePath ? `${toolName}(${filePath})` : toolName);
                   }
                 }
                 
-                if (assistantText) {
-                  messages.push({ role: "assistant", content: assistantText });
+                // Only include tool call summary if there's no text content
+                // This gives the LLM context without confusing it with raw JSON
+                let fullContent = textContent;
+                if (!textContent.trim() && toolCallSummaries.length > 0) {
+                  fullContent = `[Called tools: ${toolCallSummaries.join(", ")}]`;
                 }
+                
+                messages.push({ role: "assistant", content: fullContent || "[Tool calls made]" });
+                console.log("[Agent API] Converted assistant message with", toolCallSummaries.length, "tool calls to text summary");
                 continue;
               }
             }
             
-            // For other messages, ensure content is in correct format
+            // Handle tool messages with results - format as user message with results
             if (msg.role === "tool" && Array.isArray(msg.content)) {
-              // Tool messages should have tool-result format - keep as is if already correct
-              messages.push(msg);
-            } else if (typeof msg.content === "string" || Array.isArray(msg.content)) {
-              // Valid format - user messages with string content, or properly formatted messages
-              messages.push(msg);
-            } else {
-              console.warn("[Agent API] Skipping message with invalid format:", msg);
+              const resultParts: string[] = [];
+              for (const item of msg.content) {
+                if (item.type === "tool-result") {
+                  resultParts.push(
+                    `=== Tool Result: ${(item as any).toolName} ===\n${(item as any).result}`
+                  );
+                }
+              }
+              if (resultParts.length > 0) {
+                messages.push({ 
+                  role: "user", 
+                  content: `[Tool execution results]\n\n${resultParts.join("\n\n")}` 
+                });
+                console.log("[Agent API] Converted", resultParts.length, "tool results to user message");
+              }
+              continue;
+            }
+            
+            // Simple user/assistant messages
+            if (msg.role === "user") {
+              messages.push({ 
+                role: "user", 
+                content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content) 
+              });
+            } else if (msg.role === "assistant" && typeof msg.content === "string") {
+              messages.push({ role: "assistant", content: msg.content });
             }
           }
 
-          // If we have tool results from client, add them to continue the loop
+          // If we have new tool results from client, add as user message
           if (toolResults && toolResults.length > 0) {
             console.log("[Agent API] Processing", toolResults.length, "tool results");
             
-            // Build a single combined tool results message for the LLM
-            // This format works better with OpenRouter and various model providers
-            // Each tool result is clearly labeled with its tool call ID and name
-            const toolResultsParts: string[] = [];
-            
+            const resultParts: string[] = [];
             for (const tr of toolResults) {
               const toolResultContent = tr.result.success 
                 ? tr.result.output 
                 : `Error: ${tr.result.error || "Tool execution failed"}`;
               
-              console.log("[Agent API] Creating tool result for:", tr.toolName, "| ID:", tr.toolCallId, "| Success:", tr.result.success, "| Content length:", toolResultContent.length);
+              console.log("[Agent API] Adding tool result for:", tr.toolName, "| Success:", tr.result.success, "| Length:", toolResultContent.length);
               
-              // Format each tool result with clear identification
-              toolResultsParts.push(
-                `=== Tool Result: ${tr.toolName} (ID: ${tr.toolCallId}) ===\n` +
-                `Status: ${tr.result.success ? "Success" : "Error"}\n\n` +
-                toolResultContent
+              resultParts.push(
+                `=== Tool Result: ${tr.toolName} ===\n${toolResultContent}`
               );
             }
             
-            // Combine all tool results into a single user message
-            // This ensures the LLM sees all results together and can properly
-            // associate them with the tool calls it made
-            const combinedToolResults: CoreMessage = {
-              role: "user",
-              content: toolResultsParts.join("\n\n" + "=".repeat(50) + "\n\n"),
-            };
-            
-            console.log("[Agent API] Combined tool results message | Parts:", toolResultsParts.length, "| Total length:", (combinedToolResults.content as string).length);
-            messages.push(combinedToolResults);
+            messages.push({ 
+              role: "user", 
+              content: `[Tool execution results]\n\n${resultParts.join("\n\n")}` 
+            });
           }
           
           // Add the current prompt as user message (only on first call)
           if (prompt && currentStep === 0) {
             messages.push({ role: "user", content: prompt });
           }
+          
           console.log("[Agent API] Messages prepared:", messages.length, "messages");
-          console.log("[Agent API] Message roles:", messages.map(m => ({ role: m.role, contentType: typeof m.content === "string" ? "string" : Array.isArray(m.content) ? "array" : "other" })));
+          console.log("[Agent API] Message roles:", messages.map(m => ({ role: m.role, contentLength: typeof m.content === "string" ? m.content.length : 0 })));
 
           // Create OpenRouter client
           const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
@@ -439,18 +468,41 @@ export async function action({ request }: ActionFunctionArgs) {
             throw streamError;
           }
 
-          // Stream text deltas
+          // Stream text deltas and build segments
           let deltaCount = 0;
+          let currentTextSegmentIndex = -1; // Track current text segment for accumulation
+          
+          // If we have accumulated segments from previous steps, find the last text segment
+          if (accumulatedSegments.length > 0) {
+            const lastSegment = accumulatedSegments[accumulatedSegments.length - 1];
+            if (lastSegment && lastSegment.type === 'text') {
+              // We'll append to this segment
+              currentTextSegmentIndex = accumulatedSegments.length - 1;
+            }
+          }
+          
           try {
             for await (const delta of result.textStream) {
               fullText += delta;
+              accumulatedText += delta;
               deltaCount++;
+              
+              // Build segments: append to existing text segment or create new one
+              if (currentTextSegmentIndex >= 0 && accumulatedSegments[currentTextSegmentIndex]?.type === 'text') {
+                // Append to existing text segment
+                accumulatedSegments[currentTextSegmentIndex].content += delta;
+              } else {
+                // Create new text segment
+                accumulatedSegments.push({ type: 'text', content: delta });
+                currentTextSegmentIndex = accumulatedSegments.length - 1;
+              }
+              
               sendChunk({
                 type: "text_delta",
                 delta,
               });
             }
-            console.log("[Agent API] Text streaming complete:", deltaCount, "deltas |", fullText.length, "chars");
+            console.log("[Agent API] Text streaming complete:", deltaCount, "deltas |", fullText.length, "chars | Accumulated:", accumulatedText.length, "chars");
           } catch (streamError) {
             console.error("[Agent API] Error during text streaming:", streamError);
             throw streamError;
@@ -481,6 +533,10 @@ export async function action({ request }: ActionFunctionArgs) {
           const autoTools: typeof pendingToolCalls = [];
           const ackTools: typeof pendingToolCalls = [];
           
+          // Reset current text segment index since we're now processing tool calls
+          // Any new text after tool calls should start a new segment
+          currentTextSegmentIndex = -1;
+          
           for (const toolCall of responseToolCalls) {
             const toolName = toolCall.toolName || toolCall.name;
             const toolCallId = toolCall.toolCallId || toolCall.id;
@@ -502,9 +558,19 @@ export async function action({ request }: ActionFunctionArgs) {
               id: toolCallId,
               name: toolName,
               args,
+              status: "pending",
+              category,
+              startTime: Date.now(),
             };
             
             pendingToolCalls.push(toolCallInfo);
+            
+            // Add to accumulated tool calls (check for duplicates)
+            if (!accumulatedToolCalls.some(tc => tc.id === toolCallId)) {
+              accumulatedToolCalls.push(toolCallInfo);
+              // Add tool call segment for interleaved rendering
+              accumulatedSegments.push({ type: 'toolCall', toolCall: toolCallInfo });
+            }
             
             if (category === "auto") {
               autoTools.push(toolCallInfo);
@@ -535,30 +601,62 @@ export async function action({ request }: ActionFunctionArgs) {
           const inputTokens = usage ? ((usage as any).promptTokens || 0) : 0;
           const outputTokens = usage ? ((usage as any).completionTokens || 0) : 0;
           
-          if (conversationId && chatId && (fullText || pendingToolCalls.length > 0)) {
+          if (conversationId && chatId && (accumulatedText || accumulatedToolCalls.length > 0)) {
             try {
-              const assistantMessageId = await chatService.addMessageToChat(
-                conversationId,
-                chatId,
-                {
-                  role: "assistant",
-                  content: fullText || "",
-                  toolCalls: pendingToolCalls.map(tc => ({
-                    id: tc.id,
-                    name: tc.name,
-                    args: tc.args,
-                    status: "pending", // Will be updated by frontend after execution
-                  })),
-                  model: model,
-                  tokensUsed: tokensUsed,
-                  inputTokens: inputTokens,
-                  outputTokens: outputTokens,
-                  clientRequestId: `assistant-${sessionId}-${stepCount}`,
-                } as any,
-                userId
-              );
-              console.log("[Agent API] Assistant message saved:", assistantMessageId, "| Tokens:", tokensUsed);
-              sendChunk({ type: "assistant_message_saved", messageId: assistantMessageId });
+              if (assistantMessageId) {
+                // Update existing message (continuation step)
+                const result = await chatService.updateChatMessage(
+                  conversationId,
+                  chatId,
+                  assistantMessageId,
+                  {
+                    content: accumulatedText || "",
+                    toolCalls: accumulatedToolCalls.map(tc => ({
+                      id: tc.id,
+                      name: tc.name,
+                      args: tc.args,
+                      status: tc.status || "pending",
+                      category: tc.category,
+                      startTime: tc.startTime,
+                    })),
+                    segments: accumulatedSegments,
+                    tokensUsed: tokensUsed,
+                    inputTokens: inputTokens,
+                    outputTokens: outputTokens,
+                  },
+                  userId
+                );
+                console.log("[Agent API] Assistant message updated:", assistantMessageId, "| Tokens:", tokensUsed, "| Segments:", accumulatedSegments.length);
+                sendChunk({ type: "assistant_message_saved", messageId: assistantMessageId });
+              } else {
+                // Create new message (first step)
+                const result = await chatService.addMessageToChat(
+                  conversationId,
+                  chatId,
+                  {
+                    role: "assistant",
+                    content: accumulatedText || "",
+                    toolCalls: accumulatedToolCalls.map(tc => ({
+                      id: tc.id,
+                      name: tc.name,
+                      args: tc.args,
+                      status: tc.status || "pending",
+                      category: tc.category,
+                      startTime: tc.startTime,
+                    })),
+                    segments: accumulatedSegments,
+                    model: model,
+                    tokensUsed: tokensUsed,
+                    inputTokens: inputTokens,
+                    outputTokens: outputTokens,
+                    clientRequestId: `assistant-${sessionId}-${stepCount}`,
+                  } as any,
+                  userId
+                );
+                assistantMessageId = result.messageId;
+                console.log("[Agent API] Assistant message created:", assistantMessageId, "| Tokens:", tokensUsed, "| Segments:", accumulatedSegments.length);
+                sendChunk({ type: "assistant_message_saved", messageId: assistantMessageId });
+              }
             } catch (saveError) {
               console.error("[Agent API] Failed to save assistant message:", saveError);
               // Don't fail the request, just log the error
@@ -604,11 +702,23 @@ export async function action({ request }: ActionFunctionArgs) {
               text: fullText,
               step: stepCount,
               sessionId,
+              // Assistant message ID for updating instead of creating new messages
+              assistantMessageId,
+              // Accumulated data for continuations (preserves interleaved order)
+              accumulatedText,
+              accumulatedToolCalls,
+              accumulatedSegments,
               // Send messages back so client can continue the conversation
               messages: [...messages, assistantMessageWithToolCalls],
             };
             
-            console.log("[Agent API] Awaiting event payload:", JSON.stringify(awaitingEvent, null, 2).substring(0, 500));
+            // Log full JSON for multiedit tool calls, truncated for others
+            const hasMultiedit = pendingToolCalls.some(tc => tc.name === "multiedit");
+            if (hasMultiedit) {
+              console.log("[Agent API] Awaiting event payload (multiedit - FULL JSON):", JSON.stringify(awaitingEvent, null, 2));
+            } else {
+              console.log("[Agent API] Awaiting event payload:", JSON.stringify(awaitingEvent, null, 2).substring(0, 500));
+            }
             sendChunk(awaitingEvent);
             console.log("[Agent API] awaiting_tool_results event sent");
           } else {

@@ -108,8 +108,7 @@ export function useChatHandlers({
           );
 
           // Convert existing chat messages to format the agent API expects
-          // Pass the FULL conversation history including complete tool calls and results
-          // This ensures the agent has context of all files read, edits made, etc.
+          // Format tool calls and results as structured arrays that backend will convert to text
           const conversationHistory: any[] = [];
           
           for (const msg of chat.messages) {
@@ -122,33 +121,58 @@ export function useChatHandlers({
             } else if (msg.role === "assistant") {
               const toolCalls = (msg as any).toolCalls;
               
-              // If assistant has tool calls, include them with full results
+              // If assistant has tool calls, include them with full context
               if (toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0) {
-                // Build content with full tool call details and results
-                let fullContent = msg.content || "";
+                // Build content array with text and tool-call parts
+                const contentParts: any[] = [];
                 
-                // Add full tool calls with their complete results
-                const toolCallDetails: string[] = [];
-                for (const tc of toolCalls) {
-                  let toolDetail = `\n\n=== Tool Call: ${tc.name} (ID: ${tc.id}) ===\n`;
-                  toolDetail += `Arguments: ${JSON.stringify(tc.args, null, 2)}\n`;
-                  
-                  // Include the FULL result - this is critical for context
-                  if (tc.result) {
-                    const resultOutput = tc.result.output || tc.result.error || JSON.stringify(tc.result);
-                    toolDetail += `Result:\n${resultOutput}`;
-                  }
-                  toolCallDetails.push(toolDetail);
+                // Add text part if there's content
+                if (msg.content) {
+                  contentParts.push({
+                    type: "text",
+                    text: msg.content,
+                  });
                 }
                 
-                fullContent += toolCallDetails.join("\n");
+                // Add each tool call
+                for (const tc of toolCalls) {
+                  contentParts.push({
+                    type: "tool-call",
+                    toolCallId: tc.id,
+                    toolName: tc.name,
+                    args: tc.args || {},
+                  });
+                }
                 
                 conversationHistory.push({
                   role: "assistant",
-                  content: fullContent,
+                  content: contentParts,
                 });
+                
+                // Add tool results as separate tool message
+                const toolResultParts: any[] = [];
+                for (const tc of toolCalls) {
+                  if (tc.result || tc.status === "completed" || tc.status === "error") {
+                    const resultOutput = tc.result?.output || tc.result?.error || 
+                      (tc.status === "error" ? "Tool execution failed" : "Tool completed successfully");
+                    
+                    toolResultParts.push({
+                      type: "tool-result",
+                      toolCallId: tc.id,
+                      toolName: tc.name,
+                      result: resultOutput,
+                    });
+                  }
+                }
+                
+                if (toolResultParts.length > 0) {
+                  conversationHistory.push({
+                    role: "tool",
+                    content: toolResultParts,
+                  });
+                }
               } else {
-                // No tool calls - just pass the content
+                // No tool calls - just pass the content as string
                 conversationHistory.push({
                   role: "assistant",
                   content: msg.content || "",
@@ -160,7 +184,7 @@ export function useChatHandlers({
           console.log(
             "[ChatHandler] Including",
             conversationHistory.length,
-            "previous messages with full tool call results in context"
+            "messages with tool context"
           );
 
           const response = await fetch("/api/agent", {
@@ -205,34 +229,31 @@ export function useChatHandlers({
             response: Response,
             sessionId?: string,
             currentStep = 0,
-            isContinuation = false
-          ): Promise<{ text: string; toolCalls: any[] }> => {
+            isContinuation = false,
+            // Accumulated data from previous steps (for continuations)
+            prevAssistantMessageId?: string,
+            prevAccumulatedText?: string,
+            prevAccumulatedToolCalls?: any[],
+            prevAccumulatedSegments?: any[]
+          ): Promise<{ text: string; toolCalls: any[]; assistantMessageId?: string; accumulatedText?: string; accumulatedToolCalls?: any[]; accumulatedSegments?: any[] }> => {
             console.log(
               "[ChatHandler] Starting to process agent stream, step:",
               currentStep,
               "| Continuation:",
-              isContinuation
+              isContinuation,
+              "| PrevMsgId:",
+              prevAssistantMessageId
             );
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
             
-            // For continuations, start with existing message content to append to
-            // This preserves previous text and tool calls in the streaming flow
-            let assistantText = "";
-            if (isContinuation && chat.messages.length > 0) {
-              const lastMessage = chat.messages[chat.messages.length - 1];
-              if (lastMessage?.role === "assistant" && lastMessage.content) {
-                assistantText = lastMessage.content;
-                console.log("[ChatHandler] Continuation: starting with existing content length:", assistantText.length);
-              }
-            }
-            
-            let allToolCalls: any[] = [];
-            // For continuations, also preserve existing tool calls
-            if (isContinuation && chat.currentToolCalls && chat.currentToolCalls.length > 0) {
-              allToolCalls = [...chat.currentToolCalls];
-              console.log("[ChatHandler] Continuation: preserving", allToolCalls.length, "existing tool calls");
-            }
+            // For continuations, use accumulated data from server response
+            let assistantText = prevAccumulatedText || "";
+            let allToolCalls: any[] = [...(prevAccumulatedToolCalls || [])];
+            let currentAssistantMessageId = prevAssistantMessageId;
+            let accumulatedText = prevAccumulatedText || "";
+            let accumulatedToolCalls = [...(prevAccumulatedToolCalls || [])];
+            let accumulatedSegments = [...(prevAccumulatedSegments || [])];
             
             let currentSessionId = sessionId;
             let messagesForContinuation: any[] = [];
@@ -272,9 +293,15 @@ export function useChatHandlers({
 
                   if (data.type === "session_start") {
                     currentSessionId = data.sessionId;
+                    // Capture assistant message ID from server for continuations
+                    if (data.assistantMessageId) {
+                      currentAssistantMessageId = data.assistantMessageId;
+                    }
                     console.log(
                       "[ChatHandler] Session started:",
-                      currentSessionId
+                      currentSessionId,
+                      "| AssistantMsgId:",
+                      currentAssistantMessageId
                     );
                   } else if (data.type === "chat_title_updated") {
                     // Chat title was generated from first user message
@@ -326,6 +353,21 @@ export function useChatHandlers({
                       "| Auto:",
                       data.autoTools?.length || 0
                     );
+                    
+                    // Capture accumulated data from server for continuations
+                    if (data.assistantMessageId) {
+                      currentAssistantMessageId = data.assistantMessageId;
+                    }
+                    if (data.accumulatedText !== undefined) {
+                      accumulatedText = data.accumulatedText;
+                    }
+                    if (data.accumulatedToolCalls) {
+                      accumulatedToolCalls = data.accumulatedToolCalls;
+                    }
+                    if (data.accumulatedSegments) {
+                      accumulatedSegments = data.accumulatedSegments;
+                    }
+                    
                     // Update tool calls from event if provided
                     if (data.toolCalls && Array.isArray(data.toolCalls)) {
                       const newToolCalls: any[] = [];
@@ -356,13 +398,19 @@ export function useChatHandlers({
                     }
 
                     messagesForContinuation = data.messages || [];
-                    const autoTools = data.autoTools || [];
-                    const ackTools = data.ackTools || [];
+                    const autoTools = Array.isArray(data.autoTools) ? data.autoTools : [];
+                    const ackTools = Array.isArray(data.ackTools) ? data.ackTools : [];
                     const allToolsToExecute = [...autoTools, ...ackTools];
 
                     console.log(
                       "[ChatHandler] Tools to execute:",
-                      allToolsToExecute.length
+                      allToolsToExecute.length,
+                      "| autoTools:",
+                      autoTools.length,
+                      "| ackTools:",
+                      ackTools.length,
+                      "| Tool names:",
+                      allToolsToExecute.map(t => t?.name || 'unknown').join(', ')
                     );
 
                     // Ensure WebContainer is available before executing tools
@@ -716,6 +764,13 @@ export function useChatHandlers({
                       }
                     }
 
+                    console.log(
+                      "[ChatHandler] Tool execution loop completed | Results:",
+                      toolResults.length,
+                      "| Expected:",
+                      allToolsToExecute.length
+                    );
+
                     // Continue agent loop with tool results
                     if (toolResults.length > 0 && currentStep < 10) {
                       console.log(
@@ -752,6 +807,11 @@ export function useChatHandlers({
                           // Pass conversationId and chatId for message persistence
                           conversationId: conversationId,
                           chatId: chatId,
+                          // Pass accumulated data for continuations (preserves interleaved order)
+                          assistantMessageId: currentAssistantMessageId,
+                          accumulatedText: accumulatedText,
+                          accumulatedToolCalls: accumulatedToolCalls,
+                          accumulatedSegments: accumulatedSegments,
                         }),
                         signal: abortController.signal,
                       });
@@ -776,13 +836,22 @@ export function useChatHandlers({
 
                       // Recursively process the continuation stream (appends to same message)
                       console.log(
-                        "[ChatHandler] Processing continuation stream"
+                        "[ChatHandler] Processing continuation stream | AssistantMsgId:",
+                        currentAssistantMessageId,
+                        "| AccumulatedText:",
+                        accumulatedText.length,
+                        "| AccumulatedToolCalls:",
+                        accumulatedToolCalls.length
                       );
                       const continuationResult = await processAgentStream(
                         continuationResponse,
                         currentSessionId,
                         (data.step || currentStep) + 1,
-                        true
+                        true,
+                        currentAssistantMessageId,
+                        accumulatedText,
+                        accumulatedToolCalls,
+                        accumulatedSegments
                       );
                       // Continuation already updates streaming segments and tool calls directly
                       // Return the accumulated values from the continuation (which includes everything)
@@ -803,7 +872,14 @@ export function useChatHandlers({
                         "| Max steps:",
                         currentStep >= 10
                       );
-                      return { text: assistantText, toolCalls: allToolCalls };
+                      return { 
+                        text: assistantText, 
+                        toolCalls: allToolCalls,
+                        assistantMessageId: currentAssistantMessageId,
+                        accumulatedText,
+                        accumulatedToolCalls,
+                        accumulatedSegments,
+                      };
                     }
                   } else if (data.type === "complete") {
                     // Agent finished
@@ -814,10 +890,31 @@ export function useChatHandlers({
                       allToolCalls.length
                     );
                     assistantText = assistantText || data.text || "";
-                    return { text: assistantText, toolCalls: allToolCalls };
+                    return { 
+                      text: assistantText, 
+                      toolCalls: allToolCalls,
+                      assistantMessageId: currentAssistantMessageId,
+                      accumulatedText,
+                      accumulatedToolCalls,
+                      accumulatedSegments,
+                    };
                   }
                 } catch (parseError) {
-                  // Ignore parse errors
+                  // Log errors but continue processing stream
+                  // Only ignore if it's a JSON parse error (incomplete data)
+                  if (parseError instanceof SyntaxError) {
+                    // JSON parse error - likely incomplete data, ignore
+                  } else {
+                    // Real error during event processing - log it
+                    console.error("[ChatHandler] Error processing event:", parseError);
+                    // Re-throw if it's a critical error
+                    if (parseError instanceof Error && 
+                        (parseError.message.includes("Agent continuation error") ||
+                         parseError.message.includes("Tool") ||
+                         parseError.message.includes("WebContainer"))) {
+                      throw parseError;
+                    }
+                  }
                 }
               }
             }
@@ -828,7 +925,14 @@ export function useChatHandlers({
               "chars | Tool calls:",
               allToolCalls.length
             );
-            return { text: assistantText, toolCalls: allToolCalls };
+            return { 
+              text: assistantText, 
+              toolCalls: allToolCalls,
+              assistantMessageId: currentAssistantMessageId,
+              accumulatedText,
+              accumulatedToolCalls,
+              accumulatedSegments,
+            };
           };
 
           console.log("[ChatHandler] Starting agent stream processing");
@@ -849,16 +953,19 @@ export function useChatHandlers({
             allAssistantMessages[allAssistantMessages.length - 1];
 
           if (lastAssistantMessage) {
-            // Get the final content - prefer UI content (it has full streaming text)
+            // Get the final content - prefer accumulated text from server if available
+            const accumulatedContent = result.accumulatedText || "";
             const uiContent =
               typeof lastAssistantMessage.content === "string"
                 ? lastAssistantMessage.content
                 : "";
-            // Use result.text if it's longer (more complete)
+            // Use accumulated text from server if available, otherwise fall back to UI content
             const finalContent =
-              result.text && result.text.length > uiContent.length
-                ? result.text
-                : uiContent || result.text || "";
+              accumulatedContent.length > 0
+                ? accumulatedContent
+                : result.text && result.text.length > uiContent.length
+                  ? result.text
+                  : uiContent || result.text || "";
 
             // Update the last assistant message with final content and tool calls
             // Ensure all tool calls have "completed" status for proper file changes display
@@ -871,20 +978,35 @@ export function useChatHandlers({
                   }))
                 : (lastAssistantMessage as any).toolCalls || [];
 
-            // Build finalized segments from streaming segments
-            // This preserves the correct interleaved order of text and tool calls
-            const currentStreamingSegments = chat.streamingSegments || [];
-            const finalizedSegments = currentStreamingSegments.map((segment: any) => {
-              if (segment.type === 'toolCall') {
-                // Find the finalized version of this tool call
-                const finalizedTc = finalizedToolCalls.find((tc: any) => tc.id === segment.toolCall.id);
-                return {
-                  type: 'toolCall' as const,
-                  toolCall: finalizedTc || { ...segment.toolCall, status: 'completed' as const },
-                };
-              }
-              return segment;
-            });
+            // Use accumulated segments from server if available (preserves correct interleaved order)
+            // This is more reliable than building from streaming segments which may miss continuations
+            let finalizedSegments: any[] = [];
+            if (result.accumulatedSegments && result.accumulatedSegments.length > 0) {
+              // Update tool call statuses in accumulated segments
+              finalizedSegments = result.accumulatedSegments.map((segment: any) => {
+                if (segment.type === 'toolCall') {
+                  const finalizedTc = finalizedToolCalls.find((tc: any) => tc.id === segment.toolCall?.id);
+                  return {
+                    type: 'toolCall' as const,
+                    toolCall: finalizedTc || { ...segment.toolCall, status: 'completed' as const },
+                  };
+                }
+                return segment;
+              });
+            } else {
+              // Fall back to streaming segments if accumulated not available
+              const currentStreamingSegments = chat.streamingSegments || [];
+              finalizedSegments = currentStreamingSegments.map((segment: any) => {
+                if (segment.type === 'toolCall') {
+                  const finalizedTc = finalizedToolCalls.find((tc: any) => tc.id === segment.toolCall.id);
+                  return {
+                    type: 'toolCall' as const,
+                    toolCall: finalizedTc || { ...segment.toolCall, status: 'completed' as const },
+                  };
+                }
+                return segment;
+              });
+            }
 
             // Update message with toolCalls AND segments (preserves order)
             chat.setMessages((prev: Message[]) => {
@@ -907,6 +1029,7 @@ export function useChatHandlers({
                 messageId: lastAssistantMessage.id,
                 toolCallsCount: finalizedToolCalls.length,
                 segmentsCount: finalizedSegments.length,
+                usedAccumulated: (result.accumulatedSegments?.length || 0) > 0,
                 fileChangesCount: finalizedToolCalls.filter((tc: any) =>
                   ["edit", "write", "multiedit"].includes(tc.name)
                 ).length,
