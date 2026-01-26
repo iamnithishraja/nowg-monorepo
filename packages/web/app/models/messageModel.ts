@@ -78,6 +78,8 @@ export const messageSchemaDefinition = {
         type: String,
         required: true,
       },
+      filePath: { type: String }, // Full file path for restoration (from HEAD)
+      contentType: { type: String }, // Additional content type field (from HEAD)
       size: {
         type: Number,
         required: true,

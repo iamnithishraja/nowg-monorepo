@@ -399,19 +399,31 @@ export class ChatService {
         $push: { messages: result._id },
       });
 
-      // Update user profile with message data
-      try {
-        const profileService = new ProfileService();
-        await profileService.updateOnMessage(conversation.userId, {
-          role: message.role,
-          model: modelToUse,
-          tokensUsed: tokensUsed,
-          inputTokens: inputTokens,
-          outputTokens: outputTokens,
-        });
-      } catch (profileError) {
-        console.error("Error updating profile:", profileError);
-        // Don't fail the message creation if profile update fails
+      // Update user profile with message data (only for valid roles)
+      if (message.role === "user" || message.role === "assistant" || message.role === "system") {
+        try {
+          const profileService = new ProfileService();
+          await profileService.updateOnMessage(conversation.userId, {
+            role: message.role,
+            model: modelToUse,
+            tokensUsed: tokensUsed,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+          });
+        } catch (profileError) {
+          console.error("Error updating profile:", profileError);
+          // Don't fail the message creation if profile update fails
+        }
+      }
+
+      // Sync conversation to R2 after assistant messages (when LLM responds)
+      if (message.role === "assistant") {
+        try {
+          await this.syncConversationToR2(conversationId, conversation.userId);
+        } catch (syncError) {
+          console.error("[ChatService] Error syncing conversation to R2:", syncError);
+          // Don't fail message creation if sync fails
+        }
       }
 
       return result._id.toString();
@@ -601,6 +613,36 @@ export class ChatService {
 
       const result = await messageDoc.save();
 
+      // Automatically extract files from message content and store in R2 (for assistant messages)
+      if (message.role === "assistant" && message.content) {
+        try {
+          const { extractAndStoreFilesFromMessage } = await import("./extractAndStoreFiles");
+          const uploadedFiles = await extractAndStoreFilesFromMessage(
+            result._id.toString(),
+            conversationId,
+            conversation.userId,
+            message.content,
+            message.role
+          );
+
+          // Update AgentMessage with R2 file references
+          if (uploadedFiles.length > 0) {
+            await AgentMessage.findByIdAndUpdate(result._id, {
+              $set: { r2Files: uploadedFiles },
+            });
+            console.log(
+              `[ChatService] Automatically stored ${uploadedFiles.length} files in R2 for chat message ${result._id}`
+            );
+          }
+        } catch (fileExtractionError) {
+          console.error(
+            "[ChatService] Error extracting and storing files from chat message:",
+            fileExtractionError
+          );
+          // Don't fail message creation if file extraction fails
+        }
+      }
+
       // Add message reference to chat (but NOT to conversation.messages)
       await Chat.findByIdAndUpdate(chatId, {
         $push: { messages: result._id },
@@ -612,18 +654,30 @@ export class ChatService {
         $set: { updatedAt: new Date() },
       });
 
-      // Update user profile with message data
-      try {
-        const profileService = new ProfileService();
-        await profileService.updateOnMessage(conversation.userId, {
-          role: message.role,
-          model: (message as any).model,
-          tokensUsed: (message as any).tokensUsed,
-          inputTokens: (message as any).inputTokens,
-          outputTokens: (message as any).outputTokens,
-        });
-      } catch (profileError) {
-        console.error("[ChatService] Error updating profile:", profileError);
+      // Update user profile with message data (only for valid roles)
+      if (message.role === "user" || message.role === "assistant" || message.role === "system") {
+        try {
+          const profileService = new ProfileService();
+          await profileService.updateOnMessage(conversation.userId, {
+            role: message.role,
+            model: (message as any).model,
+            tokensUsed: (message as any).tokensUsed,
+            inputTokens: (message as any).inputTokens,
+            outputTokens: (message as any).outputTokens,
+          });
+        } catch (profileError) {
+          console.error("[ChatService] Error updating profile:", profileError);
+        }
+      }
+
+      // Sync conversation to R2 after assistant messages in chats (when LLM responds)
+      if (message.role === "assistant") {
+        try {
+          await this.syncConversationToR2(conversationId, conversation.userId);
+        } catch (syncError) {
+          console.error("[ChatService] Error syncing chat conversation to R2:", syncError);
+          // Don't fail message creation if sync fails
+        }
       }
 
       // Generate title from first user message synchronously so it's immediately visible in UI
@@ -931,6 +985,14 @@ export class ChatService {
           updatedAt: new Date(),
         },
       });
+
+      // Sync conversation to R2 after update
+      try {
+        await this.syncConversationToR2(conversationId, userId);
+      } catch (syncError) {
+        console.error("[ChatService] Error syncing conversation to R2:", syncError);
+        // Don't fail update if sync fails
+      }
     } catch (error) {
       console.error("Error updating message model:", error);
       throw error;
@@ -1255,6 +1317,152 @@ export class ChatService {
     } catch (error) {
       console.error("Error adding additional tokens:", error);
       throw error;
+    }
+  }
+
+  // Public method to sync conversation to R2 (for use in API routes like revert)
+  async syncConversationToR2Public(
+    conversationId: string,
+    userId: string
+  ): Promise<void> {
+    return this.syncConversationToR2(conversationId, userId);
+  }
+
+  // Sync conversation data to R2 (updates same location, doesn't create new buckets)
+  private async syncConversationToR2(
+    conversationId: string,
+    userId: string
+  ): Promise<void> {
+    try {
+      await this.ensureConnection();
+
+      // Get full conversation with all messages
+      const conversation = await Conversation.findById(conversationId)
+        .select("_id title model userId createdAt updatedAt adminProjectId")
+        .lean();
+
+      if (!conversation) {
+        console.warn(`[ChatService] Conversation ${conversationId} not found for R2 sync`);
+        return;
+      }
+
+      // Get all messages for the conversation
+      const messages = await Messages.find({
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+      })
+        .sort({ timestamp: 1 })
+        .lean();
+
+      // Format messages for R2
+      const formattedMessages = messages.map((msg: any) => ({
+        id: msg._id.toString(),
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        model: msg.model,
+        tokensUsed: msg.tokensUsed,
+        inputTokens: msg.inputTokens,
+        outputTokens: msg.outputTokens,
+        toolCalls: msg.toolCalls || [],
+        r2Files: msg.r2Files ? msg.r2Files.map((f: any) => ({
+          name: f.name,
+          filePath: f.filePath || f.name, // Preserve filePath
+          type: f.contentType || f.type, // Read from new 'contentType' field, fallback to old 'type'
+          size: f.size,
+          url: f.url,
+          uploadedAt: f.uploadedAt,
+        })) : [],
+      }));
+
+      // Get all chats with their messages for R2
+      const chats = await Chat.find({
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+      })
+        .populate("messages")
+        .lean();
+
+      const formattedChats = chats.map((chat: any) => {
+        const chatMessages = Array.isArray(chat.messages) ? chat.messages : [];
+        return {
+          id: chat._id.toString(),
+          title: chat.title,
+          createdAt: chat.createdAt,
+          updatedAt: chat.updatedAt,
+          messages: chatMessages
+            .filter((msg: any) => msg && msg._id)
+            .map((msg: any) => ({
+              id: msg._id.toString(),
+              role: msg.role,
+              content: msg.content || "",
+              toolCalls: msg.toolCalls || [],
+              toolResults: msg.toolResults || [],
+              model: msg.model,
+              tokensUsed: msg.tokensUsed,
+              inputTokens: msg.inputTokens,
+              outputTokens: msg.outputTokens,
+              createdAt: msg.createdAt,
+              timestamp: msg.createdAt,
+              // AgentMessage r2Files (includes filePath for restoration)
+              r2Files: (msg as any).r2Files ? (msg as any).r2Files.map((f: any) => ({
+                name: f.name,
+                filePath: f.filePath || f.name, // Preserve filePath
+                type: f.contentType || f.type, // Read from new 'contentType' field, fallback to old 'type'
+                size: f.size,
+                url: f.url,
+                uploadedAt: f.uploadedAt,
+              })) : [],
+            }))
+            .sort(
+              (a: any, b: any) =>
+                new Date(a.createdAt).getTime() -
+                new Date(b.createdAt).getTime()
+            ),
+        };
+      });
+
+      // Prepare conversation data for R2
+      const conversationData = {
+        id: conversation._id.toString(),
+        title: conversation.title,
+        model: conversation.model,
+        userId: conversation.userId,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+        adminProjectId: conversation.adminProjectId
+          ? conversation.adminProjectId.toString()
+          : null,
+        messages: formattedMessages,
+        chats: formattedChats,
+        syncedAt: new Date().toISOString(),
+      };
+
+      // Get projectId if available
+      const projectId = conversation.adminProjectId
+        ? conversation.adminProjectId.toString()
+        : undefined;
+
+      // Import and call sync function
+      const { syncConversationToR2 } = await import("./r2Storage");
+      const result = await syncConversationToR2(
+        userId,
+        conversationId,
+        conversationData,
+        projectId
+      );
+
+      if (result.success) {
+        console.log(
+          `[ChatService] Successfully synced conversation ${conversationId} to R2`
+        );
+      } else {
+        console.error(
+          `[ChatService] Failed to sync conversation ${conversationId} to R2:`,
+          result.error
+        );
+      }
+    } catch (error) {
+      console.error("[ChatService] Error in syncConversationToR2:", error);
+      // Don't throw - sync failures shouldn't break the main flow
     }
   }
 
