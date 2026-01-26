@@ -35,6 +35,7 @@ import { ProjectAdminDialog } from "../components/ProjectAdminDialog";
 import { ProjectSidebar } from "../components/ProjectSidebar";
 import { Button } from "../components/ui/button";
 import { ColorSchemeDialog } from "../components/ui/ColorSchemeDialog";
+
 import {
     Dialog,
     DialogContent,
@@ -229,6 +230,95 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     userWithAccess?.role === UserRole.ORG_ADMIN ||
     userWithAccess?.hasOrgAdminAccess === true;
 
+  const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
+
+  // Get sidebar context from localStorage (set by AppSidebar)
+  const [sidebarContext, setSidebarContext] = useState<"personal" | "organization">(
+    // Default value - will be updated by useEffect on client side
+    "personal"
+  );
+
+  // Initialize context from localStorage on client side - only after user access is loaded
+  useEffect(() => {
+    if (isLoadingUserAccess) return; // Wait for user access to be loaded
+
+    // Prefer workspace selection if present (ProjectSidebar persists org id here)
+    const workspace = localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    const workspaceImpliesOrg =
+      workspace && workspace !== "personal" ? true : false;
+
+    const saved = localStorage.getItem("web-sidebar-context");
+    if (workspaceImpliesOrg) {
+      setSidebarContext("organization");
+    } else if (saved === "personal" || saved === "organization") {
+      setSidebarContext(saved);
+    } else {
+      // Default to organization for org_admins, personal for others
+      setSidebarContext(isOrgAdmin ? "organization" : "personal");
+    }
+  }, [isOrgAdmin, isLoadingUserAccess]);
+
+  // Listen for context changes from other tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "web-sidebar-context") {
+        const saved = e.newValue;
+        if (saved === "personal" || saved === "organization") {
+          console.log("Context changed via storage event:", saved);
+          setSidebarContext(saved);
+        }
+      }
+
+      // Also react to workspace selection changes (org id vs "personal")
+      if (e.key === WORKSPACE_STORAGE_KEY) {
+        const workspace = e.newValue;
+        if (workspace && workspace !== "personal") {
+          setSelectedOrganizationId(workspace);
+          setSidebarContext("organization");
+        } else if (workspace === "personal") {
+          setSidebarContext("personal");
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  // Also listen for custom events from the same tab (when sidebar changes context)
+  useEffect(() => {
+    const handleContextChange = (e: CustomEvent) => {
+      const newContext = e.detail;
+      if (newContext === "personal" || newContext === "organization") {
+        console.log("Context changed via custom event:", newContext);
+        setSidebarContext(newContext);
+      }
+    };
+
+    window.addEventListener("sidebarContextChange", handleContextChange as EventListener);
+    return () => window.removeEventListener("sidebarContextChange", handleContextChange as EventListener);
+  }, []);
+
+  // Poll localStorage periodically to ensure sync (fallback mechanism)
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      const saved = localStorage.getItem("web-sidebar-context");
+      if (saved === "personal" || saved === "organization") {
+        if (saved !== sidebarContext) {
+          console.log("Context sync via polling:", saved);
+          setSidebarContext(saved);
+        }
+      }
+    }, 1000); // Check every second
+
+    return () => clearInterval(pollInterval);
+  }, [sidebarContext]);
+
+  // Debug: Log context changes
+  useEffect(() => {
+    console.log("Home component context changed to:", sidebarContext);
+  }, [sidebarContext]);
+
   // Use hooks for org admin data and project creation
   const { organizations, availableUsers, isLoadingUsers } = useOrgAdminData(
     isOrgAdmin,
@@ -238,7 +328,19 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
   // Set default organization when organizations are loaded
   useEffect(() => {
-    if (organizations.length > 0 && !selectedOrganizationId) {
+    if (organizations.length === 0) return;
+
+    // Prefer persisted org workspace selection when available
+    const workspace = localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    if (workspace && workspace !== "personal") {
+      const exists = organizations.some((o) => o.id === workspace);
+      if (exists && workspace !== selectedOrganizationId) {
+        setSelectedOrganizationId(workspace);
+        return;
+      }
+    }
+
+    if (!selectedOrganizationId) {
       setSelectedOrganizationId(organizations[0].id);
     }
   }, [organizations, selectedOrganizationId]);
@@ -437,13 +539,27 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
     // Wait for user access to be loaded
     if (isLoadingUserAccess) {
+      console.log("Waiting for user access to load...");
       // Wait a bit and try again
       setTimeout(() => sendPrompt(), 100);
       return;
     }
 
-    // If user is org_admin and has organizations, show project admin assignment dialog first
-    if (isOrgAdmin && organizations.length > 0) {
+    // Determine project type based on sidebar context
+    const shouldCreateOrgProject = isOrgAdmin && sidebarContext === "organization" && organizations.length > 0;
+
+    console.log("Creating project:", {
+      isOrgAdmin,
+      sidebarContext,
+      organizationsCount: organizations.length,
+      shouldCreateOrgProject,
+      userWithAccess: !!userWithAccess,
+      currentLocalStorage: localStorage.getItem("web-sidebar-context")
+    });
+
+    // If user is org_admin and in organization context and has organizations, show project admin assignment dialog
+    if (shouldCreateOrgProject) {
+      console.log("Showing project admin dialog for organization project");
       setPendingPrompt(currentPrompt);
       setPendingFiles([...uploadedFiles]);
       // Pre-fill project title with a suggestion from the prompt
@@ -456,7 +572,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       return;
     }
 
-    // Regular flow for non-org-admin users or org_admin without organizations
+    // Create personal conversation for:
+    // - Non-org-admin users
+    // - Org_admin users in personal context
+    // - Org_admin users without organizations
+    console.log("Creating personal conversation");
     await createConversation(currentPrompt, uploadedFiles);
   };
 
@@ -513,6 +633,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       if (response.ok) {
         const data = await response.json();
         const conversationId = data.conversationId;
+
+        // Notify sidebar to refresh conversations
+        window.dispatchEvent(new CustomEvent("conversationCreated"));
 
         if (selectedDbProvider) {
           try {

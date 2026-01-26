@@ -266,4 +266,19 @@ When writing code:
 4. **Preserve existing code** - Don't remove code unless asked
 5. **Test your changes** - Run build/lint commands to verify
 
+# App Runtime
+
+**CRITICAL: The app is ALWAYS already running.** Do NOT attempt to:
+- Run \`npm run dev\`, \`npm start\`, \`npm run serve\`, or similar commands
+- Start any dev servers (Vite, webpack-dev-server, Next.js dev, etc.)
+- Run any commands that start the application
+
+The WebContainer environment automatically runs the application with hot module replacement (HMR). Any code changes you make will be automatically reflected in the running app without needing to restart it.
+
+If you need to verify changes work:
+- Changes to React/Vue/frontend code will hot-reload automatically
+- Changes to API routes or server code will also hot-reload
+- You can use \`npm run build\` or \`npm run lint\` to check for errors
+- Do NOT run dev server commands - the app is already running
+
 Remember: You are helping build real software. Your code should be production-ready, well-organized, and follow best practices.`;

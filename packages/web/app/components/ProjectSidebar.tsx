@@ -60,6 +60,7 @@ interface Organization {
 }
 
 const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
+const SIDEBAR_CONTEXT_STORAGE_KEY = "web-sidebar-context";
 
 // User avatar component - extracted and memoized
 interface UserAvatarProps {
@@ -174,6 +175,25 @@ function ProjectSidebarComponent({
     } catch (err) {
       console.error("Error saving workspace to localStorage:", err);
     }
+  }, [selectedWorkspace, hasLoadedWorkspaceFromStorage]);
+
+  // Keep chat creation context in sync with selected workspace (home.tsx uses this)
+  useEffect(() => {
+    if (typeof window === "undefined" || !hasLoadedWorkspaceFromStorage) return;
+
+    const nextContext: "personal" | "organization" =
+      selectedWorkspace === "personal" ? "personal" : "organization";
+
+    try {
+      window.localStorage.setItem(SIDEBAR_CONTEXT_STORAGE_KEY, nextContext);
+    } catch (err) {
+      console.error("Error saving sidebar context to localStorage:", err);
+    }
+
+    // Notify listeners in the same tab (home.tsx listens for this)
+    window.dispatchEvent(
+      new CustomEvent("sidebarContextChange", { detail: nextContext })
+    );
   }, [selectedWorkspace, hasLoadedWorkspaceFromStorage]);
 
   // Fetch projects and organizations

@@ -22,6 +22,8 @@ interface ChatDeps {
   figmaUrl?: string;
   enableFigmaMCP?: boolean;
   chatMode?: "build" | "ask";
+  /** Callback when chat title is updated (from first message) */
+  onChatTitleUpdated?: (title: string) => void;
 }
 
 export function useChatHandlers({
@@ -41,6 +43,7 @@ export function useChatHandlers({
   figmaUrl,
   enableFigmaMCP,
   chatMode = "build",
+  onChatTitleUpdated,
 }: ChatDeps) {
   const sendingRef = useRef(false);
 
@@ -78,28 +81,8 @@ export function useChatHandlers({
           };
           chat.addMessage(userMessage, isMountedRef);
 
-          // Store user message in chat (async, don't block)
-          // Don't reload messages here as it would overwrite streaming assistant message
-          // The messages will be synced when the assistant response completes
-          fetch("/api/conversations?conversationId=" + conversationId, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "addChatMessage",
-              chatId: chatId,
-              message: {
-                role: "user",
-                content: messageContent,
-              },
-            }),
-          })            .then(async (response) => {
-              if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.error("Failed to store user message:", errorData);
-              }
-            })            .catch((error) => {
-              console.error("Error storing user message:", error);
-            });
+          // Note: User message is now saved by the agent API directly
+          // This ensures proper ordering and avoids race conditions
 
           chat.setIsLoading(true);
           chat.setIsStreaming(true);
@@ -117,19 +100,84 @@ export function useChatHandlers({
             "[ChatHandler] Sending request to agent API | Mode:",
             chatMode,
             "| Agent:",
-            agentName
+            agentName,
+            "| ConvId:",
+            conversationId,
+            "| ChatId:",
+            chatId
           );
+
+          // Convert existing chat messages to format the agent API expects
+          // Pass the FULL conversation history including complete tool calls and results
+          // This ensures the agent has context of all files read, edits made, etc.
+          const conversationHistory: any[] = [];
+          
+          for (const msg of chat.messages) {
+            if (msg.role === "user") {
+              // User messages - pass full content
+              conversationHistory.push({
+                role: "user",
+                content: msg.content || "",
+              });
+            } else if (msg.role === "assistant") {
+              const toolCalls = (msg as any).toolCalls;
+              
+              // If assistant has tool calls, include them with full results
+              if (toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0) {
+                // Build content with full tool call details and results
+                let fullContent = msg.content || "";
+                
+                // Add full tool calls with their complete results
+                const toolCallDetails: string[] = [];
+                for (const tc of toolCalls) {
+                  let toolDetail = `\n\n=== Tool Call: ${tc.name} (ID: ${tc.id}) ===\n`;
+                  toolDetail += `Arguments: ${JSON.stringify(tc.args, null, 2)}\n`;
+                  
+                  // Include the FULL result - this is critical for context
+                  if (tc.result) {
+                    const resultOutput = tc.result.output || tc.result.error || JSON.stringify(tc.result);
+                    toolDetail += `Result:\n${resultOutput}`;
+                  }
+                  toolCallDetails.push(toolDetail);
+                }
+                
+                fullContent += toolCallDetails.join("\n");
+                
+                conversationHistory.push({
+                  role: "assistant",
+                  content: fullContent,
+                });
+              } else {
+                // No tool calls - just pass the content
+                conversationHistory.push({
+                  role: "assistant",
+                  content: msg.content || "",
+                });
+              }
+            }
+          }
+
+          console.log(
+            "[ChatHandler] Including",
+            conversationHistory.length,
+            "previous messages with full tool call results in context"
+          );
+
           const response = await fetch("/api/agent", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               requestType: "prompt",
               prompt: messageContent,
+              messages: conversationHistory, // Include conversation history for context
               model: effectiveModel,
               agent: agentName,
               files: files.filesMap || {},
               fileTree: files.fileTree,
               maxSteps: 10,
+              // Pass conversationId and chatId for message persistence
+              conversationId: conversationId,
+              chatId: chatId,
             }),
             signal: abortController.signal,
           });
@@ -167,15 +215,27 @@ export function useChatHandlers({
             );
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
+            
+            // For continuations, start with existing message content to append to
+            // This preserves previous text and tool calls in the streaming flow
             let assistantText = "";
+            if (isContinuation && chat.messages.length > 0) {
+              const lastMessage = chat.messages[chat.messages.length - 1];
+              if (lastMessage?.role === "assistant" && lastMessage.content) {
+                assistantText = lastMessage.content;
+                console.log("[ChatHandler] Continuation: starting with existing content length:", assistantText.length);
+              }
+            }
+            
             let allToolCalls: any[] = [];
+            // For continuations, also preserve existing tool calls
+            if (isContinuation && chat.currentToolCalls && chat.currentToolCalls.length > 0) {
+              allToolCalls = [...chat.currentToolCalls];
+              console.log("[ChatHandler] Continuation: preserving", allToolCalls.length, "existing tool calls");
+            }
+            
             let currentSessionId = sessionId;
             let messagesForContinuation: any[] = [];
-
-            // If this is a continuation, start a new assistant message
-            if (isContinuation) {
-              chat.beginAssistantMessage(isMountedRef);
-            }
 
             if (!reader) {
               throw new Error("No response stream");
@@ -216,31 +276,49 @@ export function useChatHandlers({
                       "[ChatHandler] Session started:",
                       currentSessionId
                     );
+                  } else if (data.type === "chat_title_updated") {
+                    // Chat title was generated from first user message
+                    console.log("[ChatHandler] Chat title updated:", data.chatTitle);
+                    onChatTitleUpdated?.(data.chatTitle);
+                  } else if (data.type === "user_message_saved") {
+                    // User message was saved to database
+                    console.log("[ChatHandler] User message saved:", data.messageId);
                   } else if (data.type === "text_delta") {
                     assistantText += data.delta;
+                    // Update message content
                     chat.updateLastAssistantMessage(
                       assistantText,
                       isMountedRef
                     );
+                    // Also append to streaming segments for ordered rendering
+                    chat.appendTextSegment?.(data.delta, isMountedRef);
                   } else if (data.type === "tool_call") {
-                    const toolCall = {
-                      id: data.id,
-                      name: data.name,
-                      args: data.args,
-                      status: "pending" as const,
-                      category: data.category,
-                      startTime: Date.now(),
-                    };
-                    allToolCalls.push(toolCall);
-                    // Use functional update to add to existing tool calls
-                    chat.setCurrentToolCalls((prev: any[]) => [
-                      ...prev,
-                      toolCall,
-                    ]);
-                    console.log(
-                      "[ChatHandler] Tool call received:",
-                      toolCall.name
+                    // Check if tool call already exists (may be sent early via onStepFinish)
+                    const existingToolCall = allToolCalls.find(
+                      (t) => t.id === data.id
                     );
+                    
+                    if (!existingToolCall) {
+                      // New tool call - add it
+                      const toolCall = {
+                        id: data.id,
+                        name: data.name,
+                        args: data.args,
+                        status: "pending" as const,
+                        category: data.category,
+                        startTime: Date.now(),
+                      };
+                      allToolCalls.push(toolCall);
+                      chat.setCurrentToolCalls((prev: any[]) => [
+                        ...prev,
+                        toolCall,
+                      ]);
+                      chat.appendToolCallSegment?.(toolCall, isMountedRef);
+                      console.log(
+                        "[ChatHandler] Tool call received:",
+                        toolCall.name
+                      );
+                    }
                   } else if (data.type === "awaiting_tool_results") {
                     console.log(
                       "[ChatHandler] Awaiting tool results | Ack:",
@@ -363,6 +441,8 @@ export function useChatHandlers({
                                 : tc
                             )
                           );
+                          // Update streaming segments too
+                          chat.updateToolCallInSegments?.(toolCall.id, { status: "executing" as const }, isMountedRef);
                         }
 
                         // Execute with better error context
@@ -440,6 +520,12 @@ export function useChatHandlers({
                                 : tc
                             )
                           );
+                          // Update streaming segments too
+                          chat.updateToolCallInSegments?.(toolCall.id, { 
+                            status: "completed" as const, 
+                            result, 
+                            endTime 
+                          }, isMountedRef);
                         }
 
                         // If this is a file-writing tool (edit, write, multiedit), update UI files state
@@ -608,6 +694,12 @@ export function useChatHandlers({
                                 : tc
                             )
                           );
+                          // Update streaming segments too
+                          chat.updateToolCallInSegments?.(toolCall.id, { 
+                            status: "error" as const, 
+                            result: errorResult, 
+                            endTime 
+                          }, isMountedRef);
                         }
 
                         toolResults.push({
@@ -657,6 +749,9 @@ export function useChatHandlers({
                           files: files.filesMap || {},
                           fileTree: files.fileTree,
                           maxSteps: 10,
+                          // Pass conversationId and chatId for message persistence
+                          conversationId: conversationId,
+                          chatId: chatId,
                         }),
                         signal: abortController.signal,
                       });
@@ -679,7 +774,7 @@ export function useChatHandlers({
                         );
                       }
 
-                      // Recursively process the continuation stream (create new message for continuation)
+                      // Recursively process the continuation stream (appends to same message)
                       console.log(
                         "[ChatHandler] Processing continuation stream"
                       );
@@ -689,20 +784,15 @@ export function useChatHandlers({
                         (data.step || currentStep) + 1,
                         true
                       );
-                      // Don't accumulate continuation text into previous message - it's already in a new message
-                      // Just collect tool calls
-                      allToolCalls = [
-                        ...allToolCalls,
-                        ...continuationResult.toolCalls,
-                      ];
+                      // Continuation already updates streaming segments and tool calls directly
+                      // Return the accumulated values from the continuation (which includes everything)
                       console.log(
-                        "[ChatHandler] Continuation complete | Continuation text:",
+                        "[ChatHandler] Continuation complete | Total text:",
                         continuationResult.text.length,
                         "| Total tool calls:",
-                        allToolCalls.length
+                        continuationResult.toolCalls.length
                       );
-                      // Return accumulated text from this step only (continuation text is in separate message)
-                      return { text: assistantText, toolCalls: allToolCalls };
+                      return continuationResult;
                     } else {
                       // No tools to execute or max steps reached - return current state
                       console.log(
@@ -781,7 +871,22 @@ export function useChatHandlers({
                   }))
                 : (lastAssistantMessage as any).toolCalls || [];
 
-            // Update message with toolCalls
+            // Build finalized segments from streaming segments
+            // This preserves the correct interleaved order of text and tool calls
+            const currentStreamingSegments = chat.streamingSegments || [];
+            const finalizedSegments = currentStreamingSegments.map((segment: any) => {
+              if (segment.type === 'toolCall') {
+                // Find the finalized version of this tool call
+                const finalizedTc = finalizedToolCalls.find((tc: any) => tc.id === segment.toolCall.id);
+                return {
+                  type: 'toolCall' as const,
+                  toolCall: finalizedTc || { ...segment.toolCall, status: 'completed' as const },
+                };
+              }
+              return segment;
+            });
+
+            // Update message with toolCalls AND segments (preserves order)
             chat.setMessages((prev: Message[]) => {
               const updated = prev.map((msg: Message) =>
                 msg.id === lastAssistantMessage.id
@@ -789,6 +894,7 @@ export function useChatHandlers({
                       ...msg,
                       content: finalContent,
                       toolCalls: finalizedToolCalls,
+                      segments: finalizedSegments,
                     }
                   : msg
               );
@@ -797,9 +903,10 @@ export function useChatHandlers({
               const updatedMessage = updated.find(
                 (m: Message) => m.id === lastAssistantMessage.id
               );
-              console.log("[ChatHandler] Updated message with toolCalls:", {
+              console.log("[ChatHandler] Updated message with toolCalls and segments:", {
                 messageId: lastAssistantMessage.id,
                 toolCallsCount: finalizedToolCalls.length,
+                segmentsCount: finalizedSegments.length,
                 fileChangesCount: finalizedToolCalls.filter((tc: any) =>
                   ["edit", "write", "multiedit"].includes(tc.name)
                 ).length,
@@ -814,48 +921,9 @@ export function useChatHandlers({
             // Small delay to ensure React has re-rendered with the new message state
             await new Promise((resolve) => setTimeout(resolve, 100));
 
-            // Store assistant message in chat with final content
-            if (finalContent) {
-              const assistantMessage = {
-                role: "assistant",
-                content: finalContent,
-                model: effectiveModel,
-                // Use finalized toolCalls (with completed status) for storage
-                toolCalls: finalizedToolCalls.map((tc: any) => ({
-                  id: tc.id,
-                  name: tc.name,
-                  args: tc.args,
-                  status: tc.status === "error" ? "error" : "completed", // Ensure completed status
-                  result: tc.result,
-                  startTime: tc.startTime,
-                  endTime: tc.endTime,
-                  category: tc.category,
-                })),
-              };
-
-              const assistantMessageResponse = await fetch(
-                "/api/conversations?conversationId=" + conversationId,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    action: "addChatMessage",
-                    chatId: chatId,
-                    message: assistantMessage,
-                  }),
-                }
-              );
-
-              if (!assistantMessageResponse.ok) {
-                const errorData = await assistantMessageResponse
-                  .json()
-                  .catch(() => ({}));
-                console.error("Failed to store assistant message:", errorData);
-                // Don't throw - we still want to show the message in UI even if storage fails
-              }
-              // Don't reload from DB - it would overwrite our streaming content
-              // The UI already has the complete content, no need to sync
-            }
+            // Note: Assistant message is now saved by the agent API directly
+            // This ensures proper ordering and includes token usage info
+            // The UI state is updated above with the final content and tool calls
           }
 
           chat.setIsLoading(false);
@@ -881,6 +949,9 @@ export function useChatHandlers({
       }
 
       // Regular conversation flow (not a chat)
+      // Add user message to UI immediately for better UX
+      chat.addMessage(userMessage, isMountedRef);
+      
       chat.setIsLoading(true);
       chat.setIsStreaming(true);
       chat.setError(null);
@@ -976,7 +1047,12 @@ export function useChatHandlers({
 
       const messageContent = input.trim();
 
-      if (!hasHandledInitialPrompt) {
+      // For chats (with chatId), always use handleSend which handles the agent API
+      // handleInitialPrompt is for workspace template flows only
+      if (chatId) {
+        await handleSend(messageContent);
+        setHasHandledInitialPrompt(true);
+      } else if (!hasHandledInitialPrompt) {
         await handleInitialPrompt(messageContent, conversationId || undefined);
         setHasHandledInitialPrompt(true);
       } else {
@@ -987,6 +1063,7 @@ export function useChatHandlers({
       chat.isLoading,
       hasHandledInitialPrompt,
       conversationId,
+      chatId,
       handleInitialPrompt,
       setHasHandledInitialPrompt,
       handleSend,

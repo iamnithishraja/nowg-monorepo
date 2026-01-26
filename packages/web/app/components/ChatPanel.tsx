@@ -42,6 +42,19 @@ const formatMessageTime = (timestamp?: string | Date) => {
   }
 };
 
+// Streaming segment types
+interface StreamingTextSegment {
+  type: 'text';
+  content: string;
+}
+
+interface StreamingToolCallSegment {
+  type: 'toolCall';
+  toolCall: any;
+}
+
+type StreamingSegment = StreamingTextSegment | StreamingToolCallSegment;
+
 interface ChatPanelProps {
   messages: Message[];
   selectedModel: string;
@@ -53,7 +66,9 @@ interface ChatPanelProps {
   onInspectorEnable?: () => void;
   conversationId?: string;
   currentToolCalls?: any[]; // Tool calls for current streaming message
+  streamingSegments?: StreamingSegment[]; // Ordered streaming segments for interleaved rendering
   chatId?: string | null; // Chat ID to detect if we're in a chat
+  onFileClick?: (filePath: string) => void; // Callback when a file in tool call is clicked
 }
 
 // Memoized file attachment component
@@ -167,7 +182,9 @@ function ChatPanelComponent({
   onInspectorEnable,
   conversationId,
   currentToolCalls = [],
+  streamingSegments = [],
   chatId,
+  onFileClick,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [fileDataMap, setFileDataMap] = useState<Map<string, string>>(
@@ -885,8 +902,10 @@ function ChatPanelComponent({
         <div className="space-y-6 h-full">
           {messages.map((message) => {
             // Use parseMessageSegments for assistant messages, simple text for user messages
+            // Support "toolcall" role for agent messages that are tool call results
+            const isToolCallMessage = (message as any).role === "toolcall";
             const segments =
-              message.role === "assistant"
+              message.role === "assistant" || isToolCallMessage
                 ? parseMessageSegments(message)
                 : [
                     {
@@ -902,6 +921,10 @@ function ChatPanelComponent({
               (message as any).createdAt || (message as any).timestamp
             );
 
+            // For agent messages, check if this is a tool call message
+            const messageToolCalls = (message as any).toolCalls || [];
+            const messageToolResults = (message as any).toolResults || [];
+
             return (
               <div
                 key={message.id}
@@ -916,6 +939,51 @@ function ChatPanelComponent({
                 {timestamp && message.role === "user" && (
                   <div className="text-[11px] text-muted-foreground/60 mb-2 px-1">
                     {timestamp}
+                  </div>
+                )}
+
+                {/* Tool call message - render tool calls and results in a compact format */}
+                {isToolCallMessage && (messageToolCalls.length > 0 || messageToolResults.length > 0) && (
+                  <div className="w-full max-w-full space-y-1">
+                    {/* Tool calls */}
+                    {messageToolCalls.length > 0 && (
+                      <div className="space-y-0.5">
+                        {messageToolCalls.map((tc: any, idx: number) => (
+                          <ToolCallItem
+                            key={tc.id || `tc-${idx}`}
+                            toolCall={tc}
+                            isCompact
+                            onFileClick={onFileClick}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {/* Tool results */}
+                    {messageToolResults.length > 0 && (
+                      <div className="space-y-0.5">
+                        {messageToolResults.map((tr: any, idx: number) => (
+                          <div
+                            key={tr.toolCallId || `tr-${idx}`}
+                            className="flex items-center gap-2 py-1 text-xs text-muted-foreground/70"
+                          >
+                            <div className="w-2 h-2 rounded-full bg-emerald-500/50" />
+                            <span className="truncate">
+                              {tr.toolName || "Tool"} result
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Content if any */}
+                    {message.content && (
+                      <div className="text-sm leading-relaxed text-foreground/90 mt-2">
+                        {renderRichContent(
+                          typeof message.content === "string"
+                            ? message.content
+                            : JSON.stringify(message.content)
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -986,13 +1054,72 @@ function ChatPanelComponent({
                               .map((s) => s.content)
                               .join("\n");
 
-                      // Get tool calls (from message or currentToolCalls for streaming)
+                      // Get tool calls and segments (from message or currentToolCalls for streaming)
                       const messageToolCalls = (message as any).toolCalls;
+                      const messageSegments = (message as any).segments;
                       const isLastMessage =
                         message.id === messages[messages.length - 1]?.id;
+                      
+                      // For streaming message, use streamingSegments for ordered rendering
+                      const hasStreamingSegments = isLastMessage && streamingSegments && streamingSegments.length > 0;
+                      
+                      if (hasStreamingSegments) {
+                        // Render streaming segments in order (interleaved text and tool calls)
+                        return (
+                          <>
+                            {streamingSegments.map((segment, idx) => (
+                              <div key={`streaming-segment-${idx}`}>
+                                {segment.type === 'text' && segment.content && (
+                                  <div className="text-sm leading-relaxed text-foreground/90">
+                                    {renderRichContent(segment.content)}
+                                  </div>
+                                )}
+                                {segment.type === 'toolCall' && (
+                                  <div className="my-1">
+                                    <ToolCallItem
+                                      toolCall={segment.toolCall}
+                                      isCompact
+                                      onFileClick={onFileClick}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </>
+                        );
+                      }
 
+                      // Check if message has saved segments (preserves correct order)
+                      const hasSavedSegments = messageSegments && Array.isArray(messageSegments) && messageSegments.length > 0;
+                      
+                      if (hasSavedSegments) {
+                        // Render saved segments in their correct order (interleaved text and tool calls)
+                        return (
+                          <>
+                            {messageSegments.map((segment: any, idx: number) => (
+                              <div key={`saved-segment-${idx}`}>
+                                {segment.type === 'text' && segment.content && (
+                                  <div className="text-sm leading-relaxed text-foreground/90">
+                                    {renderRichContent(segment.content)}
+                                  </div>
+                                )}
+                                {segment.type === 'toolCall' && segment.toolCall && (
+                                  <div className="my-1">
+                                    <ToolCallItem
+                                      toolCall={segment.toolCall}
+                                      isCompact
+                                      onFileClick={onFileClick}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </>
+                        );
+                      }
+
+                      // Fallback for messages without saved segments (legacy or loaded from DB without segments)
                       // Combine message tool calls with current tool calls for the last message
-                      // This ensures tool calls don't disappear during streaming
                       let toolCallsToUse: any[] = [];
                       const messageToolCallsArray =
                         messageToolCalls &&
@@ -1029,7 +1156,7 @@ function ChatPanelComponent({
                         toolCallsToUse = messageToolCallsArray;
                       }
 
-                      // Render segments normally, then tool calls at end
+                      // Render segments normally, then tool calls at end (legacy fallback)
                       return (
                         <>
                           {segments.map((segment, idx) => (
@@ -1058,7 +1185,7 @@ function ChatPanelComponent({
                               )}
                             </div>
                           ))}
-                          {/* Tool calls at end if no textIndex */}
+                          {/* Tool calls at end only if no saved segments (legacy fallback) */}
                           {toolCallsToUse.length > 0 && (
                             <div className="space-y-0.5 mt-2">
                               {toolCallsToUse.map((tc: any) => (
@@ -1066,6 +1193,7 @@ function ChatPanelComponent({
                                   key={tc.id}
                                   toolCall={tc}
                                   isCompact
+                                  onFileClick={onFileClick}
                                 />
                               ))}
                             </div>

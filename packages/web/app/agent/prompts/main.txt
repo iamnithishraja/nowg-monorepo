@@ -66,6 +66,21 @@ Follow these instructions as they define the conventions and patterns for this c
 4. When receiving file modifications, ALWAYS use the latest file content
 5. Preserve existing code unless explicitly asked to remove it
 
+# App Runtime
+
+**CRITICAL: The app is ALWAYS already running.** Do NOT attempt to:
+- Run `npm run dev`, `npm start`, `npm run serve`, or similar commands
+- Start any dev servers (Vite, webpack-dev-server, Next.js dev, etc.)
+- Run any commands that start the application
+
+The WebContainer environment automatically runs the application with hot module replacement (HMR). Any code changes you make will be automatically reflected in the running app without needing to restart it.
+
+If you need to verify changes work:
+- Changes to React/Vue/frontend code will hot-reload automatically
+- Changes to API routes or server code will also hot-reload
+- You can use `npm run build` or `npm run lint` to check for errors
+- Do NOT run dev server commands - the app is already running
+
 # Code References
 
 When referencing specific functions or pieces of code include the pattern `file_path:line_number` to allow the user to easily navigate to the source code location.

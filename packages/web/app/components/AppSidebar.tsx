@@ -11,8 +11,9 @@ import {
   MoreHorizontal,
   Plus,
   Trash2,
+  User,
   Users,
-  X
+  X,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
@@ -24,7 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from "./ui/dialog";
 import {
   DropdownMenu,
@@ -89,11 +90,84 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<
     Record<string, boolean>
   >({});
+  const [userWithAccess, setUserWithAccess] = useState<any>(null);
+  const [sidebarContext, setSidebarContext] = useState<
+    "personal" | "organization"
+  >("personal");
+
+  // Ensure sidebarContext is properly typed for TypeScript
+  const context: "personal" | "organization" = sidebarContext;
+
+  // Helper function to determine if separator should be shown
+  const shouldShowSeparator = () => {
+    const hasContextConversations =
+      context === "personal"
+        ? Object.keys(groupedPersonalConversations).length > 0
+        : Object.keys(groupedOrganizationConversations).length > 0;
+    const hasVisibleTeamConversations =
+      context === "personal" &&
+      Object.keys(groupedTeamConversations).length > 0;
+    return hasContextConversations && hasVisibleTeamConversations;
+  };
 
   const location = useLocation();
   const currentConversationId = new URLSearchParams(location.search).get(
     "conversationId"
   );
+
+  // Fetch user access info
+  useEffect(() => {
+    const fetchUserAccess = async () => {
+      try {
+        const res = await fetch("/api/admin/me", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUserWithAccess(data);
+          // Default to organization context for org_admins
+          const isOrgAdmin =
+            data?.role === "ORG_ADMIN" || data?.hasOrgAdminAccess === true;
+          const defaultContext = isOrgAdmin ? "organization" : "personal";
+          console.log("AppSidebar: Setting initial context to", defaultContext);
+          setSidebarContext(defaultContext);
+        }
+      } catch (error) {
+        console.error("Error fetching user access:", error);
+      }
+    };
+    fetchUserAccess();
+  }, []);
+
+  // Check if user is org_admin
+  const isOrgAdmin =
+    userWithAccess?.role === "ORG_ADMIN" ||
+    userWithAccess?.hasOrgAdminAccess === true;
+
+  // Save context to localStorage and notify other components when it changes
+  useEffect(() => {
+    console.log("AppSidebar: Context changed to", sidebarContext);
+    localStorage.setItem("web-sidebar-context", sidebarContext);
+    // Dispatch custom event to notify other components in the same tab
+    window.dispatchEvent(
+      new CustomEvent("sidebarContextChange", { detail: sidebarContext })
+    );
+  }, [sidebarContext]);
+
+  // Listen for conversation creation events
+  useEffect(() => {
+    const handleConversationCreated = () => {
+      // Refetch conversations when a new one is created
+      fetchConversations();
+    };
+
+    window.addEventListener("conversationCreated", handleConversationCreated);
+    return () =>
+      window.removeEventListener(
+        "conversationCreated",
+        handleConversationCreated
+      );
+  }, []);
 
   // Fetch conversations
   const fetchConversations = async () => {
@@ -156,76 +230,82 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
   };
 
   // Update conversation title - MEMOIZED
-  const updateTitle = useCallback(async (conversationId: string, title: string) => {
-    try {
-      const response = await fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "updateTitle",
-          conversationId,
-          title,
-        }),
-      });
+  const updateTitle = useCallback(
+    async (conversationId: string, title: string) => {
+      try {
+        const response = await fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "updateTitle",
+            conversationId,
+            title,
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to update title");
+        if (!response.ok) {
+          throw new Error("Failed to update title");
+        }
+
+        // Update local state
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId
+              ? { ...conv, title, updatedAt: new Date().toISOString() }
+              : conv
+          )
+        );
+
+        setEditingConversation(null);
+        setNewTitle("");
+      } catch (err) {
+        console.error("Error updating title:", err);
+        setError(err instanceof Error ? err.message : "Failed to update title");
       }
-
-      // Update local state
-      setConversations((prev) =>
-        prev.map((conv) =>
-          conv.id === conversationId
-            ? { ...conv, title, updatedAt: new Date().toISOString() }
-            : conv
-        )
-      );
-
-      setEditingConversation(null);
-      setNewTitle("");
-    } catch (err) {
-      console.error("Error updating title:", err);
-      setError(err instanceof Error ? err.message : "Failed to update title");
-    }
-  }, []);
+    },
+    []
+  );
 
   // Delete conversation - MEMOIZED
-  const deleteConversation = useCallback(async (conversationId: string) => {
-    setIsDeleting(true);
-    try {
-      const response = await fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "delete",
-          conversationId,
-        }),
-      });
+  const deleteConversation = useCallback(
+    async (conversationId: string) => {
+      setIsDeleting(true);
+      try {
+        const response = await fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "delete",
+            conversationId,
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to delete conversation");
+        if (!response.ok) {
+          throw new Error("Failed to delete conversation");
+        }
+
+        // Remove from local state
+        setConversations((prev) =>
+          prev.filter((conv) => conv.id !== conversationId)
+        );
+        setDeleteDialogOpen(false);
+        setConversationToDelete(null);
+
+        // If we deleted the current conversation, navigate to home
+        if (conversationId === currentConversationId) {
+          window.location.href = "/home";
+        }
+      } catch (err) {
+        console.error("Error deleting conversation:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to delete conversation"
+        );
+      } finally {
+        setIsDeleting(false);
       }
-
-      // Remove from local state
-      setConversations((prev) =>
-        prev.filter((conv) => conv.id !== conversationId)
-      );
-      setDeleteDialogOpen(false);
-      setConversationToDelete(null);
-
-      // If we deleted the current conversation, navigate to home
-      if (conversationId === currentConversationId) {
-        window.location.href = "/home";
-      }
-    } catch (err) {
-      console.error("Error deleting conversation:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to delete conversation"
-      );
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [currentConversationId]);
+    },
+    [currentConversationId]
+  );
 
   // Format relative time - memoized as callback
   const formatTimeAgo = useCallback((dateString: string) => {
@@ -252,7 +332,11 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
   }, []);
 
   // MEMOIZED: Separate personal, team, and organization conversations
-  const { personalConversations, teamConversations, organizationConversations } = useMemo(() => {
+  const {
+    personalConversations,
+    teamConversations,
+    organizationConversations,
+  } = useMemo(() => {
     const organization = conversations.filter(
       (c) => c.organizationId && c.projectType === "organization"
     );
@@ -266,31 +350,41 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
         c.projectType !== "organization" &&
         (c.projectType === "personal" || !c.projectType)
     );
-    return { personalConversations: personal, teamConversations: team, organizationConversations: organization };
+    return {
+      personalConversations: personal,
+      teamConversations: team,
+      organizationConversations: organization,
+    };
   }, [conversations]);
 
   // MEMOIZED: Filter conversations
-  const { filteredPersonal, filteredTeam, filteredOrganization } = useMemo(() => {
-    const query = filterQuery.trim().toLowerCase();
-    if (!query) {
-      return { 
-        filteredPersonal: personalConversations, 
-        filteredTeam: teamConversations, 
-        filteredOrganization: organizationConversations 
+  const { filteredPersonal, filteredTeam, filteredOrganization } =
+    useMemo(() => {
+      const query = filterQuery.trim().toLowerCase();
+      if (!query) {
+        return {
+          filteredPersonal: personalConversations,
+          filteredTeam: teamConversations,
+          filteredOrganization: organizationConversations,
+        };
+      }
+      return {
+        filteredPersonal: personalConversations.filter((c) =>
+          (c.title || "").toLowerCase().includes(query)
+        ),
+        filteredTeam: teamConversations.filter((c) =>
+          (c.title || "").toLowerCase().includes(query)
+        ),
+        filteredOrganization: organizationConversations.filter((c) =>
+          (c.title || "").toLowerCase().includes(query)
+        ),
       };
-    }
-    return {
-      filteredPersonal: personalConversations.filter((c) =>
-        (c.title || "").toLowerCase().includes(query)
-      ),
-      filteredTeam: teamConversations.filter((c) =>
-        (c.title || "").toLowerCase().includes(query)
-      ),
-      filteredOrganization: organizationConversations.filter((c) =>
-        (c.title || "").toLowerCase().includes(query)
-      ),
-    };
-  }, [filterQuery, personalConversations, teamConversations, organizationConversations]);
+    }, [
+      filterQuery,
+      personalConversations,
+      teamConversations,
+      organizationConversations,
+    ]);
 
   // MEMOIZED: Group personal conversations by date
   const groupedPersonalConversations = useMemo(() => {
@@ -301,7 +395,7 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toDateString();
     const weekAgo = today.getTime() - 7 * 24 * 60 * 60 * 1000;
-    
+
     return filteredPersonal.reduce(
       (groups, conversation) => {
         if (!conversation.lastMessageAt) {
@@ -338,57 +432,70 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
   }, [filteredPersonal]);
 
   // MEMOIZED: Group team conversations by team
-  const groupedTeamConversations = useMemo(() => 
-    filteredTeam.reduce(
-      (groups, conversation) => {
-        const teamKey = conversation.teamName || "Unknown Team";
-        if (!groups[teamKey]) groups[teamKey] = [];
-        groups[teamKey].push(conversation);
-        return groups;
-      },
-      {} as Record<string, Conversation[]>
-    ), [filteredTeam]);
+  const groupedTeamConversations = useMemo(
+    () =>
+      filteredTeam.reduce(
+        (groups, conversation) => {
+          const teamKey = conversation.teamName || "Unknown Team";
+          if (!groups[teamKey]) groups[teamKey] = [];
+          groups[teamKey].push(conversation);
+          return groups;
+        },
+        {} as Record<string, Conversation[]>
+      ),
+    [filteredTeam]
+  );
 
   // MEMOIZED: Group organization conversations by organization
-  const groupedOrganizationConversations = useMemo(() =>
-    filteredOrganization.reduce(
-      (groups, conversation) => {
-        const orgKey = conversation.organizationName || "Unknown Organization";
-        if (!groups[orgKey]) groups[orgKey] = [];
-        groups[orgKey].push(conversation);
-        return groups;
-      },
-      {} as Record<string, Conversation[]>
-    ), [filteredOrganization]);
+  const groupedOrganizationConversations = useMemo(
+    () =>
+      filteredOrganization.reduce(
+        (groups, conversation) => {
+          const orgKey =
+            conversation.organizationName || "Unknown Organization";
+          if (!groups[orgKey]) groups[orgKey] = [];
+          groups[orgKey].push(conversation);
+          return groups;
+        },
+        {} as Record<string, Conversation[]>
+      ),
+    [filteredOrganization]
+  );
 
   useEffect(() => {
     fetchConversations();
   }, []);
 
   // MEMOIZED event handlers to prevent re-renders
-  const handleEditClick = useCallback((conversation: Conversation, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setEditingConversation(conversation);
-    setNewTitle(conversation.title);
-  }, []);
+  const handleEditClick = useCallback(
+    (conversation: Conversation, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setEditingConversation(conversation);
+      setNewTitle(conversation.title);
+    },
+    []
+  );
 
-  const handleDeleteClick = useCallback((
-    conversation: Conversation,
-    e: React.MouseEvent
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setConversationToDelete(conversation);
-    setDeleteDialogOpen(true);
-  }, []);
+  const handleDeleteClick = useCallback(
+    (conversation: Conversation, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setConversationToDelete(conversation);
+      setDeleteDialogOpen(true);
+    },
+    []
+  );
 
-  const handleEditSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingConversation && newTitle.trim()) {
-      updateTitle(editingConversation.id, newTitle.trim());
-    }
-  }, [editingConversation, newTitle, updateTitle]);
+  const handleEditSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (editingConversation && newTitle.trim()) {
+        updateTitle(editingConversation.id, newTitle.trim());
+      }
+    },
+    [editingConversation, newTitle, updateTitle]
+  );
 
   // Open on cursor touching the left screen edge
   useEffect(() => {
@@ -485,6 +592,53 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
                   </p>
                 </div>
               </div>
+
+              {/* Context Switcher for Org Admins */}
+              {isOrgAdmin && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-8 px-3 text-xs gap-2 border-border/30 hover:bg-primary/5"
+                    >
+                      {context === "personal" ? (
+                        <User className="h-3 w-3" />
+                      ) : (
+                        <Building2 className="h-3 w-3" />
+                      )}
+                      <span className="hidden sm:inline">
+                        {context === "personal" ? "Personal" : "Organization"}
+                      </span>
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-48">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        console.log("Dropdown: Setting context to personal");
+                        setSidebarContext("personal");
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <User className="h-4 w-4" />
+                      Personal Projects
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        console.log(
+                          "Dropdown: Setting context to organization"
+                        );
+                        setSidebarContext("organization");
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Building2 className="h-4 w-4" />
+                      Organization Projects
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
               <div className="flex items-center gap-1">
                 {/* Filter button */}
                 <DropdownMenu>
@@ -577,7 +731,7 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
                       )}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0 transition-colors duration-200">
+                        <div className="w-8 h-8 rounded-lg bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0 transition-colors duration-200">
                           <HomeIcon className="h-4 w-4 text-primary/80 group-hover:text-primary transition-colors duration-200" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -615,7 +769,7 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
             ) : conversations.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-muted/30 to-muted/10 flex items-center justify-center border border-muted/20">
+                  <div className="w-12 h-12 rounded-xl bg-linear-to-br from-muted/30 to-muted/10 flex items-center justify-center border border-muted/20">
                     <MessageCircle className="h-6 w-6 opacity-50" />
                   </div>
                   <div>
@@ -630,389 +784,414 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
               </div>
             ) : (
               <div className="space-y-2 pb-4 min-h-0">
-                {/* Organizations Section - Moved to top */}
-                {Object.keys(groupedOrganizationConversations).length > 0 && (
-                  <>
-                    <SidebarGroup>
-                      <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-gradient-to-r from-transparent via-muted/20 to-transparent flex items-center gap-2">
-                        <Building2 className="h-3 w-3" />
-                        Organizations
-                      </SidebarGroupLabel>
-                      <SidebarGroupContent className="space-y-1 mt-2">
-                        {Object.entries(groupedOrganizationConversations).map(
-                          ([orgName, orgConversations]) => {
-                            const orgId = orgConversations[0]?.organizationId;
-                            const orgKey = `org-${orgId || orgName}`;
-                            return (
-                              <SidebarGroup key={orgKey}>
-                                <SidebarGroupLabel className="px-1 py-1 text-[11px] font-medium text-muted-foreground/70 flex items-center justify-between">
-                                  <button
-                                    className="flex items-center gap-1.5 hover:text-foreground/80 transition-colors"
-                                    onClick={() =>
-                                      setCollapsedGroups((prev) => ({
-                                        ...prev,
-                                        [orgKey]: !prev[orgKey],
-                                      }))
-                                    }
-                                    aria-label={`${
-                                      collapsedGroups[orgKey]
-                                        ? "Expand"
-                                        : "Collapse"
-                                    } ${orgName}`}
-                                  >
-                                    {collapsedGroups[orgKey] ? (
-                                      <ChevronRight className="h-3 w-3" />
-                                    ) : (
-                                      <ChevronDown className="h-3 w-3" />
-                                    )}
-                                    <span className="truncate">{orgName}</span>
-                                  </button>
-                                  <span className="text-[10px] text-muted-foreground/60">
-                                    {orgConversations.length}
-                                  </span>
-                                </SidebarGroupLabel>
-                                {!collapsedGroups[orgKey] ? (
-                                  <SidebarGroupContent className="space-y-1 ml-2 pl-2 border-l border-border/30">
-                                    <SidebarMenu>
-                                      {orgConversations.map((conversation) => (
-                                        <SidebarMenuItem key={conversation.id}>
-                                          <Link
-                                            to={`/workspace?conversationId=${conversation.id}`}
-                                          >
-                                            <SidebarMenuButton
-                                              isActive={
-                                                conversation.id ===
-                                                currentConversationId
-                                              }
-                                              className={cn(
-                                                "group rounded-lg h-9 data-[active=true]:bg-primary/10 data-[active=true]:border data-[active=true]:border-primary/20 hover:bg-muted/50 px-2 py-2 transition-all duration-200 ease-out hover:scale-[1.01] shadow-sm hover:shadow-md data-[active=true]:scale-[1.01]"
-                                              )}
-                                              title={
-                                                conversation.title ||
-                                                "Untitled Conversation"
-                                              }
-                                            >
-                                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0 transition-colors duration-200">
-                                                  <MessageCircle className="h-3 w-3 text-primary/80 group-hover:text-primary transition-colors duration-200" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="truncate text-xs font-medium text-foreground/90 group-hover:text-foreground transition-colors duration-200">
-                                                    {conversation.title ||
-                                                      "Untitled Conversation"}
-                                                  </div>
-                                                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">
-                                                    {formatTimeAgo(
-                                                      conversation.lastMessageAt
-                                                    )}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </SidebarMenuButton>
-                                          </Link>
-                                        </SidebarMenuItem>
-                                      ))}
-                                    </SidebarMenu>
-                                  </SidebarGroupContent>
-                                ) : null}
-                              </SidebarGroup>
-                            );
-                          }
-                        )}
-                      </SidebarGroupContent>
-                    </SidebarGroup>
-                    {Object.keys(groupedPersonalConversations).length > 0 ||
-                    Object.keys(groupedTeamConversations).length > 0 ? (
-                      <SidebarSeparator className="my-2 opacity-50" />
-                    ) : null}
-                  </>
-                )}
-
-                {/* Personal Conversations */}
-                {Object.keys(groupedPersonalConversations).length > 0 && (
-                  <>
-                    {Object.entries(groupedPersonalConversations).map(
-                      ([groupName, groupConversations]) => (
-                        <SidebarGroup key={groupName}>
-                          <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-gradient-to-r from-transparent via-muted/20 to-transparent flex items-center justify-between">
-                            <button
-                              className="flex items-center gap-1 hover:text-foreground/80 transition-colors"
-                              onClick={() =>
-                                setCollapsedGroups((prev) => ({
-                                  ...prev,
-                                  [groupName]: !prev[groupName],
-                                }))
-                              }
-                              aria-label={`${
-                                collapsedGroups[groupName]
-                                  ? "Expand"
-                                  : "Collapse"
-                              } ${groupName}`}
-                            >
-                              {collapsedGroups[groupName] ? (
-                                <ChevronRight className="h-3 w-3" />
-                              ) : (
-                                <ChevronDown className="h-3 w-3" />
-                              )}
-                              {groupName}
-                            </button>
-                            <span className="text-[10px] text-muted-foreground/60">
-                              {groupConversations.length}
-                            </span>
-                          </SidebarGroupLabel>
-                          {!collapsedGroups[groupName] ? (
-                            <SidebarGroupContent className="space-y-2">
-                              <SidebarMenu>
-                                {groupConversations.map((conversation) => (
-                                  <SidebarMenuItem key={conversation.id}>
-                                    <Link
-                                      to={`/workspace?conversationId=${conversation.id}`}
+                {/* Organizations Section - Only show when in organization context */}
+                {context === "organization" &&
+                  Object.keys(groupedOrganizationConversations).length > 0 && (
+                    <>
+                      <SidebarGroup>
+                        <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-linear-to-r from-transparent via-muted/20 to-transparent flex items-center gap-2">
+                          <Building2 className="h-3 w-3" />
+                          Organizations
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent className="space-y-1 mt-2">
+                          {Object.entries(groupedOrganizationConversations).map(
+                            ([orgName, orgConversations]) => {
+                              const orgId = orgConversations[0]?.organizationId;
+                              const orgKey = `org-${orgId || orgName}`;
+                              return (
+                                <SidebarGroup key={orgKey}>
+                                  <SidebarGroupLabel className="px-1 py-1 text-[11px] font-medium text-muted-foreground/70 flex items-center justify-between">
+                                    <button
+                                      className="flex items-center gap-1.5 hover:text-foreground/80 transition-colors"
+                                      onClick={() =>
+                                        setCollapsedGroups((prev) => ({
+                                          ...prev,
+                                          [orgKey]: !prev[orgKey],
+                                        }))
+                                      }
+                                      aria-label={`${
+                                        collapsedGroups[orgKey]
+                                          ? "Expand"
+                                          : "Collapse"
+                                      } ${orgName}`}
                                     >
-                                      <SidebarMenuButton
-                                        isActive={
-                                          conversation.id ===
-                                          currentConversationId
-                                        }
-                                        className={cn(
-                                          "group rounded-xl h-10 data-[active=true]:bg-primary/10 data-[active=true]:border data-[active=true]:border-primary/20 hover:bg-muted/50 px-2 py-3 transition-all duration-200 ease-out hover:scale-[1.02] data-[active=true]:scale-[1.02] shadow-sm hover:shadow-md data-[active=true]:shadow-md"
-                                        )}
-                                        title={
-                                          conversation.title ||
-                                          "Untitled Conversation"
-                                        }
-                                      >
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0 transition-colors duration-200">
-                                            <MessageCircle className="h-4 w-4 text-primary/80 group-hover:text-primary transition-colors duration-200" />
-                                          </div>
-                                          <div className="flex-1 min-w-0">
-                                            <div className="truncate text-sm font-medium text-foreground/90 group-hover:text-foreground transition-colors duration-200">
-                                              {conversation.title ||
-                                                "Untitled Conversation"}
-                                            </div>
-                                            <div className="text-[10px] text-muted-foreground/60 mt-0.5">
-                                              {formatTimeAgo(
-                                                conversation.lastMessageAt
-                                              )}
-                                            </div>
-                                          </div>
-                                        </div>
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/80 rounded-lg transition-all duration-200 scale-95 group-hover:scale-100"
-                                              onClick={(e) =>
-                                                e.preventDefault()
-                                              }
+                                      {collapsedGroups[orgKey] ? (
+                                        <ChevronRight className="h-3 w-3" />
+                                      ) : (
+                                        <ChevronDown className="h-3 w-3" />
+                                      )}
+                                      <span className="truncate">
+                                        {orgName}
+                                      </span>
+                                    </button>
+                                    <span className="text-[10px] text-muted-foreground/60">
+                                      {orgConversations.length}
+                                    </span>
+                                  </SidebarGroupLabel>
+                                  {!collapsedGroups[orgKey] ? (
+                                    <SidebarGroupContent className="space-y-1 ml-2 pl-2 border-l border-border/30">
+                                      <SidebarMenu>
+                                        {orgConversations.map(
+                                          (conversation) => (
+                                            <SidebarMenuItem
+                                              key={conversation.id}
                                             >
-                                              <MoreHorizontal className="h-3 w-3" />
-                                              <span className="sr-only">
-                                                More options
-                                              </span>
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent
-                                            align="end"
-                                            className="w-48 rounded-lg border-border/50 bg-background/95 backdrop-blur-xl shadow-lg shadow-black/10"
-                                          >
-                                            <DropdownMenuItem
-                                              onClick={(e) =>
-                                                handleEditClick(conversation, e)
-                                              }
-                                              className="rounded-md hover:bg-muted/50 transition-colors duration-150 focus:bg-muted/50 py-2 px-3 cursor-pointer"
-                                            >
-                                              <Edit2 className="h-4 w-4 mr-3 text-muted-foreground/60" />
-                                              <span className="text-sm">
-                                                Rename
-                                              </span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                              onClick={(e) =>
-                                                handleDeleteClick(
-                                                  conversation,
-                                                  e
-                                                )
-                                              }
-                                              className="text-destructive focus:text-destructive focus:bg-destructive/5 rounded-md transition-colors duration-150 py-2 px-3 cursor-pointer"
-                                            >
-                                              <Trash2 className="h-4 w-4 mr-3" />
-                                              <span className="text-sm">
-                                                Delete
-                                              </span>
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      </SidebarMenuButton>
-                                    </Link>
-                                  </SidebarMenuItem>
-                                ))}
-                              </SidebarMenu>
-                            </SidebarGroupContent>
-                          ) : null}
-                        </SidebarGroup>
-                      )
-                    )}
-                  </>
-                )}
-
-                {/* Teams Section */}
-                {Object.keys(groupedTeamConversations).length > 0 && (
-                  <>
-                    {Object.keys(groupedPersonalConversations).length > 0 ? (
-                      <SidebarSeparator className="my-2 opacity-50" />
-                    ) : null}
-                    <SidebarGroup>
-                      <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-gradient-to-r from-transparent via-muted/20 to-transparent flex items-center gap-2">
-                        <Users className="h-3 w-3" />
-                        Teams
-                      </SidebarGroupLabel>
-                      <SidebarGroupContent className="space-y-1 mt-2">
-                        {Object.entries(groupedTeamConversations).map(
-                          ([teamName, teamConversations]) => {
-                            const teamId = teamConversations[0]?.teamId;
-                            const teamKey = `team-${teamId || teamName}`;
-                            return (
-                              <SidebarGroup key={teamKey}>
-                                <SidebarGroupLabel className="px-1 py-1 text-[11px] font-medium text-muted-foreground/70 flex items-center justify-between">
-                                  <button
-                                    className="flex items-center gap-1.5 hover:text-foreground/80 transition-colors"
-                                    onClick={() =>
-                                      setCollapsedGroups((prev) => ({
-                                        ...prev,
-                                        [teamKey]: !prev[teamKey],
-                                      }))
-                                    }
-                                    aria-label={`${
-                                      collapsedGroups[teamKey]
-                                        ? "Expand"
-                                        : "Collapse"
-                                    } ${teamName}`}
-                                  >
-                                    {collapsedGroups[teamKey] ? (
-                                      <ChevronRight className="h-3 w-3" />
-                                    ) : (
-                                      <ChevronDown className="h-3 w-3" />
-                                    )}
-                                    <span className="truncate">{teamName}</span>
-                                  </button>
-                                  <span className="text-[10px] text-muted-foreground/60">
-                                    {teamConversations.length}
-                                  </span>
-                                </SidebarGroupLabel>
-                                {!collapsedGroups[teamKey] ? (
-                                  <SidebarGroupContent className="space-y-1 ml-2 pl-2 border-l border-border/30">
-                                    <SidebarMenu>
-                                      {teamConversations.map((conversation) => (
-                                        <SidebarMenuItem key={conversation.id}>
-                                          <Link
-                                            to={`/workspace?conversationId=${conversation.id}`}
-                                          >
-                                            <SidebarMenuButton
-                                              isActive={
-                                                conversation.id ===
-                                                currentConversationId
-                                              }
-                                              className={cn(
-                                                "group rounded-lg h-9 data-[active=true]:bg-primary/10 data-[active=true]:border data-[active=true]:border-primary/20 hover:bg-muted/50 px-2 py-2 transition-all duration-200 ease-out hover:scale-[1.01] shadow-sm hover:shadow-md data-[active=true]:scale-[1.01]"
-                                              )}
-                                              title={
-                                                conversation.title ||
-                                                "Untitled Conversation"
-                                              }
-                                            >
-                                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0 transition-colors duration-200">
-                                                  <MessageCircle className="h-3 w-3 text-primary/80 group-hover:text-primary transition-colors duration-200" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="truncate text-xs font-medium text-foreground/90 group-hover:text-foreground transition-colors duration-200">
-                                                    {conversation.title ||
-                                                      "Untitled Conversation"}
-                                                  </div>
-                                                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">
-                                                    {formatTimeAgo(
-                                                      conversation.lastMessageAt
-                                                    )}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                              <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/80 rounded-lg transition-all duration-200 scale-95 group-hover:scale-100"
-                                                    onClick={(e) =>
-                                                      e.preventDefault()
-                                                    }
-                                                  >
-                                                    <MoreHorizontal className="h-3 w-3" />
-                                                    <span className="sr-only">
-                                                      More options
-                                                    </span>
-                                                  </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent
-                                                  align="end"
-                                                  className="w-48 rounded-lg border-border/50 bg-background/95 backdrop-blur-xl shadow-lg shadow-black/10"
+                                              <Link
+                                                to={`/workspace?conversationId=${conversation.id}`}
+                                              >
+                                                <SidebarMenuButton
+                                                  isActive={
+                                                    conversation.id ===
+                                                    currentConversationId
+                                                  }
+                                                  className={cn(
+                                                    "group rounded-lg h-9 data-[active=true]:bg-primary/10 data-[active=true]:border data-[active=true]:border-primary/20 hover:bg-muted/50 px-2 py-2 transition-all duration-200 ease-out hover:scale-[1.01] shadow-sm hover:shadow-md data-[active=true]:scale-[1.01]"
+                                                  )}
+                                                  title={
+                                                    conversation.title ||
+                                                    "Untitled Conversation"
+                                                  }
                                                 >
-                                                  <DropdownMenuItem
-                                                    onClick={(e) =>
-                                                      handleEditClick(
-                                                        conversation,
-                                                        e
-                                                      )
-                                                    }
-                                                    className="rounded-md transition-colors duration-150 py-2 px-3 cursor-pointer"
-                                                  >
-                                                    <Edit2 className="h-4 w-4 mr-3" />
-                                                    <span className="text-sm">
-                                                      Rename
-                                                    </span>
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuItem
-                                                    onClick={(e) =>
-                                                      handleDeleteClick(
-                                                        conversation,
-                                                        e
-                                                      )
-                                                    }
-                                                    className="text-destructive focus:text-destructive focus:bg-destructive/5 rounded-md transition-colors duration-150 py-2 px-3 cursor-pointer"
-                                                  >
-                                                    <Trash2 className="h-4 w-4 mr-3" />
-                                                    <span className="text-sm">
-                                                      Delete
-                                                    </span>
-                                                  </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                              </DropdownMenu>
-                                            </SidebarMenuButton>
-                                          </Link>
-                                        </SidebarMenuItem>
-                                      ))}
-                                    </SidebarMenu>
-                                  </SidebarGroupContent>
-                                ) : null}
-                              </SidebarGroup>
-                            );
-                          }
-                        )}
-                      </SidebarGroupContent>
-                    </SidebarGroup>
-                  </>
-                )}
+                                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    <div className="w-6 h-6 rounded-md bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0 transition-colors duration-200">
+                                                      <MessageCircle className="h-3 w-3 text-primary/80 group-hover:text-primary transition-colors duration-200" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                      <div className="truncate text-xs font-medium text-foreground/90 group-hover:text-foreground transition-colors duration-200">
+                                                        {conversation.title ||
+                                                          "Untitled Conversation"}
+                                                      </div>
+                                                      <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                                        {formatTimeAgo(
+                                                          conversation.lastMessageAt
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </SidebarMenuButton>
+                                              </Link>
+                                            </SidebarMenuItem>
+                                          )
+                                        )}
+                                      </SidebarMenu>
+                                    </SidebarGroupContent>
+                                  ) : null}
+                                </SidebarGroup>
+                              );
+                            }
+                          )}
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                      {shouldShowSeparator() ? (
+                        <SidebarSeparator className="my-2 opacity-50" />
+                      ) : null}
+                    </>
+                  )}
+
+                {/* Personal Conversations - Only show when in personal context */}
+                {context === "personal" &&
+                  Object.keys(groupedPersonalConversations).length > 0 && (
+                    <>
+                      {Object.entries(groupedPersonalConversations).map(
+                        ([groupName, groupConversations]) => (
+                          <SidebarGroup key={groupName}>
+                            <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-linear-to-r from-transparent via-muted/20 to-transparent flex items-center justify-between">
+                              <button
+                                className="flex items-center gap-1 hover:text-foreground/80 transition-colors"
+                                onClick={() =>
+                                  setCollapsedGroups((prev) => ({
+                                    ...prev,
+                                    [groupName]: !prev[groupName],
+                                  }))
+                                }
+                                aria-label={`${
+                                  collapsedGroups[groupName]
+                                    ? "Expand"
+                                    : "Collapse"
+                                } ${groupName}`}
+                              >
+                                {collapsedGroups[groupName] ? (
+                                  <ChevronRight className="h-3 w-3" />
+                                ) : (
+                                  <ChevronDown className="h-3 w-3" />
+                                )}
+                                {groupName}
+                              </button>
+                              <span className="text-[10px] text-muted-foreground/60">
+                                {groupConversations.length}
+                              </span>
+                            </SidebarGroupLabel>
+                            {!collapsedGroups[groupName] ? (
+                              <SidebarGroupContent className="space-y-2">
+                                <SidebarMenu>
+                                  {groupConversations.map((conversation) => (
+                                    <SidebarMenuItem key={conversation.id}>
+                                      <Link
+                                        to={`/workspace?conversationId=${conversation.id}`}
+                                      >
+                                        <SidebarMenuButton
+                                          isActive={
+                                            conversation.id ===
+                                            currentConversationId
+                                          }
+                                          className={cn(
+                                            "group rounded-xl h-10 data-[active=true]:bg-primary/10 data-[active=true]:border data-[active=true]:border-primary/20 hover:bg-muted/50 px-2 py-3 transition-all duration-200 ease-out hover:scale-[1.02] data-[active=true]:scale-[1.02] shadow-sm hover:shadow-md data-[active=true]:shadow-md"
+                                          )}
+                                          title={
+                                            conversation.title ||
+                                            "Untitled Conversation"
+                                          }
+                                        >
+                                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0 transition-colors duration-200">
+                                              <MessageCircle className="h-4 w-4 text-primary/80 group-hover:text-primary transition-colors duration-200" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                              <div className="truncate text-sm font-medium text-foreground/90 group-hover:text-foreground transition-colors duration-200">
+                                                {conversation.title ||
+                                                  "Untitled Conversation"}
+                                              </div>
+                                              <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                                {formatTimeAgo(
+                                                  conversation.lastMessageAt
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/80 rounded-lg transition-all duration-200 scale-95 group-hover:scale-100"
+                                                onClick={(e) =>
+                                                  e.preventDefault()
+                                                }
+                                              >
+                                                <MoreHorizontal className="h-3 w-3" />
+                                                <span className="sr-only">
+                                                  More options
+                                                </span>
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent
+                                              align="end"
+                                              className="w-48 rounded-lg border-border/50 bg-background/95 backdrop-blur-xl shadow-lg shadow-black/10"
+                                            >
+                                              <DropdownMenuItem
+                                                onClick={(e) =>
+                                                  handleEditClick(
+                                                    conversation,
+                                                    e
+                                                  )
+                                                }
+                                                className="rounded-md hover:bg-muted/50 transition-colors duration-150 focus:bg-muted/50 py-2 px-3 cursor-pointer"
+                                              >
+                                                <Edit2 className="h-4 w-4 mr-3 text-muted-foreground/60" />
+                                                <span className="text-sm">
+                                                  Rename
+                                                </span>
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem
+                                                onClick={(e) =>
+                                                  handleDeleteClick(
+                                                    conversation,
+                                                    e
+                                                  )
+                                                }
+                                                className="text-destructive focus:text-destructive focus:bg-destructive/5 rounded-md transition-colors duration-150 py-2 px-3 cursor-pointer"
+                                              >
+                                                <Trash2 className="h-4 w-4 mr-3" />
+                                                <span className="text-sm">
+                                                  Delete
+                                                </span>
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        </SidebarMenuButton>
+                                      </Link>
+                                    </SidebarMenuItem>
+                                  ))}
+                                </SidebarMenu>
+                              </SidebarGroupContent>
+                            ) : null}
+                          </SidebarGroup>
+                        )
+                      )}
+                    </>
+                  )}
+
+                {/* Teams Section - Only show when in personal context */}
+                {context === "personal" &&
+                  Object.keys(groupedTeamConversations).length > 0 && (
+                    <>
+                      {Object.keys(groupedPersonalConversations).length > 0 ? (
+                        <SidebarSeparator className="my-2 opacity-50" />
+                      ) : null}
+                      <SidebarGroup>
+                        <SidebarGroupLabel className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold bg-linear-to-r from-transparent via-muted/20 to-transparent flex items-center gap-2">
+                          <Users className="h-3 w-3" />
+                          Teams
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent className="space-y-1 mt-2">
+                          {Object.entries(groupedTeamConversations).map(
+                            ([teamName, teamConversations]) => {
+                              const teamId = teamConversations[0]?.teamId;
+                              const teamKey = `team-${teamId || teamName}`;
+                              return (
+                                <SidebarGroup key={teamKey}>
+                                  <SidebarGroupLabel className="px-1 py-1 text-[11px] font-medium text-muted-foreground/70 flex items-center justify-between">
+                                    <button
+                                      className="flex items-center gap-1.5 hover:text-foreground/80 transition-colors"
+                                      onClick={() =>
+                                        setCollapsedGroups((prev) => ({
+                                          ...prev,
+                                          [teamKey]: !prev[teamKey],
+                                        }))
+                                      }
+                                      aria-label={`${
+                                        collapsedGroups[teamKey]
+                                          ? "Expand"
+                                          : "Collapse"
+                                      } ${teamName}`}
+                                    >
+                                      {collapsedGroups[teamKey] ? (
+                                        <ChevronRight className="h-3 w-3" />
+                                      ) : (
+                                        <ChevronDown className="h-3 w-3" />
+                                      )}
+                                      <span className="truncate">
+                                        {teamName}
+                                      </span>
+                                    </button>
+                                    <span className="text-[10px] text-muted-foreground/60">
+                                      {teamConversations.length}
+                                    </span>
+                                  </SidebarGroupLabel>
+                                  {!collapsedGroups[teamKey] ? (
+                                    <SidebarGroupContent className="space-y-1 ml-2 pl-2 border-l border-border/30">
+                                      <SidebarMenu>
+                                        {teamConversations.map(
+                                          (conversation) => (
+                                            <SidebarMenuItem
+                                              key={conversation.id}
+                                            >
+                                              <Link
+                                                to={`/workspace?conversationId=${conversation.id}`}
+                                              >
+                                                <SidebarMenuButton
+                                                  isActive={
+                                                    conversation.id ===
+                                                    currentConversationId
+                                                  }
+                                                  className={cn(
+                                                    "group rounded-lg h-9 data-[active=true]:bg-primary/10 data-[active=true]:border data-[active=true]:border-primary/20 hover:bg-muted/50 px-2 py-2 transition-all duration-200 ease-out hover:scale-[1.01] shadow-sm hover:shadow-md data-[active=true]:scale-[1.01]"
+                                                  )}
+                                                  title={
+                                                    conversation.title ||
+                                                    "Untitled Conversation"
+                                                  }
+                                                >
+                                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    <div className="w-6 h-6 rounded-md bg-linear-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0 transition-colors duration-200">
+                                                      <MessageCircle className="h-3 w-3 text-primary/80 group-hover:text-primary transition-colors duration-200" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                      <div className="truncate text-xs font-medium text-foreground/90 group-hover:text-foreground transition-colors duration-200">
+                                                        {conversation.title ||
+                                                          "Untitled Conversation"}
+                                                      </div>
+                                                      <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                                        {formatTimeAgo(
+                                                          conversation.lastMessageAt
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                  <DropdownMenu>
+                                                    <DropdownMenuTrigger
+                                                      asChild
+                                                    >
+                                                      <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/80 rounded-lg transition-all duration-200 scale-95 group-hover:scale-100"
+                                                        onClick={(e) =>
+                                                          e.preventDefault()
+                                                        }
+                                                      >
+                                                        <MoreHorizontal className="h-3 w-3" />
+                                                        <span className="sr-only">
+                                                          More options
+                                                        </span>
+                                                      </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent
+                                                      align="end"
+                                                      className="w-48 rounded-lg border-border/50 bg-background/95 backdrop-blur-xl shadow-lg shadow-black/10"
+                                                    >
+                                                      <DropdownMenuItem
+                                                        onClick={(e) =>
+                                                          handleEditClick(
+                                                            conversation,
+                                                            e
+                                                          )
+                                                        }
+                                                        className="rounded-md transition-colors duration-150 py-2 px-3 cursor-pointer"
+                                                      >
+                                                        <Edit2 className="h-4 w-4 mr-3" />
+                                                        <span className="text-sm">
+                                                          Rename
+                                                        </span>
+                                                      </DropdownMenuItem>
+                                                      <DropdownMenuItem
+                                                        onClick={(e) =>
+                                                          handleDeleteClick(
+                                                            conversation,
+                                                            e
+                                                          )
+                                                        }
+                                                        className="text-destructive focus:text-destructive focus:bg-destructive/5 rounded-md transition-colors duration-150 py-2 px-3 cursor-pointer"
+                                                      >
+                                                        <Trash2 className="h-4 w-4 mr-3" />
+                                                        <span className="text-sm">
+                                                          Delete
+                                                        </span>
+                                                      </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                  </DropdownMenu>
+                                                </SidebarMenuButton>
+                                              </Link>
+                                            </SidebarMenuItem>
+                                          )
+                                        )}
+                                      </SidebarMenu>
+                                    </SidebarGroupContent>
+                                  ) : null}
+                                </SidebarGroup>
+                              );
+                            }
+                          )}
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                    </>
+                  )}
 
                 {/* Show message if no conversations match filter */}
-                {Object.keys(groupedPersonalConversations).length === 0 &&
-                  Object.keys(groupedTeamConversations).length === 0 &&
-                  Object.keys(groupedOrganizationConversations).length ===
-                    0 && (
-                    <div className="p-4 text-center text-muted-foreground text-sm">
-                      No conversations match your filter.
-                    </div>
-                  )}
+                {((context === "personal" &&
+                  Object.keys(groupedPersonalConversations).length === 0 &&
+                  Object.keys(groupedTeamConversations).length === 0) ||
+                  (context === "organization" &&
+                    Object.keys(groupedOrganizationConversations).length ===
+                      0)) && (
+                  <div className="p-4 text-center text-muted-foreground text-sm">
+                    {filterQuery
+                      ? "No conversations match your filter."
+                      : context === "personal"
+                        ? "No personal conversations yet."
+                        : "No organization conversations yet."}
+                  </div>
+                )}
               </div>
             )}
           </SidebarContent>
@@ -1029,12 +1208,12 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
           }
         }}
       >
-        <DialogContent className="p-[1px] rounded-2xl bg-gradient-to-b from-white/15 via-white/5 to-transparent sm:max-w-[450px]">
+        <DialogContent className="p-px rounded-2xl bg-linear-to-b from-white/15 via-white/5 to-transparent sm:max-w-[450px]">
           <div className="bg-background/70 backdrop-blur-xl border border-border/50 rounded-2xl shadow-xl shadow-black/30 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300">
             <form onSubmit={handleEditSubmit}>
               <DialogHeader className="space-y-3 pb-4 px-6 pt-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
+                  <div className="w-10 h-10 rounded-lg bg-linear-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
                     <Edit2 className="h-5 w-5 text-primary" />
                   </div>
                   <div>
@@ -1092,7 +1271,7 @@ function AppSidebarComponent({ className }: AppSidebarProps) {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="p-[1px] rounded-2xl bg-gradient-to-b from-white/15 via-white/5 to-transparent max-w-md">
+        <DialogContent className="p-px rounded-2xl bg-linear-to-b from-white/15 via-white/5 to-transparent max-w-md">
           <div className="bg-background/70 backdrop-blur-xl border border-border/50 rounded-2xl shadow-xl shadow-black/30 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300">
             <DialogHeader className="pb-4 px-6 pt-6">
               <DialogTitle className="text-foreground flex items-center gap-2">

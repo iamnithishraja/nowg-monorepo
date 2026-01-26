@@ -7,13 +7,6 @@ export const messageSchemaDefinition = {
     ref: "Conversation",
     required: true,
   },
-  // Optional reference to Chat - if set, this message belongs to a chat, not the main conversation
-  chatId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Chat",
-    default: null,
-    index: true,
-  },
   // Optional idempotency key provided by client to avoid duplicates
   clientRequestId: { type: String, index: true },
   role: {
@@ -28,7 +21,7 @@ export const messageSchemaDefinition = {
   tokensUsed: { type: Number },
   inputTokens: { type: Number },
   outputTokens: { type: Number },
-  // Reference to File model (legacy - files now stored in R2)
+  // Reference to File model
   files: [
     {
       type: mongoose.Schema.Types.ObjectId,
@@ -119,6 +112,6 @@ export function getMessageModel(): mongoose.Model<any> {
   return mongoose.model("Message", messageSchema);
 }
 
-const Message = getMessageModel();
+const Messages = getMessageModel();
 
-export default Message;
+export default Messages;

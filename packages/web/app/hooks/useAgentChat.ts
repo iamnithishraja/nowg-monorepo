@@ -93,6 +93,10 @@ export interface UseAgentChatOptions {
     messages: CoreMessage[],
     step: number
   ) => void;
+  /**
+   * Callback when the chat title is updated (generated from first message)
+   */
+  onChatTitleUpdated?: (title: string) => void;
 }
 
 /**
@@ -142,6 +146,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     onComplete,
     onError,
     onAwaitingAcknowledgement,
+    onChatTitleUpdated,
   } = options;
 
   const [state, setState] = useState<AgentChatState>({
@@ -375,6 +380,17 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               case "done":
                 console.log("[useAgentChat] Stream done event received");
                 break;
+
+              case "chat_title_updated":
+                // Chat title was generated from the first user message
+                console.log("[useAgentChat] Chat title updated:", data.chatTitle);
+                onChatTitleUpdated?.(data.chatTitle);
+                break;
+
+              case "user_message_saved":
+                // User message was saved to database
+                console.log("[useAgentChat] User message saved:", data.messageId);
+                break;
             }
           } catch (parseError) {
             console.error("[useAgentChat] Parse error:", parseError);
@@ -403,7 +419,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         messages: messagesForContinuation,
       };
     },
-    [state.sessionId, onTextDelta, onToolCall, onStepComplete]
+    [state.sessionId, onTextDelta, onToolCall, onStepComplete, onChatTitleUpdated]
   );
 
   /**

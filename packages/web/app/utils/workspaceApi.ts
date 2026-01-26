@@ -99,11 +99,11 @@ export const convertToUIMessages = (messages: any[]): Message[] => {
   // Filter out invalid messages and deduplicate by id
   const validMessages = messages.filter((msg: any) => {
     // Be more lenient with content filtering - only filter out completely empty messages
-    const isValid =
-      msg && msg.role && msg.content !== undefined && msg.content !== null;
-    if (!isValid) {
-
-    }
+    // For AgentMessage, we also allow messages with toolCalls or toolResults even if content is empty
+    const hasContent = msg.content !== undefined && msg.content !== null;
+    const hasToolCalls = msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0;
+    const hasToolResults = msg.toolResults && Array.isArray(msg.toolResults) && msg.toolResults.length > 0;
+    const isValid = msg && msg.role && (hasContent || hasToolCalls || hasToolResults);
     return isValid;
   });
 
@@ -113,7 +113,6 @@ export const convertToUIMessages = (messages: any[]): Message[] => {
     .filter((msg: any) => {
       const id = msg.id || msg._id?.toString();
       if (seenIds.has(id)) {
-
         return false;
       }
       seenIds.add(id);
@@ -128,9 +127,17 @@ export const convertToUIMessages = (messages: any[]): Message[] => {
       ...(msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0 
         ? { toolCalls: msg.toolCalls } 
         : {}),
-      // Preserve other message metadata
+      // Preserve toolResults for agent messages
+      ...(msg.toolResults && Array.isArray(msg.toolResults) && msg.toolResults.length > 0 
+        ? { toolResults: msg.toolResults } 
+        : {}),
+      // Preserve model and token info
       ...(msg.model ? { model: msg.model } : {}),
-      ...(msg.timestamp ? { timestamp: msg.timestamp } : {}),
+      ...(msg.tokensUsed ? { tokensUsed: msg.tokensUsed } : {}),
+      ...(msg.inputTokens ? { inputTokens: msg.inputTokens } : {}),
+      ...(msg.outputTokens ? { outputTokens: msg.outputTokens } : {}),
+      // Preserve timestamps
+      ...(msg.timestamp || msg.createdAt ? { timestamp: msg.timestamp || msg.createdAt } : {}),
     }));
 };
 
