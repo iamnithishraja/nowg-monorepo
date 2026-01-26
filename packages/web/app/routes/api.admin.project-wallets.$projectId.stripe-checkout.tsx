@@ -1,13 +1,13 @@
+import { Project } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
+import mongoose from "mongoose";
 import type { ActionFunctionArgs } from "react-router";
 import { requireAdmin } from "~/lib/adminMiddleware";
-import { connectToDatabase } from "~/lib/mongo";
 import { getEnvWithDefault } from "~/lib/env";
-import { createPaymentCheckout } from "~/lib/paymentHandler";
-import Project from "~/models/projectModel";
-import { isProjectAdmin } from "~/lib/projectRoles";
+import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import { hasAdminAccess, UserRole } from "~/lib/types/roles";
-import mongoose from "mongoose";
+import { createPaymentCheckout } from "~/lib/paymentHandler";
+import { isProjectAdmin } from "~/lib/projectRoles";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {

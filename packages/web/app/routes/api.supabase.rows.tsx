@@ -1,11 +1,11 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { Conversation } from "@nowgai/shared/models";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "../lib/auth";
-import Conversation from "../models/conversationModel";
 import {
-  fetchRowsFromSupabase,
-  updateRowInSupabase,
-  deleteRowFromSupabase,
-  createRowInSupabase,
+    createRowInSupabase,
+    deleteRowFromSupabase,
+    fetchRowsFromSupabase,
+    updateRowInSupabase,
 } from "../lib/supabaseManager";
 
 /**

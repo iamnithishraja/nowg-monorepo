@@ -1,42 +1,43 @@
-import { useState, useEffect } from "react";
+import {
+  ArrowsClockwise,
+  ArrowsOutSimple,
+  ArrowSquareOut,
+  Bell,
+  CaretDown,
+  ChartBar,
+  ChatCircle,
+  Code,
+  CurrencyDollar,
+  Database,
+  DeviceMobile,
+  GitBranch,
+  GithubLogo,
+  Globe,
+  Lightning,
+  Shield,
+  SignOut,
+  User as UserIcon,
+  Users
+} from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { useGitHubAuth } from "~/hooks/useGitHubAuth";
+import { useGitHubRepository } from "~/hooks/useGitHubRepository";
 import { authClient } from "../lib/authClient";
+import { cn } from "../lib/utils";
+import { UnifiedDeploymentDialog, useDeployDialog } from "./DeployDialog";
+import { GitHubDeleteDialog } from "./github/GitHubDeleteDialog";
+import { GitHubRepositoryDialog } from "./github/GitHubRepositoryDialog";
 import { Button } from "./ui/button";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import {
-  CaretDown,
-  Globe,
-  File,
-  ArrowsClockwise,
-  ArrowsOut,
-  DeviceMobile,
-  Rocket,
-  ShareNetwork,
-  Bell,
-  SignOut,
-  Gear,
-  SquaresFour,
-  CreditCard,
-  User as UserIcon,
-  ArrowSquareOut,
-  Database,
-  ChartBar,
-  GitBranch,
-  Users,
-  Shield,
-  CurrencyDollar,
-  Lightning,
-  ChatCircle,
-  GithubLogo,
-  Robot,
-} from "@phosphor-icons/react";
+import { VersionSelector } from "./VersionSelector";
 
 // Vercel Logo SVG
 const VercelIcon = ({ className }: { className?: string }) => (
@@ -87,15 +88,6 @@ const SupabaseIcon = ({ className }: { className?: string }) => (
     </defs>
   </svg>
 );
-import { cn } from "../lib/utils";
-import { VersionSelector } from "./VersionSelector";
-import SyncStatus from "./SyncStatus";
-import { useGitHubAuth } from "~/hooks/useGitHubAuth";
-import { useGitHubRepository } from "~/hooks/useGitHubRepository";
-import { GitHubRepositoryDialog } from "./github/GitHubRepositoryDialog";
-import { GitHubDeleteDialog } from "./github/GitHubDeleteDialog";
-import { UnifiedDeploymentDialog, useDeployDialog } from "./DeployDialog";
-import { ArrowsOutSimple, Code } from "phosphor-react";
 
 type TabType = "files" | "preview";
 

@@ -1,18 +1,17 @@
-import { CreditCard, Minus, Plus } from "@phosphor-icons/react";
+import { CreditCard, FolderOpen, Minus, Plus } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
-import { Icon } from "~/components/Icon";
 import type { TeamMember } from "./TeamMembersTable";
 
 interface ProjectCredits {
@@ -178,7 +177,7 @@ export function ManageCreditsDialog({
           ) : projectCredits.length === 0 ? (
             <div className="text-center py-8">
               <div className="w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center mx-auto mb-3">
-                <Icon name="FolderOpen" size="md" color="#727279" />
+                <FolderOpen size={20} color="#727279" />
               </div>
               <p className="text-[14px] text-tertiary">
                 No projects assigned to this user

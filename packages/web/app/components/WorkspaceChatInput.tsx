@@ -1,16 +1,16 @@
 import {
-    BookOpen,
-  CaretRight,
   ArrowSquareOut,
-  GithubLogo,
-SpinnerGap,
+  BookOpen,
+  CaretRight,
+  ChatCircle,
   Cursor,
-    Palette,
+  GithubLogo,
+  Palette,
   PaperPlaneRight,
   Sparkle,
-    Square,
-  Upload,
-  ChatCircle
+  SpinnerGap,
+  Square,
+  Upload
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { OPENROUTER_MODELS } from "../consts/models";
@@ -18,7 +18,9 @@ import { useFileHandling } from "../hooks/useFileHandling";
 import { cn } from "../lib/utils";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import type { DesignScheme } from "../types/design-scheme";
+import { getShortcutLabel } from "../utils/platform";
 
+import { ArrowUp, SelectionPlus } from "@phosphor-icons/react";
 import { FilePreview } from "./FileUpload";
 import { Button } from "./ui/button";
 import {
@@ -44,7 +46,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "./ui/tooltip";
-import { SelectionPlus, ArrowUp } from "phosphor-react";
 
 interface WorkspaceChatInputProps {
   input: string;
@@ -96,7 +97,7 @@ export function WorkspaceChatInput({
   const isDisabled = isLoading || isProcessingTemplate || isStreaming;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const [shortcutLabel, setShortcutLabel] = useState("Ctrl+Enter");
+  const shortcutLabel = getShortcutLabel();
 
   // Workspace state for switching tabs and edit mode
   // Hooks MUST be called unconditionally - always call useWorkspaceStore
@@ -108,20 +109,6 @@ export function WorkspaceChatInput({
   const setChatMode = useWorkspaceStore((s) => s.setChatMode);
   // Use propSelectedModel if provided, otherwise fall back to store value
   const selectedModel = propSelectedModel || storeSelectedModel;
-
-  // Platform-aware shortcut label
-  useEffect(() => {
-    try {
-      const ua = navigator.userAgent || "";
-      const platform = (navigator.platform || "").toLowerCase();
-      const isApple =
-        /mac|iphone|ipad|ipod/.test(platform) ||
-        /Mac|iPhone|iPad|iPod/.test(ua);
-      setShortcutLabel(isApple ? "⌘ Return" : "Ctrl+Enter");
-    } catch {
-      // no-op (SSR or unavailable navigator)
-    }
-  }, []);
 
   const examplePrompts = [
     {

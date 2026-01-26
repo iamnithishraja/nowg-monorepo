@@ -1,8 +1,8 @@
+import { Deployment } from "@nowgai/shared/models";
 import mongoose from "mongoose";
-import Deployment from "../models/deploymentModel";
+import { getEnv } from "./env";
 import { connectToDatabase } from "./mongo";
 import { ProfileService } from "./profileService";
-import { getEnv } from "./env";
 
 export class DeploymentService {
   private async ensureConnection() {

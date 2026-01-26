@@ -1,7 +1,7 @@
-import type { Route } from "./+types/api.supabase.projects";
-import Conversation from "../models/conversationModel";
+import { Conversation } from "@nowgai/shared/models";
 import { auth } from "../lib/auth";
 import { deleteSupabaseProject } from "../lib/supabaseManager";
+import type { Route } from "./+types/api.supabase.projects";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const authInstance = await auth;

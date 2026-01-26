@@ -1,8 +1,7 @@
+import { OrganizationMember, Profile } from "@nowgai/shared/models";
 import type { Request, Response } from "express";
+import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
-import Profile from "../../models/profileModel";
-import OrganizationMember from "../../models/organizationMemberModel";
-import { UserRole } from "../../types/roles";
 import { getUserOrganizations } from "../../lib/organizationRoles";
 
 export async function getDashboardStats(req: Request, res: Response) {

@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
+import SupabaseIntegration from "~/models/supabaseIntegrationModel";
 import { auth } from "../lib/auth";
 import { connectToDatabase } from "../lib/mongo";
-import SupabaseIntegration from "../models/supabaseIntegrationModel";
 
 /**
  * API Route: Disconnect Supabase Integration

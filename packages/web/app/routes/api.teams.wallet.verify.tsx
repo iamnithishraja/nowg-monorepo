@@ -1,9 +1,8 @@
+import { Team, TeamMember } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
-import { stripe } from "~/lib/stripe";
 import { connectToDatabase } from "~/lib/mongo";
-import Team from "~/models/teamModel";
-import TeamMember from "~/models/teamMemberModel";
+import { stripe } from "~/lib/stripe";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

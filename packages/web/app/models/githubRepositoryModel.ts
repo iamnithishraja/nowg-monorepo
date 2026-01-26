@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const githubRepositorySchema = new mongoose.Schema({
+// Schema definition for reuse
+export const githubRepositorySchemaDefinition = {
   conversationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Conversation",
@@ -64,12 +65,22 @@ const githubRepositorySchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
+
+export const githubRepositorySchema = new mongoose.Schema(githubRepositorySchemaDefinition);
 
 // Index for faster lookups
 githubRepositorySchema.index({ conversationId: 1 });
 githubRepositorySchema.index({ userId: 1 });
 
-const GitHubRepository = mongoose.model("GitHubRepository", githubRepositorySchema);
-export default GitHubRepository;
+// Model getter function for consistent access
+export function getGitHubRepositoryModel(): mongoose.Model<any> {
+  if (mongoose.models.GitHubRepository) {
+    return mongoose.models.GitHubRepository as mongoose.Model<any>;
+  }
+  return mongoose.model("GitHubRepository", githubRepositorySchema);
+}
 
+const GitHubRepository = getGitHubRepositoryModel();
+
+export default GitHubRepository;

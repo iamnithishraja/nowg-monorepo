@@ -1,7 +1,7 @@
+import { Profile } from "@nowgai/shared/models";
 import type { LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import Profile from "~/models/profileModel";
 import { isWhitelistedEmail } from "~/lib/stripe";
 
 export async function loader({ request }: LoaderFunctionArgs) {

@@ -1,6 +1,6 @@
+import { DEFAULT_USER_ROLE } from "@nowgai/shared/types";
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
-import { UserRole, DEFAULT_USER_ROLE } from "../types/roles";
 
 // Create auth instance - will be initialized after DB connection
 let authInstance: ReturnType<typeof betterAuth> | null = null;

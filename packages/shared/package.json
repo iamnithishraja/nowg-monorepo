@@ -1,0 +1,49 @@
+{
+	"name": "@nowgai/shared",
+	"version": "1.0.0",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"require": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./models": {
+			"import": "./dist/models/index.js",
+			"require": "./dist/models/index.js",
+			"types": "./dist/models/index.d.ts"
+		},
+		"./types": {
+			"import": "./dist/types/index.js",
+			"require": "./dist/types/index.js",
+			"types": "./dist/types/index.d.ts"
+		},
+		"./utils": {
+			"import": "./dist/utils/index.js",
+			"require": "./dist/utils/index.js",
+			"types": "./dist/utils/index.d.ts"
+		},
+		"./db": {
+			"import": "./dist/db/index.js",
+			"require": "./dist/db/index.js",
+			"types": "./dist/db/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsc --watch",
+		"typecheck": "tsc --noEmit"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"mongoose": "^8.18.2"
+	},
+	"devDependencies": {
+		"@types/node": "^22.15.32",
+		"typescript": "^5.8.3"
+	}
+}

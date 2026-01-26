@@ -1,7 +1,7 @@
+import { Conversation } from "@nowgai/shared/models";
 import type { LoaderFunctionArgs } from "react-router";
-import Conversation from "~/models/conversationModel";
-import { connectToDatabase } from "~/lib/mongo";
 import { getEnvWithDefault } from "~/lib/env";
+import { connectToDatabase } from "~/lib/mongo";
 
 async function requireAdmin(request: Request) {
   const cookies = request.headers.get("cookie");

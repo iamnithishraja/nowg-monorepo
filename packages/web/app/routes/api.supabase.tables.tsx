@@ -1,6 +1,6 @@
+import { Conversation } from "@nowgai/shared/models";
 import type { LoaderFunctionArgs } from "react-router";
 import { auth } from "../lib/auth";
-import Conversation from "../models/conversationModel";
 import { fetchTablesFromSupabase } from "../lib/supabaseManager";
 
 /**

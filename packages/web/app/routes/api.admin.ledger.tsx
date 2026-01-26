@@ -1,14 +1,10 @@
-import type { LoaderFunctionArgs } from "react-router";
+import { Organization, OrgProjectWallet, OrgWallet, Project, UserProjectWallet } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
+import type { LoaderFunctionArgs } from "react-router";
+import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import OrgWallet from "~/models/orgWalletModel";
-import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import UserProjectWallet from "~/models/userProjectWalletModel";
-import Organization from "~/models/organizationModel";
-import Project from "~/models/projectModel";
-import { hasAdminAccess } from "~/lib/types/roles";
-import { getUsersCollection } from "~/lib/adminHelpers";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {

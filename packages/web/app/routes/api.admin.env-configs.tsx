@@ -1,8 +1,7 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import EnvConfig from "~/models/envConfigModel";
+import { EnvConfig } from "@nowgai/shared/models";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { getEnvWithDefault, updateEnvKeysInCache } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
-import { getEnvWithDefault } from "~/lib/env";
-import { updateEnvKeysInCache } from "~/lib/env";
 
 // CORS headers
 const corsHeaders = {

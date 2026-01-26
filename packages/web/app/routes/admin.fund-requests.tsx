@@ -1,13 +1,14 @@
+import { UserRole } from "@nowgai/shared/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Download,
-  Search,
-  X,
-  XCircle,
+    CheckCircle2,
+    ChevronDown,
+    ChevronUp,
+    Clock,
+    Download,
+    Search,
+    X,
+    XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
@@ -18,29 +19,28 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "~/components/ui/table";
 import { Textarea } from "~/components/ui/textarea";
 import { useToast } from "~/hooks/use-toast";
 import { useAuth } from "~/hooks/useAuth";
 import { adminClient } from "~/lib/adminClient";
 import { auth } from "~/lib/auth";
-import { UserRole } from "~/lib/types/roles";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const authInstance = await auth;

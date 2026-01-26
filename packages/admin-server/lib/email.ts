@@ -1,5 +1,5 @@
+import { EnvConfig } from "@nowgai/shared/models";
 import { Resend } from "resend";
-import EnvConfig from "../models/envConfigModel";
 
 let resend: Resend | null = null;
 let RESEND_FROM = "";

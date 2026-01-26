@@ -1,8 +1,8 @@
+import { ProjectMember } from "@nowgai/shared/models";
+import { ProjectRole } from "@nowgai/shared/types";
 import type { LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import ProjectMember from "../models/projectMemberModel";
-import { ProjectRole } from "~/lib/types/roles";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

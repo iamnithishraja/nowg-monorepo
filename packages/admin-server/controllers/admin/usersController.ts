@@ -1,17 +1,16 @@
+import { OrganizationMember, Profile, ProjectMember } from "@nowgai/shared/models";
+import {
+  ProjectRole,
+  UserRole,
+  getInvalidUserRoleError,
+  hasAdminAccess,
+  isValidUserRole,
+} from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
-import Profile from "../../models/profileModel";
-import ProjectMember from "../../models/projectMemberModel";
-import {
-  UserRole,
-  ProjectRole,
-  isValidUserRole,
-  getInvalidUserRoleError,
-  hasAdminAccess,
-} from "../../types/roles";
-import { getUserProjects } from "../../lib/projectRoles";
 import { getUserOrganizations } from "../../lib/organizationRoles";
+import { getUserProjects } from "../../lib/projectRoles";
 
 export async function getUsers(req: Request, res: Response) {
   try {
@@ -70,9 +69,6 @@ export async function getUsers(req: Request, res: Response) {
         if (userOrgs.length > 0) {
           const orgIds = userOrgs.map((o) => o.organizationId);
           // Get all users from these organizations using OrganizationMember
-          const { default: OrganizationMember } = await import(
-            "../../models/organizationMemberModel"
-          );
           const orgMembers = await OrganizationMember.find({
             organizationId: { $in: orgIds },
             status: "active",

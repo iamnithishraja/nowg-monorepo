@@ -1,13 +1,10 @@
-import * as React from "react";
-import Background from "../components/Background";
-import GlowEffects from "../components/GlowEffects";
 import { Header } from "../components";
+import Background from "../components/Background";
 
 export default function VercelIntegrationDocs() {
 	return (
 		<div className="min-h-screen relative text-foreground">
 			<Background />
-			<GlowEffects />
 			<div className="relative z-10 flex min-h-screen flex-col">
 				<Header showAuthButtons={true} showSidebarToggle={false} />
 				<main className="flex-1">

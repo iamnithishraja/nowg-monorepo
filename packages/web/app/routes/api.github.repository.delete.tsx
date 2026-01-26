@@ -1,9 +1,8 @@
+import { Conversation } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
 import GitHubRepository from "~/models/githubRepositoryModel";
-import Conversation from "~/models/conversationModel";
-import mongoose from "mongoose";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

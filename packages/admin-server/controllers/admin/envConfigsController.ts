@@ -1,5 +1,5 @@
+import { EnvConfig } from "@nowgai/shared/models";
 import type { Request, Response } from "express";
-import EnvConfig from "../../models/envConfigModel";
 
 const PROTECTED_KEYS = [
   "MONGODB_URI",

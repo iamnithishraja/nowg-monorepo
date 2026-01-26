@@ -1,3 +1,4 @@
+import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     ArrowDownCircle,
@@ -18,7 +19,6 @@ import {
 import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { redirect } from "react-router";
-import { UserRole, hasAdminAccess } from "~/lib/types/roles";
 import { AdminLayout } from "../components/AdminLayout";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";

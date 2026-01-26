@@ -1,11 +1,10 @@
+import { Organization, OrgWallet } from "@nowgai/shared/models";
+import { hasAdminAccess, UserRole } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
-import { getBetterAuthUrl } from "../../lib/stripe";
-import { createPaymentCheckout } from "../../lib/paymentHandler";
-import OrgWallet from "../../models/orgWalletModel";
-import Organization from "../../models/organizationModel";
-import { UserRole, hasAdminAccess } from "../../types/roles";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
+import { createPaymentCheckout } from "../../lib/paymentHandler";
+import { getBetterAuthUrl, getStripe } from "../../lib/stripe";
 
 // Helper to validate ObjectId
 const isValidObjectId = (id: string): boolean => {
