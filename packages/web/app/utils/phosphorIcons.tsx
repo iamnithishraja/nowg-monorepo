@@ -13,8 +13,12 @@ const phosphorIconMap = new Map<string, React.ComponentType<any>>();
 const populatePhosphorMap = () => {
   Object.entries(PhosphorIcons).forEach(([key, value]) => {
     if (
-      typeof value === "function" &&
-      key.charAt(0) === key.charAt(0).toUpperCase()
+      (typeof value === "function" ||
+        (typeof value === "object" && value !== null)) &&
+      key.charAt(0) === key.charAt(0).toUpperCase() &&
+      !key.endsWith("Icon") &&
+      key !== "IconContext" &&
+      key !== "IconBase"
     ) {
       phosphorIconMap.set(key, value as React.ComponentType<any>);
     }
