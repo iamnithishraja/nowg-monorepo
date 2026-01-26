@@ -33,12 +33,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <html lang="en" className="dark">
       <head>
         {/* React-scan for dev debugging only - remove in production builds */}
-        {import.meta.env.DEV && (
+        {/* {import.meta.env.DEV && (
           <script
             crossOrigin="anonymous"
             src="//unpkg.com/react-scan/dist/auto.global.js"
           />
-        )}
+        )} */}
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
