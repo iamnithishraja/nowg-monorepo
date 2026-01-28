@@ -1,7 +1,15 @@
 import { ChatCircle } from "@phosphor-icons/react";
 import { Bot, Download, FileText, Loader2, RotateCcw, X } from "lucide-react";
 import type React from "react";
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createClientFileStorageService } from "../lib/clientFileStorage";
 import { cn } from "../lib/utils";
 import type { Message } from "../types/chat";
@@ -44,12 +52,12 @@ const formatMessageTime = (timestamp?: string | Date) => {
 
 // Streaming segment types
 interface StreamingTextSegment {
-  type: 'text';
+  type: "text";
   content: string;
 }
 
 interface StreamingToolCallSegment {
-  type: 'toolCall';
+  type: "toolCall";
   toolCall: any;
 }
 
@@ -67,6 +75,7 @@ interface ChatPanelProps {
   conversationId?: string;
   currentToolCalls?: any[]; // Tool calls for current streaming message
   streamingSegments?: StreamingSegment[]; // Ordered streaming segments for interleaved rendering
+  isStreamingText?: boolean; // True when text is actively being streamed
   chatId?: string | null; // Chat ID to detect if we're in a chat
   onFileClick?: (filePath: string) => void; // Callback when a file in tool call is clicked
 }
@@ -183,6 +192,7 @@ function ChatPanelComponent({
   conversationId,
   currentToolCalls = [],
   streamingSegments = [],
+  isStreamingText = false,
   chatId,
   onFileClick,
 }: ChatPanelProps) {
@@ -275,14 +285,17 @@ function ChatPanelComponent({
   }, []);
 
   // Memoize user messages for revert check
-  const userMessages = useMemo(() => 
-    messages.filter((m) => m.role === "user"),
+  const userMessages = useMemo(
+    () => messages.filter((m) => m.role === "user"),
     [messages]
   );
 
-  const getIsLastUserMessage = useCallback((messageId: string) => {
-    return userMessages[userMessages.length - 1]?.id === messageId;
-  }, [userMessages]);
+  const getIsLastUserMessage = useCallback(
+    (messageId: string) => {
+      return userMessages[userMessages.length - 1]?.id === messageId;
+    },
+    [userMessages]
+  );
 
   // Clean message content by removing artifacts and handling special components
   const cleanMessageContent = (message: Message) => {
@@ -943,49 +956,51 @@ function ChatPanelComponent({
                 )}
 
                 {/* Tool call message - render tool calls and results in a compact format */}
-                {isToolCallMessage && (messageToolCalls.length > 0 || messageToolResults.length > 0) && (
-                  <div className="w-full max-w-full space-y-1">
-                    {/* Tool calls */}
-                    {messageToolCalls.length > 0 && (
-                      <div className="space-y-0.5">
-                        {messageToolCalls.map((tc: any, idx: number) => (
-                          <ToolCallItem
-                            key={tc.id || `tc-${idx}`}
-                            toolCall={tc}
-                            isCompact
-                            onFileClick={onFileClick}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {/* Tool results */}
-                    {messageToolResults.length > 0 && (
-                      <div className="space-y-0.5">
-                        {messageToolResults.map((tr: any, idx: number) => (
-                          <div
-                            key={tr.toolCallId || `tr-${idx}`}
-                            className="flex items-center gap-2 py-1 text-xs text-muted-foreground/70"
-                          >
-                            <div className="w-2 h-2 rounded-full bg-emerald-500/50" />
-                            <span className="truncate">
-                              {tr.toolName || "Tool"} result
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {/* Content if any */}
-                    {message.content && (
-                      <div className="text-sm leading-relaxed text-foreground/90 mt-2">
-                        {renderRichContent(
-                          typeof message.content === "string"
-                            ? message.content
-                            : JSON.stringify(message.content)
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {isToolCallMessage &&
+                  (messageToolCalls.length > 0 ||
+                    messageToolResults.length > 0) && (
+                    <div className="w-full max-w-full space-y-1">
+                      {/* Tool calls */}
+                      {messageToolCalls.length > 0 && (
+                        <div className="space-y-0.5">
+                          {messageToolCalls.map((tc: any, idx: number) => (
+                            <ToolCallItem
+                              key={tc.id || `tc-${idx}`}
+                              toolCall={tc}
+                              isCompact
+                              onFileClick={onFileClick}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {/* Tool results */}
+                      {messageToolResults.length > 0 && (
+                        <div className="space-y-0.5">
+                          {messageToolResults.map((tr: any, idx: number) => (
+                            <div
+                              key={tr.toolCallId || `tr-${idx}`}
+                              className="flex items-center gap-2 py-1 text-xs text-muted-foreground/70"
+                            >
+                              <div className="w-2 h-2 rounded-full bg-emerald-500/50" />
+                              <span className="truncate">
+                                {tr.toolName || "Tool"} result
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Content if any */}
+                      {message.content && (
+                        <div className="text-sm leading-relaxed text-foreground/90 mt-2">
+                          {renderRichContent(
+                            typeof message.content === "string"
+                              ? message.content
+                              : JSON.stringify(message.content)
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                 {/* User message - styled as a premium card */}
                 {message.role === "user" && (
@@ -1059,22 +1074,25 @@ function ChatPanelComponent({
                       const messageSegments = (message as any).segments;
                       const isLastMessage =
                         message.id === messages[messages.length - 1]?.id;
-                      
+
                       // For streaming message, use streamingSegments for ordered rendering
-                      const hasStreamingSegments = isLastMessage && streamingSegments && streamingSegments.length > 0;
-                      
+                      const hasStreamingSegments =
+                        isLastMessage &&
+                        streamingSegments &&
+                        streamingSegments.length > 0;
+
                       if (hasStreamingSegments) {
                         // Render streaming segments in order (interleaved text and tool calls)
                         return (
                           <>
                             {streamingSegments.map((segment, idx) => (
                               <div key={`streaming-segment-${idx}`}>
-                                {segment.type === 'text' && segment.content && (
+                                {segment.type === "text" && segment.content && (
                                   <div className="text-sm leading-relaxed text-foreground/90">
                                     {renderRichContent(segment.content)}
                                   </div>
                                 )}
-                                {segment.type === 'toolCall' && (
+                                {segment.type === "toolCall" && (
                                   <div className="my-1">
                                     <ToolCallItem
                                       toolCall={segment.toolCall}
@@ -1090,30 +1108,37 @@ function ChatPanelComponent({
                       }
 
                       // Check if message has saved segments (preserves correct order)
-                      const hasSavedSegments = messageSegments && Array.isArray(messageSegments) && messageSegments.length > 0;
-                      
+                      const hasSavedSegments =
+                        messageSegments &&
+                        Array.isArray(messageSegments) &&
+                        messageSegments.length > 0;
+
                       if (hasSavedSegments) {
                         // Render saved segments in their correct order (interleaved text and tool calls)
                         return (
                           <>
-                            {messageSegments.map((segment: any, idx: number) => (
-                              <div key={`saved-segment-${idx}`}>
-                                {segment.type === 'text' && segment.content && (
-                                  <div className="text-sm leading-relaxed text-foreground/90">
-                                    {renderRichContent(segment.content)}
-                                  </div>
-                                )}
-                                {segment.type === 'toolCall' && segment.toolCall && (
-                                  <div className="my-1">
-                                    <ToolCallItem
-                                      toolCall={segment.toolCall}
-                                      isCompact
-                                      onFileClick={onFileClick}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                            {messageSegments.map(
+                              (segment: any, idx: number) => (
+                                <div key={`saved-segment-${idx}`}>
+                                  {segment.type === "text" &&
+                                    segment.content && (
+                                      <div className="text-sm leading-relaxed text-foreground/90">
+                                        {renderRichContent(segment.content)}
+                                      </div>
+                                    )}
+                                  {segment.type === "toolCall" &&
+                                    segment.toolCall && (
+                                      <div className="my-1">
+                                        <ToolCallItem
+                                          toolCall={segment.toolCall}
+                                          isCompact
+                                          onFileClick={onFileClick}
+                                        />
+                                      </div>
+                                    )}
+                                </div>
+                              )
+                            )}
                           </>
                         );
                       }
@@ -1253,6 +1278,20 @@ function ChatPanelComponent({
               </div>
             </div>
           )}
+
+          {/* Thinking indicator - only for additional chats, show when loading but no tool executing and no text streaming */}
+          {chatId &&
+            isLoading &&
+            !isProcessingTemplate &&
+            !isStreamingText &&
+            !currentToolCalls.some(
+              (tc) => tc.status === "pending" || tc.status === "executing"
+            ) && (
+              <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground/70">
+                <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
+                <span>Thinking...</span>
+              </div>
+            )}
 
           {error && (
             <div className="flex gap-3">
