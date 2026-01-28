@@ -556,11 +556,18 @@ export class ChatService {
         }
       }
       
-      // Create AgentMessage - uses simpler schema designed for agent chat
+      // Extract parts array if present (OpenCode-style)
+      const parts = (message as any).parts || undefined;
+      const finish = (message as any).finish || undefined;
+      
+      // Create AgentMessage - supports OpenCode-style parts array
       const messageDoc = new AgentMessage({
         conversationId: new mongoose.Types.ObjectId(conversationId),
         role: role,
         content: message.content || "",
+        // OpenCode-style parts array (primary storage format)
+        parts: parts,
+        // Legacy fields for backwards compatibility
         toolCalls: toolCalls ? toolCalls.map((tc: any) => ({
           id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
           name: tc.name || tc.toolName,
@@ -577,6 +584,12 @@ export class ChatService {
         tokensUsed: tokensUsed,
         inputTokens: inputTokens,
         outputTokens: outputTokens,
+        // Finish reason for assistant messages
+        finish: finish,
+        // Timestamps
+        time: {
+          created: Date.now(),
+        },
         clientRequestId: clientRequestId,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -662,17 +675,20 @@ export class ChatService {
   // Update an existing message in a chat (for continuations)
   // Used when the agent loop continues and we need to update the same message
   // instead of creating a new one
+  // Supports OpenCode-style parts array as primary storage format
   async updateChatMessage(
     conversationId: string,
     chatId: string,
     messageId: string,
     updates: {
       content?: string;
+      parts?: any[]; // OpenCode-style parts array
       toolCalls?: any[];
       segments?: any[];
       tokensUsed?: number;
       inputTokens?: number;
       outputTokens?: number;
+      finish?: string; // Finish reason
     },
     userId: string
   ): Promise<{ messageId: string }> {
@@ -696,10 +712,15 @@ export class ChatService {
       // Build update object
       const updateData: any = {
         updatedAt: new Date(),
+        "time.completed": Date.now(),
       };
 
       if (updates.content !== undefined) {
         updateData.content = updates.content;
+      }
+      // OpenCode-style parts array (primary format)
+      if (updates.parts !== undefined) {
+        updateData.parts = updates.parts;
       }
       if (updates.toolCalls !== undefined) {
         updateData.toolCalls = updates.toolCalls.map((tc: any) => ({
@@ -724,6 +745,9 @@ export class ChatService {
       }
       if (updates.outputTokens !== undefined) {
         updateData.outputTokens = updates.outputTokens;
+      }
+      if (updates.finish !== undefined) {
+        updateData.finish = updates.finish;
       }
 
       // Update the message
@@ -801,12 +825,14 @@ export class ChatService {
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
 
-      // Map to AgentMessage format with all fields
+      // Map to AgentMessage format with all fields (OpenCode-style)
       return sortedMessages.map((msg: any) => ({
         id: msg._id.toString(),
         role: msg.role,
         content: msg.content || "",
-        // Segments preserve interleaved order of text and tool calls
+        // OpenCode-style parts array (primary format)
+        parts: msg.parts || [],
+        // Legacy fields for backwards compatibility
         segments: msg.segments || [],
         toolCalls: msg.toolCalls || [],
         toolResults: msg.toolResults || [],
@@ -815,6 +841,12 @@ export class ChatService {
         tokensUsed: msg.tokensUsed,
         inputTokens: msg.inputTokens,
         outputTokens: msg.outputTokens,
+        // Finish reason
+        finish: msg.finish,
+        // Error info
+        error: msg.error,
+        // Time info (OpenCode style)
+        time: msg.time || { created: msg.createdAt?.getTime() || Date.now() },
         // Timestamps
         createdAt: msg.createdAt,
         timestamp: msg.createdAt, // For backwards compatibility

@@ -881,23 +881,6 @@ export function useChatHandlers({
                         accumulatedSegments,
                       };
                     }
-                  } else if (data.type === "complete") {
-                    // Agent finished
-                    console.log(
-                      "[ChatHandler] Stream complete | Text:",
-                      assistantText.length,
-                      "chars | Tool calls:",
-                      allToolCalls.length
-                    );
-                    assistantText = assistantText || data.text || "";
-                    return { 
-                      text: assistantText, 
-                      toolCalls: allToolCalls,
-                      assistantMessageId: currentAssistantMessageId,
-                      accumulatedText,
-                      accumulatedToolCalls,
-                      accumulatedSegments,
-                    };
                   }
                 } catch (parseError) {
                   // Log errors but continue processing stream
@@ -920,7 +903,7 @@ export function useChatHandlers({
             }
 
             console.log(
-              "[ChatHandler] Stream ended without complete event | Text:",
+              "[ChatHandler] Stream ended | Text:",
               assistantText.length,
               "chars | Tool calls:",
               allToolCalls.length

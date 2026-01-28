@@ -353,33 +353,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                 hasAutoTools = data.hasAutoTools || false;
                 break;
 
-              case "complete": {
-                // No more tool calls, we're done
-                console.log("[useAgentChat] Complete | Text length:", assistantText.length, "| Tool calls:", toolCalls.length);
-                setState((prev) => ({
-                  ...prev,
-                  sessionId: data.sessionId || sessionId,
-                  step: data.steps || prev.step,
-                }));
-                return { 
-                  complete: true, 
-                  text: assistantText, 
-                  toolCalls,
-                  hasAckTools: false,
-                  hasAutoTools: false,
-                  autoToolCalls: [],
-                  ackToolCalls: [],
-                  messages: messagesForContinuation,
-                };
-              }
-
               case "error":
                 console.error("[useAgentChat] Stream error:", data.error);
                 throw new Error(data.error);
-
-              case "done":
-                console.log("[useAgentChat] Stream done event received");
-                break;
 
               case "chat_title_updated":
                 // Chat title was generated from the first user message
