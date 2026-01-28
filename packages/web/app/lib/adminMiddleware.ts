@@ -1,17 +1,13 @@
+import { OrganizationMember, Project } from "@nowgai/shared/models";
+import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
+import mongoose from "mongoose";
 import type { Request } from "react-router";
 import { auth } from "./auth";
-import mongoose from "mongoose";
-import OrganizationMember from "../models/organizationMemberModel";
-import ProjectMember from "../models/projectMemberModel";
-import Organization from "../models/organizationModel";
-import Project from "../models/projectModel";
-import { UserRole, hasAdminAccess } from "./types/roles";
-import { hasAnyProjectAdminRole, getUserProjects } from "./projectRoles";
 import {
-  hasAnyOrganizationAdminRole,
-  getUserOrganizations,
+    getUserOrganizations,
+    hasAnyOrganizationAdminRole,
 } from "./organizationRoles";
-import { ProjectRole } from "./types/roles";
+import { getUserProjects, hasAnyProjectAdminRole } from "./projectRoles";
 
 export interface AdminUser {
   id: string;

@@ -1,12 +1,12 @@
+import { Profile } from "@nowgai/shared/models";
+import { convertINRToUSD } from "@nowgai/shared/utils";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
-import { connectToDatabase } from "~/lib/mongo";
-import Profile from "~/models/profileModel";
-import { stripe } from "~/lib/stripe";
-import { razorpay } from "~/lib/razorpay";
-import { verifyPayUHash, getPayUConfig } from "~/lib/payu";
 import { getEnv } from "~/lib/env";
-import { convertINRToUSD } from "~/lib/currencyConverter";
+import { connectToDatabase } from "~/lib/mongo";
+import { getPayUConfig, verifyPayUHash } from "~/lib/payu";
+import { razorpay } from "~/lib/razorpay";
+import { stripe } from "~/lib/stripe";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

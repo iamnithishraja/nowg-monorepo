@@ -1,10 +1,10 @@
+import { ArrowRight, CheckCircle2, DollarSign, Home, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { redirect } from "react-router";
-import { auth } from "../lib/auth";
-import { useState, useEffect } from "react";
+import { Link, redirect, useNavigate } from "react-router";
 import { Header } from "../components";
+import { AppSidebar } from "../components/AppSidebar";
 import Background from "../components/Background";
-import GlowEffects from "../components/GlowEffects";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -13,9 +13,7 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { SidebarProvider } from "../components/ui/sidebar";
-import { AppSidebar } from "../components/AppSidebar";
-import { CheckCircle2, ArrowRight, Home, Zap, DollarSign } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import { auth } from "../lib/auth";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const authInstance = await auth;
@@ -123,7 +121,6 @@ export default function PaymentSuccess() {
       <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <Background />
-          <GlowEffects />
         </div>
 
         <AppSidebar className="flex-shrink-0" />

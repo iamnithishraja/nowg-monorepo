@@ -1,14 +1,11 @@
+import { Organization, OrganizationMember, Project, ProjectMember } from "@nowgai/shared/models";
+import { hasAdminAccess, ProjectRole } from "@nowgai/shared/types";
+import { ObjectId } from "mongodb";
 import type { ActionFunctionArgs } from "react-router";
+import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import Project from "~/models/projectModel";
-import Organization from "~/models/organizationModel";
-import ProjectMember from "~/models/projectMemberModel";
-import OrganizationMember from "~/models/organizationMemberModel";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import { hasAdminAccess, ProjectRole } from "~/lib/types/roles";
-import { getUsersCollection } from "~/lib/adminHelpers";
-import { ObjectId } from "mongodb";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {

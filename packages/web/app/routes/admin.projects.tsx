@@ -1,34 +1,34 @@
+import { UserRole } from "@nowgai/shared/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { redirect } from "react-router";
 import { toast } from "sonner";
-import { UserRole } from "~/lib/types/roles";
 import {
-  AssignAdminDialog,
-  CreateProjectDialog,
-  DeleteProjectDialog,
-  EditProjectDialog,
-  ManageTeamMembersDialog,
-  ProjectsGrid,
-  ProjectsHeader,
-  TransferFundsDialog,
-  UnassignProjectAdminDialog,
-  type ProjectType,
+    AssignAdminDialog,
+    CreateProjectDialog,
+    DeleteProjectDialog,
+    EditProjectDialog,
+    ManageTeamMembersDialog,
+    ProjectsGrid,
+    ProjectsHeader,
+    TransferFundsDialog,
+    UnassignProjectAdminDialog,
+    type ProjectType,
 } from "../components/admin/projects";
 import {
-  useAssignProjectAdmin,
-  useAvailableAdminUsers,
-  useCreateProject,
-  useDeleteProject,
-  useOrgAdminOrganization,
-  useOrganizations,
-  useOrgWallet,
-  useProjects,
-  useTransferFunds,
-  useUnassignProjectAdmin,
-  useUpdateProject,
+    useAssignProjectAdmin,
+    useAvailableAdminUsers,
+    useCreateProject,
+    useDeleteProject,
+    useOrgAdminOrganization,
+    useOrganizations,
+    useOrgWallet,
+    useProjects,
+    useTransferFunds,
+    useUnassignProjectAdmin,
+    useUpdateProject,
 } from "../components/admin/projects/hooks";
 import { useCurrentUser } from "../components/admin/users/hooks";
 import { AdminLayout } from "../components/AdminLayout";

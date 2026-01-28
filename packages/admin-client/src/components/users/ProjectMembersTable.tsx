@@ -1,19 +1,19 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { User, Search, FolderKanban, UserPlus } from "lucide-react";
-import { UsersResponse } from "./types";
-import { getRoleBadgeVariant } from "@/types/roles";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { getRoleBadgeVariant } from "@nowgai/shared/types";
+import { FolderKanban, Search, User, UserPlus } from "lucide-react";
 import { Pagination } from "./Pagination";
+import { UsersResponse } from "./types";
 
 interface ProjectMembersTableProps {
   data: UsersResponse | undefined;

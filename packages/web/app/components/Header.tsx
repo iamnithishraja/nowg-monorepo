@@ -1,29 +1,28 @@
-import { Button } from "./ui/button";
-import { cn } from "../lib/utils";
-import { Link, useNavigate } from "react-router";
-import { authClient } from "../lib/authClient";
 import {
-  List,
-  X,
-  SignOut,
-  ChartBar,
-  Database,
-  User as UserIcon,
-  GitBranch,
-  CurrencyDollar,
-  Lightning,
-  Users,
-  ChatCircle,
-  Shield,
-  CaretDown,
   Bell,
-  Gear,
-  SquaresFour,
+  CaretDown,
+  CaretLeft,
+  ChartBar,
+  ChatCircle,
   CreditCard,
+  CurrencyDollar,
+  Database,
+  Gear,
+  GitBranch,
+  Lightning,
+  List,
+  Shield,
+  SignOut,
+  User as UserIcon,
+  Users,
+  X
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router";
 import crop from "~/assets/crop.png";
-import { useSidebar } from "./ui/sidebar";
+import { authClient } from "../lib/authClient";
+import { cn } from "../lib/utils";
+import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { CaretLeft } from "phosphor-react";
+import { useSidebar } from "./ui/sidebar";
 
 interface HeaderProps {
   className?: string;

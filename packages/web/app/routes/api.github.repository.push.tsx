@@ -1,9 +1,9 @@
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { GitHubRepositoryService } from "~/lib/githubRepositoryService";
+import { connectToDatabase } from "~/lib/mongo";
 import GitHubRepository from "~/models/githubRepositoryModel";
 import Message from "~/models/messageModel";
-import { connectToDatabase } from "~/lib/mongo";
 
 interface FileContent {
   path: string;

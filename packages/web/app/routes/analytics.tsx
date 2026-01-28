@@ -1,9 +1,35 @@
-import type { Route } from "./+types/analytics";
-import { useState, useEffect } from "react";
+import {
+  Activity,
+  Loader2,
+  MessageSquare,
+  RefreshCw,
+  Sparkles,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { redirect } from "react-router";
-import { auth } from "../lib/auth";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Header } from "../components";
 import { AnalyticsSkeleton } from "../components/AnalyticsSkeleton";
+import { AppSidebar } from "../components/AppSidebar";
+import Background from "../components/Background";
+import { Button } from "../components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,42 +42,14 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "../components/ui/chart";
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-import {
-  MessageSquare,
-  Zap,
-  TrendingUp,
-  Activity,
-  Sparkles,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
-import Background from "../components/Background";
-import GlowEffects from "../components/GlowEffects";
+import { SidebarProvider } from "../components/ui/sidebar";
 import {
   Tabs,
-  TabsContent,
   TabsList,
-  TabsTrigger,
+  TabsTrigger
 } from "../components/ui/tabs";
-import { SidebarProvider } from "../components/ui/sidebar";
-import { AppSidebar } from "../components/AppSidebar";
-import { Button } from "../components/ui/button";
+import { auth } from "../lib/auth";
+import type { Route } from "./+types/analytics";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const authInstance = await auth;
@@ -261,7 +259,6 @@ function AnalyticsContent() {
       <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <Background />
-          <GlowEffects />
         </div>
 
         {/* Left Sidebar - AppSidebar */}

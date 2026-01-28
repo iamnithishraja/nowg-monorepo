@@ -1,15 +1,13 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { OrganizationMember, Profile, ProjectMember } from "@nowgai/shared/models";
+import { hasAdminAccess, OrganizationRole, ProjectRole } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
-import Profile from "~/models/profileModel";
-import ProjectMember from "~/models/projectMemberModel";
-import OrganizationMember from "~/models/organizationMemberModel";
-import { getEnvWithDefault } from "~/lib/env";
-import { requireAdmin } from "~/lib/adminMiddleware";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getUsersCollection } from "~/lib/adminHelpers";
+import { requireAdmin } from "~/lib/adminMiddleware";
+import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
-import { getUserProjects } from "~/lib/projectRoles";
 import { getUserOrganizations } from "~/lib/organizationRoles";
-import { hasAdminAccess, ProjectRole, OrganizationRole } from "~/lib/types/roles";
+import { getUserProjects } from "~/lib/projectRoles";
 
 // Handle OPTIONS preflight for CORS
 export async function OPTIONS() {

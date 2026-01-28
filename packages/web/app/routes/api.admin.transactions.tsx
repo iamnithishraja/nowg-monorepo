@@ -1,7 +1,7 @@
+import { Profile } from "@nowgai/shared/models";
 import type { LoaderFunctionArgs } from "react-router";
-import { Transaction, User } from "~/models/adminModel";
-import Profile from "~/models/profileModel";
 import { auth } from "~/lib/auth";
+import { User } from "~/models/adminModel";
 
 async function requireAdmin(request: Request) {
   const authInstance = await auth;

@@ -1,7 +1,8 @@
+import { getRoleBadgeVariant, UserRole } from "@nowgai/shared/types";
 import {
+    ArrowClockwise,
     ChartBar,
     Eye,
-    ArrowClockwise,
     MagnifyingGlass,
     Shield,
     ShieldSlash,
@@ -22,7 +23,6 @@ import {
     TableHeader,
     TableRow,
 } from "~/components/ui/table";
-import { getRoleBadgeVariant, UserRole } from "~/lib/types/roles";
 import { Pagination } from "./Pagination";
 import type { UsersResponse, UserType } from "./types";
 

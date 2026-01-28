@@ -1,28 +1,28 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Save,
-  RefreshCw,
-  Percent,
-  Server,
-  Globe,
-  Database,
-} from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { UserRole } from "@nowgai/shared/types";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+    Database,
+    Globe,
+    Percent,
+    RefreshCw,
+    Save,
+    Server,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
 type Markup = {
   id: string;

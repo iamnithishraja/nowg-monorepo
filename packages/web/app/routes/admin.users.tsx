@@ -1,46 +1,46 @@
+import { UserRole } from "@nowgai/shared/types";
 import { Building2, FolderKanban } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { redirect } from "react-router";
 import { toast } from "sonner";
-import type { UserType, TeamMember } from "~/components/admin/users";
+import { RemoveUserFromOrgDialog } from "~/components/admin/RemoveUserFromOrgDialog";
+import type { TeamMember, UserType } from "~/components/admin/users";
 import {
-  AllUsersTable,
-  InviteAdminDialog,
-  InviteToProjectDialog,
-  ProjectMembersTable,
-  RoleChangeDialog,
-  UserDetailDialog,
-  UsersHeader,
-  TeamMembersTable,
-  AddTeammateDialog,
-  ManageRoleDialog,
-  ManageCreditsDialog,
+    AddTeammateDialog,
+    AllUsersTable,
+    InviteAdminDialog,
+    InviteToProjectDialog,
+    ManageCreditsDialog,
+    ManageRoleDialog,
+    ProjectMembersTable,
+    RoleChangeDialog,
+    TeamMembersTable,
+    UserDetailDialog,
+    UsersHeader,
 } from "~/components/admin/users";
 import {
-  useAddToProject,
-  useAvailableOrgUsers,
-  useCurrentUser,
-  useInviteAdmin,
-  useInviteOrgUser,
-  useOrganizations,
-  useSearchUser,
-  useUpdateRole,
-  useUserDetail,
-  useUsers,
-  useOrgUsers,
-  useRemoveOrgUser,
-  useUserProjectWallets,
-  useUpdateUserProjectWalletLimit,
-  useUpdateOrganizationRole,
-  useUpdateProjectRole,
-  useProjectAdminUsers,
+    useAddToProject,
+    useAvailableOrgUsers,
+    useCurrentUser,
+    useInviteAdmin,
+    useInviteOrgUser,
+    useOrganizations,
+    useOrgUsers,
+    useProjectAdminUsers,
+    useRemoveOrgUser,
+    useSearchUser,
+    useUpdateOrganizationRole,
+    useUpdateProjectRole,
+    useUpdateRole,
+    useUpdateUserProjectWalletLimit,
+    useUserDetail,
+    useUserProjectWallets,
+    useUsers,
 } from "~/components/admin/users/hooks";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { UserRole } from "~/lib/types/roles";
 import { AdminLayout } from "../components/AdminLayout";
 import { auth } from "../lib/auth";
-import { RemoveUserFromOrgDialog } from "~/components/admin/RemoveUserFromOrgDialog";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const authInstance = await auth;

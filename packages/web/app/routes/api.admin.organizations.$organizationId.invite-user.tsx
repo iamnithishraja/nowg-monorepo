@@ -1,19 +1,17 @@
-import type { ActionFunctionArgs } from "react-router";
-import { ObjectId } from "mongodb";
+import { Organization, OrganizationMember, OrgUserInvitation } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
 import { randomBytes } from "crypto";
-import { requireAdmin } from "~/lib/adminMiddleware";
+import { ObjectId } from "mongodb";
+import type { ActionFunctionArgs } from "react-router";
 import { getUsersCollection } from "~/lib/adminHelpers";
-import { connectToDatabase } from "~/lib/mongo";
-import OrganizationMember from "~/models/organizationMemberModel";
-import Organization from "~/models/organizationModel";
-import OrgUserInvitation from "~/models/orgUserInvitationModel";
-import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import { hasAdminAccess } from "~/lib/types/roles";
+import { requireAdmin } from "~/lib/adminMiddleware";
 import {
-  sendOrgUserInvitationEmail,
-  sendOrgUserInvitationEmailForNewUser,
+    sendOrgUserInvitationEmail,
+    sendOrgUserInvitationEmailForNewUser,
 } from "~/lib/email";
 import { getEnvWithDefault } from "~/lib/env";
+import { connectToDatabase } from "~/lib/mongo";
+import { isOrganizationAdmin } from "~/lib/organizationRoles";
 
 // Handle OPTIONS preflight for CORS
 export async function OPTIONS() {

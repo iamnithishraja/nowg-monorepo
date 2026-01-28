@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from 'react-router';
-import { enhancePrompt, ENHANCER_SYSTEM_PROMPT, callLLMChat } from '../lib/utils';
 import { getEnv } from '~/lib/env';
+import { callLLMChat, enhancePrompt, ENHANCER_SYSTEM_PROMPT } from '../lib/utils.server';
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

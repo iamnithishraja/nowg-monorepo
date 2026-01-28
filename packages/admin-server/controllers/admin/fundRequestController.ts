@@ -1,16 +1,10 @@
+import { FundRequest, Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
-import FundRequest from "../../models/fundRequestModel";
-import Project from "../../models/projectModel";
-import Organization from "../../models/organizationModel";
-import OrganizationMember from "../../models/organizationMemberModel";
-import ProjectMember from "../../models/projectMemberModel";
-import OrgWallet from "../../models/orgWalletModel";
-import OrgProjectWallet from "../../models/orgProjectWalletModel";
-import { isProjectAdmin } from "../../lib/projectRoles";
-import { isOrganizationAdmin } from "../../lib/organizationRoles";
-import { hasAdminAccess } from "../../types/roles";
 import mongoose from "mongoose";
+import { isOrganizationAdmin } from "../../lib/organizationRoles";
+import { isProjectAdmin } from "../../lib/projectRoles";
 
 function isValidObjectId(id: string): boolean {
   return ObjectId.isValid(id);

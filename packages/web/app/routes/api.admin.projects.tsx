@@ -1,5 +1,11 @@
+import { Conversation, Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember } from "@nowgai/shared/models";
+import {
+    OrganizationRole,
+    ProjectRole
+} from "@nowgai/shared/types";
 import crypto from "crypto";
 import { ObjectId } from "mongodb";
+import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
@@ -7,18 +13,6 @@ import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
 import { getUserOrganizations } from "~/lib/organizationRoles";
 import { getUserProjects } from "~/lib/projectRoles";
-import {
-  OrganizationRole,
-  ProjectRole
-} from "~/lib/types/roles";
-import Conversation from "~/models/conversationModel";
-import Organization from "~/models/organizationModel";
-import OrganizationMember from "~/models/organizationMemberModel";
-import OrgProjectWallet from "~/models/orgProjectWalletModel";
-import OrgWallet from "~/models/orgWalletModel";
-import Project from "~/models/projectModel";
-import ProjectMember from "~/models/projectMemberModel";
-import mongoose from "mongoose";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

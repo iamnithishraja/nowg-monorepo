@@ -1,9 +1,9 @@
-import File from "../models/fileModel";
-import Messages from "../models/messageModel";
-import Conversation from "../models/conversationModel";
-import { connectToDatabase } from "./mongo";
+import { Conversation } from "@nowgai/shared/models";
 import mongoose from "mongoose";
-import { uploadFileToR2, shouldIgnoreFile } from "./r2Storage";
+import File from "~/models/fileModel";
+import Messages from "~/models/messageModel";
+import { connectToDatabase } from "./mongo";
+import { uploadFileToR2, shouldIgnoreFile, getConversationFromR2 } from "./r2Storage";
 
 export class FileService {
   private async ensureConnection() {
@@ -60,14 +60,15 @@ export class FileService {
         // Convert base64 to buffer
         const fileBuffer = Buffer.from(base64Data, "base64");
 
-        // Upload to R2
+        // Upload to R2 (pass file.name as filePath to allow overwriting)
         const uploadResult = await uploadFileToR2(
           userId,
           conversationId,
           fileBuffer,
           file.name,
           file.type,
-          projectId
+          projectId,
+          file.name // Use filename as path for overwriting
         );
 
         if (uploadResult.success && uploadResult.url) {
@@ -204,7 +205,101 @@ export class FileService {
     try {
       await this.ensureConnection();
 
-      // Get all messages in the conversation
+      // First, get conversation to get userId and projectId
+      const conversation = await Conversation.findById(conversationId)
+        .select("userId adminProjectId")
+        .lean();
+
+      if (!conversation) {
+        console.warn(`[FileService] Conversation ${conversationId} not found`);
+        return [];
+      }
+
+      const userId = conversation.userId;
+      const projectId = conversation.adminProjectId
+        ? conversation.adminProjectId.toString()
+        : undefined;
+
+      // Try to fetch from R2 first
+      try {
+        const r2Result = await getConversationFromR2(
+          userId,
+          conversationId,
+          projectId
+        );
+
+        if (r2Result.success && r2Result.data) {
+          // Extract all files from messages in R2 data (main conversation + all chats)
+          const allFiles: Array<{
+            id: string;
+            messageId: string;
+            name: string;
+            type: string;
+            size: number;
+            url?: string;
+            base64Data?: string;
+            uploadedAt: Date;
+          }> = [];
+
+          // Get files from main conversation messages
+          const messages = r2Result.data.messages || [];
+          for (const message of messages) {
+            if (message.r2Files && message.r2Files.length > 0) {
+              for (const file of message.r2Files) {
+                allFiles.push({
+                  id: file.url || file.id || `${message.id}-${file.name}`,
+                  messageId: message.id,
+                  name: file.name,
+                  type: file.type,
+                  size: file.size,
+                  url: file.url,
+                  uploadedAt: new Date(file.uploadedAt),
+                });
+              }
+            }
+          }
+
+          // Get files from all chat messages
+          const chats = r2Result.data.chats || [];
+          for (const chat of chats) {
+            const chatMessages = chat.messages || [];
+            for (const message of chatMessages) {
+              if (message.r2Files && message.r2Files.length > 0) {
+                for (const file of message.r2Files) {
+                  allFiles.push({
+                    id: file.url || file.id || `${message.id}-${file.name}`,
+                    messageId: message.id,
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    url: file.url,
+                    uploadedAt: new Date(file.uploadedAt),
+                  });
+                }
+              }
+            }
+          }
+
+          // Sort by uploadedAt
+          allFiles.sort(
+            (a, b) =>
+              new Date(a.uploadedAt).getTime() -
+              new Date(b.uploadedAt).getTime()
+          );
+
+          console.log(
+            `[FileService] Fetched ${allFiles.length} files from R2 for conversation ${conversationId} (main: ${messages.length} messages, chats: ${chats.length})`
+          );
+          return allFiles;
+        }
+      } catch (r2Error) {
+        console.warn(
+          `[FileService] Failed to fetch from R2, falling back to database:`,
+          r2Error
+        );
+      }
+
+      // Fallback to database if R2 fetch fails
       const messages = await Messages.find({
         conversationId: new mongoose.Types.ObjectId(conversationId),
       }).select("_id r2Files");

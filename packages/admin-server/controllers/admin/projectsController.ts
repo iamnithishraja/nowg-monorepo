@@ -1,28 +1,18 @@
+import { Conversation, Organization, OrganizationMember, OrgProjectWallet, OrgWallet, Project, ProjectMember, UserProjectWallet } from "@nowgai/shared/models";
+import { hasAdminAccess, ProjectRole, UserRole } from "@nowgai/shared/types";
+import {
+    createTransaction,
+    getLastTransactionId,
+} from "@nowgai/shared/utils";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
-import { randomBytes } from "crypto";
-import Project from "../../models/projectModel";
-import Organization from "../../models/organizationModel";
-import ProjectMember from "../../models/projectMemberModel";
-import OrganizationMember from "../../models/organizationMemberModel";
-import UserProjectWallet from "../../models/userProjectWalletModel";
-import OrgProjectWallet from "../../models/orgProjectWalletModel";
-import OrgWallet from "../../models/orgWalletModel";
-import Conversation from "../../models/conversationModel";
 import { getUsersCollection } from "../../config/db";
 import {
-  sendProjectAdminInvitationEmail,
-  sendOrgUserInvitationEmail,
-  sendProjectCreatedEmail,
+    sendProjectCreatedEmail
 } from "../../lib/email";
-import { UserRole, ProjectRole, hasAdminAccess } from "../../types/roles";
-import { getUserProjects, isProjectAdmin } from "../../lib/projectRoles";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
-import {
-  createTransaction,
-  getLastTransactionId,
-} from "../../lib/walletHelpers";
+import { getUserProjects } from "../../lib/projectRoles";
 
 /**
  * GET /api/admin/projects
@@ -342,11 +332,7 @@ export async function createProject(req: Request, res: Response) {
       }
     }
 
-    // Import models
-    const OrgWallet = (await import("../../models/orgWalletModel")).default;
-    const OrgProjectWallet = (
-      await import("../../models/orgProjectWalletModel")
-    ).default;
+    // OrgWallet and OrgProjectWallet are already imported at the top from @nowgai/shared/models
     const mongoose = await import("mongoose");
 
     // Start a MongoDB session for atomic transaction

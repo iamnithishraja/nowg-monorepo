@@ -1,14 +1,14 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getRoleBadgeVariant } from "@nowgai/shared/types";
 import { UserDetailType } from "./types";
-import { getRoleBadgeVariant } from "@/types/roles";
 import { UserStatsCards } from "./UserStatsCards";
 
 interface UserDetailDialogProps {

@@ -1,10 +1,10 @@
+import { Organization } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
+import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import Organization from "~/models/organizationModel";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import { hasAdminAccess } from "~/lib/types/roles";
-import mongoose from "mongoose";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {

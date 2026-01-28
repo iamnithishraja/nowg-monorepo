@@ -1,24 +1,42 @@
+import {
+  ArrowLeft,
+  CreditCard,
+  Database,
+  DollarSign,
+  FolderKanban,
+  Github,
+  Loader2,
+  Palette,
+  Plus,
+  Send,
+  Settings,
+  Trash2,
+  Upload,
+  UserPlus,
+  Users,
+  Wallet,
+  XCircle
+} from "lucide-react";
+import { MongoClient, ObjectId } from "mongodb";
 import * as React from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData, useNavigate, useParams } from "react-router";
-import { auth } from "~/lib/auth";
-import { connectToDatabase } from "~/lib/mongo";
-import Team from "~/models/teamModel";
-import TeamMember from "~/models/teamMemberModel";
-import TeamInvitation from "~/models/teamInvitationModel";
-import Conversation from "~/models/conversationModel";
-import ProjectWallet from "~/models/projectWalletModel";
-import { MongoClient, ObjectId } from "mongodb";
+import { Link, useLoaderData, useNavigate } from "react-router";
+import { Header } from "~/components";
+import { AppSidebar } from "~/components/AppSidebar";
+import Background from "~/components/Background";
+import { FilePreview } from "~/components/FileUpload";
+import GitHubImportModal from "~/components/GitHubImportModal";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
+import { ColorSchemeDialog } from "~/components/ui/ColorSchemeDialog";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -26,48 +44,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
 import { SidebarProvider } from "~/components/ui/sidebar";
-import { AppSidebar } from "~/components/AppSidebar";
-import { Header } from "~/components";
-import Background from "~/components/Background";
-import GlowEffects from "~/components/GlowEffects";
-import GitHubImportModal from "~/components/GitHubImportModal";
-import { FilePreview } from "~/components/FileUpload";
-import { ColorSchemeDialog } from "~/components/ui/ColorSchemeDialog";
+import { Switch } from "~/components/ui/switch";
+import { Textarea } from "~/components/ui/textarea";
+import { OPENROUTER_MODELS } from "~/consts/models";
+import { useToast } from "~/hooks/use-toast";
 import { useFileHandling } from "~/hooks/useFileHandling";
 import { useSupabaseAuth } from "~/hooks/useSupabaseAuth";
-import { useToast } from "~/hooks/use-toast";
+import { auth } from "~/lib/auth";
 import { createClientFileStorageService } from "~/lib/clientFileStorage";
-import { OPENROUTER_MODELS } from "~/consts/models";
-import type { DesignScheme } from "~/types/design-scheme";
-import {
-  ArrowLeft,
-  Users,
-  Wallet,
-  FolderKanban,
-  UserPlus,
-  Settings,
-  Trash2,
-  Loader2,
-  Plus,
-  CreditCard,
-  DollarSign,
-  XCircle,
-  Clock,
-  Database,
-  Palette,
-  Upload,
-  Github,
-  Send,
-  Sparkles,
-} from "lucide-react";
-import { Link } from "react-router";
+import { connectToDatabase } from "~/lib/mongo";
 import { cn } from "~/lib/utils";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
+    const { Conversation, ProjectWallet, Team, TeamInvitation, TeamMember } = await import("@nowgai/shared/models");
+    
     const authInstance = await auth;
     const session = await authInstance.api.getSession({
       headers: request.headers,
@@ -555,7 +547,6 @@ export default function TeamDetailPage() {
       <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <Background />
-          <GlowEffects />
         </div>
 
         <AppSidebar className="shrink-0" />

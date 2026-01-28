@@ -239,33 +239,21 @@ export function AgentModal({ isOpen, onClose, templateFiles, conversationId }: A
       console.error("[AgentModal] Agent error callback:", errorMsg);
     },
     onComplete: (message) => {
-      console.log("[AgentModal] Agent complete callback:", message.id);
     },
     onAwaitingAcknowledgement: (ackTools, results, messages, step) => {
-      console.log(
-        "[AgentModal] Action tools executed, auto-acknowledging:",
-        ackTools.length,
-        "| Results:",
-        results.length
-      );
       // Auto-acknowledge immediately with the results passed directly
       // This avoids relying on async state updates
       setTimeout(() => {
-        console.log("[AgentModal] Auto-acknowledging now with", results.length, "results");
         acknowledge(results, messages, step);
       }, 100);
     },
   });
   
-  // Log state changes for debugging
   useEffect(() => {
     if (error) {
       console.error("[AgentModal] Error state:", error);
     }
-    if (isLoading || isStreaming) {
-      console.log("[AgentModal] Loading state - isLoading:", isLoading, "isStreaming:", isStreaming, "step:", step);
-    }
-  }, [error, isLoading, isStreaming, step]);
+  }, [error]);
   
   // Auto-scroll to bottom
   useEffect(() => {
@@ -282,16 +270,13 @@ export function AgentModal({ isOpen, onClose, templateFiles, conversationId }: A
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) {
-      console.log("[AgentModal] Submit prevented - empty input or loading");
       return;
     }
     
     const prompt = input.trim();
-    console.log("[AgentModal] Submitting prompt:", prompt.substring(0, 100));
     setInput("");
     try {
       await sendMessage(prompt);
-      console.log("[AgentModal] Message sent successfully");
     } catch (error) {
       console.error("[AgentModal] Error sending message:", error);
     }

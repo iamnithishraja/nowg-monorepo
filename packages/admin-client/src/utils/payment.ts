@@ -2,7 +2,7 @@
  * Payment utility functions for Nowgai-Admin
  */
 
-import { convertUSDToINR } from "./currencyConverter";
+import { convertUSDToINR } from "@nowgai/shared/utils";
 
 /**
  * Get country code from browser geolocation

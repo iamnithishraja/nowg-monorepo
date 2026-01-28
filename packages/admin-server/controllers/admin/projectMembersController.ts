@@ -1,21 +1,16 @@
+import { Conversation, Organization, OrganizationMember, Project, ProjectMember, UserProjectWallet } from "@nowgai/shared/models";
+import {
+    OrganizationRole,
+    ProjectRole,
+    UserRole,
+    hasAdminAccess,
+} from "@nowgai/shared/types";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
-import ProjectMember from "../../models/projectMemberModel";
-import Project from "../../models/projectModel";
-import Organization from "../../models/organizationModel";
 import { getUsersCollection } from "../../config/db";
-import {
-  UserRole,
-  ProjectRole,
-  OrganizationRole,
-  hasAdminAccess,
-} from "../../types/roles";
 import { sendProjectMemberInvitationEmail } from "../../lib/email";
-import { isProjectAdmin } from "../../lib/projectRoles";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
-import OrganizationMember from "../../models/organizationMemberModel";
-import Conversation from "../../models/conversationModel";
-import UserProjectWallet from "../../models/userProjectWalletModel";
+import { isProjectAdmin } from "../../lib/projectRoles";
 
 /**
  * GET /api/admin/projects/:projectId/members

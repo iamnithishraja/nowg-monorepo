@@ -1,15 +1,19 @@
 import mongoose from "mongoose";
 
-const templateFileSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    path: { type: String, required: true },
-    content: { type: String, required: true },
-  },
+// Template file schema definition
+export const templateFileSchemaDefinition = {
+  name: { type: String, required: true },
+  path: { type: String, required: true },
+  content: { type: String, required: true },
+};
+
+export const templateFileSchema = new mongoose.Schema(
+  templateFileSchemaDefinition,
   { _id: false }
 );
 
-const versionSnapshotSchema = new mongoose.Schema({
+// Schema definition for reuse
+export const versionSnapshotSchemaDefinition = {
   userId: {
     type: String,
     required: true,
@@ -44,16 +48,23 @@ const versionSnapshotSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+};
+
+export const versionSnapshotSchema = new mongoose.Schema(versionSnapshotSchemaDefinition);
 
 versionSnapshotSchema.index(
   { conversationId: 1, versionNumber: 1 },
   { unique: true }
 );
 
-const VersionSnapshot =
-  mongoose.models.VersionSnapshot ||
-  mongoose.model("VersionSnapshot", versionSnapshotSchema);
+// Model getter function for consistent access
+export function getVersionSnapshotModel(): mongoose.Model<any> {
+  if (mongoose.models.VersionSnapshot) {
+    return mongoose.models.VersionSnapshot as mongoose.Model<any>;
+  }
+  return mongoose.model("VersionSnapshot", versionSnapshotSchema);
+}
+
+const VersionSnapshot = getVersionSnapshotModel();
 
 export default VersionSnapshot;
-

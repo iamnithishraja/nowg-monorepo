@@ -1,18 +1,17 @@
-import { useNavigate } from "react-router";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "./ui/dropdown-menu";
-import { CaretDown, SidebarSimple } from "@phosphor-icons/react";
-import crop from "~/assets/crop.png";
-import { CaretLeft, GasPump, GearSix, Plus, ChatCircle } from "phosphor-react";
-import { ChatSwitcher } from "./ChatSwitcher";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { CaretDown, CaretLeft, GasPump, GearSix, Plus, SidebarSimple } from "@phosphor-icons/react";
 import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router";
+import crop from "~/assets/crop.png";
 import { cn } from "~/lib/utils";
+import { ChatSwitcher } from "./ChatSwitcher";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface WorkspaceLeftHeaderProps {
   chatTitle?: string;

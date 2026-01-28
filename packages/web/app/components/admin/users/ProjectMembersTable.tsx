@@ -1,3 +1,4 @@
+import { getRoleBadgeVariant } from "@nowgai/shared/types";
 import { FolderSimple, MagnifyingGlass, User, UserPlus } from "@phosphor-icons/react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -12,7 +13,6 @@ import {
     TableHeader,
     TableRow,
 } from "~/components/ui/table";
-import { getRoleBadgeVariant } from "~/lib/types/roles";
 import { Pagination } from "./Pagination";
 import type { UsersResponse } from "./types";
 

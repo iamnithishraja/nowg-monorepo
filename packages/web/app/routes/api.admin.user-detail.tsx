@@ -1,8 +1,8 @@
-import type { LoaderFunctionArgs } from "react-router";
+import { Profile } from "@nowgai/shared/models";
 import { MongoClient, ObjectId } from "mongodb";
-import Profile from "~/models/profileModel";
-import { connectToDatabase } from "~/lib/mongo";
+import type { LoaderFunctionArgs } from "react-router";
 import { getEnvWithDefault } from "~/lib/env";
+import { connectToDatabase } from "~/lib/mongo";
 
 async function requireAdmin(request: Request) {
   const cookies = request.headers.get("cookie");

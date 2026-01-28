@@ -1,6 +1,6 @@
+import { ProjectMember } from "@nowgai/shared/models";
+import { ProjectRole } from "@nowgai/shared/types";
 import mongoose from "mongoose";
-import ProjectMember from "../models/projectMemberModel";
-import { ProjectRole } from "../types/roles";
 
 /**
  * Get user's role in a specific project

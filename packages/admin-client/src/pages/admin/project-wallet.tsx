@@ -1,47 +1,47 @@
-import { useState, useEffect } from "react";
-import { useParams, useLocation } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
-import { Wallet } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
-import {
-  WalletHeader,
-  WalletOverviewCards,
-  TransactionHistoryTable,
-  UserWalletsTable,
-  AddFundsDialog,
-  TransferDialog,
-  RequestDialog,
-  CreditBackDialog,
-  UserWallet,
-} from "@/components/project-wallet";
 import { WalletTransactionAnalytics } from "@/components/analytics/WalletTransactionAnalytics";
 import { useProjectWalletAnalytics } from "@/components/analytics/hooks";
 import {
-  useProjectWallet,
-  useProjectWalletTransactions,
-  useOrgWallet,
-  useUserProjectWallets,
-  useTransferFromOrg,
-  useStripeCheckout,
-  useStripeVerify,
-  useCreditBackToOrg,
-  useSetWalletLimit,
-  useFundRequests,
-  useCreateFundRequest,
-  useApproveFundRequest,
-  useRejectFundRequest,
+    AddFundsDialog,
+    CreditBackDialog,
+    RequestDialog,
+    TransactionHistoryTable,
+    TransferDialog,
+    UserWallet,
+    UserWalletsTable,
+    WalletHeader,
+    WalletOverviewCards,
+} from "@/components/project-wallet";
+import {
+    useApproveFundRequest,
+    useCreateFundRequest,
+    useCreditBackToOrg,
+    useFundRequests,
+    useOrgWallet,
+    useProjectWallet,
+    useProjectWalletTransactions,
+    useRejectFundRequest,
+    useSetWalletLimit,
+    useStripeCheckout,
+    useStripeVerify,
+    useTransferFromOrg,
+    useUserProjectWallets,
 } from "@/components/project-wallet/hooks";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { UserRole } from "@nowgai/shared/types";
+import { useQueryClient } from "@tanstack/react-query";
+import { Wallet } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation, useParams } from "wouter";
 
 export default function ProjectWalletPage() {
   const params = useParams();

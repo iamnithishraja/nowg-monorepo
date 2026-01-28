@@ -170,7 +170,6 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
    */
   const executeToolCall = useCallback(
     async (toolCall: AgentToolCall): Promise<AgentToolCall> => {
-      console.log("[useAgentChat] Executing tool:", toolCall.name, "| Args:", toolCall.args);
       try {
         const tool = ToolRegistry.get(toolCall.name);
         if (!tool) {
@@ -183,7 +182,6 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           };
         }
 
-        console.log("[useAgentChat] Tool found, executing...");
         const result = await tool.execute(toolCall.args, {
           sessionID: state.sessionId || "agent-session",
           messageID: `msg-${Date.now()}`,
@@ -193,7 +191,6 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
         // Tool.Result has { title, output, metadata } - check if output exists
         const isSuccess = result && "output" in result && typeof result.output === "string";
-        console.log("[useAgentChat] Tool execution complete:", toolCall.name, "| Success:", isSuccess);
 
         return {
           ...toolCall,
@@ -242,7 +239,6 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       response: Response,
       abortSignal: AbortSignal
     ): Promise<StreamResult> => {
-      console.log("[useAgentChat] Processing stream response, status:", response.status);
       const reader = response.body?.getReader();
       if (!reader) {
         console.error("[useAgentChat] No response stream available");
@@ -261,13 +257,11 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
       while (true) {
         if (abortSignal.aborted) {
-          console.log("[useAgentChat] Stream aborted");
           break;
         }
         
         const { done, value } = await reader.read();
         if (done) {
-          console.log("[useAgentChat] Stream done, processed", eventCount, "events");
           break;
         }
 
@@ -280,12 +274,10 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           try {
             const data = JSON.parse(line.slice(6));
             eventCount++;
-            console.log("[useAgentChat] Stream event:", data.type, "| Event #", eventCount);
 
             switch (data.type) {
               case "session_start":
                 sessionId = data.sessionId;
-                console.log("[useAgentChat] Session started:", sessionId, "| Step:", data.step);
                 setState((prev) => ({ ...prev, sessionId, step: data.step || prev.step }));
                 break;
 
@@ -296,7 +288,6 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                 break;
 
               case "tool_call": {
-                console.log("[useAgentChat] Tool call received:", data.name, "| Category:", data.category);
                 const tc: AgentToolCall = {
                   id: data.id,
                   name: data.name,
@@ -315,18 +306,15 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               }
 
               case "step_complete":
-                console.log("[useAgentChat] Step complete:", data.step);
                 setState((prev) => ({ ...prev, step: data.step }));
                 onStepComplete?.(data.step);
                 break;
 
               case "awaiting_tool_results":
                 // Server wants us to execute tools and send results back
-                console.log("[useAgentChat] Awaiting tool results | Ack:", data.hasAckTools, "| Auto:", data.hasAutoTools, "| Tool calls in event:", data.toolCalls?.length);
                 
                 // Update tool calls from the event if provided (they might have been sent here instead of as separate tool_call events)
                 if (data.toolCalls && Array.isArray(data.toolCalls) && data.toolCalls.length > 0) {
-                  console.log("[useAgentChat] Updating tool calls from awaiting_tool_results event");
                   const eventToolCalls: AgentToolCall[] = data.toolCalls.map((tc: any) => ({
                     id: tc.id,
                     name: tc.name,
@@ -353,19 +341,39 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                 hasAutoTools = data.hasAutoTools || false;
                 break;
 
+              case "complete": {
+                // No more tool calls, we're done
+                setState((prev) => ({
+                  ...prev,
+                  sessionId: data.sessionId || sessionId,
+                  step: data.steps || prev.step,
+                }));
+                return { 
+                  complete: true, 
+                  text: assistantText, 
+                  toolCalls,
+                  hasAckTools: false,
+                  hasAutoTools: false,
+                  autoToolCalls: [],
+                  ackToolCalls: [],
+                  messages: messagesForContinuation,
+                };
+              }
+
               case "error":
                 console.error("[useAgentChat] Stream error:", data.error);
                 throw new Error(data.error);
 
+              case "done":
+                break;
+
               case "chat_title_updated":
                 // Chat title was generated from the first user message
-                console.log("[useAgentChat] Chat title updated:", data.chatTitle);
                 onChatTitleUpdated?.(data.chatTitle);
                 break;
 
               case "user_message_saved":
                 // User message was saved to database
-                console.log("[useAgentChat] User message saved:", data.messageId);
                 break;
             }
           } catch (parseError) {
@@ -382,7 +390,6 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       const ackToolCalls = toolCalls.filter(tc => tc.category === "ack");
 
       const isComplete = !awaitingToolResults || toolCalls.length === 0;
-      console.log("[useAgentChat] Stream processing result | Complete:", isComplete, "| Awaiting:", awaitingToolResults, "| Tool calls:", toolCalls.length, "| HasAck:", hasAckTools, "| HasAuto:", hasAutoTools);
 
       return { 
         complete: isComplete, 
@@ -466,19 +473,14 @@ results?: ToolResultPayload[],
     const pendingResults = results || state.pendingAckResults;
     const isAwaiting = results ? true : state.awaitingAcknowledgement;
     
-    console.log("[useAgentChat] acknowledge called | Awaiting:", isAwaiting, "| Pending results:", pendingResults.length, "| Using provided results:", !!results);
     if (!isAwaiting || pendingResults.length === 0) {
-      console.log("[useAgentChat] Cannot acknowledge - not awaiting or no pending results");
       return;
     }
 
     const abortSignal = abortControllerRef.current?.signal;
     if (!abortSignal || abortSignal.aborted) {
-      console.log("[useAgentChat] Cannot acknowledge - abort signal invalid");
       return;
     }
-
-    console.log("[useAgentChat] Sending acknowledgement with", pendingResults.length, "tool results");
     // Clear awaiting state
     setState((prev) => ({
       ...prev,
@@ -496,7 +498,6 @@ results?: ToolResultPayload[],
 
     try {
       // Send acknowledgement request with tool results
-      console.log("[useAgentChat] Sending acknowledgement request to /api/agent");
       const response = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -515,8 +516,6 @@ results?: ToolResultPayload[],
         }),
         signal: abortSignal,
       });
-
-      console.log("[useAgentChat] Acknowledgement response status:", response.status);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -638,7 +637,6 @@ results?: ToolResultPayload[],
       currentText: string,
       abortSignal: AbortSignal
     ) => {
-      console.log("[useAgentChat] continueWithResults called | Step:", currentStep, "| Tool results:", toolResults.length);
       let step = currentStep;
       let tools = [...allToolCalls];
       let text = currentText;
@@ -646,11 +644,9 @@ results?: ToolResultPayload[],
 
       while (step < maxSteps) {
         if (abortSignal.aborted) {
-          console.log("[useAgentChat] Loop aborted at step", step);
           break;
         }
 
-        console.log("[useAgentChat] Continuing loop | Step:", step, "/", maxSteps);
         // Send tool results
         const response = await fetch("/api/agent", {
           method: "POST",
@@ -671,7 +667,6 @@ results?: ToolResultPayload[],
           signal: abortSignal,
         });
 
-        console.log("[useAgentChat] Tool results response status:", response.status);
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           console.error("[useAgentChat] Tool results response error:", errorData);
@@ -688,11 +683,9 @@ results?: ToolResultPayload[],
         const result = await processStream(response, abortSignal);
         text = result.text || text;
         step++;
-        console.log("[useAgentChat] Loop iteration complete | Step:", step, "| Complete:", result.complete, "| Tool calls:", result.toolCalls.length);
 
         if (result.complete || result.toolCalls.length === 0) {
           // Done - finalize
-          console.log("[useAgentChat] Loop complete, finalizing message");
           const assistantMessage: AgentMessage = {
             id: `assistant-${Date.now()}`,
             role: "assistant",
@@ -717,13 +710,11 @@ results?: ToolResultPayload[],
         }
 
         // Execute all tools
-        console.log("[useAgentChat] Executing", result.toolCalls.length, "tools in loop");
         const { executedTools, results } = await executeAndBuildResults(result.toolCalls);
         tools = [...tools, ...executedTools];
 
         // Check if we need acknowledgement for action tools
         if (result.hasAckTools) {
-          console.log("[useAgentChat] Action tools detected, waiting for acknowledgement");
           const ackExecutedTools = executedTools.filter(t => t.category === "ack");
           
           // Store state and wait for user acknowledgement
@@ -776,9 +767,7 @@ results?: ToolResultPayload[],
    */
   const sendMessage = useCallback(
     async (prompt: string) => {
-      console.log("[useAgentChat] sendMessage called:", prompt.substring(0, 100));
       if (state.isLoading) {
-        console.log("[useAgentChat] Already loading, ignoring request");
         return;
       }
 
@@ -786,7 +775,6 @@ results?: ToolResultPayload[],
       abortControllerRef.current?.abort();
       abortControllerRef.current = new AbortController();
       const abortSignal = abortControllerRef.current.signal;
-      console.log("[useAgentChat] Abort controller created");
 
       // Add user message
       const userMessage: AgentMessage = {
@@ -816,7 +804,6 @@ results?: ToolResultPayload[],
 
       try {
         // First request - send the prompt
-        console.log("[useAgentChat] Sending request to /api/agent");
         const response = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -836,7 +823,6 @@ results?: ToolResultPayload[],
           signal: abortSignal,
         });
 
-        console.log("[useAgentChat] Response received, status:", response.status);
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           console.error("[useAgentChat] Response error:", errorData);
@@ -844,15 +830,12 @@ results?: ToolResultPayload[],
         }
 
         // Process the stream
-        console.log("[useAgentChat] Processing stream...");
         const result = await processStream(response, abortSignal);
         finalText = result.text || finalText;
         currentStep++;
-        console.log("[useAgentChat] Stream processed | Complete:", result.complete, "| Tool calls:", result.toolCalls.length);
 
         // If complete (no tool calls), we're done
         if (result.complete || result.toolCalls.length === 0) {
-          console.log("[useAgentChat] No tool calls, completing");
           const assistantMessage: AgentMessage = {
             id: `assistant-${Date.now()}`,
             role: "assistant",
@@ -874,14 +857,11 @@ results?: ToolResultPayload[],
         }
 
         // Execute all tools
-        console.log("[useAgentChat] Executing", result.toolCalls.length, "tools");
         const { executedTools, results } = await executeAndBuildResults(result.toolCalls);
         allToolCalls = [...executedTools];
-        console.log("[useAgentChat] Tools executed | Results:", results.length);
 
         // Check if we need acknowledgement for action tools
         if (result.hasAckTools) {
-          console.log("[useAgentChat] Action tools require acknowledgement");
           const ackExecutedTools = executedTools.filter(t => t.category === "ack");
           
           // Store state and wait for user acknowledgement
@@ -907,13 +887,11 @@ results?: ToolResultPayload[],
         }
 
         // Only auto tools - continue the loop automatically
-        console.log("[useAgentChat] Auto tools only, continuing loop");
         await continueWithResults(results, result.messages, currentStep, allToolCalls, finalText, abortSignal);
 
       } catch (error) {
         console.error("[useAgentChat] Error in sendMessage:", error);
         if ((error as Error).name === "AbortError") {
-          console.log("[useAgentChat] Request aborted");
           setState((prev) => ({
             ...prev,
             isLoading: false,

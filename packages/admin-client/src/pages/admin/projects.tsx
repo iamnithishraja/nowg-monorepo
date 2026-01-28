@@ -1,33 +1,33 @@
-import { useState, useEffect, useMemo } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/types/roles";
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle } from "lucide-react";
-import { UnassignProjectAdminDialog } from "@/components/unassign-project-admin-dialog";
 import {
-  ProjectsHeader,
-  ProjectsTable,
-  CreateProjectDialog,
-  EditProjectDialog,
-  AssignAdminDialog,
-  TransferFundsDialog,
-  DeleteProjectDialog,
-  ProjectType,
+    AssignAdminDialog,
+    CreateProjectDialog,
+    DeleteProjectDialog,
+    EditProjectDialog,
+    ProjectsHeader,
+    ProjectsTable,
+    ProjectType,
+    TransferFundsDialog,
 } from "@/components/projects";
 import {
-  useProjects,
-  useOrganizations,
-  useOrgAdminOrganization,
-  useAvailableAdminUsers,
-  useOrgWallet,
-  useCreateProject,
-  useUpdateProject,
-  useAssignProjectAdmin,
-  useUnassignProjectAdmin,
-  useDeleteProject,
-  useTransferFunds,
+    useAssignProjectAdmin,
+    useAvailableAdminUsers,
+    useCreateProject,
+    useDeleteProject,
+    useOrgAdminOrganization,
+    useOrganizations,
+    useOrgWallet,
+    useProjects,
+    useTransferFunds,
+    useUnassignProjectAdmin,
+    useUpdateProject,
 } from "@/components/projects/hooks";
+import { Card, CardContent } from "@/components/ui/card";
+import { UnassignProjectAdminDialog } from "@/components/unassign-project-admin-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { UserRole } from "@nowgai/shared/types";
+import { AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export default function Projects() {
   const [searchQuery, setSearchQuery] = useState("");

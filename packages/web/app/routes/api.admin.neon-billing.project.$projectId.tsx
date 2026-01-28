@@ -1,13 +1,12 @@
-import type { LoaderFunctionArgs } from "react-router";
+import { Conversation, Project } from "@nowgai/shared/models";
+import { hasAdminAccess } from "@nowgai/shared/types";
 import mongoose from "mongoose";
+import type { LoaderFunctionArgs } from "react-router";
 import { requireAdmin } from "~/lib/adminMiddleware";
 import { connectToDatabase } from "~/lib/mongo";
-import { isProjectAdmin } from "~/lib/projectRoles";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
-import { hasAdminAccess } from "~/lib/types/roles";
+import { isProjectAdmin } from "~/lib/projectRoles";
 import NeonUsageBilling from "~/models/neonUsageBillingModel";
-import Project from "~/models/projectModel";
-import Conversation from "~/models/conversationModel";
 
 /**
  * API Route: Get Neon Billing Summary for an Admin Project

@@ -1,4 +1,4 @@
-import EnvConfig from "../models/envConfigModel";
+import { EnvConfig } from "@nowgai/shared/models";
 
 /**
  * PayU integration helper
@@ -85,5 +85,5 @@ function verifyPayUHash(
   return calculatedHash === hash;
 }
 
-export { getPayUConfig, generatePayUHash, verifyPayUHash };
+export { generatePayUHash, getPayUConfig, verifyPayUHash };
 

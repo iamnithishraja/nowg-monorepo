@@ -9,13 +9,13 @@ import {
   User as UserIcon,
   Zap,
 } from "lucide-react";
-import { Link, useLocation } from "react-router";
 import { useState } from "react";
+import { Link, useLocation } from "react-router";
 import logo from "~/assets/logo.png";
-import { Button } from "./ui/button";
-import { Icon } from "./Icon";
-import { useOrganization } from "~/hooks/useDashboard";
 import { useProjectAdminUsers } from "~/components/admin/users/hooks";
+import { useOrganization } from "~/hooks/useDashboard";
+import { getPhosphorIcon } from "~/utils/phosphorIcons";
+import { Button } from "./ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -29,7 +29,6 @@ import {
   SidebarMenuItem,
 } from "./ui/sidebar";
 import { Skeleton } from "./ui/skeleton";
-import { Avatar, AvatarFallback } from "./ui/avatar";
 
 // Role types
 enum UserRole {
@@ -498,10 +497,11 @@ export function AdminSidebar({ user, isLoading }: AdminSidebarProps) {
                   // Render icon based on type
                   const renderIcon = () => {
                     if (item.iconType === "phosphor") {
+                      const IconComponent = getPhosphorIcon(item.icon as string);
+                      if (!IconComponent) return null;
                       return (
-                        <Icon
-                          name={item.icon as string}
-                          size="sm"
+                        <IconComponent
+                          size={16}
                           color={isActive ? "#8C63F2" : "white"}
                           weight={isActive ? "duotone" : "regular"}
                         />
