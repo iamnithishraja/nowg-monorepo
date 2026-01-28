@@ -9,6 +9,12 @@ import type { Agent } from "./agent";
  * 
  * Converts our Tool.Info definitions to Vercel AI SDK Tool format,
  * similar to how opencode resolves tools for the LLM.
+ * 
+ * IMPORTANT: Tools that require WebContainer (filesystem tools) do NOT
+ * have execute functions - they are executed on the CLIENT side.
+ * The server only collects tool calls and sends them to the client via
+ * `awaiting_tool_results`. The client executes them using WebContainer
+ * and sends results back.
  */
 export namespace AgentTools {
   /**
@@ -21,6 +27,29 @@ export namespace AgentTools {
     abort?: AbortSignal;
     onMetadata?: (data: { title?: string; metadata?: any }) => void;
   }
+
+  /**
+   * Tools that require WebContainer for execution.
+   * These tools will NOT have execute functions on the server - they are
+   * executed on the client side only.
+   * 
+   * Server-safe tools (NOT in this list):
+   * - webfetch: HTTP fetch API
+   * - websearch: Web search API
+   * - codesearch: Exa Code API (HTTP-based)
+   */
+  const WEBCONTAINER_TOOLS = new Set([
+    "read",
+    "grep", 
+    "ls",
+    "glob",
+    "lsp",
+    "edit",
+    "write",
+    "multiedit",
+    "bash",
+    "batch", // batch can call other tools that need WebContainer
+  ]);
 
   /**
    * Convert a Zod schema to JSON Schema for AI SDK
@@ -130,17 +159,41 @@ export namespace AgentTools {
 
   /**
    * Convert our Tool.Info to AI SDK Tool format
+   * 
+   * For WebContainer-dependent tools, we DON'T provide an execute function.
+   * This means the AI SDK will just collect tool calls and return them,
+   * allowing the client to execute them using WebContainer.
+   * 
+   * For server-safe tools (webfetch, websearch), we provide execute functions
+   * so they can run on the server.
    */
   function convertTool(
     toolInfo: Tool.Info,
     ctx: ExecutionContext
   ): AITool {
     const schema = zodToJsonSchema(toolInfo.parameters);
+    const requiresWebContainer = WEBCONTAINER_TOOLS.has(toolInfo.id);
 
-    return tool({
+    // For WebContainer tools, don't provide execute - client will handle execution
+    // The AI SDK will collect tool calls and the client executes them
+    if (requiresWebContainer) {
+      // Use tool helper but without execute - cast through unknown to AITool
+      // since we're intentionally omitting execute for client-side execution
+      const clientTool = {
+        type: "function" as const,
+        description: toolInfo.description,
+        parameters: jsonSchema(schema as any),
+      };
+      return clientTool as unknown as AITool;
+    }
+
+    // For server-safe tools, provide execute function
+    // Cast through unknown to avoid strict type checking on the execute return type
+    const serverTool = {
+      type: "function" as const,
       description: toolInfo.description,
       parameters: jsonSchema(schema as any),
-      async execute(args: any) {
+      execute: async (args: any) => {
         // Create tool context
         const toolCtx: Tool.Context = {
           sessionID: ctx.sessionID,
@@ -165,7 +218,8 @@ export namespace AgentTools {
           };
         }
       },
-    });
+    };
+    return serverTool as unknown as AITool;
   }
 
   /**

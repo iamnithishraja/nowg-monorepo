@@ -286,7 +286,7 @@ describe("MultiEditTool", () => {
           },
           createMockContext()
         )
-      ).rejects.toThrow("Cannot edit directory");
+      ).rejects.toThrow("Path is a directory");
     });
 
     it("should throw error for empty edits array", async () => {
@@ -340,7 +340,7 @@ describe("MultiEditTool", () => {
           },
           createMockContext()
         )
-      ).rejects.toThrow("Edit 2 failed");
+      ).rejects.toThrow("Edit 2 of 2 failed");
     });
 
     it("should not apply any edits if one fails", async () => {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronRight, Loader2, XCircle, FileText, FolderOpen, Terminal, Search, Globe } from "lucide-react";
+import { Check, ChevronRight, Loader2, XCircle, FileText, FolderOpen, Terminal, Search, Globe, Layers } from "lucide-react";
 import { cn } from "../lib/utils";
 
 interface ToolCallItemProps {
@@ -17,10 +17,12 @@ function getToolIcon(name: string) {
     case "read":
       return <FileText className="w-3 h-3 text-purple-400" />;
     case "ls":
+    case "list":
     case "mkdir":
     case "glob":
       return <FolderOpen className="w-3 h-3 text-amber-400" />;
     case "shell":
+    case "bash":
     case "install":
       return <Terminal className="w-3 h-3 text-cyan-400" />;
     case "grep":
@@ -30,6 +32,8 @@ function getToolIcon(name: string) {
     case "websearch":
     case "webfetch":
       return <Globe className="w-3 h-3 text-green-400" />;
+    case "batch":
+      return <Layers className="w-3 h-3 text-pink-400" />;
     default:
       return <FileText className="w-3 h-3 text-muted-foreground" />;
   }
@@ -92,23 +96,34 @@ function getToolDescription(name: string, args?: any, status?: string, result?: 
   const deletions = metadata?.deletions;
 
   // For file operations, use past tense when completed
-  const fileDescriptions: Record<string, { inProgress: string; completed: string }> = {
-    edit: { inProgress: "Editing", completed: "Edited" },
-    multiedit: { inProgress: "Editing", completed: "Edited" },
-    write: { inProgress: "Creating", completed: "Created" },
-    read: { inProgress: "Reading", completed: "Read" },
+  const fileDescriptions: Record<string, { inProgress: string; completed: string; fallbackInProgress: string; fallbackCompleted: string }> = {
+    edit: { inProgress: "Editing", completed: "Edited", fallbackInProgress: "Editing file", fallbackCompleted: "Edited file" },
+    multiedit: { inProgress: "Editing", completed: "Edited", fallbackInProgress: "Editing files", fallbackCompleted: "Edited files" },
+    write: { inProgress: "Creating", completed: "Created", fallbackInProgress: "Creating file", fallbackCompleted: "Created file" },
+    read: { inProgress: "Reading", completed: "Read", fallbackInProgress: "Reading file", fallbackCompleted: "Read file" },
   };
 
-  if (fileDescriptions[name] && fileName) {
+  // Handle file operations - show file name if available, otherwise show fallback
+  if (fileDescriptions[name]) {
     const desc = fileDescriptions[name];
-    const verb = isCompleted ? desc.completed : desc.inProgress;
-    return { 
-      text: `${verb} ${fileName}`, 
-      fileName, 
-      filePath,
-      additions: isCompleted ? additions : undefined,
-      deletions: isCompleted ? deletions : undefined,
-    };
+    if (fileName) {
+      // File path available - show actual file name
+      const verb = isCompleted ? desc.completed : desc.inProgress;
+      return { 
+        text: `${verb} ${fileName}`, 
+        fileName, 
+        filePath,
+        additions: isCompleted ? additions : undefined,
+        deletions: isCompleted ? deletions : undefined,
+      };
+    } else {
+      // No file path - use fallback text (still descriptive)
+      return { 
+        text: isCompleted ? desc.fallbackCompleted : desc.fallbackInProgress, 
+        fileName: null, 
+        filePath: null,
+      };
+    }
   }
 
   const otherDescriptions: Record<string, { inProgress: string; completed: string }> = {
@@ -116,9 +131,17 @@ function getToolDescription(name: string, args?: any, status?: string, result?: 
       inProgress: args?.path ? `Listing ${args.path}` : "Listing directory",
       completed: args?.path ? `Listed ${args.path}` : "Listed directory"
     },
+    list: { 
+      inProgress: args?.path ? `Listing ${args.path}` : "Listing directory",
+      completed: args?.path ? `Listed ${args.path}` : "Listed directory"
+    },
     shell: { 
-      inProgress: args?.command ? `Running: ${args.command}` : "Running command",
-      completed: args?.command ? `Ran: ${args.command}` : "Ran command"
+      inProgress: args?.command ? `Running: ${args.command.substring(0, 50)}${args.command.length > 50 ? '...' : ''}` : "Running command",
+      completed: args?.command ? `Ran: ${args.command.substring(0, 50)}${args.command.length > 50 ? '...' : ''}` : "Ran command"
+    },
+    bash: { 
+      inProgress: args?.command ? `Running: ${args.command.substring(0, 50)}${args.command.length > 50 ? '...' : ''}` : "Running command",
+      completed: args?.command ? `Ran: ${args.command.substring(0, 50)}${args.command.length > 50 ? '...' : ''}` : "Ran command"
     },
     install: { 
       inProgress: args?.package ? `Installing ${args.package}` : "Installing packages",
@@ -163,31 +186,47 @@ function getToolDescription(name: string, args?: any, status?: string, result?: 
     };
   }
 
+  // Final fallback - show the tool name so user knows what happened
   return { 
-    text: isInProgress ? "Working..." : "Completed", 
+    text: isInProgress ? `Running ${name}...` : `${name} completed`, 
     fileName: null, 
     filePath: null 
   };
 }
 
-export function ToolCallItem({
+// Single tool call item renderer (internal)
+function SingleToolCallItem({
   toolCall,
   isCompact = false,
   onFileClick,
-}: ToolCallItemProps) {
+  // For batch sub-items: override display values
+  overrideName,
+  overrideArgs,
+  hideExpand,
+}: {
+  toolCall: any;
+  isCompact?: boolean;
+  onFileClick?: (filePath: string) => void;
+  overrideName?: string;
+  overrideArgs?: any;
+  hideExpand?: boolean;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const displayName = overrideName || toolCall.name;
+  const displayArgs = overrideArgs || toolCall.args;
 
   // Get effective status (handles DB-loaded tool calls that may not have explicit status)
   const effectiveStatus = getEffectiveStatus(toolCall);
 
   const { text, fileName, filePath, additions, deletions } = getToolDescription(
-    toolCall.name,
-    toolCall.args,
+    displayName,
+    displayArgs,
     effectiveStatus,
     toolCall.result
   );
 
-  const isFileOp = isFileOperation(toolCall.name);
+  const isFileOp = isFileOperation(displayName);
   const isCompleted = effectiveStatus === "completed";
   const hasClickableFile = isFileOp && filePath && onFileClick;
   const hasDiffStats = isCompleted && (additions !== undefined || deletions !== undefined);
@@ -256,22 +295,24 @@ export function ToolCallItem({
     return (
       <div
         className="flex items-center gap-2 py-1 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors cursor-pointer group"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => !hideExpand && setIsExpanded(!isExpanded)}
       >
         {getStatusIcon(effectiveStatus, "sm")}
-        {getToolIcon(toolCall.name)}
+        {getToolIcon(displayName)}
         {renderDescription()}
-        {toolCall.endTime && toolCall.startTime && (
+        {toolCall.endTime && toolCall.startTime && !hideExpand && (
           <span className="text-[10px] text-muted-foreground/40 ml-auto">
             {toolCall.endTime - toolCall.startTime}ms
           </span>
         )}
-        <ChevronRight
-          className={cn(
-            "w-3 h-3 text-muted-foreground/30 transition-transform",
-            isExpanded && "rotate-90"
-          )}
-        />
+        {!hideExpand && (
+          <ChevronRight
+            className={cn(
+              "w-3 h-3 text-muted-foreground/30 transition-transform",
+              isExpanded && "rotate-90"
+            )}
+          />
+        )}
       </div>
     );
   }
@@ -281,37 +322,39 @@ export function ToolCallItem({
     <div className="border border-border/20 rounded-lg overflow-hidden bg-surface-2/30">
       <div
         className="flex items-center gap-2 px-2.5 py-2 cursor-pointer hover:bg-surface-3/20 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => !hideExpand && setIsExpanded(!isExpanded)}
       >
         {getStatusIcon(effectiveStatus, "md")}
-        {getToolIcon(toolCall.name)}
+        {getToolIcon(displayName)}
 
         <span className="text-xs text-muted-foreground flex-1 min-w-0">
           {renderDescription()}
         </span>
 
-        {toolCall.endTime && toolCall.startTime && (
+        {toolCall.endTime && toolCall.startTime && !hideExpand && (
           <span className="text-[10px] text-muted-foreground/50 ml-auto mr-1">
             {toolCall.endTime - toolCall.startTime}ms
           </span>
         )}
 
-        <ChevronRight
-          className={cn(
-            "w-3 h-3 text-muted-foreground/40 transition-transform shrink-0",
-            isExpanded && "rotate-90"
-          )}
-        />
+        {!hideExpand && (
+          <ChevronRight
+            className={cn(
+              "w-3 h-3 text-muted-foreground/40 transition-transform shrink-0",
+              isExpanded && "rotate-90"
+            )}
+          />
+        )}
       </div>
 
-      {isExpanded && (
+      {isExpanded && !hideExpand && (
         <div className="border-t border-border/10 px-2.5 py-2 space-y-2 bg-surface-1/30">
           <div>
             <div className="text-[9px] uppercase text-muted-foreground/50 mb-1">
               Arguments
             </div>
             <pre className="text-[10px] font-mono bg-surface-1/50 rounded p-1.5 overflow-x-auto max-h-24 text-muted-foreground/70">
-              {JSON.stringify(toolCall.args, null, 2)}
+              {JSON.stringify(displayArgs, null, 2)}
             </pre>
           </div>
 
@@ -333,5 +376,56 @@ export function ToolCallItem({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Main ToolCallItem export - handles batch expansion
+ * For batch tool calls, renders each sub-call as individual items
+ */
+export function ToolCallItem({
+  toolCall,
+  isCompact = false,
+  onFileClick,
+}: ToolCallItemProps) {
+  // Check if this is a batch tool call that should be expanded
+  const isBatch = toolCall.name === "batch" && 
+    toolCall.args?.tool_calls && 
+    Array.isArray(toolCall.args.tool_calls) &&
+    toolCall.args.tool_calls.length > 0;
+
+  if (isBatch) {
+    // Expand batch into individual items - render each sub-call separately
+    const batchCalls = toolCall.args.tool_calls;
+    const effectiveStatus = getEffectiveStatus(toolCall);
+    
+    return (
+      <>
+        {batchCalls.map((subCall: { tool: string; parameters: any }, index: number) => (
+          <SingleToolCallItem
+            key={`batch-${toolCall.id}-${index}`}
+            toolCall={{
+              ...toolCall,
+              // Pass through the parent status/timing but use sub-call's tool info
+              id: `${toolCall.id}-${index}`,
+            }}
+            isCompact={isCompact}
+            onFileClick={onFileClick}
+            overrideName={subCall.tool}
+            overrideArgs={subCall.parameters}
+            hideExpand={true}
+          />
+        ))}
+      </>
+    );
+  }
+
+  // Regular single tool call
+  return (
+    <SingleToolCallItem
+      toolCall={toolCall}
+      isCompact={isCompact}
+      onFileClick={onFileClick}
+    />
   );
 }

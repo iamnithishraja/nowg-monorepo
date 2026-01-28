@@ -18,7 +18,7 @@ const STARTER_TEMPLATES: Template[] = [
     name: 'Vite React',
     label: 'React + Vite + TypeScript',
     description: 'React starter template powered by Vite for fast development experience',
-    githubRepo: 'xKevIsDev/bolt-vite-react-ts-template',
+    githubRepo: 'nithish932/bolt-vite-react-ts-template',
     tags: ['react', 'vite', 'frontend', 'website', 'app', 'typescript'],
     icon: 'i-bolt:react',
   },

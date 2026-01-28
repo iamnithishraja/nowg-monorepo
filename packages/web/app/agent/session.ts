@@ -410,23 +410,9 @@ export namespace AgentSession {
             });
           }
 
-          // Get usage
+          // Get usage for logging
           const usage = await result.usage;
-
-          // Send completion
-          sendChunk({
-            type: "complete",
-            text: fullText,
-            usage: usage
-              ? {
-                  promptTokens: (usage as any).promptTokens || (usage as any).input || 0,
-                  completionTokens: (usage as any).completionTokens || (usage as any).output || 0,
-                  totalTokens: (usage as any).totalTokens || ((usage as any).input || 0) + ((usage as any).output || 0),
-                }
-              : undefined,
-          });
-
-          sendChunk({ type: "done" });
+          console.log("[Agent Session] Stream complete | Text length:", fullText.length, "| Usage:", usage);
         } catch (error) {
           sendChunk({
             type: "error",

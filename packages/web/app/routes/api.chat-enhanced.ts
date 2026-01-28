@@ -479,7 +479,6 @@ ${summary}
             tokensUsed: tokensUsed,
           });
 
-          sendChunk({ type: "done" });
         } catch (error) {
           sendChunk({
             type: "error",

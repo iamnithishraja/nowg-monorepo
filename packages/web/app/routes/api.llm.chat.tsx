@@ -1792,8 +1792,6 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             }
           }
 
-          sendChunk({ type: "done" });
-
           // Release Figma MCP connection back to pool
           if (figmaMCPClient) {
             figmaMCPPool.releaseConnection(userId);
