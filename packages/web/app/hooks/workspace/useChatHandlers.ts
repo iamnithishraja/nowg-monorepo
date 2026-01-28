@@ -2,6 +2,111 @@ import { useCallback, useRef } from "react";
 import type { Message } from "../../types/chat";
 import { OPENROUTER_MODELS } from "../../consts/models";
 
+/**
+ * Robust mutex for ensuring sequential execution of file operations
+ * This prevents race conditions when multiple edit calls target the same file
+ * 
+ * Features:
+ * - Timeout support to prevent indefinite hangs
+ * - Auto-reset on timeout to recover from stuck states
+ * - Proper queue management
+ */
+class ExecutionMutex {
+  private queue: Array<{ resolve: () => void; timeoutId: NodeJS.Timeout }> = [];
+  private locked = false;
+  private lockHolder: string | null = null;
+  private lockTime: number = 0;
+  
+  // Max time a single operation can hold the lock (30 seconds)
+  private readonly LOCK_TIMEOUT = 30000;
+
+  async acquire(operationId?: string): Promise<void> {
+    const id = operationId || `op-${Date.now()}`;
+    
+    // Check for stale lock (lock held too long - likely a bug)
+    if (this.locked && this.lockTime > 0) {
+      const elapsed = Date.now() - this.lockTime;
+      if (elapsed > this.LOCK_TIMEOUT) {
+        console.warn(`[Mutex] Stale lock detected (held for ${elapsed}ms by ${this.lockHolder}), forcing reset`);
+        this.forceReset();
+      }
+    }
+    
+    if (!this.locked) {
+      this.locked = true;
+      this.lockHolder = id;
+      this.lockTime = Date.now();
+      console.log(`[Mutex] Lock acquired by ${id}`);
+      return;
+    }
+    
+    console.log(`[Mutex] ${id} waiting for lock (held by ${this.lockHolder})`);
+    
+    return new Promise<void>((resolve, reject) => {
+      // Timeout to prevent indefinite waiting
+      const timeoutId = setTimeout(() => {
+        // Remove from queue
+        const idx = this.queue.findIndex(item => item.resolve === resolve);
+        if (idx >= 0) {
+          this.queue.splice(idx, 1);
+        }
+        console.warn(`[Mutex] Timeout waiting for lock (${id}), forcing reset`);
+        this.forceReset();
+        // Resolve anyway to continue execution
+        resolve();
+      }, this.LOCK_TIMEOUT);
+      
+      this.queue.push({ resolve, timeoutId });
+    });
+  }
+
+  release(operationId?: string): void {
+    const id = operationId || 'unknown';
+    console.log(`[Mutex] Lock released by ${id} (was held by ${this.lockHolder})`);
+    
+    const next = this.queue.shift();
+    if (next) {
+      clearTimeout(next.timeoutId);
+      this.lockHolder = `queued-${Date.now()}`;
+      this.lockTime = Date.now();
+      next.resolve();
+    } else {
+      this.locked = false;
+      this.lockHolder = null;
+      this.lockTime = 0;
+    }
+  }
+  
+  /**
+   * Force reset the mutex - use only for recovery from stuck states
+   */
+  forceReset(): void {
+    console.warn(`[Mutex] Force resetting mutex (was locked: ${this.locked}, queue: ${this.queue.length})`);
+    // Clear all timeouts
+    for (const item of this.queue) {
+      clearTimeout(item.timeoutId);
+    }
+    // Resolve all waiting promises
+    const waiting = [...this.queue];
+    this.queue = [];
+    this.locked = false;
+    this.lockHolder = null;
+    this.lockTime = 0;
+    
+    // Resolve waiting callers so they can proceed
+    for (const item of waiting) {
+      item.resolve();
+    }
+  }
+  
+  isLocked(): boolean {
+    return this.locked;
+  }
+}
+
+// Global mutex for tool execution to ensure sequential execution
+const toolExecutionMutex = new ExecutionMutex();
+
 interface ChatDeps {
   chat: any;
   files: any;
@@ -400,15 +505,48 @@ export function useChatHandlers({
                     messagesForContinuation = data.messages || [];
                     const autoTools = Array.isArray(data.autoTools) ? data.autoTools : [];
                     const ackTools = Array.isArray(data.ackTools) ? data.ackTools : [];
-                    const allToolsToExecute = [...autoTools, ...ackTools];
+                    const serverToolsToExecute = [...autoTools, ...ackTools];
+
+                    // IMPORTANT: Use allToolCalls (from tool_call events) as source of truth
+                    // The server might not include all tools in autoTools/ackTools due to timing
+                    // Only execute tools that are still pending
+                    const pendingToolCalls = allToolCalls.filter(tc => tc.status === "pending");
+                    
+                    // Merge: prefer server tools but ensure all pending tool_call events are included
+                    const allToolsToExecute: any[] = [];
+                    const seenIds = new Set<string>();
+                    
+                    // First add all server-provided tools
+                    for (const tc of serverToolsToExecute) {
+                      if (tc?.id && !seenIds.has(tc.id)) {
+                        seenIds.add(tc.id);
+                        allToolsToExecute.push(tc);
+                      }
+                    }
+                    
+                    // Then add any pending tool calls that weren't in server response
+                    for (const tc of pendingToolCalls) {
+                      if (tc?.id && !seenIds.has(tc.id)) {
+                        seenIds.add(tc.id);
+                        allToolsToExecute.push({
+                          id: tc.id,
+                          name: tc.name,
+                          args: tc.args,
+                        });
+                        console.warn(
+                          "[ChatHandler] Tool call from event not in server response, adding:",
+                          tc.name, tc.id
+                        );
+                      }
+                    }
 
                     console.log(
                       "[ChatHandler] Tools to execute:",
                       allToolsToExecute.length,
-                      "| autoTools:",
-                      autoTools.length,
-                      "| ackTools:",
-                      ackTools.length,
+                      "| From server:",
+                      serverToolsToExecute.length,
+                      "| Pending tool_calls:",
+                      pendingToolCalls.length,
                       "| Tool names:",
                       allToolsToExecute.map(t => t?.name || 'unknown').join(', ')
                     );
@@ -450,12 +588,24 @@ export function useChatHandlers({
                       // Continue anyway - some tools might not need WebContainer
                     }
 
-                    // Execute all tools
+                    // Execute all tools SEQUENTIALLY with mutex protection
+                    // This is critical for file operations like edit/multiedit
                     const toolResults = [];
-                    for (const toolCall of allToolsToExecute) {
+                    console.log(
+                      "[ChatHandler] Starting sequential tool execution | Total tools:",
+                      allToolsToExecute.length
+                    );
+                    
+                    for (let toolIndex = 0; toolIndex < allToolsToExecute.length; toolIndex++) {
+                      const toolCall = allToolsToExecute[toolIndex];
+                      const operationId = `${toolCall.name}-${toolIndex}-${Date.now()}`;
+                      
+                      // Acquire mutex to ensure only one tool executes at a time
+                      await toolExecutionMutex.acquire(operationId);
+                      
                       try {
                         console.log(
-                          "[ChatHandler] Executing tool:",
+                          `[ChatHandler] Executing tool ${toolIndex + 1}/${allToolsToExecute.length}:`,
                           toolCall.name,
                           "| Args:",
                           JSON.stringify(toolCall.args).substring(0, 200)
@@ -702,7 +852,7 @@ export function useChatHandlers({
                           },
                         });
                         console.log(
-                          "[ChatHandler] Tool result prepared:",
+                          `[ChatHandler] Tool ${toolIndex + 1}/${allToolsToExecute.length} completed:`,
                           toolCall.name,
                           "| Output length:",
                           output?.length || 0
@@ -761,11 +911,20 @@ export function useChatHandlers({
                                 : String(toolError),
                           },
                         });
+                      } finally {
+                        // ALWAYS release mutex - this is critical to prevent deadlocks
+                        toolExecutionMutex.release(operationId);
+                        
+                        // Add small delay between file operations to let WebContainer sync
+                        // This helps prevent race conditions with rapid sequential edits
+                        if (["edit", "write", "multiedit"].includes(toolCall.name)) {
+                          await new Promise(resolve => setTimeout(resolve, 50));
+                        }
                       }
                     }
 
                     console.log(
-                      "[ChatHandler] Tool execution loop completed | Results:",
+                      "[ChatHandler] Sequential tool execution completed | Results:",
                       toolResults.length,
                       "| Expected:",
                       allToolsToExecute.length

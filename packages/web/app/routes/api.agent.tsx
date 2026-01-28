@@ -541,38 +541,50 @@ export async function action({ request }: ActionFunctionArgs) {
             throw streamError;
           }
 
-          // Get tool calls from result if not already collected
-          let responseToolCalls: any[] = collectedToolCalls;
-          if (collectedToolCalls.length === 0) {
-            try {
-              const resultToolCalls = await result.toolCalls || [];
-              responseToolCalls = Array.isArray(resultToolCalls) ? resultToolCalls.map((tc: any) => ({
-                toolCallId: tc.toolCallId || tc.id,
-                toolName: tc.toolName || tc.name,
-                args: tc.args || {},
-              })) : [];
-              
-              // Create tool parts for any we missed
-              for (const tc of responseToolCalls) {
-                if (!toolCallParts[tc.toolCallId]) {
-                  const toolPart = createToolPartRunning(tc.toolName, tc.toolCallId, tc.args);
-                  parts.push(toolPart);
-                  toolCallParts[tc.toolCallId] = toolPart;
-                  
-                  sendChunk({
-                    type: "tool_call",
-                    id: tc.toolCallId,
-                    name: tc.toolName,
-                    args: tc.args,
-                    step: stepCount,
-                    category: getToolCategory(tc.toolName),
-                  });
-                }
+          // Get tool calls from result - ALWAYS check both sources to avoid race conditions
+          // The onStepFinish callback is async, so collectedToolCalls might not be populated yet
+          let responseToolCalls: any[] = [...collectedToolCalls];
+          
+          try {
+            // Always try to get tool calls from result.toolCalls as well
+            const resultToolCalls = await result.toolCalls || [];
+            const additionalToolCalls = Array.isArray(resultToolCalls) ? resultToolCalls.map((tc: any) => ({
+              toolCallId: tc.toolCallId || tc.id,
+              toolName: tc.toolName || tc.name,
+              args: tc.args || {},
+            })) : [];
+            
+            // Merge any tool calls from result that aren't in collectedToolCalls
+            for (const tc of additionalToolCalls) {
+              if (!responseToolCalls.some(existing => existing.toolCallId === tc.toolCallId)) {
+                responseToolCalls.push(tc);
+                console.log("[Agent API] Adding tool call from result.toolCalls:", tc.toolName, tc.toolCallId);
               }
-            } catch (e) {
-              console.error("[Agent API] Error getting tool calls:", e);
             }
+            
+            // Create tool parts and send events for any tool calls we missed earlier
+            for (const tc of responseToolCalls) {
+              if (!toolCallParts[tc.toolCallId]) {
+                const toolPart = createToolPartRunning(tc.toolName, tc.toolCallId, tc.args);
+                parts.push(toolPart);
+                toolCallParts[tc.toolCallId] = toolPart;
+                
+                sendChunk({
+                  type: "tool_call",
+                  id: tc.toolCallId,
+                  name: tc.toolName,
+                  args: tc.args,
+                  step: stepCount,
+                  category: getToolCategory(tc.toolName),
+                });
+                console.log("[Agent API] Sent delayed tool_call event:", tc.toolName, tc.toolCallId);
+              }
+            }
+          } catch (e) {
+            console.error("[Agent API] Error getting tool calls:", e);
           }
+          
+          console.log("[Agent API] Total tool calls to send:", responseToolCalls.length);
 
           // Get usage info
           let usage: any = {};
