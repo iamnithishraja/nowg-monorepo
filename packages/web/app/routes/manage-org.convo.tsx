@@ -25,7 +25,6 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { SidebarProvider } from "../components/ui/sidebar";
 import { ProjectSidebar } from "../components/ProjectSidebar";
 import { Header } from "../components";
 import Background from "../components/Background";
@@ -508,8 +507,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   };
 
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="h-screen w-screen bg-canvas text-primary flex overflow-hidden">
+    <div className="h-screen w-screen bg-canvas text-primary flex overflow-hidden">
         {/* Background layers - absolutely positioned */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <Background />
@@ -550,7 +548,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <Header showSidebarToggle={true} showAuthButtons={false} />
+          <Header showSidebarToggle={false} showAuthButtons={false} />
 
           <main className="relative z-20 flex-1 overflow-y-auto overflow-x-hidden">
             <div className="flex flex-col items-center pt-8 sm:pt-12 pb-8">
@@ -1017,6 +1015,5 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
           </main>
         </div>
       </div>
-    </SidebarProvider>
   );
 }

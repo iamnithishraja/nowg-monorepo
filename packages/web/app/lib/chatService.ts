@@ -924,6 +924,38 @@ export class ChatService {
     }
   }
 
+  // Toggle starred status
+  async toggleStarred(
+    conversationId: string,
+    userId: string
+  ): Promise<boolean> {
+    try {
+      await this.ensureConnection();
+
+      const conversation = await Conversation.findOne({
+        _id: conversationId,
+        userId,
+      });
+
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+
+      const newStarredStatus = !(conversation.starred || false);
+      await Conversation.findByIdAndUpdate(conversationId, {
+        $set: {
+          starred: newStarredStatus,
+          updatedAt: new Date(),
+        },
+      });
+
+      return newStarredStatus;
+    } catch (error) {
+      console.error("Error toggling starred status:", error);
+      throw error;
+    }
+  }
+
   // Update conversation messages array
   async updateConversationMessages(
     conversationId: string,

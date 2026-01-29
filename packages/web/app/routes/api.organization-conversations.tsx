@@ -134,6 +134,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         model: conv.model,
         createdAt: conv.createdAt,
         updatedAt: conv.updatedAt,
+        starred: conv.starred || false,
         project: project
           ? {
               id: project._id.toString(),

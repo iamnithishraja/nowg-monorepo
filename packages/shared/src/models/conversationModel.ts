@@ -127,6 +127,18 @@ export const conversationSchemaDefinition = {
     default: null,
     index: true,
   },
+  // Organization association (if this is an organization project)
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Organization",
+    default: null,
+  },
+  // Starred status (user can star projects for quick access)
+  starred: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
 };
 
 export const conversationSchema = new mongoose.Schema(conversationSchemaDefinition);

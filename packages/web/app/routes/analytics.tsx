@@ -42,7 +42,6 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "../components/ui/chart";
-import { SidebarProvider } from "../components/ui/sidebar";
 import {
   Tabs,
   TabsList,
@@ -256,18 +255,17 @@ function AnalyticsContent({ loaderData }: { loaderData?: { user?: any } }) {
   };
 
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <Background />
-        </div>
+    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <Background />
+      </div>
 
-        {/* Left Sidebar - ProjectSidebar */}
-        <ProjectSidebar user={user} className="flex-shrink-0" />
+      {/* Left Sidebar - ProjectSidebar */}
+      <ProjectSidebar user={user} className="flex-shrink-0" />
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header showAuthButtons={false} showSidebarToggle={true} />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header showAuthButtons={false} showSidebarToggle={false} />
 
           <main className="relative z-20 flex flex-col h-full overflow-hidden">
             <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
@@ -901,7 +899,6 @@ function AnalyticsContent({ loaderData }: { loaderData?: { user?: any } }) {
           </main>
         </div>
       </div>
-    </SidebarProvider>
   );
 }
 

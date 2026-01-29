@@ -25,7 +25,6 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
-import { SidebarProvider } from "~/components/ui/sidebar";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
 
@@ -251,8 +250,8 @@ export default function TeamsPage() {
   };
 
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
+    <>
+    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <Background />
         </div>
@@ -260,7 +259,7 @@ export default function TeamsPage() {
         <ProjectSidebar user={user} className="shrink-0" />
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          <Header showAuthButtons={false} showSidebarToggle={true} />
+          <Header showAuthButtons={false} showSidebarToggle={false} />
 
           <main className="relative z-20 flex flex-col h-full overflow-hidden">
             <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
@@ -628,6 +627,6 @@ export default function TeamsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </SidebarProvider>
+    </>
   );
 }

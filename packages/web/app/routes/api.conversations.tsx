@@ -174,6 +174,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       teamId: null,
       teamName: null,
       projectType: "personal",
+      starred: (conv as any).starred || false,
     }));
 
     // Format team conversations with team info
@@ -190,6 +191,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       teamId: conv.teamId?._id?.toString() || conv.teamId?.toString() || null,
       teamName: conv.teamId?.name || null,
       projectType: "team",
+      starred: (conv as any).starred || false,
     }));
 
     // Get unique teams
@@ -416,6 +418,45 @@ export async function action({ request }: ActionFunctionArgs) {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
+
+      case "toggleStar":
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verify ownership
+        const conversationForStar = await chatService.getConversation(
+          conversationId,
+          userId
+        );
+        if (!conversationForStar) {
+          return new Response(
+            JSON.stringify({ error: "Conversation not found" }),
+            {
+              status: 404,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        const newStarredStatus = await chatService.toggleStarred(
+          conversationId,
+          userId
+        );
+
+        return new Response(
+          JSON.stringify({ success: true, starred: newStarredStatus }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
 
       case "updateMessageModel":
         if (!conversationId || !messageId || !model) {
