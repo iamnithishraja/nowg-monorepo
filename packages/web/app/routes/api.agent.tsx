@@ -1,11 +1,25 @@
+import {
+  Conversation,
+  Markup,
+  OrgProjectWallet,
+  Profile,
+  Project,
+  ProjectWallet,
+  Team,
+  TeamMember,
+  UserProjectWallet,
+} from "@nowgai/shared/models";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { streamText, type CoreMessage } from "ai";
+import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { getEnv } from "~/lib/env";
 import { Agent, AgentTools, SystemPrompt } from "~/agent";
 import type { FileMap, FileNode } from "~/utils/constants";
 import { ChatService } from "~/lib/chatService";
+import { connectToDatabase } from "~/lib/mongo";
+import { isWhitelistedEmail } from "~/lib/stripe";
 
 /**
  * Agent API Endpoint
@@ -153,6 +167,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const requestType = body.requestType || "prompt";
     const userId = session.user.id;
+    const userEmail = session.user.email;
+
+    // Check if user is whitelisted (developers etc.)
+    const isWhitelisted = isWhitelistedEmail(userEmail);
     
     // Initialize chat service for message persistence
     const chatService = new ChatService();
@@ -532,6 +550,318 @@ export async function action({ request }: ActionFunctionArgs) {
               // Don't fail the request, just log the error
             }
           }
+
+          // ========== WALLET DEDUCTION LOGIC ==========
+          // Deduct from appropriate wallet based on conversation type (same as main chat)
+          if (inputTokens > 0 && outputTokens > 0 && conversationId) {
+            try {
+              await connectToDatabase();
+
+              // Get conversation to determine wallet type
+              const conversation = await Conversation.findById(conversationId);
+
+              // Calculate base cost
+              const MODEL_PRICING: Record<
+                string,
+                { input: number; output: number }
+              > = {
+                "anthropic/claude-3.5-sonnet": { input: 3.6, output: 18 },
+                "anthropic/claude-4.5-sonnet": { input: 3.6, output: 18 },
+                "openai/gpt-5-nano": { input: 0.06, output: 0.48 },
+                "google/gemini-2.5-flash": { input: 0.36, output: 3 },
+              };
+              const pricing = MODEL_PRICING[model] || {
+                input: 3.6,
+                output: 18,
+              };
+              const baseCost =
+                (inputTokens / 1_000_000) * pricing.input +
+                (outputTokens / 1_000_000) * pricing.output;
+
+              // Get organizationId if this is a project conversation
+              let orgId: mongoose.Types.ObjectId | null = null;
+              let projectId: mongoose.Types.ObjectId | null = null;
+              let project: any = null;
+
+              // Check if this is an organization/project conversation (has adminProjectId)
+              if (conversation?.adminProjectId) {
+                const adminProjectId = conversation.adminProjectId;
+
+                if (adminProjectId instanceof mongoose.Types.ObjectId) {
+                  projectId = adminProjectId;
+                } else if (typeof adminProjectId === "string") {
+                  projectId = new mongoose.Types.ObjectId(adminProjectId);
+                } else if (
+                  typeof adminProjectId === "object" &&
+                  adminProjectId !== null &&
+                  "_id" in adminProjectId
+                ) {
+                  const adminProjectIdObj = adminProjectId as { _id: any };
+                  projectId =
+                    adminProjectIdObj._id instanceof mongoose.Types.ObjectId
+                      ? adminProjectIdObj._id
+                      : new mongoose.Types.ObjectId(adminProjectIdObj._id);
+                } else {
+                  projectId = new mongoose.Types.ObjectId(
+                    String(adminProjectId)
+                  );
+                }
+
+                // Get project to access organizationId
+                project = (await Project.findById(projectId).lean()) as any;
+                if (project && project.organizationId) {
+                  orgId =
+                    project.organizationId instanceof mongoose.Types.ObjectId
+                      ? project.organizationId
+                      : new mongoose.Types.ObjectId(
+                          String(project.organizationId)
+                        );
+                }
+              }
+
+              // Fetch markup for organization (default to 20% if not found)
+              let markupMultiplier = 1.2;
+              if (orgId) {
+                const markup = await Markup.findOne({
+                  organizationId: orgId,
+                  provider: "openrouter",
+                });
+                if (markup && markup.value !== undefined) {
+                  markupMultiplier = 1 + markup.value / 100;
+                }
+                console.log("[Agent API] MARKUP:", {
+                  orgId,
+                  markup,
+                  markupMultiplier,
+                });
+              }
+
+              // Apply markup to base cost
+              const cost = baseCost * markupMultiplier;
+              console.log("[Agent API] Cost calculation:", {
+                inputTokens,
+                outputTokens,
+                baseCost,
+                markupMultiplier,
+                cost,
+              });
+
+              // Continue with project wallet logic if this is a project conversation
+              if (
+                conversation?.adminProjectId &&
+                projectId &&
+                orgId &&
+                project
+              ) {
+                // Get or create project wallet (OrgProjectWallet)
+                let projectWallet = await OrgProjectWallet.findOne({
+                  projectId: projectId,
+                });
+
+                if (!projectWallet) {
+                  try {
+                    projectWallet = new OrgProjectWallet({
+                      projectId: projectId,
+                      balance: 0,
+                      transactions: [],
+                    });
+                    await projectWallet.save();
+                    console.log(
+                      `[Agent API] Created OrgProjectWallet for project: ${projectId}`
+                    );
+                  } catch (walletError: any) {
+                    console.error(
+                      `[Agent API] Failed to create OrgProjectWallet:`,
+                      walletError.message
+                    );
+                    projectWallet = await OrgProjectWallet.findOne({
+                      projectId: projectId,
+                    });
+                    if (!projectWallet) {
+                      throw new Error(
+                        `Failed to create or find wallet for project ${projectId}`
+                      );
+                    }
+                  }
+                }
+
+                // Deduct from project wallet (only if not whitelisted)
+                const projectBalanceBefore = projectWallet.balance || 0;
+                const projectBalanceAfter = isWhitelisted
+                  ? projectBalanceBefore
+                  : Math.max(0, projectBalanceBefore - cost);
+                projectWallet.balance = projectBalanceAfter;
+
+                const transactionDescription = isWhitelisted
+                  ? `Agent message (${model}) - $${cost.toFixed(4)} [Whitelisted - No charge]`
+                  : `Agent message (${model}) - $${cost.toFixed(4)}`;
+
+                projectWallet.transactions.push({
+                  type: "debit",
+                  amount: cost,
+                  balanceBefore: projectBalanceBefore,
+                  balanceAfter: projectBalanceAfter,
+                  description: transactionDescription,
+                  performedBy: userId,
+                  model: model,
+                  inputTokens: inputTokens,
+                  outputTokens: outputTokens,
+                  conversationId: conversationId.toString(),
+                  userId: userId,
+                  createdAt: new Date(),
+                });
+                await projectWallet.save();
+
+                const projectTransactionId =
+                  projectWallet.transactions[
+                    projectWallet.transactions.length - 1
+                  ]._id?.toString() || null;
+
+                // Get or create user project wallet and update spending
+                let userProjectWallet = await UserProjectWallet.findOne({
+                  userId: userId,
+                  projectId: projectId,
+                });
+
+                if (!userProjectWallet) {
+                  userProjectWallet = new UserProjectWallet({
+                    userId: userId,
+                    projectId: projectId,
+                    organizationId: orgId,
+                    balance: 0,
+                    currentSpending: 0,
+                    limit: null,
+                    transactions: [],
+                  });
+                }
+
+                const userSpendingBefore =
+                  userProjectWallet.currentSpending || 0;
+                const userSpendingAfter = isWhitelisted
+                  ? userSpendingBefore
+                  : userSpendingBefore + cost;
+                userProjectWallet.currentSpending = userSpendingAfter;
+
+                const userTransactionDescription = isWhitelisted
+                  ? `Usage tracking: Agent message (${model}) - $${cost.toFixed(4)} [Whitelisted - No charge]`
+                  : `Usage deduction: Agent message (${model}) - $${cost.toFixed(4)}`;
+
+                userProjectWallet.transactions.push({
+                  type: "debit",
+                  amount: cost,
+                  balanceBefore: 0,
+                  balanceAfter: 0,
+                  description: userTransactionDescription,
+                  performedBy: userId,
+                  source: "usage_deduction",
+                  relatedProjectWalletTransactionId: projectTransactionId,
+                  fromAddress: projectWallet._id.toString(),
+                  toAddress: null,
+                  createdAt: new Date(),
+                });
+                await userProjectWallet.save();
+                console.log(
+                  `[Agent API] Deducted $${cost.toFixed(4)} from OrgProjectWallet for project ${projectId}`
+                );
+              } else if (
+                conversation?.teamId &&
+                conversation?.projectType === "team"
+              ) {
+                // Team project - deduct from team wallet
+                const team = await Team.findById(conversation.teamId);
+                const membership = await TeamMember.findOne({
+                  teamId: conversation.teamId,
+                  userId: userId,
+                  status: "active",
+                });
+
+                if (team && membership) {
+                  const teamBefore = team.balance || 0;
+                  const teamAfter = Math.max(0, teamBefore - cost);
+                  team.balance = teamAfter;
+
+                  team.transactions.push({
+                    type: "deduction",
+                    amount: cost,
+                    balanceBefore: teamBefore,
+                    balanceAfter: teamAfter,
+                    description: `Agent message (${model}) - $${cost.toFixed(4)}`,
+                    conversationId: conversationId.toString(),
+                    userId: userId,
+                    model,
+                    inputTokens,
+                    outputTokens,
+                    createdAt: new Date(),
+                  });
+                  await team.save();
+
+                  // Update member's current spending if wallet limit is set
+                  if (
+                    membership.walletLimit !== null &&
+                    membership.walletLimit !== undefined
+                  ) {
+                    membership.currentSpending =
+                      (membership.currentSpending || 0) + cost;
+                    await membership.save();
+                  }
+
+                  // Also update project wallet if it exists
+                  const projectWallet = await ProjectWallet.findOne({
+                    conversationId: conversationId,
+                  });
+                  if (projectWallet) {
+                    const projectBefore = projectWallet.balance || 0;
+                    const projectAfter = Math.max(0, projectBefore - cost);
+                    projectWallet.balance = projectAfter;
+
+                    projectWallet.transactions.push({
+                      type: "deduction",
+                      amount: cost,
+                      balanceBefore: projectBefore,
+                      balanceAfter: projectAfter,
+                      description: `Agent message (${model}) - $${cost.toFixed(4)}`,
+                      model,
+                      inputTokens,
+                      outputTokens,
+                      createdAt: new Date(),
+                    });
+                    await projectWallet.save();
+                  }
+                  console.log(
+                    `[Agent API] Deducted $${cost.toFixed(4)} from Team wallet for team ${conversation.teamId}`
+                  );
+                }
+              } else {
+                // Personal project - deduct from profile
+                const profile = await Profile.findOne({ userId });
+                if (profile) {
+                  const before = profile.balance || 0;
+                  const after = Math.max(0, before - cost);
+                  profile.balance = after;
+
+                  profile.transactions.push({
+                    type: "deduction",
+                    amount: cost,
+                    balanceBefore: before,
+                    balanceAfter: after,
+                    description: `Agent message (${model}) - $${cost.toFixed(4)}`,
+                    conversationId: conversationId.toString(),
+                    model,
+                    inputTokens,
+                    outputTokens,
+                    createdAt: new Date(),
+                  });
+                  await profile.save();
+                  console.log(
+                    `[Agent API] Deducted $${cost.toFixed(4)} from Profile wallet for user ${userId}`
+                  );
+                }
+              }
+            } catch (e) {
+              console.error("[Agent API] Error deducting balance:", e);
+            }
+          }
+          // ========== END WALLET DEDUCTION LOGIC ==========
 
           // If there are pending tool calls, tell client to execute and send results back
           if (pendingToolCalls.length > 0) {
