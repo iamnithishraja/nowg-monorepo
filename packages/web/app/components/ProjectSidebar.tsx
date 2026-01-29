@@ -773,7 +773,7 @@ function ProjectSidebarComponent({
                       displayedProjects.map((project) => (
                         <div
                           key={project.id}
-                          className="group relative max-w-full"
+                          className="group relative max-w-54"
                         >
                           <Link
                             to={`/workspace?conversationId=${project.id}`}
@@ -880,7 +880,7 @@ function ProjectSidebarComponent({
                       displayedProjects.map((project) => (
                         <div
                           key={project.id}
-                          className="group relative max-w-full"
+                          className="group relative max-w-54"
                         >
                           <Link
                             to={`/workspace?conversationId=${project.id}`}
