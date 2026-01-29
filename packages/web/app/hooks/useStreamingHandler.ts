@@ -64,6 +64,9 @@ interface StreamingHandlerOptions {
   onToolCall?: (toolCall: ToolCallEvent) => Promise<ToolCallResult>;
   onToolCallStart?: (toolCall: ToolCallEvent) => void;
   onToolCallComplete?: (result: ToolCallResult) => void;
+  // Optional hooks for R2 sync events
+  onSyncStarted?: () => void;
+  onSyncCompleted?: () => void;
 }
 
 export function useStreamingHandler() {
@@ -203,6 +206,20 @@ export function useStreamingHandler() {
                   // Prefer raw content if provided (includes artifacts/actions)
                   assistantContent = data.raw || data.content || "";
                   options.onMessageComplete(assistantContent);
+                  break;
+
+                case "sync_started":
+                  // R2 sync has started
+                  if (options.onSyncStarted) {
+                    options.onSyncStarted();
+                  }
+                  break;
+
+                case "sync_completed":
+                  // R2 sync has completed
+                  if (options.onSyncCompleted) {
+                    options.onSyncCompleted();
+                  }
                   break;
 
                 case "done":

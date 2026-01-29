@@ -6,6 +6,8 @@ import {
   CaretDown,
   ChartBar,
   ChatCircle,
+  CircleNotch,
+  CloudArrowUp,
   Code,
   CurrencyDollar,
   Database,
@@ -25,6 +27,7 @@ import { useGitHubAuth } from "~/hooks/useGitHubAuth";
 import { useGitHubRepository } from "~/hooks/useGitHubRepository";
 import { authClient } from "../lib/authClient";
 import { cn } from "../lib/utils";
+import { useIsSyncingToR2 } from "../stores/useWorkspaceStore";
 import { UnifiedDeploymentDialog, useDeployDialog } from "./DeployDialog";
 import { GitHubDeleteDialog } from "./github/GitHubDeleteDialog";
 import { GitHubRepositoryDialog } from "./github/GitHubRepositoryDialog";
@@ -121,6 +124,9 @@ export function WorkspaceRightHeader({
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
   const [showGitHubDeleteDialog, setShowGitHubDeleteDialog] = useState(false);
   const [isGitHubDeleting, setIsGitHubDeleting] = useState(false);
+  
+  // R2 sync status
+  const isSyncingToR2 = useIsSyncingToR2();
 
   // GitHub hooks
   const {
@@ -472,12 +478,21 @@ export function WorkspaceRightHeader({
         {/* Right: Deploy, Share, Avatar */}
         <div className="flex items-center gap-2">
 
+          {/* R2 Sync Indicator - shows when syncing files to cloud */}
+          {isSyncingToR2 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/15 border border-violet-500/30 animate-pulse">
+              <CloudArrowUp className="w-4 h-4 text-violet-400" weight="bold" />
+              <span className="text-xs text-violet-300 font-medium">Syncing to cloud...</span>
+              <CircleNotch className="w-3.5 h-3.5 text-violet-400 animate-spin" />
+            </div>
+          )}
+
           {/* Deploy Button - purple with dropdown arrow */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 className="h-8 gap-1.5 px-4 rounded-lg text-xs font-medium text-white bg-[#8b5cf6] hover:bg-[#7c4deb] border-0"
-                disabled={!!isDeploying || versions.length === 0}
+                disabled={!!isDeploying || versions.length === 0 || isSyncingToR2}
               >
                 Deploy
                 <CaretDown className="w-3 h-3 ml-0.5" />

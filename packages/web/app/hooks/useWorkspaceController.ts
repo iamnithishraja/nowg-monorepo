@@ -828,6 +828,15 @@ conversationId
           }
         } catch {}
       },
+      // R2 sync status handlers
+      onSyncStarted: () => {
+        const { setIsSyncingToR2 } = useWorkspaceStore.getState();
+        setIsSyncingToR2(true);
+      },
+      onSyncCompleted: () => {
+        const { setIsSyncingToR2 } = useWorkspaceStore.getState();
+        setIsSyncingToR2(false);
+      },
       onMessageComplete: (content: string) => {
         // Extract and set project title FIRST
         const artifactMatch = content.match(

@@ -498,6 +498,9 @@ export async function action({ request }: ActionFunctionArgs) {
           
           if (conversationId && chatId && (fullText || pendingToolCalls.length > 0)) {
             try {
+              // Notify frontend that R2 sync is starting
+              sendChunk({ type: "sync_started" });
+              
               const assistantMessageId = await chatService.addMessageToChat(
                 conversationId,
                 chatId,
@@ -518,9 +521,14 @@ export async function action({ request }: ActionFunctionArgs) {
                 } as any,
                 userId
               );
+              
+              // Notify frontend that R2 sync is complete
+              sendChunk({ type: "sync_completed" });
               sendChunk({ type: "assistant_message_saved", messageId: assistantMessageId });
             } catch (saveError) {
               console.error("[Agent API] Failed to save assistant message:", saveError);
+              // Make sure to complete sync state even on error
+              sendChunk({ type: "sync_completed" });
               // Don't fail the request, just log the error
             }
           }

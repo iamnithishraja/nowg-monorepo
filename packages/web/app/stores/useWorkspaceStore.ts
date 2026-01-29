@@ -21,6 +21,8 @@ interface WorkspaceState {
   isTerminalRunning: boolean;
   // chat mode
   chatMode: ChatMode;
+  // R2 sync state
+  isSyncingToR2: boolean;
   setSelectedModel: (model: string) => void;
   setConversationId: (id: string | null) => void;
   setConversationTitle: (title: string | null) => void;
@@ -35,6 +37,7 @@ interface WorkspaceState {
   setIsTerminalRunning: (v: boolean) => void;
   setIsEditActive: (v: boolean) => void;
   setChatMode: (mode: ChatMode) => void;
+  setIsSyncingToR2: (v: boolean) => void;
 }
 
 // Max terminal lines to prevent memory bloat
@@ -54,6 +57,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   terminalLines: [],
   isTerminalRunning: false,
   chatMode: "build",
+  isSyncingToR2: false,
   setSelectedModel: (model) => set({ selectedModel: model }),
   setConversationId: (id) => set({ conversationId: id }),
   setConversationTitle: (title) => set({ conversationTitle: title }),
@@ -76,6 +80,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setIsTerminalRunning: (v) => set({ isTerminalRunning: v }),
   setIsEditActive: (v) => set({ isEditActive: v }),
   setChatMode: (mode) => set({ chatMode: mode }),
+  setIsSyncingToR2: (v) => set({ isSyncingToR2: v }),
 }));
 
 // ============================================
@@ -166,4 +171,6 @@ export const useActiveTab = () =>
 export const useConversationId = () =>
   useWorkspaceStore((state) => state.conversationId);
 
+export const useIsSyncingToR2 = () =>
+  useWorkspaceStore((state) => state.isSyncingToR2);
 

@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import type { Message } from "../../types/chat";
 import { OPENROUTER_MODELS } from "../../consts/models";
+import { useWorkspaceStore } from "../../stores/useWorkspaceStore";
 
 interface ChatDeps {
   chat: any;
@@ -676,6 +677,14 @@ export function useChatHandlers({
                     // Agent finished
                     assistantText = assistantText || data.text || "";
                     return { text: assistantText, toolCalls: allToolCalls };
+                  } else if (data.type === "sync_started") {
+                    // R2 sync has started
+                    const { setIsSyncingToR2 } = useWorkspaceStore.getState();
+                    setIsSyncingToR2(true);
+                  } else if (data.type === "sync_completed") {
+                    // R2 sync has completed
+                    const { setIsSyncingToR2 } = useWorkspaceStore.getState();
+                    setIsSyncingToR2(false);
                   }
                 } catch (parseError) {
                   // Ignore parse errors
@@ -818,7 +827,9 @@ export function useChatHandlers({
                   
                   if (filesToSync.length > 0) {
                     // Sync files to R2
+                    const { setIsSyncingToR2 } = useWorkspaceStore.getState();
                     try {
+                      setIsSyncingToR2(true);
                       const syncResponse = await fetch("/api/conversations", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -837,6 +848,8 @@ export function useChatHandlers({
                       }
                     } catch (syncError) {
                       console.error("[ChatHandler] Error syncing files to R2:", syncError);
+                    } finally {
+                      setIsSyncingToR2(false);
                     }
                     
                     // Also save IndexedDB snapshot for the MAIN conversation (not the chat)
