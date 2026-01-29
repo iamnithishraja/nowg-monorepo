@@ -301,26 +301,6 @@ function ProjectSidebarComponent({
     return project?.starred || false;
   }, [projects]);
 
-  // Get projects based on view - MEMOIZED
-  const displayedProjects = useMemo(() => {
-    let projectsToShow = [...filteredProjects];
-    
-    if (projectView === "starred") {
-      projectsToShow = projectsToShow.filter(p => p.starred === true);
-    } else if (projectView === "recent") {
-      // Show only 5 most recent
-      projectsToShow = projectsToShow
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        .slice(0, 5);
-    } else {
-      // Show all projects
-      projectsToShow = projectsToShow
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    }
-    
-    return projectsToShow;
-  }, [filteredProjects, projectView]);
-
   // Get recent projects (last 5) - MEMOIZED (for display in recent section)
   const recentProjects = useMemo(() => 
     [...filteredProjects]
@@ -331,6 +311,21 @@ function ProjectSidebarComponent({
       .slice(0, 5),
     [filteredProjects]
   );
+
+  // Get projects based on view - MEMOIZED
+  const displayedProjects = useMemo(() => {
+    let projectsToShow = [...filteredProjects];
+    
+    if (projectView === "starred") {
+      projectsToShow = projectsToShow.filter(p => p.starred === true);
+    } else if (projectView === "all") {
+      // Show ALL projects sorted by date
+      projectsToShow = projectsToShow
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    }
+    
+    return projectsToShow;
+  }, [filteredProjects, projectView]);
 
   // Format date for display - MEMOIZED
   const formatDate = useCallback((dateString: string) => {
@@ -579,7 +574,8 @@ function ProjectSidebarComponent({
               <button
                 onClick={() => {
                   setOpenDropdownId(null);
-                  setProjectView("all");
+                  // Toggle: if already "all", go back to "recent", otherwise set to "all"
+                  setProjectView(projectView === "all" ? "recent" : "all");
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -595,7 +591,8 @@ function ProjectSidebarComponent({
               <button
                 onClick={() => {
                   setOpenDropdownId(null);
-                  setProjectView("starred");
+                  // Toggle: if already "starred", go back to "recent", otherwise set to "starred"
+                  setProjectView(projectView === "starred" ? "recent" : "starred");
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -608,7 +605,7 @@ function ProjectSidebarComponent({
                 Starred
               </button>
 
-              {/* Recent Projects - Always visible, shows only when view is "recent" */}
+              {/* Recent Projects - Only show when not viewing All or Starred */}
               {projectView === "recent" && (
                 <div className="pt-4">
                   <button
@@ -642,19 +639,19 @@ function ProjectSidebarComponent({
                             <Link
                               to={`/workspace?conversationId=${project.id}`}
                               className={cn(
-                                "flex items-center gap-3 pl-6 pr-2 py-2 rounded-lg text-sm transition-colors",
+                                "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors",
                                 currentProjectId === project.id
                                   ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
                                   : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                               )}
                               onClick={() => setOpenDropdownId(null)}
                             >
-                                <ChatTeardropDots className="w-5 h-5" />
+                                <ChatTeardropDots className="w-5 h-5 shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <div className="truncate font-medium text-sm flex items-center gap-2">
                                   {project.title || "Untitled Project"}
                                   {project.starred && (
-                                    <Star className="w-3 h-3 fill-current text-yellow-400" />
+                                    <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
                                   )}
                                 </div>
                                 <div className="text-[10px] text-white/30">
@@ -670,13 +667,13 @@ function ProjectSidebarComponent({
                             >
                               <DropdownMenuTrigger asChild>
                                 <button
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
                                   }}
                                 >
-                                  <DotsThreeOutline className="w-5 h-5 text-white/50" />
+                                  <DotsThreeOutline className="w-5 h-5 text-white/60 hover:text-white" />
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent
@@ -684,17 +681,17 @@ function ProjectSidebarComponent({
                                 className="w-40 bg-[#1a1a1a] border-white/10"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleStarToggle(project.id);
-                                  setOpenDropdownId(null);
-                                }}
-                                className="gap-2 cursor-pointer"
-                              >
-                                <Star className={cn("w-5 h-5", project.starred && "fill-current")} />
-                                {project.starred ? "Unstar" : "Star"}
-                              </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStarToggle(project.id);
+                                    setOpenDropdownId(null);
+                                  }}
+                                  className="gap-2 cursor-pointer"
+                                >
+                                  <Star className={cn("w-5 h-5", project.starred && "fill-current")} />
+                                  {project.starred ? "Unstar" : "Star"}
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -717,93 +714,193 @@ function ProjectSidebarComponent({
                 </div>
               )}
 
-              {/* All Projects or Starred Projects */}
-              {(projectView === "all" || projectView === "starred") && (
-                <div className="pt-4 space-y-0.5">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
-                    </div>
-                  ) : displayedProjects.length === 0 ? (
-                    <p className="px-3 py-2 text-xs text-white/30">
-                      {projectView === "starred" ? "No starred projects yet" : "No projects yet"}
-                    </p>
-                  ) : (
-                    displayedProjects.map((project) => (
-                      <div key={project.id} className="group relative">
-                        <Link
-                          to={`/workspace?conversationId=${project.id}`}
-                          className={cn(
-                            "flex items-center gap-3 pl-6 pr-2 py-2 rounded-lg text-sm transition-colors",
-                            currentProjectId === project.id
-                              ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
-                              : "text-white/60 hover:text-white hover:bg-white/[0.04]"
-                          )}
-                          onClick={() => setOpenDropdownId(null)}
-                        >
-                            <ChatTeardropDots className="w-5 h-5" />
-                          <div className="flex-1 min-w-0">
-                            <div className="truncate font-medium text-sm flex items-center gap-2">
-                              {project.title || "Untitled Project"}
-                              {project.starred && (
-                                <Star className="w-3 h-3 fill-current text-yellow-400" />
-                              )}
-                            </div>
-                            <div className="text-[10px] text-white/30">
-                              {formatDate(project.updatedAt)}
-                            </div>
-                          </div>
-                        </Link>
-
-                        {/* Actions Menu */}
-                        <DropdownMenu
-                          open={openDropdownId === project.id}
-                          onOpenChange={(open) => setOpenDropdownId(open ? project.id : null)}
-                        >
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                            >
-                              <DotsThreeOutline className="w-5 h-5 text-white/50" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="w-40 bg-[#1a1a1a] border-white/10"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleStarToggle(project.id);
-                                setOpenDropdownId(null);
-                              }}
-                              className="gap-2 cursor-pointer"
-                            >
-                              <Star className={cn("w-5 h-5", project.starred && "fill-current")} />
-                              {project.starred ? "Unstar" : "Star"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setProjectToDelete(project);
-                                setDeleteDialogOpen(true);
-                                setOpenDropdownId(null);
-                              }}
-                              className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
-                            >
-                              <Trash className="w-5 h-5" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+              {/* All Projects - Show when selected */}
+              {projectView === "all" && (
+                <div className="pt-4">
+                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1">
+                    All Projects
+                  </div>
+                  <div className="space-y-0.5">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
                       </div>
-                    ))
-                  )}
+                    ) : displayedProjects.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-white/30">
+                        No projects yet
+                      </p>
+                    ) : (
+                      displayedProjects.map((project) => (
+                        <div key={project.id} className="group relative">
+                          <Link
+                            to={`/workspace?conversationId=${project.id}`}
+                            className={cn(
+                              "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors",
+                              currentProjectId === project.id
+                                ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
+                                : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                            )}
+                            onClick={() => setOpenDropdownId(null)}
+                          >
+                              <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="truncate font-medium text-sm flex items-center gap-2">
+                                {project.title || "Untitled Project"}
+                                {project.starred && (
+                                  <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
+                                )}
+                              </div>
+                              <div className="text-[10px] text-white/30">
+                                {formatDate(project.updatedAt)}
+                              </div>
+                            </div>
+                          </Link>
+
+                          {/* Actions Menu */}
+                          <DropdownMenu
+                            open={openDropdownId === project.id}
+                            onOpenChange={(open) => setOpenDropdownId(open ? project.id : null)}
+                          >
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                              >
+                                <DotsThreeOutline className="w-5 h-5 text-white/60 hover:text-white" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-40 bg-[#1a1a1a] border-white/10"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStarToggle(project.id);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="gap-2 cursor-pointer"
+                              >
+                                <Star className={cn("w-5 h-5", project.starred && "fill-current")} />
+                                {project.starred ? "Unstar" : "Star"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setProjectToDelete(project);
+                                  setDeleteDialogOpen(true);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
+                              >
+                                <Trash className="w-5 h-5" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Starred Projects - Show when selected */}
+              {projectView === "starred" && (
+                <div className="pt-4">
+                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1">
+                    Starred Projects
+                  </div>
+                  <div className="space-y-0.5">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
+                      </div>
+                    ) : displayedProjects.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-white/30">
+                        No starred projects yet
+                      </p>
+                    ) : (
+                      displayedProjects.map((project) => (
+                        <div key={project.id} className="group relative">
+                          <Link
+                            to={`/workspace?conversationId=${project.id}`}
+                            className={cn(
+                              "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors",
+                              currentProjectId === project.id
+                                ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
+                                : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                            )}
+                            onClick={() => setOpenDropdownId(null)}
+                          >
+                              <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="truncate font-medium text-sm flex items-center gap-2">
+                                {project.title || "Untitled Project"}
+                                {project.starred && (
+                                  <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
+                                )}
+                              </div>
+                              <div className="text-[10px] text-white/30">
+                                {formatDate(project.updatedAt)}
+                              </div>
+                            </div>
+                          </Link>
+
+                          {/* Actions Menu */}
+                          <DropdownMenu
+                            open={openDropdownId === project.id}
+                            onOpenChange={(open) => setOpenDropdownId(open ? project.id : null)}
+                          >
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                              >
+                                <DotsThreeOutline className="w-5 h-5 text-white/60 hover:text-white" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-40 bg-[#1a1a1a] border-white/10"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStarToggle(project.id);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="gap-2 cursor-pointer"
+                              >
+                                <Star className={cn("w-5 h-5", project.starred && "fill-current")} />
+                                {project.starred ? "Unstar" : "Star"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setProjectToDelete(project);
+                                  setDeleteDialogOpen(true);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
+                              >
+                                <Trash className="w-5 h-5" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
 
