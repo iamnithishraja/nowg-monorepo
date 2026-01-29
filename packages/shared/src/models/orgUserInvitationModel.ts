@@ -1,5 +1,19 @@
-import { randomBytes } from "crypto";
 import mongoose from "mongoose";
+
+// Generate a random hex token - works in both Node.js and browser environments
+function generateRandomToken(): string {
+  // Use crypto.randomUUID if available (Node 14.17+ and modern browsers)
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+  }
+  // Fallback for older environments
+  const chars = "0123456789abcdef";
+  let result = "";
+  for (let i = 0; i < 64; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return result;
+}
 
 // Schema definition for reuse
 export const orgUserInvitationSchemaDefinition = {
@@ -31,7 +45,7 @@ export const orgUserInvitationSchemaDefinition = {
     required: false, // Not required to allow clearing after acceptance
     unique: true,
     sparse: true, // Allow multiple null values (unique only for non-null values)
-    default: () => randomBytes(32).toString("hex"),
+    default: generateRandomToken,
   },
   // Status
   status: {
