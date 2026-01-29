@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import type { LoaderFunctionArgs } from "react-router";
+import { redirect } from "react-router";
 import {
   MessageSquare,
   FolderKanban,
@@ -14,6 +16,7 @@ import {
   CreditCard,
   DollarSign,
 } from "lucide-react";
+import { auth } from "../lib/auth";
 import {
   Card,
   CardContent,
@@ -23,7 +26,7 @@ import {
 } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { SidebarProvider } from "../components/ui/sidebar";
-import { AppSidebar } from "../components/AppSidebar";
+import { ProjectSidebar } from "../components/ProjectSidebar";
 import { Header } from "../components";
 import Background from "../components/Background";
 import { Input } from "../components/ui/input";
@@ -54,7 +57,21 @@ interface Conversation {
   } | null;
 }
 
-export default function ManageOrgConvo() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  const authInstance = await auth;
+  const session = await authInstance.api.getSession({
+    headers: request.headers,
+  });
+
+  if (!session) {
+    throw redirect("/");
+  }
+
+  return { user: session.user };
+}
+
+export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: any } }) {
+  const user = loaderData?.user;
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [organizations, setOrganizations] = useState<
@@ -529,7 +546,7 @@ export default function ManageOrgConvo() {
         </div>
 
         {/* Left Sidebar */}
-        <AppSidebar className="flex-shrink-0" />
+        <ProjectSidebar user={user} className="flex-shrink-0" />
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">

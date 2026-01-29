@@ -13,7 +13,7 @@ import * as React from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate } from "react-router";
 import { Header } from "~/components";
-import { AppSidebar } from "~/components/AppSidebar";
+import { ProjectSidebar } from "~/components/ProjectSidebar";
 import Background from "~/components/Background";
 import { TeamOnboardingDialog } from "~/components/TeamOnboardingDialog";
 import { Button } from "~/components/ui/button";
@@ -39,7 +39,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
 
     if (!session?.user?.id) {
-      return { teams: [], invitations: [] };
+      return { teams: [], invitations: [], user: session?.user || null };
     }
 
     await connectToDatabase();
@@ -96,16 +96,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
         invitedAt: inv.invitedAt,
         expiresAt: inv.expiresAt,
       })),
+      user: session.user,
     };
   } catch (error) {
     console.error("Teams loader error:", error);
-    return { teams: [], invitations: [] };
+    const authInstance = await auth;
+    const session = await authInstance.api.getSession({
+      headers: request.headers,
+    });
+    return { teams: [], invitations: [], user: session?.user || null };
   }
 }
 
 export default function TeamsPage() {
-  const { teams: initialTeams, invitations: initialInvitations } =
-    useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>();
+  const { teams: initialTeams, invitations: initialInvitations } = loaderData;
+  const user = loaderData.user;
   const [teams, setTeams] = React.useState(initialTeams);
   const [invitations, setInvitations] = React.useState(initialInvitations);
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
@@ -251,7 +257,7 @@ export default function TeamsPage() {
           <Background />
         </div>
 
-        <AppSidebar className="shrink-0" />
+        <ProjectSidebar user={user} className="shrink-0" />
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header showAuthButtons={false} showSidebarToggle={true} />

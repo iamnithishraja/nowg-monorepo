@@ -27,7 +27,7 @@ import {
 } from "recharts";
 import { Header } from "../components";
 import { AnalyticsSkeleton } from "../components/AnalyticsSkeleton";
-import { AppSidebar } from "../components/AppSidebar";
+import { ProjectSidebar } from "../components/ProjectSidebar";
 import Background from "../components/Background";
 import { Button } from "../components/ui/button";
 import {
@@ -62,7 +62,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   // Return empty data - we'll fetch on client side to show skeleton immediately
-  return { analyticsData: null };
+  return { analyticsData: null, user: session.user };
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -72,7 +72,8 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-function AnalyticsContent() {
+function AnalyticsContent({ loaderData }: { loaderData?: { user?: any } }) {
+  const user = loaderData?.user;
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d">("30d");
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState({
@@ -261,8 +262,8 @@ function AnalyticsContent() {
           <Background />
         </div>
 
-        {/* Left Sidebar - AppSidebar */}
-        <AppSidebar className="flex-shrink-0" />
+        {/* Left Sidebar - ProjectSidebar */}
+        <ProjectSidebar user={user} className="flex-shrink-0" />
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -904,6 +905,6 @@ function AnalyticsContent() {
   );
 }
 
-export default function Analytics() {
-  return <AnalyticsContent />;
+export default function Analytics({ loaderData }: Route.ComponentProps) {
+  return <AnalyticsContent loaderData={loaderData} />;
 }

@@ -207,16 +207,6 @@ export function ProjectCard({
               <Users className="h-4 w-4 mr-2 text-secondary" weight="fill" />
               <span>Manage Team Members</span>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/admin/projects/${project.id}/wallet`);
-              }}
-              className="cursor-pointer"
-            >
-              <Wallet className="h-4 w-4 mr-2 text-secondary" weight="fill" />
-              <span>View Project Wallet</span>
-            </DropdownMenuItem>
             {!isProjectAdmin && (
               <>
                 <DropdownMenuSeparator className="bg-subtle" />
