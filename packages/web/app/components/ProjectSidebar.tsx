@@ -17,7 +17,7 @@ import {
   Star,
   Trash,
   User,
-  Warning
+  Warning,
 } from "@phosphor-icons/react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
@@ -69,7 +69,10 @@ interface UserAvatarProps {
   imageUrl?: string;
 }
 
-const UserAvatar = memo(function UserAvatar({ displayName, imageUrl }: UserAvatarProps) {
+const UserAvatar = memo(function UserAvatar({
+  displayName,
+  imageUrl,
+}: UserAvatarProps) {
   const [broken, setBroken] = useState(false);
 
   if (imageUrl && !broken) {
@@ -131,7 +134,9 @@ function ProjectSidebarComponent({
     useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [recentProjectsExpanded, setRecentProjectsExpanded] = useState(true);
-  const [projectView, setProjectView] = useState<"recent" | "all" | "starred">("recent");
+  const [projectView, setProjectView] = useState<"recent" | "all" | "starred">(
+    "recent"
+  );
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   // Edit/Delete state
@@ -141,8 +146,8 @@ function ProjectSidebarComponent({
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const currentProjectId = useMemo(() => 
-    new URLSearchParams(location.search).get("conversationId"),
+  const currentProjectId = useMemo(
+    () => new URLSearchParams(location.search).get("conversationId"),
     [location.search]
   );
 
@@ -162,7 +167,8 @@ function ProjectSidebarComponent({
 
     if (openDropdownId) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [openDropdownId]);
 
@@ -285,45 +291,54 @@ function ProjectSidebarComponent({
   }, []);
 
   // Filter projects based on selected workspace - MEMOIZED
-  const filteredProjects = useMemo(() => 
-    projects.filter((p) => {
-      if (selectedWorkspace === "personal") {
-        return p.type === "personal";
-      }
-      return p.type === "organization" && p.organizationId === selectedWorkspace;
-    }),
+  const filteredProjects = useMemo(
+    () =>
+      projects.filter((p) => {
+        if (selectedWorkspace === "personal") {
+          return p.type === "personal";
+        }
+        return (
+          p.type === "organization" && p.organizationId === selectedWorkspace
+        );
+      }),
     [projects, selectedWorkspace]
   );
 
   // Helper to check if project is starred
-  const isProjectStarred = useCallback((projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    return project?.starred || false;
-  }, [projects]);
+  const isProjectStarred = useCallback(
+    (projectId: string) => {
+      const project = projects.find((p) => p.id === projectId);
+      return project?.starred || false;
+    },
+    [projects]
+  );
 
   // Get recent projects (last 5) - MEMOIZED (for display in recent section)
-  const recentProjects = useMemo(() => 
-    [...filteredProjects]
-      .sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      )
-      .slice(0, 5),
+  const recentProjects = useMemo(
+    () =>
+      [...filteredProjects]
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
+        .slice(0, 5),
     [filteredProjects]
   );
 
   // Get projects based on view - MEMOIZED
   const displayedProjects = useMemo(() => {
     let projectsToShow = [...filteredProjects];
-    
+
     if (projectView === "starred") {
-      projectsToShow = projectsToShow.filter(p => p.starred === true);
+      projectsToShow = projectsToShow.filter((p) => p.starred === true);
     } else if (projectView === "all") {
       // Show ALL projects sorted by date
-      projectsToShow = projectsToShow
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      projectsToShow = projectsToShow.sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
     }
-    
+
     return projectsToShow;
   }, [filteredProjects, projectView]);
 
@@ -369,28 +384,31 @@ function ProjectSidebarComponent({
   }, []);
 
   // Handle project delete - MEMOIZED
-  const handleDelete = useCallback(async (projectId: string) => {
-    setIsDeleting(true);
-    try {
-      const response = await fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", conversationId: projectId }),
-      });
-      if (response.ok) {
-        setProjects((prev) => prev.filter((p) => p.id !== projectId));
-        setDeleteDialogOpen(false);
-        setProjectToDelete(null);
-        if (projectId === currentProjectId) {
-          navigate("/home");
+  const handleDelete = useCallback(
+    async (projectId: string) => {
+      setIsDeleting(true);
+      try {
+        const response = await fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "delete", conversationId: projectId }),
+        });
+        if (response.ok) {
+          setProjects((prev) => prev.filter((p) => p.id !== projectId));
+          setDeleteDialogOpen(false);
+          setProjectToDelete(null);
+          if (projectId === currentProjectId) {
+            navigate("/home");
+          }
         }
+      } catch (err) {
+        console.error("Error deleting project:", err);
+      } finally {
+        setIsDeleting(false);
       }
-    } catch (err) {
-      console.error("Error deleting project:", err);
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [currentProjectId, navigate]);
+    },
+    [currentProjectId, navigate]
+  );
 
   // Handle star/unstar project - MEMOIZED
   const handleStarToggle = useCallback(async (projectId: string) => {
@@ -409,7 +427,7 @@ function ProjectSidebarComponent({
       }
 
       const data = await response.json();
-      
+
       // Update local state
       setProjects((prev) =>
         prev.map((p) =>
@@ -422,10 +440,13 @@ function ProjectSidebarComponent({
   }, []);
 
   // Memoize user avatar props
-  const avatarProps = useMemo(() => ({
-    displayName: user?.name || user?.email,
-    imageUrl: user?.image,
-  }), [user?.name, user?.email, user?.image]);
+  const avatarProps = useMemo(
+    () => ({
+      displayName: user?.name || user?.email,
+      imageUrl: user?.image,
+    }),
+    [user?.name, user?.email, user?.image]
+  );
 
   return (
     <>
@@ -435,8 +456,8 @@ function ProjectSidebarComponent({
           isWorkspace && isCollapsed
             ? "w-0 overflow-hidden border-r-0"
             : isCollapsed
-            ? "w-16 overflow-hidden"
-            : "w-60 overflow-hidden",
+              ? "w-16 overflow-hidden"
+              : "w-60 overflow-hidden",
           className
         )}
       >
@@ -592,7 +613,9 @@ function ProjectSidebarComponent({
                 onClick={() => {
                   setOpenDropdownId(null);
                   // Toggle: if already "starred", go back to "recent", otherwise set to "starred"
-                  setProjectView(projectView === "starred" ? "recent" : "starred");
+                  setProjectView(
+                    projectView === "starred" ? "recent" : "starred"
+                  );
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -601,7 +624,12 @@ function ProjectSidebarComponent({
                     : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                 )}
               >
-                <Star className={cn("w-4 h-4", projectView === "starred" && "fill-current")} />
+                <Star
+                  className={cn(
+                    "w-4 h-4",
+                    projectView === "starred" && "fill-current"
+                  )}
+                />
                 Starred
               </button>
 
@@ -635,26 +663,31 @@ function ProjectSidebarComponent({
                         </p>
                       ) : (
                         recentProjects.map((project) => (
-                          <div key={project.id} className="group relative">
+                          <div
+                            key={project.id}
+                            className="group relative max-w-54"
+                          >
                             <Link
                               to={`/workspace?conversationId=${project.id}`}
                               className={cn(
-                                "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors",
+                                "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
                                 currentProjectId === project.id
                                   ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
                                   : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                               )}
                               onClick={() => setOpenDropdownId(null)}
                             >
-                                <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                              <ChatTeardropDots className="w-5 h-5 shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <div className="truncate font-medium text-sm flex items-center gap-2">
-                                  {project.title || "Untitled Project"}
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="truncate font-medium text-sm block">
+                                    {project.title || "Untitled Project"}
+                                  </span>
                                   {project.starred && (
                                     <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
                                   )}
                                 </div>
-                                <div className="text-[10px] text-white/30">
+                                <div className="text-[10px] text-white/30 truncate">
                                   {formatDate(project.updatedAt)}
                                 </div>
                               </div>
@@ -663,17 +696,19 @@ function ProjectSidebarComponent({
                             {/* Actions Menu */}
                             <DropdownMenu
                               open={openDropdownId === project.id}
-                              onOpenChange={(open) => setOpenDropdownId(open ? project.id : null)}
+                              onOpenChange={(open) =>
+                                setOpenDropdownId(open ? project.id : null)
+                              }
                             >
                               <DropdownMenuTrigger asChild>
                                 <button
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
                                   }}
                                 >
-                                  <DotsThreeOutline className="w-5 h-5 text-white/60 hover:text-white" />
+                                  <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent
@@ -689,7 +724,12 @@ function ProjectSidebarComponent({
                                   }}
                                   className="gap-2 cursor-pointer"
                                 >
-                                  <Star className={cn("w-5 h-5", project.starred && "fill-current")} />
+                                  <Star
+                                    className={cn(
+                                      "w-5 h-5",
+                                      project.starred && "fill-current"
+                                    )}
+                                  />
                                   {project.starred ? "Unstar" : "Star"}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
@@ -731,26 +771,31 @@ function ProjectSidebarComponent({
                       </p>
                     ) : (
                       displayedProjects.map((project) => (
-                        <div key={project.id} className="group relative">
+                        <div
+                          key={project.id}
+                          className="group relative max-w-full"
+                        >
                           <Link
                             to={`/workspace?conversationId=${project.id}`}
                             className={cn(
-                              "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors",
+                              "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
                               currentProjectId === project.id
                                 ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
                                 : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                             )}
                             onClick={() => setOpenDropdownId(null)}
                           >
-                              <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                            <ChatTeardropDots className="w-5 h-5 shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <div className="truncate font-medium text-sm flex items-center gap-2">
-                                {project.title || "Untitled Project"}
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="truncate font-medium text-sm block">
+                                  {project.title || "Untitled Project"}
+                                </span>
                                 {project.starred && (
                                   <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
                                 )}
                               </div>
-                              <div className="text-[10px] text-white/30">
+                              <div className="text-[10px] text-white/30 truncate">
                                 {formatDate(project.updatedAt)}
                               </div>
                             </div>
@@ -759,17 +804,19 @@ function ProjectSidebarComponent({
                           {/* Actions Menu */}
                           <DropdownMenu
                             open={openDropdownId === project.id}
-                            onOpenChange={(open) => setOpenDropdownId(open ? project.id : null)}
+                            onOpenChange={(open) =>
+                              setOpenDropdownId(open ? project.id : null)
+                            }
                           >
                             <DropdownMenuTrigger asChild>
                               <button
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
                                 }}
                               >
-                                <DotsThreeOutline className="w-5 h-5 text-white/60 hover:text-white" />
+                                <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
@@ -785,7 +832,12 @@ function ProjectSidebarComponent({
                                 }}
                                 className="gap-2 cursor-pointer"
                               >
-                                <Star className={cn("w-5 h-5", project.starred && "fill-current")} />
+                                <Star
+                                  className={cn(
+                                    "w-5 h-5",
+                                    project.starred && "fill-current"
+                                  )}
+                                />
                                 {project.starred ? "Unstar" : "Star"}
                               </DropdownMenuItem>
                               <DropdownMenuItem
@@ -826,26 +878,31 @@ function ProjectSidebarComponent({
                       </p>
                     ) : (
                       displayedProjects.map((project) => (
-                        <div key={project.id} className="group relative">
+                        <div
+                          key={project.id}
+                          className="group relative max-w-full"
+                        >
                           <Link
                             to={`/workspace?conversationId=${project.id}`}
                             className={cn(
-                              "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors",
+                              "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
                               currentProjectId === project.id
                                 ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
                                 : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                             )}
                             onClick={() => setOpenDropdownId(null)}
                           >
-                              <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                            <ChatTeardropDots className="w-5 h-5 shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <div className="truncate font-medium text-sm flex items-center gap-2">
-                                {project.title || "Untitled Project"}
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="truncate font-medium text-sm block">
+                                  {project.title || "Untitled Project"}
+                                </span>
                                 {project.starred && (
                                   <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
                                 )}
                               </div>
-                              <div className="text-[10px] text-white/30">
+                              <div className="text-[10px] text-white/30 truncate">
                                 {formatDate(project.updatedAt)}
                               </div>
                             </div>
@@ -854,17 +911,19 @@ function ProjectSidebarComponent({
                           {/* Actions Menu */}
                           <DropdownMenu
                             open={openDropdownId === project.id}
-                            onOpenChange={(open) => setOpenDropdownId(open ? project.id : null)}
+                            onOpenChange={(open) =>
+                              setOpenDropdownId(open ? project.id : null)
+                            }
                           >
                             <DropdownMenuTrigger asChild>
                               <button
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
                                 }}
                               >
-                                <DotsThreeOutline className="w-5 h-5 text-white/60 hover:text-white" />
+                                <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
@@ -880,7 +939,12 @@ function ProjectSidebarComponent({
                                 }}
                                 className="gap-2 cursor-pointer"
                               >
-                                <Star className={cn("w-5 h-5", project.starred && "fill-current")} />
+                                <Star
+                                  className={cn(
+                                    "w-5 h-5",
+                                    project.starred && "fill-current"
+                                  )}
+                                />
                                 {project.starred ? "Unstar" : "Star"}
                               </DropdownMenuItem>
                               <DropdownMenuItem
@@ -950,7 +1014,10 @@ function ProjectSidebarComponent({
               onClick={() => navigate("/profile")}
               className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/4 transition-colors"
             >
-              <UserAvatar displayName={avatarProps.displayName} imageUrl={avatarProps.imageUrl} />
+              <UserAvatar
+                displayName={avatarProps.displayName}
+                imageUrl={avatarProps.imageUrl}
+              />
               {!isCollapsed && (
                 <span className="text-sm text-white/70 truncate max-w-30">
                   {user?.name || user?.email || "User"}
