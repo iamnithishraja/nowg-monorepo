@@ -23,16 +23,16 @@ import { isWhitelistedEmail } from "~/lib/stripe";
 
 /**
  * Agent API Endpoint
- * 
+ *
  * This endpoint provides an agentic loop with tool calling support.
  * Tools are defined on the server but executed on the frontend via WebContainer.
- * 
+ *
  * Tool Categories:
  * - AUTO_CONTINUE: Read-only tools (read, grep, ls, glob, codesearch, lsp)
  *   These run in a loop - frontend executes and automatically continues
  * - REQUIRES_ACK: Write/action tools (edit, write, multiedit, bash, webfetch, websearch, batch)
  *   These require frontend acknowledgement before continuing
- * 
+ *
  * The flow:
  * 1. Client sends prompt + conversation history + files context
  * 2. Server runs LLM with tool definitions
@@ -41,7 +41,7 @@ import { isWhitelistedEmail } from "~/lib/stripe";
  * 5. For AUTO_CONTINUE tools: Client sends results back immediately to continue loop
  * 6. For REQUIRES_ACK tools: Client waits for user acknowledgement, then hits endpoint
  * 7. Loop continues until no more tool calls
- * 
+ *
  * Event types streamed:
  * - session_start: Session initialized with ID
  * - text_delta: Incremental text from LLM
@@ -60,7 +60,15 @@ export const TOOL_CATEGORIES = {
   /** Read-only tools that auto-continue the loop */
   AUTO_CONTINUE: new Set(["read", "grep", "ls", "glob", "codesearch", "lsp"]),
   /** Action tools that require acknowledgement */
-  REQUIRES_ACK: new Set(["edit", "write", "multiedit", "bash", "webfetch", "websearch", "batch"]),
+  REQUIRES_ACK: new Set([
+    "edit",
+    "write",
+    "multiedit",
+    "bash",
+    "webfetch",
+    "websearch",
+    "batch",
+  ]),
 } as const;
 
 /**
@@ -91,13 +99,13 @@ interface ToolResult {
 /**
  * Request types for the agent endpoint
  */
-type RequestType = 
-  | "prompt"           // Initial user prompt
-  | "tool_results"     // Tool results from auto-continue tools
+type RequestType =
+  | "prompt" // Initial user prompt
+  | "tool_results" // Tool results from auto-continue tools
   | "acknowledgement"; // Acknowledgement for action tools
 
 interface AgentRequest {
-  /** 
+  /**
    * Request type:
    * - "prompt": New user prompt (default)
    * - "tool_results": Results from auto-continue tools (frontend auto-sends)
@@ -171,31 +179,240 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Check if user is whitelisted (developers etc.)
     const isWhitelisted = isWhitelistedEmail(userEmail);
-    
+
+    // ========== BALANCE CHECK BEFORE PROCESSING ==========
+    // Check balance - same logic as main chat API
+    if (!isWhitelisted && conversationId) {
+      try {
+        await connectToDatabase();
+
+        // Load conversation to determine wallet type
+        const conversationDoc = await Conversation.findById(conversationId);
+
+        if (!conversationDoc) {
+          return new Response(
+            JSON.stringify({ error: "Conversation not found" }),
+            { status: 404, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check if this is an organization/project conversation (has adminProjectId)
+        if (conversationDoc.adminProjectId) {
+          // Get project ID from adminProjectId (handle both ObjectId and populated object)
+          let projectId: any;
+          if (
+            conversationDoc.adminProjectId instanceof mongoose.Types.ObjectId
+          ) {
+            projectId = conversationDoc.adminProjectId;
+          } else if (typeof conversationDoc.adminProjectId === "string") {
+            projectId = new mongoose.Types.ObjectId(
+              conversationDoc.adminProjectId
+            );
+          } else if ((conversationDoc.adminProjectId as any)._id) {
+            projectId =
+              (conversationDoc.adminProjectId as any)._id instanceof
+              mongoose.Types.ObjectId
+                ? (conversationDoc.adminProjectId as any)._id
+                : new mongoose.Types.ObjectId(
+                    (conversationDoc.adminProjectId as any)._id
+                  );
+          } else {
+            projectId = new mongoose.Types.ObjectId(
+              conversationDoc.adminProjectId as string
+            );
+          }
+
+          // Get project to access organizationId
+          const project = await Project.findById(projectId).lean();
+          if (!project) {
+            return new Response(
+              JSON.stringify({ error: "Project not found" }),
+              { status: 404, headers: { "Content-Type": "application/json" } }
+            );
+          }
+
+          // Check user project wallet limit if set
+          const userProjectWallet = await UserProjectWallet.findOne({
+            userId: userId,
+            projectId: projectId,
+          });
+
+          if (userProjectWallet) {
+            if (
+              userProjectWallet.limit !== null &&
+              userProjectWallet.limit !== undefined
+            ) {
+              if (
+                (userProjectWallet.currentSpending || 0) >=
+                userProjectWallet.limit
+              ) {
+                return new Response(
+                  JSON.stringify({
+                    error:
+                      "You have reached your spending limit for this project. Your limit is fully used. Please ask your project admin to increase your limit.",
+                    errorType: "user_limit_exceeded",
+                    requiresRecharge: true,
+                    currentSpending: userProjectWallet.currentSpending || 0,
+                    limit: userProjectWallet.limit,
+                  }),
+                  {
+                    status: 402,
+                    headers: { "Content-Type": "application/json" },
+                  }
+                );
+              }
+            }
+          }
+
+          // Check project wallet balance (OrgProjectWallet)
+          const projectWallet = await OrgProjectWallet.findOne({
+            projectId: projectId,
+          });
+
+          if (!projectWallet) {
+            return new Response(
+              JSON.stringify({
+                error:
+                  "Project wallet not found. Please ask your organization or project admin to create and add funds to the project wallet.",
+                errorType: "project_wallet_not_found",
+                requiresRecharge: true,
+              }),
+              { status: 402, headers: { "Content-Type": "application/json" } }
+            );
+          }
+
+          // Check project wallet balance - requires at least $1 minimum
+          if ((projectWallet.balance || 0) < 1) {
+            return new Response(
+              JSON.stringify({
+                error:
+                  "Project wallet has insufficient balance. Please ask your organization or project admin to add funds to the project wallet. A minimum balance of $1 is required.",
+                errorType: "project_wallet_empty",
+                balance: projectWallet.balance || 0,
+                requiresRecharge: true,
+              }),
+              { status: 402, headers: { "Content-Type": "application/json" } }
+            );
+          }
+        } else if (
+          conversationDoc.teamId &&
+          conversationDoc.projectType === "team"
+        ) {
+          // Team project - check team wallet
+          const team = await Team.findById(conversationDoc.teamId);
+          const membership = await TeamMember.findOne({
+            teamId: conversationDoc.teamId,
+            userId: userId,
+            status: "active",
+          });
+
+          if (!team || !membership) {
+            return new Response(
+              JSON.stringify({ error: "Team or membership not found" }),
+              { status: 404, headers: { "Content-Type": "application/json" } }
+            );
+          }
+
+          // Check member wallet limit if set
+          if (
+            membership.walletLimit !== null &&
+            membership.walletLimit !== undefined
+          ) {
+            if ((membership.currentSpending || 0) >= membership.walletLimit) {
+              return new Response(
+                JSON.stringify({
+                  error: "You have reached your wallet limit for this team",
+                  errorType: "user_limit_exceeded",
+                  requiresRecharge: true,
+                }),
+                { status: 402, headers: { "Content-Type": "application/json" } }
+              );
+            }
+          }
+
+          // Check team wallet balance - requires at least $1 minimum
+          if ((team.balance || 0) < 1) {
+            return new Response(
+              JSON.stringify({
+                error:
+                  "Team wallet has insufficient balance. Please add funds to the team wallet. A minimum balance of $1 is required.",
+                errorType: "team_wallet_empty",
+                balance: team.balance,
+                requiresRecharge: true,
+              }),
+              { status: 402, headers: { "Content-Type": "application/json" } }
+            );
+          }
+        } else {
+          // Personal project - check profile balance
+          const profile = await Profile.findOne({ userId });
+
+          console.log("[Agent API] BALANCE CHECK:", {
+            userId,
+            isWhitelisted,
+            currentBalance: profile?.balance || 0,
+            hasProfile: !!profile,
+          });
+
+          // Check personal wallet balance - requires at least $1 minimum
+          if (!profile || (profile.balance || 0) < 1) {
+            return new Response(
+              JSON.stringify({
+                error:
+                  "Insufficient balance. Please recharge your account. A minimum balance of $1 is required.",
+                errorType: "insufficient_balance",
+                balance: profile?.balance || 0,
+                requiresRecharge: true,
+              }),
+              { status: 402, headers: { "Content-Type": "application/json" } }
+            );
+          }
+        }
+      } catch (e) {
+        // If DB check fails, proceed without blocking to avoid hard outages
+        console.warn("[Agent API] Balance check failed, proceeding:", e);
+      }
+    }
+    // ========== END BALANCE CHECK ==========
+
     // Initialize chat service for message persistence
     const chatService = new ChatService();
 
     // Validate request based on type
     if (requestType === "prompt" && !prompt && inputMessages.length === 0) {
-      console.error("[Agent API] Validation failed: prompt or messages required");
+      console.error(
+        "[Agent API] Validation failed: prompt or messages required"
+      );
       return new Response(
-        JSON.stringify({ error: "prompt or messages required for prompt request" }),
+        JSON.stringify({
+          error: "prompt or messages required for prompt request",
+        }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    if ((requestType === "tool_results" || requestType === "acknowledgement") && 
-        (!toolResults || toolResults.length === 0)) {
+    if (
+      (requestType === "tool_results" || requestType === "acknowledgement") &&
+      (!toolResults || toolResults.length === 0)
+    ) {
       console.error("[Agent API] Validation failed: toolResults required");
       return new Response(
-        JSON.stringify({ error: "toolResults required for tool_results/acknowledgement request" }),
+        JSON.stringify({
+          error:
+            "toolResults required for tool_results/acknowledgement request",
+        }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
     // Check step limit
     if (currentStep >= maxSteps) {
-      console.warn("[Agent API] Max steps reached:", currentStep, ">=", maxSteps);
+      console.warn(
+        "[Agent API] Max steps reached:",
+        currentStep,
+        ">=",
+        maxSteps
+      );
       return new Response(
         JSON.stringify({ error: `Max steps (${maxSteps}) reached` }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -223,14 +440,27 @@ export async function action({ request }: ActionFunctionArgs) {
 
         try {
           // Generate session ID
-          const sessionId = inputSessionId || `agent-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+          const sessionId =
+            inputSessionId ||
+            `agent-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
           const messageId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
           const stepCount = currentStep + 1;
 
-          sendChunk({ type: "session_start", sessionId, messageId, step: stepCount });
+          sendChunk({
+            type: "session_start",
+            sessionId,
+            messageId,
+            step: stepCount,
+          });
 
           // Save user message to database on first step (only for prompt requests)
-          if (requestType === "prompt" && prompt && conversationId && chatId && currentStep === 0) {
+          if (
+            requestType === "prompt" &&
+            prompt &&
+            conversationId &&
+            chatId &&
+            currentStep === 0
+          ) {
             try {
               const result = await chatService.addMessageToChat(
                 conversationId,
@@ -242,14 +472,23 @@ export async function action({ request }: ActionFunctionArgs) {
                 } as any,
                 userId
               );
-              sendChunk({ type: "user_message_saved", messageId: result.messageId });
-              
+              sendChunk({
+                type: "user_message_saved",
+                messageId: result.messageId,
+              });
+
               // If a new chat title was generated (first message), send it to the client
               if (result.chatTitle) {
-                sendChunk({ type: "chat_title_updated", chatTitle: result.chatTitle });
+                sendChunk({
+                  type: "chat_title_updated",
+                  chatTitle: result.chatTitle,
+                });
               }
             } catch (saveError) {
-              console.error("[Agent API] Failed to save user message:", saveError);
+              console.error(
+                "[Agent API] Failed to save user message:",
+                saveError
+              );
               // Don't fail the request, just log the error
             }
           }
@@ -277,50 +516,66 @@ export async function action({ request }: ActionFunctionArgs) {
           // Build messages array
           // Convert inputMessages to proper CoreMessage format, filtering out invalid formats
           const messages: CoreMessage[] = [];
-          
+
           // Process input messages and convert to proper format
           for (const msg of inputMessages) {
             // Handle assistant messages with tool calls
             if (msg.role === "assistant" && Array.isArray(msg.content)) {
-              const hasToolCalls = msg.content.some((item: any) => item.type === "tool-call");
+              const hasToolCalls = msg.content.some(
+                (item: any) => item.type === "tool-call"
+              );
               if (hasToolCalls) {
                 // Extract text content and tool call info for the assistant message
-                const textItem = msg.content.find((item: any) => item.type === "text");
-                const toolCallItems = msg.content.filter((item: any) => item.type === "tool-call");
-                
+                const textItem = msg.content.find(
+                  (item: any) => item.type === "text"
+                );
+                const toolCallItems = msg.content.filter(
+                  (item: any) => item.type === "tool-call"
+                );
+
                 // Build a text representation of what the assistant did
                 // This helps the LLM understand the context of tool results
-                let assistantText = textItem && "text" in textItem ? textItem.text : "";
-                
+                let assistantText =
+                  textItem && "text" in textItem ? textItem.text : "";
+
                 // Add tool call information so LLM knows what tools were called
                 if (toolCallItems.length > 0) {
-                  const toolCallsDesc = toolCallItems.map((tc: any) => 
-                    `- Called tool "${tc.toolName}" (ID: ${tc.toolCallId})`
-                  ).join("\n");
-                  
+                  const toolCallsDesc = toolCallItems
+                    .map(
+                      (tc: any) =>
+                        `- Called tool "${tc.toolName}" (ID: ${tc.toolCallId})`
+                    )
+                    .join("\n");
+
                   if (assistantText) {
                     assistantText += "\n\n[Tool calls made:]\n" + toolCallsDesc;
                   } else {
                     assistantText = "[Tool calls made:]\n" + toolCallsDesc;
                   }
                 }
-                
+
                 if (assistantText) {
                   messages.push({ role: "assistant", content: assistantText });
                 }
                 continue;
               }
             }
-            
+
             // For other messages, ensure content is in correct format
             if (msg.role === "tool" && Array.isArray(msg.content)) {
               // Tool messages should have tool-result format - keep as is if already correct
               messages.push(msg);
-            } else if (typeof msg.content === "string" || Array.isArray(msg.content)) {
+            } else if (
+              typeof msg.content === "string" ||
+              Array.isArray(msg.content)
+            ) {
               // Valid format - user messages with string content, or properly formatted messages
               messages.push(msg);
             } else {
-              console.warn("[Agent API] Skipping message with invalid format:", msg);
+              console.warn(
+                "[Agent API] Skipping message with invalid format:",
+                msg
+              );
             }
           }
 
@@ -330,20 +585,20 @@ export async function action({ request }: ActionFunctionArgs) {
             // This format works better with OpenRouter and various model providers
             // Each tool result is clearly labeled with its tool call ID and name
             const toolResultsParts: string[] = [];
-            
+
             for (const tr of toolResults) {
-              const toolResultContent = tr.result.success 
-                ? tr.result.output 
+              const toolResultContent = tr.result.success
+                ? tr.result.output
                 : `Error: ${tr.result.error || "Tool execution failed"}`;
-              
+
               // Format each tool result with clear identification
               toolResultsParts.push(
                 `=== Tool Result: ${tr.toolName} (ID: ${tr.toolCallId}) ===\n` +
-                `Status: ${tr.result.success ? "Success" : "Error"}\n\n` +
-                toolResultContent
+                  `Status: ${tr.result.success ? "Success" : "Error"}\n\n` +
+                  toolResultContent
               );
             }
-            
+
             // Combine all tool results into a single user message
             // This ensures the LLM sees all results together and can properly
             // associate them with the tool calls it made
@@ -351,10 +606,10 @@ export async function action({ request }: ActionFunctionArgs) {
               role: "user",
               content: toolResultsParts.join("\n\n" + "=".repeat(50) + "\n\n"),
             };
-            
+
             messages.push(combinedToolResults);
           }
-          
+
           // Add the current prompt as user message (only on first call)
           if (prompt && currentStep === 0) {
             messages.push({ role: "user", content: prompt });
@@ -370,61 +625,71 @@ export async function action({ request }: ActionFunctionArgs) {
           }> = [];
 
           console.log("[Agent API] Starting LLM stream with model:", model);
-          
+
           // Collect tool calls as they're generated
           const collectedToolCalls: Array<{
             toolCallId: string;
             toolName: string;
             args: any;
           }> = [];
-          
+
           // Track tool calls that have been announced (sent to frontend)
           const announcedToolCalls = new Set<string>();
-          
+
           // Stream the response (single step - tools run client-side)
           let result;
           try {
             result = streamText({
-            model: openrouter(model),
-            system: systemPrompt,
-            messages,
-            tools,
-            onStepFinish: async (step: any) => {
-              // Capture tool calls from each step and send immediately
-              const stepToolCalls = step.toolCalls || [];
-              for (const toolCall of stepToolCalls) {
-                const args = toolCall.args || (toolCall as any).input || {};
-                const toolCallId = toolCall.toolCallId || toolCall.id;
-                const toolName = toolCall.toolName || toolCall.name;
-                
-                // Only add if not already collected
-                if (!collectedToolCalls.some(tc => tc.toolCallId === toolCallId)) {
-                  collectedToolCalls.push({
-                    toolCallId,
-                    toolName,
-                    args,
-                  });
-                  
-                  // Send tool_call event immediately when step finishes
-                  // This happens before awaiting_tool_results, giving frontend earlier notice
-                  if (!announcedToolCalls.has(toolCallId)) {
-                    announcedToolCalls.add(toolCallId);
-                    sendChunk({
-                      type: "tool_call",
-                      id: toolCallId,
-                      name: toolName,
+              model: openrouter(model),
+              system: systemPrompt,
+              messages,
+              tools,
+              onStepFinish: async (step: any) => {
+                // Capture tool calls from each step and send immediately
+                const stepToolCalls = step.toolCalls || [];
+                for (const toolCall of stepToolCalls) {
+                  const args = toolCall.args || (toolCall as any).input || {};
+                  const toolCallId = toolCall.toolCallId || toolCall.id;
+                  const toolName = toolCall.toolName || toolCall.name;
+
+                  // Only add if not already collected
+                  if (
+                    !collectedToolCalls.some(
+                      (tc) => tc.toolCallId === toolCallId
+                    )
+                  ) {
+                    collectedToolCalls.push({
+                      toolCallId,
+                      toolName,
                       args,
-                      step: stepCount,
-                      category: getToolCategory(toolName),
                     });
+
+                    // Send tool_call event immediately when step finishes
+                    // This happens before awaiting_tool_results, giving frontend earlier notice
+                    if (!announcedToolCalls.has(toolCallId)) {
+                      announcedToolCalls.add(toolCallId);
+                      sendChunk({
+                        type: "tool_call",
+                        id: toolCallId,
+                        name: toolName,
+                        args,
+                        step: stepCount,
+                        category: getToolCategory(toolName),
+                      });
+                    }
                   }
                 }
-              }
-            },
-          });
+              },
+            });
           } catch (streamError) {
-            console.error("[Agent API] Error creating streamText:", streamError);
-            console.error("[Agent API] Messages that caused error:", JSON.stringify(messages, null, 2));
+            console.error(
+              "[Agent API] Error creating streamText:",
+              streamError
+            );
+            console.error(
+              "[Agent API] Messages that caused error:",
+              JSON.stringify(messages, null, 2)
+            );
             throw streamError;
           }
 
@@ -439,9 +704,18 @@ export async function action({ request }: ActionFunctionArgs) {
                 delta,
               });
             }
-            console.log("[Agent API] Text streaming complete:", deltaCount, "deltas |", fullText.length, "chars");
+            console.log(
+              "[Agent API] Text streaming complete:",
+              deltaCount,
+              "deltas |",
+              fullText.length,
+              "chars"
+            );
           } catch (streamError) {
-            console.error("[Agent API] Error during text streaming:", streamError);
+            console.error(
+              "[Agent API] Error during text streaming:",
+              streamError
+            );
             throw streamError;
           }
 
@@ -452,23 +726,28 @@ export async function action({ request }: ActionFunctionArgs) {
               responseToolCalls = collectedToolCalls;
             } else {
               // Fallback to result.toolCalls if available
-              const resultToolCalls = await result.toolCalls || [];
-              responseToolCalls = Array.isArray(resultToolCalls) ? resultToolCalls : [];
+              const resultToolCalls = (await result.toolCalls) || [];
+              responseToolCalls = Array.isArray(resultToolCalls)
+                ? resultToolCalls
+                : [];
             }
           } catch (toolCallsError) {
-            console.error("[Agent API] Error getting tool calls:", toolCallsError);
+            console.error(
+              "[Agent API] Error getting tool calls:",
+              toolCallsError
+            );
             responseToolCalls = collectedToolCalls;
           }
           // Process tool calls and categorize them
           const autoTools: typeof pendingToolCalls = [];
           const ackTools: typeof pendingToolCalls = [];
-          
+
           for (const toolCall of responseToolCalls) {
             const toolName = toolCall.toolName || toolCall.name;
             const toolCallId = toolCall.toolCallId || toolCall.id;
             const args = toolCall.args || {};
             const category = getToolCategory(toolName);
-            
+
             sendChunk({
               type: "tool_call",
               id: toolCallId,
@@ -483,9 +762,9 @@ export async function action({ request }: ActionFunctionArgs) {
               name: toolName,
               args,
             };
-            
+
             pendingToolCalls.push(toolCallInfo);
-            
+
             if (category === "auto") {
               autoTools.push(toolCallInfo);
             } else {
@@ -510,22 +789,33 @@ export async function action({ request }: ActionFunctionArgs) {
           });
 
           // Save assistant message to database if we have conversationId and chatId
-          const tokensUsed = usage ? ((usage as any).totalTokens || 0) : 0;
-          const inputTokens = usage ? ((usage as any).promptTokens || 0) : 0;
-          const outputTokens = usage ? ((usage as any).completionTokens || 0) : 0;
-          
-          if (conversationId && chatId && (fullText || pendingToolCalls.length > 0)) {
+          // Token usage - use same property names as main chat (inputTokens, outputTokens)
+          const tokensUsed = usage?.totalTokens || 0;
+          const inputTokens = usage?.inputTokens || 0;
+          const outputTokens = usage?.outputTokens || 0;
+
+          console.log("[Agent API] Token usage for billing:", {
+            tokensUsed,
+            inputTokens,
+            outputTokens,
+          });
+
+          if (
+            conversationId &&
+            chatId &&
+            (fullText || pendingToolCalls.length > 0)
+          ) {
             try {
               // Notify frontend that R2 sync is starting
               sendChunk({ type: "sync_started" });
-              
+
               const assistantMessageId = await chatService.addMessageToChat(
                 conversationId,
                 chatId,
                 {
                   role: "assistant",
                   content: fullText || "",
-                  toolCalls: pendingToolCalls.map(tc => ({
+                  toolCalls: pendingToolCalls.map((tc) => ({
                     id: tc.id,
                     name: tc.name,
                     args: tc.args,
@@ -539,12 +829,18 @@ export async function action({ request }: ActionFunctionArgs) {
                 } as any,
                 userId
               );
-              
+
               // Notify frontend that R2 sync is complete
               sendChunk({ type: "sync_completed" });
-              sendChunk({ type: "assistant_message_saved", messageId: assistantMessageId });
+              sendChunk({
+                type: "assistant_message_saved",
+                messageId: assistantMessageId,
+              });
             } catch (saveError) {
-              console.error("[Agent API] Failed to save assistant message:", saveError);
+              console.error(
+                "[Agent API] Failed to save assistant message:",
+                saveError
+              );
               // Make sure to complete sync state even on error
               sendChunk({ type: "sync_completed" });
               // Don't fail the request, just log the error
@@ -553,6 +849,13 @@ export async function action({ request }: ActionFunctionArgs) {
 
           // ========== WALLET DEDUCTION LOGIC ==========
           // Deduct from appropriate wallet based on conversation type (same as main chat)
+          console.log("[Agent API] Wallet deduction check:", {
+            inputTokens,
+            outputTokens,
+            conversationId,
+            willDeduct: inputTokens > 0 && outputTokens > 0 && !!conversationId,
+          });
+
           if (inputTokens > 0 && outputTokens > 0 && conversationId) {
             try {
               await connectToDatabase();
@@ -893,9 +1196,9 @@ export async function action({ request }: ActionFunctionArgs) {
               type: "awaiting_tool_results",
               toolCalls: pendingToolCalls,
               // Categorized tool lists for frontend to handle differently
-              autoTools,    // Execute and auto-continue
-              ackTools,     // Execute and wait for user acknowledgement
-              hasAckTools,  // If true, frontend should wait for user ack after executing
+              autoTools, // Execute and auto-continue
+              ackTools, // Execute and wait for user acknowledgement
+              hasAckTools, // If true, frontend should wait for user ack after executing
               hasAutoTools, // If true, frontend should auto-continue with results
               text: fullText,
               step: stepCount,
@@ -903,7 +1206,7 @@ export async function action({ request }: ActionFunctionArgs) {
               // Send messages back so client can continue the conversation
               messages: [...messages, assistantMessageWithToolCalls],
             };
-            
+
             sendChunk(awaitingEvent);
           } else {
             // No tool calls, we're done
@@ -955,9 +1258,9 @@ export async function action({ request }: ActionFunctionArgs) {
       console.error("[Agent API] Fatal error name:", error.name);
     }
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: "Internal Server Error",
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
       }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
