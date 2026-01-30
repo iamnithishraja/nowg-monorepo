@@ -72,7 +72,8 @@ export function useChatHandlers({
       if (chatId && conversationId) {
         try {
           // Import utilities once for this function scope
-          const { loadConversation, convertToUIMessages } =             await import("../../utils/workspaceApi");
+          const { loadConversation, convertToUIMessages } =
+            await import("../../utils/workspaceApi");
 
           // Add user message to UI immediately for better UX
           const userMessage: Message = {
@@ -97,12 +98,11 @@ export function useChatHandlers({
           // Use "general" agent for ask mode, "build" for build mode
           const agentName = chatMode === "ask" ? "general" : "build";
 
-
           // Convert existing chat messages to format the agent API expects
           // Pass the FULL conversation history including complete tool calls and results
           // This ensures the agent has context of all files read, edits made, etc.
           const conversationHistory: any[] = [];
-          
+
           for (const msg of chat.messages) {
             if (msg.role === "user") {
               // User messages - pass full content
@@ -112,28 +112,35 @@ export function useChatHandlers({
               });
             } else if (msg.role === "assistant") {
               const toolCalls = (msg as any).toolCalls;
-              
+
               // If assistant has tool calls, include them with full results
-              if (toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0) {
+              if (
+                toolCalls &&
+                Array.isArray(toolCalls) &&
+                toolCalls.length > 0
+              ) {
                 // Build content with full tool call details and results
                 let fullContent = msg.content || "";
-                
+
                 // Add full tool calls with their complete results
                 const toolCallDetails: string[] = [];
                 for (const tc of toolCalls) {
                   let toolDetail = `\n\n=== Tool Call: ${tc.name} (ID: ${tc.id}) ===\n`;
                   toolDetail += `Arguments: ${JSON.stringify(tc.args, null, 2)}\n`;
-                  
+
                   // Include the FULL result - this is critical for context
                   if (tc.result) {
-                    const resultOutput = tc.result.output || tc.result.error || JSON.stringify(tc.result);
+                    const resultOutput =
+                      tc.result.output ||
+                      tc.result.error ||
+                      JSON.stringify(tc.result);
                     toolDetail += `Result:\n${resultOutput}`;
                   }
                   toolCallDetails.push(toolDetail);
                 }
-                
+
                 fullContent += toolCallDetails.join("\n");
-                
+
                 conversationHistory.push({
                   role: "assistant",
                   content: fullContent,
@@ -147,7 +154,6 @@ export function useChatHandlers({
               }
             }
           }
-
 
           const response = await fetch("/api/agent", {
             method: "POST",
@@ -169,6 +175,20 @@ export function useChatHandlers({
           });
 
           if (!response.ok) {
+            // Handle 402 Payment Required (insufficient balance) errors
+            if (response.status === 402) {
+              const errorData = await response.json().catch(() => ({}));
+              const error = new Error(
+                (errorData as any).error ||
+                  "Insufficient balance. Please recharge your account to continue."
+              ) as any;
+              // Attach error data to the error object for detailed handling
+              error.errorData = errorData;
+              error.errorType =
+                (errorData as any).errorType || "insufficient_balance";
+              throw error;
+            }
+
             const errorText = await response
               .text()
               .catch(() => "Unknown error");
@@ -192,7 +212,7 @@ export function useChatHandlers({
           ): Promise<{ text: string; toolCalls: any[] }> => {
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
-            
+
             // For continuations, start with existing message content to append to
             // This preserves previous text and tool calls in the streaming flow
             let assistantText = "";
@@ -202,10 +222,10 @@ export function useChatHandlers({
                 assistantText = lastMessage.content;
               }
             }
-            
+
             // Use accumulated tool calls passed directly (not relying on React state which is async)
             let allToolCalls: any[] = [...accumulatedToolCalls];
-            
+
             let currentSessionId = sessionId;
             let messagesForContinuation: any[] = [];
 
@@ -249,7 +269,7 @@ export function useChatHandlers({
                     const existingToolCall = allToolCalls.find(
                       (t) => t.id === data.id
                     );
-                    
+
                     if (!existingToolCall) {
                       // New tool call - add it
                       const toolCall = {
@@ -301,7 +321,6 @@ export function useChatHandlers({
                     const autoTools = data.autoTools || [];
                     const ackTools = data.ackTools || [];
                     const allToolsToExecute = [...autoTools, ...ackTools];
-
 
                     // Ensure WebContainer is available before executing tools
                     // WebContainer is booted when runWebContainer is called, but in chats we might not have files
@@ -367,7 +386,11 @@ export function useChatHandlers({
                             )
                           );
                           // Update streaming segments too
-                          chat.updateToolCallInSegments?.(toolCall.id, { status: "executing" as const }, isMountedRef);
+                          chat.updateToolCallInSegments?.(
+                            toolCall.id,
+                            { status: "executing" as const },
+                            isMountedRef
+                          );
                         }
 
                         // Execute with better error context
@@ -401,7 +424,6 @@ export function useChatHandlers({
                               result
                             );
                           }
-
                         } catch (executeError) {
                           console.error(
                             "[ChatHandler] Tool execution failed:",
@@ -440,11 +462,15 @@ export function useChatHandlers({
                             )
                           );
                           // Update streaming segments too
-                          chat.updateToolCallInSegments?.(toolCall.id, { 
-                            status: "completed" as const, 
-                            result, 
-                            endTime 
-                          }, isMountedRef);
+                          chat.updateToolCallInSegments?.(
+                            toolCall.id,
+                            {
+                              status: "completed" as const,
+                              result,
+                              endTime,
+                            },
+                            isMountedRef
+                          );
                         }
 
                         // If this is a file-writing tool (edit, write, multiedit), update UI files state
@@ -599,11 +625,15 @@ export function useChatHandlers({
                             )
                           );
                           // Update streaming segments too
-                          chat.updateToolCallInSegments?.(toolCall.id, { 
-                            status: "error" as const, 
-                            result: errorResult, 
-                            endTime 
-                          }, isMountedRef);
+                          chat.updateToolCallInSegments?.(
+                            toolCall.id,
+                            {
+                              status: "error" as const,
+                              result: errorResult,
+                              endTime,
+                            },
+                            isMountedRef
+                          );
                         }
 
                         toolResults.push({
@@ -622,7 +652,6 @@ export function useChatHandlers({
 
                     // Continue agent loop with tool results
                     if (toolResults.length > 0 && currentStep < 10) {
-
                       const continuationResponse = await fetch("/api/agent", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -645,6 +674,22 @@ export function useChatHandlers({
                       });
 
                       if (!continuationResponse.ok) {
+                        // Handle 402 Payment Required (insufficient balance) errors
+                        if (continuationResponse.status === 402) {
+                          const errorData = await continuationResponse
+                            .json()
+                            .catch(() => ({}));
+                          const error = new Error(
+                            (errorData as any).error ||
+                              "Insufficient balance. Please recharge your account to continue."
+                          ) as any;
+                          error.errorData = errorData;
+                          error.errorType =
+                            (errorData as any).errorType ||
+                            "insufficient_balance";
+                          throw error;
+                        }
+
                         const errorText = await continuationResponse
                           .text()
                           .catch(() => "Unknown error");
@@ -731,17 +776,24 @@ export function useChatHandlers({
             // Build finalized segments from streaming segments
             // This preserves the correct interleaved order of text and tool calls
             const currentStreamingSegments = chat.streamingSegments || [];
-            const finalizedSegments = currentStreamingSegments.map((segment: any) => {
-              if (segment.type === 'toolCall') {
-                // Find the finalized version of this tool call
-                const finalizedTc = finalizedToolCalls.find((tc: any) => tc.id === segment.toolCall.id);
-                return {
-                  type: 'toolCall' as const,
-                  toolCall: finalizedTc || { ...segment.toolCall, status: 'completed' as const },
-                };
+            const finalizedSegments = currentStreamingSegments.map(
+              (segment: any) => {
+                if (segment.type === "toolCall") {
+                  // Find the finalized version of this tool call
+                  const finalizedTc = finalizedToolCalls.find(
+                    (tc: any) => tc.id === segment.toolCall.id
+                  );
+                  return {
+                    type: "toolCall" as const,
+                    toolCall: finalizedTc || {
+                      ...segment.toolCall,
+                      status: "completed" as const,
+                    },
+                  };
+                }
+                return segment;
               }
-              return segment;
-            });
+            );
 
             // Update message with toolCalls AND segments (preserves order)
             chat.setMessages((prev: Message[]) => {
@@ -773,20 +825,24 @@ export function useChatHandlers({
             try {
               // Check if any tool calls modified files
               const fileModifyingTools = result.toolCalls.filter(
-                (tc) => ["edit", "write", "multiedit"].includes(tc.name) && 
-                        tc.status !== "error"
+                (tc) =>
+                  ["edit", "write", "multiedit"].includes(tc.name) &&
+                  tc.status !== "error"
               );
-              
+
               if (fileModifyingTools.length > 0) {
                 // Get current files from WebContainer
-                const { WebContainerProvider } = await import("../../tools/webcontainer-provider");
+                const { WebContainerProvider } =
+                  await import("../../tools/webcontainer-provider");
                 const { WORK_DIR } = await import("../../utils/constants");
-                const container = WebContainerProvider.getInstance().getContainerSync();
-                
+                const container =
+                  WebContainerProvider.getInstance().getContainerSync();
+
                 if (container) {
                   // Read all files from WebContainer
-                  const filesToSync: Array<{ path: string; content: string }> = [];
-                  
+                  const filesToSync: Array<{ path: string; content: string }> =
+                    [];
+
                   // Get the list of files that were modified
                   const modifiedPaths = new Set<string>();
                   for (const tc of fileModifyingTools) {
@@ -802,7 +858,7 @@ export function useChatHandlers({
                       }
                     }
                   }
-                  
+
                   // Read each modified file from WebContainer
                   for (const filePath of modifiedPaths) {
                     try {
@@ -813,18 +869,23 @@ export function useChatHandlers({
                       if (!normalizedPath.startsWith(WORK_DIR)) {
                         normalizedPath = `${WORK_DIR}${normalizedPath.startsWith("/") ? "" : "/"}${normalizedPath}`;
                       }
-                      
+
                       const bytes = await container.fs.readFile(normalizedPath);
                       const content = new TextDecoder().decode(bytes);
-                      
+
                       // Store with relative path (without WORK_DIR prefix)
-                      const relativePath = normalizedPath.replace(WORK_DIR, "").replace(/^\/+/, "");
+                      const relativePath = normalizedPath
+                        .replace(WORK_DIR, "")
+                        .replace(/^\/+/, "");
                       filesToSync.push({ path: relativePath, content });
                     } catch (readError) {
-                      console.warn(`[ChatHandler] Could not read file ${filePath} for sync:`, readError);
+                      console.warn(
+                        `[ChatHandler] Could not read file ${filePath} for sync:`,
+                        readError
+                      );
                     }
                   }
-                  
+
                   if (filesToSync.length > 0) {
                     // Sync files to R2
                     const { setIsSyncingToR2 } = useWorkspaceStore.getState();
@@ -840,23 +901,30 @@ export function useChatHandlers({
                           files: filesToSync,
                         }),
                       });
-                      
+
                       if (syncResponse.ok) {
                         const syncResult = await syncResponse.json();
                       } else {
-                        console.warn("[ChatHandler] Failed to sync files to R2:", await syncResponse.text());
+                        console.warn(
+                          "[ChatHandler] Failed to sync files to R2:",
+                          await syncResponse.text()
+                        );
                       }
                     } catch (syncError) {
-                      console.error("[ChatHandler] Error syncing files to R2:", syncError);
+                      console.error(
+                        "[ChatHandler] Error syncing files to R2:",
+                        syncError
+                      );
                     } finally {
                       setIsSyncingToR2(false);
                     }
-                    
+
                     // Also save IndexedDB snapshot for the MAIN conversation (not the chat)
                     // This ensures fast restore when returning to main conversation
                     try {
-                      const { saveSnapshot, filesToSnapshot } = await import("../../lib/chatPersistence");
-                      
+                      const { saveSnapshot, filesToSnapshot } =
+                        await import("../../lib/chatPersistence");
+
                       // Get ALL current files from files state (not just modified ones)
                       // This ensures the snapshot has the complete current state
                       const allFiles = files.templateFilesState || [];
@@ -870,13 +938,19 @@ export function useChatHandlers({
                         await saveSnapshot(conversationId, snapshot);
                       }
                     } catch (snapshotError) {
-                      console.error("[ChatHandler] Error saving IndexedDB snapshot:", snapshotError);
+                      console.error(
+                        "[ChatHandler] Error saving IndexedDB snapshot:",
+                        snapshotError
+                      );
                     }
                   }
                 }
               }
             } catch (syncError) {
-              console.error("[ChatHandler] Error in post-tool-call sync:", syncError);
+              console.error(
+                "[ChatHandler] Error in post-tool-call sync:",
+                syncError
+              );
             }
           }
 
@@ -889,8 +963,40 @@ export function useChatHandlers({
           return;
         } catch (error) {
           console.error("Agent chat error:", error);
+
+          // Handle specific error cases (same as main chat)
           if (error instanceof Error) {
-            chat.setError(error.message);
+            const errorAny = error as any;
+            // Check if this is an abort error
+            if (error.name === "AbortError") {
+              // Check if user intentionally cancelled (stop button)
+              if (chat.userCancelledRef?.current) {
+                chat.setError("Chat aborted.");
+                chat.userCancelledRef.current = false;
+              }
+              // Otherwise it's cleanup/unmount - don't show error
+            } else if (
+              error.message.includes("Insufficient balance") ||
+              error.message.includes("Payment Required") ||
+              error.message.includes("spending limit") ||
+              error.message.includes("reached your") ||
+              error.message.includes("project wallet") ||
+              error.message.includes("team wallet") ||
+              error.message.includes("Team wallet")
+            ) {
+              // Trigger insufficient balance modal instead of showing text error
+              if (onInsufficientBalance) {
+                onInsufficientBalance(errorAny.errorData);
+                // Don't set any error message - let the modal handle it
+              } else {
+                // Fallback to text error if no callback provided
+                const errorMessage =
+                  "💰 **Insufficient Balance**\n\nYour account balance is too low to continue. Please recharge your account to add credits.\n\n💡 **Quick Fix**: Click the 'Recharge' button in the header or go to the recharge page to add credits.";
+                chat.setError(errorMessage);
+              }
+            } else {
+              chat.setError(error.message);
+            }
           } else {
             chat.setError("An error occurred");
           }
@@ -905,7 +1011,7 @@ export function useChatHandlers({
       // Regular conversation flow (not a chat)
       // Add user message to UI immediately for better UX
       chat.addMessage(userMessage, isMountedRef);
-      
+
       chat.setIsLoading(true);
       chat.setIsStreaming(true);
       chat.setError(null);
@@ -951,7 +1057,10 @@ export function useChatHandlers({
             error.message.includes("Insufficient balance") ||
             error.message.includes("Payment Required") ||
             error.message.includes("spending limit") ||
-            error.message.includes("project wallet")
+            error.message.includes("reached your") ||
+            error.message.includes("project wallet") ||
+            error.message.includes("team wallet") ||
+            error.message.includes("Team wallet")
           ) {
             // Trigger insufficient balance modal instead of showing text error
             if (onInsufficientBalance) {
