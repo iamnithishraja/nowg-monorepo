@@ -109,7 +109,7 @@ export class ChatService {
         .sort({ updatedAt: -1 })
         .limit(limit)
         .select(
-          "_id title model createdAt updatedAt messages.length deploymentUrl teamId projectType adminProjectId"
+          "_id title model createdAt updatedAt messages.length deploymentUrl teamId projectType adminProjectId starred"
         );
 
       // Get team conversations (where user is a team member)
@@ -129,7 +129,7 @@ export class ChatService {
               .sort({ updatedAt: -1 })
               .limit(limit)
               .select(
-                "_id title model createdAt updatedAt messages.length deploymentUrl teamId projectType"
+                "_id title model createdAt updatedAt messages.length deploymentUrl teamId projectType starred"
               )
               .populate("teamId", "name")
           : [];
