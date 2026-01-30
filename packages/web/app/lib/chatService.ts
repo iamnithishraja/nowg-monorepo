@@ -286,25 +286,25 @@ export class ChatService {
       if ((message as any).role === "user") {
         const reqId = (message as any).clientRequestId;
         if (reqId) {
-          const existingByReq = await Messages.findOne({
+          const existingByReq = (await Messages.findOne({
             conversationId,
             role: "user",
             clientRequestId: reqId,
           })
             .select("_id")
-            .lean();
+            .lean()) as any;
           if (existingByReq?._id) {
             return existingByReq._id.toString();
           }
         } else {
           // Fallback duplicate-by-content check (conservative)
-          const lastUser = await Messages.findOne({
+          const lastUser = (await Messages.findOne({
             conversationId,
             role: "user",
           })
             .sort({ timestamp: -1 })
             .select("content _id")
-            .lean();
+            .lean()) as any;
           if (lastUser && lastUser.content === message.content) {
             return lastUser._id.toString();
           }
@@ -932,10 +932,7 @@ export class ChatService {
     try {
       await this.ensureConnection();
 
-      const conversation = await Conversation.findOne({
-        _id: conversationId,
-        userId,
-      });
+      const conversation = await Conversation.findById(conversationId);
 
       if (!conversation) {
         throw new Error("Conversation not found");
