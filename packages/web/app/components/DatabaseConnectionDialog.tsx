@@ -65,7 +65,7 @@ export function DatabaseConnectionDialog({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Database className="w-5 h-5 text-primary" />
+              <Database className="w-5 h-5 text-purple-400" />
               Checking Connection
             </DialogTitle>
             <DialogDescription>
@@ -73,7 +73,7 @@ export function DatabaseConnectionDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
           </div>
         </DialogContent>
       </Dialog>
@@ -85,8 +85,8 @@ export function DatabaseConnectionDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
-              <Database className="w-5 h-5 text-primary" />
+            <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+              <Database className="w-5 h-5 text-purple-400" />
             </div>
             Database Provider
           </DialogTitle>
@@ -109,7 +109,7 @@ export function DatabaseConnectionDialog({
             <Zap className="w-4 h-4" />
             Neon (Managed)
             {selectedProvider === "neon" && (
-              <span className="ml-1 w-2 h-2 rounded-full bg-green-500" />
+              <span className="ml-1 w-2 h-2 rounded-full bg-purple-500" />
             )}
           </button>
           <button
@@ -126,7 +126,7 @@ export function DatabaseConnectionDialog({
             </svg>
             Supabase
             {selectedProvider === "supabase" && (
-              <span className="ml-1 w-2 h-2 rounded-full bg-green-500" />
+              <span className="ml-1 w-2 h-2 rounded-full bg-purple-500" />
             )}
           </button>
         </div>
@@ -135,7 +135,7 @@ export function DatabaseConnectionDialog({
         {activeTab === "neon" && (
           <div className="space-y-4 py-2">
             <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-primary">
+              <div className="flex items-center gap-2 text-sm font-medium text-purple-400">
                 <Zap className="w-4 h-4" />
                 Managed PostgreSQL
               </div>
@@ -145,8 +145,8 @@ export function DatabaseConnectionDialog({
               </p>
               <div className="space-y-2">
                 <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded bg-primary/10 mt-0.5">
-                    <Check className="w-3.5 h-3.5 text-primary" />
+                  <div className="p-1.5 rounded bg-purple-500/10 mt-0.5">
+                    <Check className="w-3.5 h-3.5 text-purple-400" />
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium">Zero configuration</p>
@@ -156,8 +156,8 @@ export function DatabaseConnectionDialog({
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded bg-primary/10 mt-0.5">
-                    <Check className="w-3.5 h-3.5 text-primary" />
+                  <div className="p-1.5 rounded bg-purple-500/10 mt-0.5">
+                    <Check className="w-3.5 h-3.5 text-purple-400" />
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium">Serverless PostgreSQL</p>
@@ -167,8 +167,8 @@ export function DatabaseConnectionDialog({
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded bg-primary/10 mt-0.5">
-                    <Check className="w-3.5 h-3.5 text-primary" />
+                  <div className="p-1.5 rounded bg-purple-500/10 mt-0.5">
+                    <Check className="w-3.5 h-3.5 text-purple-400" />
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium">
@@ -185,7 +185,7 @@ export function DatabaseConnectionDialog({
             <Button
               onClick={() => onSelectProvider("neon")}
               disabled={isProvisioningNeon || selectedProvider === "neon"}
-              className="w-full bg-primary hover:bg-primary/90"
+              className="w-full bg-purple-500 hover:bg-purple-600 text-white"
             >
               {isProvisioningNeon ? (
                 <>
@@ -212,11 +212,11 @@ export function DatabaseConnectionDialog({
           <div className="space-y-4 py-2">
             {hasSupabaseConnected ? (
               <>
-                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-green-500/20">
-                        <Check className="w-4 h-4 text-green-500" />
+                      <div className="p-2 rounded-lg bg-purple-500/20">
+                        <Check className="w-4 h-4 text-purple-400" />
                       </div>
                       <div>
                         <p className="text-sm font-medium">
@@ -227,7 +227,7 @@ export function DatabaseConnectionDialog({
                         </p>
                       </div>
                     </div>
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -269,8 +269,8 @@ export function DatabaseConnectionDialog({
                     and authentication.
                   </p>
                   <div className="flex items-start gap-3">
-                    <div className="p-1.5 rounded bg-primary/10 mt-0.5">
-                      <Check className="w-3.5 h-3.5 text-primary" />
+                    <div className="p-1.5 rounded bg-purple-500/10 mt-0.5">
+                      <Check className="w-3.5 h-3.5 text-purple-400" />
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">
@@ -282,8 +282,8 @@ export function DatabaseConnectionDialog({
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="p-1.5 rounded bg-primary/10 mt-0.5">
-                      <Check className="w-3.5 h-3.5 text-primary" />
+                    <div className="p-1.5 rounded bg-purple-500/10 mt-0.5">
+                      <Check className="w-3.5 h-3.5 text-purple-400" />
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">Your own account</p>
@@ -293,8 +293,8 @@ export function DatabaseConnectionDialog({
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="p-1.5 rounded bg-primary/10 mt-0.5">
-                      <Check className="w-3.5 h-3.5 text-primary" />
+                    <div className="p-1.5 rounded bg-purple-500/10 mt-0.5">
+                      <Check className="w-3.5 h-3.5 text-purple-400" />
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">
@@ -308,7 +308,7 @@ export function DatabaseConnectionDialog({
                 </div>
                 <Button
                   onClick={onConnectSupabase}
-                  className="w-full bg-primary hover:bg-primary/90"
+                  className="w-full bg-purple-500 hover:bg-purple-600 text-white"
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Connect Supabase Account
