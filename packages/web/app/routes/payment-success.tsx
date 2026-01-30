@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, redirect, useNavigate } from "react-router";
 import { Header } from "../components";
-import { AppSidebar } from "../components/AppSidebar";
+import { ProjectSidebar } from "../components/ProjectSidebar";
 import Background from "../components/Background";
 import { Button } from "../components/ui/button";
 import {
@@ -12,7 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import { SidebarProvider } from "../components/ui/sidebar";
 import { auth } from "../lib/auth";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -25,7 +24,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw redirect("/signin");
   }
 
-  return {};
+  return { user: session.user };
 }
 
 export const meta: MetaFunction = () => {
@@ -35,7 +34,8 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-export default function PaymentSuccess() {
+export default function PaymentSuccess({ loaderData }: { loaderData?: { user?: any } }) {
+  const user = loaderData?.user;
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [verificationStatus, setVerificationStatus] = useState<
@@ -117,16 +117,17 @@ export default function PaymentSuccess() {
   }, [loading, verificationStatus, navigate]);
 
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <Background />
-        </div>
+    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <Background />
+      </div>
 
-        <AppSidebar className="flex-shrink-0" />
+      {/* Left Sidebar - ProjectSidebar */}
+      <ProjectSidebar user={user} className="flex-shrink-0" />
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header showAuthButtons={false} showSidebarToggle={true} />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header showAuthButtons={false} showSidebarToggle={false} />
 
           <main className="relative z-20 flex flex-col h-full overflow-auto">
             <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8 pb-16 max-w-2xl mx-auto w-full flex items-center justify-center">
@@ -253,6 +254,5 @@ export default function PaymentSuccess() {
           </main>
         </div>
       </div>
-    </SidebarProvider>
   );
 }

@@ -1,13 +1,27 @@
+import { redirect } from "react-router";
 import { useState } from "react";
 import { Header } from "../components";
-import { AppSidebar } from "../components/AppSidebar";
+import { ProjectSidebar } from "../components/ProjectSidebar";
 import Background from "../components/Background";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import { SidebarProvider } from "../components/ui/sidebar";
 import { Textarea } from "../components/ui/textarea";
+import { auth } from "../lib/auth";
 import type { Route } from "./+types/support";
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const authInstance = await auth;
+  const session = await authInstance.api.getSession({
+    headers: request.headers,
+  });
+
+  if (!session) {
+    throw redirect("/signin");
+  }
+
+  return { user: session.user };
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -16,7 +30,8 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function Support() {
+export default function Support({ loaderData }: Route.ComponentProps) {
+  const user = loaderData?.user;
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
 
@@ -38,16 +53,17 @@ export default function Support() {
   const isDisabled = !subject.trim() || !message.trim();
 
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <Background />
-        </div>
+    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <Background />
+      </div>
 
-        <AppSidebar className="flex-shrink-0" />
+      {/* Left Sidebar - ProjectSidebar */}
+      <ProjectSidebar user={user} className="flex-shrink-0" />
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header showAuthButtons={false} showSidebarToggle={true} />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header showAuthButtons={false} showSidebarToggle={false} />
 
           <main className="relative z-20 flex flex-col h-full overflow-hidden">
             <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
@@ -93,7 +109,6 @@ export default function Support() {
           </main>
         </div>
       </div>
-    </SidebarProvider>
   );
 }
 

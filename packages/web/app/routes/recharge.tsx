@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { redirect } from "react-router";
 import { getEnvWithDefault } from "~/lib/env";
 import { Header } from "../components";
-import { AppSidebar } from "../components/AppSidebar";
+import { ProjectSidebar } from "../components/ProjectSidebar";
 import Background from "../components/Background";
 import { Button } from "../components/ui/button";
 import {
@@ -21,7 +21,6 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import { SidebarProvider } from "../components/ui/sidebar";
 import { auth } from "../lib/auth";
 import type { Route } from "./+types/recharge";
 
@@ -35,7 +34,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     throw redirect("/signin");
   }
 
-  return { publishableKey: getEnvWithDefault("STRIPE_PUBLISHABLE_KEY", "") };
+  return { 
+    publishableKey: getEnvWithDefault("STRIPE_PUBLISHABLE_KEY", ""),
+    user: session.user 
+  };
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -46,6 +48,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function Recharge({ loaderData }: Route.ComponentProps) {
+  const user = loaderData?.user;
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
@@ -118,16 +121,17 @@ export default function Recharge({ loaderData }: Route.ComponentProps) {
   };
 
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <Background />
-        </div>
+    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <Background />
+      </div>
 
-        <AppSidebar className="flex-shrink-0" />
+      {/* Left Sidebar - ProjectSidebar */}
+      <ProjectSidebar user={user} className="flex-shrink-0" />
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header showAuthButtons={false} showSidebarToggle={true} />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header showAuthButtons={false} showSidebarToggle={false} />
 
           <main className="relative z-20 flex flex-col h-full overflow-auto">
             <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8 pb-16 max-w-6xl mx-auto w-full">
@@ -293,6 +297,5 @@ export default function Recharge({ loaderData }: Route.ComponentProps) {
           </main>
         </div>
       </div>
-    </SidebarProvider>
   );
 }

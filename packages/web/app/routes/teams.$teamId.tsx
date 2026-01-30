@@ -22,7 +22,7 @@ import * as React from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData, useNavigate } from "react-router";
 import { Header } from "~/components";
-import { AppSidebar } from "~/components/AppSidebar";
+import { ProjectSidebar } from "~/components/ProjectSidebar";
 import Background from "~/components/Background";
 import { FilePreview } from "~/components/FileUpload";
 import GitHubImportModal from "~/components/GitHubImportModal";
@@ -44,7 +44,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { SidebarProvider } from "~/components/ui/sidebar";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
 import { OPENROUTER_MODELS } from "~/consts/models";
@@ -228,6 +227,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         rejectedAt: inv.rejectedAt,
       })),
       projects: projectsWithWallets,
+      user: session.user,
     };
   } catch (error: any) {
     if (error instanceof Response) throw error;
@@ -237,7 +237,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function TeamDetailPage() {
-  const { team, membership, members, invitations, projects } =
+  const { team, membership, members, invitations, projects, user } =
     useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -543,16 +543,17 @@ export default function TeamDetailPage() {
   };
 
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <Background />
-        </div>
+    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <Background />
+      </div>
 
-        <AppSidebar className="shrink-0" />
+      {/* Left Sidebar - ProjectSidebar */}
+      <ProjectSidebar user={user} className="flex-shrink-0" />
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header showAuthButtons={false} showSidebarToggle={true} />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header showAuthButtons={false} showSidebarToggle={false} />
 
           <main className="relative z-20 flex flex-col h-full overflow-hidden">
             <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
@@ -1967,6 +1968,5 @@ export default function TeamDetailPage() {
           </main>
         </div>
       </div>
-    </SidebarProvider>
   );
 }

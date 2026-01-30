@@ -7,9 +7,9 @@ import {
   Search,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { redirect, useNavigate } from "react-router";
 import { Header } from "../components";
-import { AppSidebar } from "../components/AppSidebar";
+import { ProjectSidebar } from "../components/ProjectSidebar";
 import Background from "../components/Background";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -21,7 +21,21 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import { SidebarProvider } from "../components/ui/sidebar";
+import { auth } from "../lib/auth";
+import type { LoaderFunctionArgs } from "react-router";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const authInstance = await auth;
+  const session = await authInstance.api.getSession({
+    headers: request.headers,
+  });
+
+  if (!session) {
+    throw redirect("/signin");
+  }
+
+  return { user: session.user };
+}
 
 interface Conversation {
   id: string;
@@ -39,7 +53,8 @@ interface Conversation {
   } | null;
 }
 
-export default function OrganizationConversations() {
+export default function OrganizationConversations({ loaderData }: { loaderData?: { user?: any } }) {
+  const user = loaderData?.user;
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [organizations, setOrganizations] = useState<
@@ -134,15 +149,20 @@ export default function OrganizationConversations() {
   };
 
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="min-h-screen bg-background">
+    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <Background />
-        <div className="flex flex-col h-screen">
-          <Header showSidebarToggle={true} showAuthButtons={false} />
-          <div className="flex flex-1 overflow-hidden">
-            <AppSidebar />
-            <main className="flex-1 overflow-y-auto relative z-10">
-              <div className="container mx-auto px-4 py-8 max-w-7xl">
+      </div>
+
+      {/* Left Sidebar - ProjectSidebar */}
+      <ProjectSidebar user={user} className="shrink-0" />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header showSidebarToggle={false} showAuthButtons={false} />
+
+        <main className="relative z-20 flex flex-col h-full overflow-auto">
+          <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8 pb-16 max-w-7xl mx-auto w-full">
                 <div className="mb-8">
                   <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
                     <MessageSquare className="h-8 w-8" />
@@ -287,11 +307,9 @@ export default function OrganizationConversations() {
                     ))}
                   </div>
                 )}
-              </div>
-            </main>
           </div>
-        </div>
+        </main>
       </div>
-    </SidebarProvider>
+    </div>
   );
 }
