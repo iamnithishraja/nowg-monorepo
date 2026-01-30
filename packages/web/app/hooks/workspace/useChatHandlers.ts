@@ -286,6 +286,26 @@ export function useChatHandlers({
                         toolCall,
                       ]);
                       chat.appendToolCallSegment?.(toolCall, isMountedRef);
+
+                      // Show spinner immediately for file operations
+                      if (["edit", "write", "multiedit"].includes(data.name)) {
+                        const filePath = data.args?.filePath || data.args?.path;
+                        if (filePath) {
+                          const fileName =
+                            filePath.split("/").pop() || filePath;
+                          // Check if file already exists to determine created vs modified
+                          const existed = files.templateFilesState?.some(
+                            (f: any) =>
+                              f.path === filePath ||
+                              f.path.endsWith(`/${filePath}`)
+                          );
+                          chat.addFileCreationIndicator?.(
+                            fileName,
+                            existed ? "modified" : "created",
+                            isMountedRef
+                          );
+                        }
+                      }
                     }
                   } else if (data.type === "awaiting_tool_results") {
                     // Update tool calls from event if provided
@@ -514,6 +534,14 @@ export function useChatHandlers({
                                       content,
                                       isMountedRef
                                     );
+
+                                    // Mark file as completed in checklist (shows checkmark)
+                                    const fileName =
+                                      filePath.split("/").pop() || filePath;
+                                    chat.markFileCompleted?.(
+                                      fileName,
+                                      isMountedRef
+                                    );
                                   } catch (readError) {
                                     console.warn(
                                       "[ChatHandler] Could not read file to update UI state:",
@@ -551,6 +579,14 @@ export function useChatHandlers({
                                     files.updateFileInState(
                                       filePath,
                                       content,
+                                      isMountedRef
+                                    );
+
+                                    // Mark file as completed in checklist (shows checkmark)
+                                    const fileName =
+                                      filePath.split("/").pop() || filePath;
+                                    chat.markFileCompleted?.(
+                                      fileName,
                                       isMountedRef
                                     );
                                   } catch (readError) {
