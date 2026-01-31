@@ -974,12 +974,16 @@ export async function action({ request }: ActionFunctionArgs) {
               timestamp: msg.timestamp || msg.createdAt,
               model: msg.model,
               // Tool calls for assistant messages
+              // Normalize status: when loading from R2, tool calls should be marked as completed
+              // since these are historical messages and tools must have been executed
               toolCalls: msg.toolCalls && msg.toolCalls.length > 0
                 ? msg.toolCalls.map((tc: any) => ({
                     id: tc.id,
                     name: tc.name,
                     args: tc.args,
-                    status: tc.status,
+                    // If status is missing or "pending", mark as "completed" since these are
+                    // historical messages and tools must have been executed
+                    status: tc.status === "error" ? "error" : "completed",
                     result: tc.result,
                     startTime: tc.startTime,
                     endTime: tc.endTime,

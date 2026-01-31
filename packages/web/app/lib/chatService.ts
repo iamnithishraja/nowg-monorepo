@@ -819,7 +819,16 @@ export class ChatService {
         id: msg._id.toString(),
         role: msg.role,
         content: msg.content || "",
-        toolCalls: msg.toolCalls || [],
+        // Normalize tool calls: when loading from DB, tool calls that were executed
+        // should be marked as completed. If status is "pending" but no result exists,
+        // it means the message was saved before tool execution completed - mark as completed
+        // since the conversation must have continued for the message to be saved.
+        toolCalls: (msg.toolCalls || []).map((tc: any) => ({
+          ...tc,
+          // If status is missing or "pending", mark as "completed" since these are
+          // historical messages and tools must have been executed for the conversation to continue
+          status: tc.status === "error" ? "error" : "completed",
+        })),
         toolResults: msg.toolResults || [],
         // Model and token info (for assistant messages)
         model: msg.model,
