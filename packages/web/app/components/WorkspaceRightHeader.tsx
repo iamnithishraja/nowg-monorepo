@@ -106,8 +106,6 @@ interface WorkspaceRightHeaderProps {
   onAgentClick?: () => void;
   /** Revert to a specific version - makes it the new latest */
   onRevertToVersion?: (versionId: string) => void;
-  /** Deploy a specific version */
-  onDeployVersion?: (versionId: string) => void;
   /** Go back to the latest version */
   onGoToLatest?: () => void;
   /** Whether restoring a version */
@@ -125,7 +123,6 @@ export function WorkspaceRightHeader({
   onVersionSelect,
   onAgentClick,
   onRevertToVersion,
-  onDeployVersion,
   onGoToLatest,
   isRestoringVersion = false,
 }: WorkspaceRightHeaderProps) {
@@ -267,11 +264,6 @@ export function WorkspaceRightHeader({
     } else {
       startDeploy(provider, updateExisting);
     }
-  };
-
-  // Handler for deploying a specific version - directly deploys to Vercel
-  const handleDeployVersion = (versionId: string) => {
-    handleDeploy("vercel", false, versionId);
   };
 
   // GitHub handlers
@@ -439,7 +431,6 @@ export function WorkspaceRightHeader({
               currentVersionId={currentVersionId}
               onSelect={onVersionSelect}
               onRevertToVersion={onRevertToVersion}
-              onDeployVersion={onDeployVersion || handleDeployVersion}
               onGoToLatest={onGoToLatest}
               isRestoring={isRestoringVersion}
             />
