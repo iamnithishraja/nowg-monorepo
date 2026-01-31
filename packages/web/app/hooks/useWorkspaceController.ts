@@ -216,6 +216,8 @@ export function useWorkspaceController(
   const latestPreviewRef = useRef<string | null>(
     livePreviewUrl || previewUrl || null
   );
+  // Track if version was captured in current streaming session (prevents duplicates)
+  const versionCapturedInSessionRef = useRef(false);
 
   useEffect(() => {
     latestFilesRef.current = files.templateFilesState;
@@ -234,13 +236,21 @@ export function useWorkspaceController(
   }, [livePreviewUrl, previewUrl]);
 
   const captureVersionSnapshot = useCallback(
-    async (label?: string) => {
+    async (label?: string, force = false) => {
+      // Skip if already captured in this session (unless forced)
+      if (!force && versionCapturedInSessionRef.current) {
+        return;
+      }
+      
       if (!versionsHydrated || !conversationId) return;
 
       const filesSnapshot = cloneTemplateFiles(latestFilesRef.current);
       if (filesSnapshot.length === 0) {
         return;
       }
+      
+      // Mark as captured for this session
+      versionCapturedInSessionRef.current = true;
 
       let anchorMessageId: string | null = null;
       try {
@@ -1069,6 +1079,9 @@ conversationId
 
     // Pass file metadata to baseHandleSend - it will add the message with files
     try {
+      // Reset version captured flag for this new streaming session
+      versionCapturedInSessionRef.current = false;
+      
       const response = await baseHandleSend(messageContent, fileMetadata);
 
       // Clear uploaded files state immediately after message is sent
@@ -1076,6 +1089,10 @@ conversationId
 
       if (response) {
         await stream(response);
+        
+        // Ensure version snapshot is captured after streaming completes
+        // This is a fallback in case onDone doesn't fire properly
+        await captureVersionSnapshot();
       }
 
       // NOTE: We keep files in IndexedDB for faster loading
@@ -1206,6 +1223,10 @@ conversationId
     await ensureLatestVersionBeforeSend();
 
     const messageContent = input.trim();
+    
+    // Reset version captured flag for this new message
+    versionCapturedInSessionRef.current = false;
+    
     if (!hasHandledInitialPrompt) {
       // For empty conversations, use initial prompt handler which includes template selection/cloning
       await handleInitialPrompt(messageContent, conversationId || undefined);
