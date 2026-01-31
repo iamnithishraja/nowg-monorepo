@@ -965,11 +965,14 @@ export function useWorkspaceInit({
               // If viewing a chat (chatId is present)
               if (chatId) {
                 // Check if this is a new empty chat (just created) - if so, restore files from main conversation
-                // If chat has messages, it's an existing chat being opened - skip restoration and preserve state
+                // Also check if WebContainer is empty (no active preview) - if so, restore files even for existing chats
+                // This handles the case when directly opening a chat URL (fresh page load)
                 const isNewEmptyChat = messages.length === 0;
+                const hasActivePreview = !!getPreviewUrl();
+                const shouldRestoreFiles = isNewEmptyChat || (!hasActivePreview && !isSameConversation);
                 
-                if (isNewEmptyChat) {
-                  // New chat created - restore files from main conversation so tools can work
+                if (shouldRestoreFiles) {
+                  // New chat created OR direct navigation to chat URL - restore files from main conversation so tools can work
                   // Prefer R2 restore first (has latest files from all chats), then snapshot, then message reconstruction
                   await new Promise((resolve) => setTimeout(resolve, 100));
                   try {
@@ -1011,12 +1014,13 @@ export function useWorkspaceInit({
 
                     setIsReconstructingFiles(false);
                   } catch (restoreError) {
-                    console.error("[R2 Restore] Error restoring files for new chat:", restoreError);
+                    console.error("[R2 Restore] Error restoring files for chat:", restoreError);
                     const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
                     setIsReconstructingFiles(false);
                   }
                 } else {
-                  // Existing chat with messages - preserve WebContainer state, don't restore files
+                  // Existing chat with messages AND WebContainer already has files (switching between chats)
+                  // Preserve WebContainer state, don't restore files
                 }
                 setHasHandledInitialPrompt(true);
               } else {
