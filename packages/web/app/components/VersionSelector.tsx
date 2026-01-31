@@ -1,4 +1,4 @@
-import { SpinnerGap } from "@phosphor-icons/react";
+import { SpinnerGap, Rocket, ArrowCounterClockwise, ArrowRight } from "@phosphor-icons/react";
 import { Button } from "./ui/button";
 import {
   Select,
@@ -7,6 +7,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 
 interface VersionSelectorProps {
   versions: Array<{ id: string; label: string }>;
@@ -17,6 +25,10 @@ interface VersionSelectorProps {
   onGoToLatest?: () => void;
   canRestore?: boolean;
   isOnLatest?: boolean;
+  /** Revert to selected version - makes it the new latest */
+  onRevertToVersion?: (versionId: string) => void;
+  /** Deploy a specific version */
+  onDeployVersion?: (versionId: string) => void;
 }
 
 export function VersionSelector({
@@ -28,12 +40,19 @@ export function VersionSelector({
   onGoToLatest,
   canRestore = false,
   isOnLatest = true,
+  onRevertToVersion,
+  onDeployVersion,
 }: VersionSelectorProps) {
   const fallbackValue =
     currentVersionId ??
     (versions.length > 0 ? versions[versions.length - 1]?.id : undefined);
   const showRestoreControls =
     !isOnLatest && versions.length > 0 && (onRestore || onGoToLatest);
+  
+  // Get current selected version info
+  const selectedVersion = versions.find((v) => v.id === currentVersionId);
+  const latestVersionId = versions.length > 0 ? versions[versions.length - 1]?.id : null;
+  const isViewingOlderVersion = currentVersionId && currentVersionId !== latestVersionId;
 
   return (
     <div className="flex items-center gap-2">
@@ -49,21 +68,81 @@ export function VersionSelector({
           align="end"
           className="bg-surface-1 border-border/30 rounded-xl"
         >
-          {versions.map((version) => (
+          {versions.map((version, index) => (
             <SelectItem
               key={version.id}
               value={version.id}
               className="rounded-lg"
             >
               {version.label}
+              {index === versions.length - 1 && " (Latest)"}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
+      
       {isRestoring && (
         <SpinnerGap className="w-4 h-4 animate-spin text-purple-400" />
       )}
-      {showRestoreControls && (
+      
+      {/* Version Actions Dropdown */}
+      {versions.length > 0 && currentVersionId && (onRevertToVersion || onDeployVersion) && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-3/50"
+              disabled={isRestoring}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="w-48 bg-surface-1/95 backdrop-blur-xl border-border/50 shadow-xl shadow-black/20 rounded-xl"
+          >
+            {/* Deploy this version */}
+            {onDeployVersion && (
+              <DropdownMenuItem
+                onClick={() => onDeployVersion(currentVersionId)}
+                className="gap-2 cursor-pointer rounded-md mx-1 my-0.5 text-sm"
+              >
+                <Rocket className="w-4 h-4 text-green-400" />
+                <span>Deploy {selectedVersion?.label || "this version"}</span>
+              </DropdownMenuItem>
+            )}
+            
+            {/* Revert to this version (only show for older versions) */}
+            {isViewingOlderVersion && onRevertToVersion && (
+              <>
+                <DropdownMenuSeparator className="bg-border/30" />
+                <DropdownMenuItem
+                  onClick={() => onRevertToVersion(currentVersionId)}
+                  className="gap-2 cursor-pointer rounded-md mx-1 my-0.5 text-sm text-amber-400 hover:text-amber-300"
+                >
+                  <ArrowCounterClockwise className="w-4 h-4" />
+                  <span>Revert to {selectedVersion?.label}</span>
+                </DropdownMenuItem>
+              </>
+            )}
+            
+            {/* Go to latest (only show for older versions) */}
+            {isViewingOlderVersion && onGoToLatest && (
+              <DropdownMenuItem
+                onClick={() => onGoToLatest()}
+                className="gap-2 cursor-pointer rounded-md mx-1 my-0.5 text-sm"
+              >
+                <ArrowRight className="w-4 h-4" />
+                <span>Go to Latest</span>
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      
+      {/* Legacy restore controls (can be removed if dropdown is sufficient) */}
+      {showRestoreControls && !onRevertToVersion && (
         <div className="flex items-center gap-1.5">
           <Button
             size="sm"

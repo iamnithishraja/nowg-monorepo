@@ -104,6 +104,14 @@ interface WorkspaceRightHeaderProps {
   previewUrl?: string | null;
   onVersionSelect?: (versionId: string) => void;
   onAgentClick?: () => void;
+  /** Revert to a specific version - makes it the new latest */
+  onRevertToVersion?: (versionId: string) => void;
+  /** Deploy a specific version */
+  onDeployVersion?: (versionId: string) => void;
+  /** Go back to the latest version */
+  onGoToLatest?: () => void;
+  /** Whether restoring a version */
+  isRestoringVersion?: boolean;
 }
 
 export function WorkspaceRightHeader({
@@ -116,6 +124,10 @@ export function WorkspaceRightHeader({
   previewUrl,
   onVersionSelect,
   onAgentClick,
+  onRevertToVersion,
+  onDeployVersion,
+  onGoToLatest,
+  isRestoringVersion = false,
 }: WorkspaceRightHeaderProps) {
   const navigate = useNavigate();
   const [user, setUser] = useState<any | null>(null);
@@ -124,6 +136,7 @@ export function WorkspaceRightHeader({
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
   const [showGitHubDeleteDialog, setShowGitHubDeleteDialog] = useState(false);
   const [isGitHubDeleting, setIsGitHubDeleting] = useState(false);
+  const [versionToDeployId, setVersionToDeployId] = useState<string | null>(null);
   
   // R2 sync status
   const isSyncingToR2 = useIsSyncingToR2();
@@ -254,6 +267,19 @@ export function WorkspaceRightHeader({
       deployVersion(versionId, provider);
     } else {
       startDeploy(provider, updateExisting);
+    }
+  };
+
+  // Handler for deploying a specific version - shows provider selector
+  const handleDeployVersion = (versionId: string) => {
+    setVersionToDeployId(versionId);
+  };
+
+  // Deploy the pending version with selected provider
+  const confirmVersionDeploy = (provider: "vercel" | "netlify") => {
+    if (versionToDeployId) {
+      handleDeploy(provider, false, versionToDeployId);
+      setVersionToDeployId(null);
     }
   };
 
@@ -421,6 +447,10 @@ export function WorkspaceRightHeader({
               versions={versions}
               currentVersionId={currentVersionId}
               onSelect={onVersionSelect}
+              onRevertToVersion={onRevertToVersion}
+              onDeployVersion={onDeployVersion || handleDeployVersion}
+              onGoToLatest={onGoToLatest}
+              isRestoring={isRestoringVersion}
             />
           )}
         </div>
@@ -712,6 +742,50 @@ export function WorkspaceRightHeader({
         onCreateNewDeployment={handleDeploy}
         currentVersionId={currentVersionId}
       />
+
+      {/* Version Deploy Provider Selector Dialog */}
+      {versionToDeployId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setVersionToDeployId(null)}
+          />
+          <div className="relative bg-surface-1 border border-border/30 rounded-xl p-6 shadow-2xl max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Deploy Version</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Select a platform to deploy{" "}
+              <span className="font-medium text-foreground">
+                {versions.find((v) => v.id === versionToDeployId)?.label || "this version"}
+              </span>
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={() => confirmVersionDeploy("vercel")}
+              >
+                <VercelIcon className="w-4 h-4" />
+                Vercel
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={() => confirmVersionDeploy("netlify")}
+              >
+                <span className="text-[#00C7B7] font-bold">N</span>
+                Netlify
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              className="w-full mt-3"
+              onClick={() => setVersionToDeployId(null)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* GitHub Repository Dialog */}
       <GitHubRepositoryDialog

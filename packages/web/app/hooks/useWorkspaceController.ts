@@ -1405,6 +1405,77 @@ conversationId
     await captureVersionSnapshot(restoredLabel);
   }, [canRestoreVersion, currentVersionId, versions, captureVersionSnapshot]);
 
+  // Revert to a specific version - restores files and creates a new version
+  const handleRevertToVersion = useCallback(
+    async (versionId: string) => {
+      if (!versionId || isRestoringVersion || !versionsHydrated) return;
+
+      const targetVersion = versions.find((v) => v.id === versionId);
+      if (!targetVersion) return;
+
+      setIsRestoringVersion(true);
+      try {
+        // First, restore the files from the target version
+        await resetProjectDirectory("/home/project");
+
+        for (const file of targetVersion.files) {
+          await saveFile(file.path, file.content);
+        }
+
+        const clonedFiles = cloneTemplateFiles(targetVersion.files);
+        files.setTemplateFilesState(clonedFiles);
+        latestFilesRef.current = clonedFiles;
+        files.setFilesMap(buildFilesMapFromSnapshot(clonedFiles));
+        const nextSelectedPath =
+          targetVersion.selectedPath ?? clonedFiles[0]?.path ?? "";
+        files.setSelectedPath(nextSelectedPath);
+        latestSelectedPathRef.current = nextSelectedPath;
+
+        chat.setIsLoading(false);
+        chat.setIsStreaming(false);
+        if ((chat as any).resetFileIndicators) {
+          (chat as any).resetFileIndicators();
+        }
+
+        const nextPreview = targetVersion.previewUrl ?? null;
+        setPreviewUrl(nextPreview);
+        latestPreviewRef.current = nextPreview;
+
+        const { clearTerminal } = useWorkspaceStore.getState() as any;
+        clearTerminal();
+
+        // Now create a new version with these files (making it the latest)
+        const revertedLabel = `Reverted to ${targetVersion.label}`;
+        const savedVersion = await createVersion({
+          label: revertedLabel,
+          files: clonedFiles,
+          previewUrl: nextPreview,
+          selectedPath: nextSelectedPath,
+          anchorMessageId: targetVersion.anchorMessageId,
+        });
+
+        if (savedVersion?.id) {
+          setCurrentVersionId(savedVersion.id);
+        }
+      } catch (error) {
+        console.error("Failed to revert to version:", error);
+      } finally {
+        setIsRestoringVersion(false);
+      }
+    },
+    [
+      versions,
+      isRestoringVersion,
+      versionsHydrated,
+      resetProjectDirectory,
+      saveFile,
+      files,
+      chat,
+      setPreviewUrl,
+      createVersion,
+    ]
+  );
+
   const handleReturnToLatestVersion = useCallback(() => {
     if (isOnLatestVersion || !latestVersionIdInList) {
       return;
@@ -1477,12 +1548,14 @@ conversationId
 
     // versioning
     versionOptions,
+    versions, // Full version objects with files for deployment
     currentVersionId,
     handleVersionSelect,
     isRestoringVersion,
     handleManualVersionCreate,
     canCreateVersion,
     handleRestoreCurrentVersion,
+    handleRevertToVersion,
     handleReturnToLatestVersion,
     canRestoreVersion,
     isOnLatestVersion,
