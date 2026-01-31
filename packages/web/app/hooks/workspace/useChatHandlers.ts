@@ -25,6 +25,8 @@ interface ChatDeps {
   chatMode?: "build" | "ask";
   /** Callback when chat title is updated (from first message) */
   onChatTitleUpdated?: (title: string) => void;
+  /** Callback to capture version snapshot after chat streaming completes */
+  captureVersionSnapshot?: () => Promise<void>;
 }
 
 export function useChatHandlers({
@@ -45,6 +47,7 @@ export function useChatHandlers({
   enableFigmaMCP,
   chatMode = "build",
   onChatTitleUpdated,
+  captureVersionSnapshot,
 }: ChatDeps) {
   const sendingRef = useRef(false);
 
@@ -992,6 +995,18 @@ export function useChatHandlers({
 
           chat.setIsLoading(false);
           chat.setIsStreaming(false);
+
+          // Auto-create version snapshot after chat streaming completes
+          if (captureVersionSnapshot) {
+            try {
+              await captureVersionSnapshot();
+            } catch (versionError) {
+              console.error(
+                "[ChatHandler] Error creating version snapshot:",
+                versionError
+              );
+            }
+          }
 
           // Don't clear currentToolCalls - keep them visible as part of the message
           // They will be cleared when a new message is sent

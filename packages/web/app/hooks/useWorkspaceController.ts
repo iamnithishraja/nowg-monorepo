@@ -948,6 +948,7 @@ conversationId
     enableFigmaMCP,
     chatMode,
     onChatTitleUpdated,
+    captureVersionSnapshot, // Auto-create version after chat streaming
   });
 
   const handleSend = async (messageContent: string) => {
