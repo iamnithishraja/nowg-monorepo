@@ -996,6 +996,11 @@ export function useChatHandlers({
           chat.setIsLoading(false);
           chat.setIsStreaming(false);
 
+          // Mark all remaining file indicators as completed (removes spinners)
+          if ((chat as any).markAllFilesCompleted) {
+            (chat as any).markAllFilesCompleted(isMountedRef);
+          }
+
           // Auto-create version snapshot after chat streaming completes
           if (captureVersionSnapshot) {
             try {
@@ -1053,6 +1058,10 @@ export function useChatHandlers({
           }
           chat.setIsStreaming(false);
           chat.setIsLoading(false);
+          // Mark all remaining file indicators as completed on error too
+          if ((chat as any).markAllFilesCompleted) {
+            (chat as any).markAllFilesCompleted(isMountedRef);
+          }
           return;
         } finally {
           sendingRef.current = false;
@@ -1130,6 +1139,10 @@ export function useChatHandlers({
           chat.setError("An error occurred");
         }
         chat.setIsStreaming(false);
+        // Mark all remaining file indicators as completed on error
+        if ((chat as any).markAllFilesCompleted) {
+          (chat as any).markAllFilesCompleted(isMountedRef);
+        }
       } finally {
         chat.setIsLoading(false);
         // Reset sending flag after a short delay to allow streaming to start

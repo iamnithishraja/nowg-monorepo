@@ -865,6 +865,10 @@ conversationId
         (async () => {
           if (isMountedRef.current) {
             chat.setIsStreaming(false);
+            // Mark all remaining file indicators as completed (removes spinners)
+            if ((chat as any).markAllFilesCompleted) {
+              (chat as any).markAllFilesCompleted(isMountedRef);
+            }
             // When prompt streaming is fully complete, switch to preview tab
             setActiveTab("preview" as any);
             void captureVersionSnapshot();
@@ -1405,10 +1409,10 @@ conversationId
     await captureVersionSnapshot(restoredLabel);
   }, [canRestoreVersion, currentVersionId, versions, captureVersionSnapshot]);
 
-  // Revert to a specific version - restores files and creates a new version
+  // Revert to a specific version - restores files, creates a new version, and syncs to R2
   const handleRevertToVersion = useCallback(
     async (versionId: string) => {
-      if (!versionId || isRestoringVersion || !versionsHydrated) return;
+      if (!versionId || isRestoringVersion || !versionsHydrated || !conversationId) return;
 
       const targetVersion = versions.find((v) => v.id === versionId);
       if (!targetVersion) return;
@@ -1457,6 +1461,49 @@ conversationId
         if (savedVersion?.id) {
           setCurrentVersionId(savedVersion.id);
         }
+
+        // Sync reverted files to R2 so they persist when reopening the conversation
+        const filesToSync = clonedFiles
+          .filter((f) => f.content && f.content.trim().length > 0)
+          .map((f) => ({
+            path: f.path,
+            content: f.content,
+          }));
+
+        if (filesToSync.length > 0) {
+          const { setIsSyncingToR2 } = useWorkspaceStore.getState();
+          try {
+            setIsSyncingToR2(true);
+            const syncResponse = await fetch("/api/conversations", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "syncFilesToR2",
+                conversationId,
+                files: filesToSync,
+              }),
+            });
+
+            if (!syncResponse.ok) {
+              console.warn(
+                "[Revert] Failed to sync reverted files to R2:",
+                await syncResponse.text()
+              );
+            }
+          } catch (syncError) {
+            console.error("[Revert] Error syncing files to R2:", syncError);
+          } finally {
+            setIsSyncingToR2(false);
+          }
+
+          // Also save IndexedDB snapshot for fast restore
+          try {
+            const snapshot = filesToSnapshot(filesToSync);
+            await saveSnapshot(conversationId, snapshot);
+          } catch (snapshotError) {
+            console.error("[Revert] Error saving IndexedDB snapshot:", snapshotError);
+          }
+        }
       } catch (error) {
         console.error("Failed to revert to version:", error);
       } finally {
@@ -1467,6 +1514,7 @@ conversationId
       versions,
       isRestoringVersion,
       versionsHydrated,
+      conversationId,
       resetProjectDirectory,
       saveFile,
       files,

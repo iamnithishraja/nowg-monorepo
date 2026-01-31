@@ -388,6 +388,10 @@ export function useInitialPromptHandler({
         setIsProcessingTemplate(false);
         chat.setIsLoading(false);
         chat.setIsStreaming(false);
+        // Mark all remaining file indicators as completed (removes spinners)
+        if ((chat as any).markAllFilesCompleted) {
+          (chat as any).markAllFilesCompleted(isMountedRef);
+        }
       }
     },
     [
