@@ -102,14 +102,14 @@ export function VersionSelector({
             align="end"
             className="w-48 bg-surface-1/95 backdrop-blur-xl border-border/50 shadow-xl shadow-black/20 rounded-xl"
           >
-            {/* Deploy this version */}
+            {/* Deploy this version to Vercel */}
             {onDeployVersion && (
               <DropdownMenuItem
                 onClick={() => onDeployVersion(currentVersionId)}
                 className="gap-2 cursor-pointer rounded-md mx-1 my-0.5 text-sm"
               >
                 <Rocket className="w-4 h-4 text-green-400" />
-                <span>Deploy {selectedVersion?.label || "this version"}</span>
+                <span>Deploy to Vercel</span>
               </DropdownMenuItem>
             )}
             
