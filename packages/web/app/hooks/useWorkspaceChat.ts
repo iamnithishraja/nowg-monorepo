@@ -281,6 +281,32 @@ export function useWorkspaceChat() {
     }
   };
 
+  // Mark ALL remaining incomplete files as completed (call when streaming ends)
+  const markAllFilesCompleted = (mountedRef?: React.RefObject<boolean>) => {
+    if (mountedRef?.current === false) return;
+
+    let hasChanges = false;
+    fileCreationState.current.files.forEach((fileData, fileName) => {
+      if (!fileData.completed) {
+        fileCreationState.current.files.set(fileName, {
+          ...fileData,
+          completed: true,
+        });
+        hasChanges = true;
+      }
+    });
+
+    // Also clear generating more state
+    if (fileCreationState.current.isGeneratingMore) {
+      fileCreationState.current.isGeneratingMore = false;
+      hasChanges = true;
+    }
+
+    if (hasChanges) {
+      updateMessageWithChecklist(mountedRef);
+    }
+  };
+
   const addApplicationStarted = (
     command: string,
     mountedRef?: React.RefObject<boolean>
@@ -937,6 +963,7 @@ export function useWorkspaceChat() {
     updateLastAssistantMessage,
     addFileCreationIndicator,
     markFileCompleted,
+    markAllFilesCompleted,
     setProjectTitle,
     addApplicationStarted,
     sendChatMessage,

@@ -216,6 +216,8 @@ export function useWorkspaceController(
   const latestPreviewRef = useRef<string | null>(
     livePreviewUrl || previewUrl || null
   );
+  // Track if version was captured in current streaming session (prevents duplicates)
+  const versionCapturedInSessionRef = useRef(false);
 
   useEffect(() => {
     latestFilesRef.current = files.templateFilesState;
@@ -234,13 +236,21 @@ export function useWorkspaceController(
   }, [livePreviewUrl, previewUrl]);
 
   const captureVersionSnapshot = useCallback(
-    async (label?: string) => {
+    async (label?: string, force = false) => {
+      // Skip if already captured in this session (unless forced)
+      if (!force && versionCapturedInSessionRef.current) {
+        return;
+      }
+      
       if (!versionsHydrated || !conversationId) return;
 
       const filesSnapshot = cloneTemplateFiles(latestFilesRef.current);
       if (filesSnapshot.length === 0) {
         return;
       }
+      
+      // Mark as captured for this session
+      versionCapturedInSessionRef.current = true;
 
       let anchorMessageId: string | null = null;
       try {
@@ -865,6 +875,10 @@ conversationId
         (async () => {
           if (isMountedRef.current) {
             chat.setIsStreaming(false);
+            // Mark all remaining file indicators as completed (removes spinners)
+            if ((chat as any).markAllFilesCompleted) {
+              (chat as any).markAllFilesCompleted(isMountedRef);
+            }
             // When prompt streaming is fully complete, switch to preview tab
             setActiveTab("preview" as any);
             void captureVersionSnapshot();
@@ -948,6 +962,7 @@ conversationId
     enableFigmaMCP,
     chatMode,
     onChatTitleUpdated,
+    captureVersionSnapshot, // Auto-create version after chat streaming
   });
 
   const handleSend = async (messageContent: string) => {
@@ -1064,6 +1079,9 @@ conversationId
 
     // Pass file metadata to baseHandleSend - it will add the message with files
     try {
+      // Reset version captured flag for this new streaming session
+      versionCapturedInSessionRef.current = false;
+      
       const response = await baseHandleSend(messageContent, fileMetadata);
 
       // Clear uploaded files state immediately after message is sent
@@ -1071,6 +1089,10 @@ conversationId
 
       if (response) {
         await stream(response);
+        
+        // Ensure version snapshot is captured after streaming completes
+        // This is a fallback in case onDone doesn't fire properly
+        await captureVersionSnapshot();
       }
 
       // NOTE: We keep files in IndexedDB for faster loading
@@ -1201,6 +1223,10 @@ conversationId
     await ensureLatestVersionBeforeSend();
 
     const messageContent = input.trim();
+    
+    // Reset version captured flag for this new message
+    versionCapturedInSessionRef.current = false;
+    
     if (!hasHandledInitialPrompt) {
       // For empty conversations, use initial prompt handler which includes template selection/cloning
       await handleInitialPrompt(messageContent, conversationId || undefined);
@@ -1404,6 +1430,121 @@ conversationId
     await captureVersionSnapshot(restoredLabel);
   }, [canRestoreVersion, currentVersionId, versions, captureVersionSnapshot]);
 
+  // Revert to a specific version - restores files, creates a new version, and syncs to R2
+  const handleRevertToVersion = useCallback(
+    async (versionId: string) => {
+      if (!versionId || isRestoringVersion || !versionsHydrated || !conversationId) return;
+
+      const targetVersion = versions.find((v) => v.id === versionId);
+      if (!targetVersion) return;
+
+      setIsRestoringVersion(true);
+      try {
+        // First, restore the files from the target version
+        await resetProjectDirectory("/home/project");
+
+        for (const file of targetVersion.files) {
+          await saveFile(file.path, file.content);
+        }
+
+        const clonedFiles = cloneTemplateFiles(targetVersion.files);
+        files.setTemplateFilesState(clonedFiles);
+        latestFilesRef.current = clonedFiles;
+        files.setFilesMap(buildFilesMapFromSnapshot(clonedFiles));
+        const nextSelectedPath =
+          targetVersion.selectedPath ?? clonedFiles[0]?.path ?? "";
+        files.setSelectedPath(nextSelectedPath);
+        latestSelectedPathRef.current = nextSelectedPath;
+
+        chat.setIsLoading(false);
+        chat.setIsStreaming(false);
+        if ((chat as any).resetFileIndicators) {
+          (chat as any).resetFileIndicators();
+        }
+
+        const nextPreview = targetVersion.previewUrl ?? null;
+        setPreviewUrl(nextPreview);
+        latestPreviewRef.current = nextPreview;
+
+        const { clearTerminal } = useWorkspaceStore.getState() as any;
+        clearTerminal();
+
+        // Now create a new version with these files (making it the latest)
+        const revertedLabel = `Reverted to ${targetVersion.label}`;
+        const savedVersion = await createVersion({
+          label: revertedLabel,
+          files: clonedFiles,
+          previewUrl: nextPreview,
+          selectedPath: nextSelectedPath,
+          anchorMessageId: targetVersion.anchorMessageId,
+        });
+
+        if (savedVersion?.id) {
+          setCurrentVersionId(savedVersion.id);
+        }
+
+        // Sync reverted files to R2 so they persist when reopening the conversation
+        const filesToSync = clonedFiles
+          .filter((f) => f.content && f.content.trim().length > 0)
+          .map((f) => ({
+            path: f.path,
+            content: f.content,
+          }));
+
+        if (filesToSync.length > 0) {
+          const { setIsSyncingToR2 } = useWorkspaceStore.getState();
+          try {
+            setIsSyncingToR2(true);
+            const syncResponse = await fetch("/api/conversations", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "syncFilesToR2",
+                conversationId,
+                files: filesToSync,
+              }),
+            });
+
+            if (!syncResponse.ok) {
+              console.warn(
+                "[Revert] Failed to sync reverted files to R2:",
+                await syncResponse.text()
+              );
+            }
+          } catch (syncError) {
+            console.error("[Revert] Error syncing files to R2:", syncError);
+          } finally {
+            setIsSyncingToR2(false);
+          }
+
+          // Also save IndexedDB snapshot for fast restore
+          try {
+            const snapshot = filesToSnapshot(filesToSync);
+            await saveSnapshot(conversationId, snapshot);
+          } catch (snapshotError) {
+            console.error("[Revert] Error saving IndexedDB snapshot:", snapshotError);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to revert to version:", error);
+      } finally {
+        setIsRestoringVersion(false);
+      }
+    },
+    [
+      versions,
+      isRestoringVersion,
+      versionsHydrated,
+      conversationId,
+      resetProjectDirectory,
+      saveFile,
+      files,
+      chat,
+      setPreviewUrl,
+      createVersion,
+    ]
+  );
+
   const handleReturnToLatestVersion = useCallback(() => {
     if (isOnLatestVersion || !latestVersionIdInList) {
       return;
@@ -1476,12 +1617,14 @@ conversationId
 
     // versioning
     versionOptions,
+    versions, // Full version objects with files for deployment
     currentVersionId,
     handleVersionSelect,
     isRestoringVersion,
     handleManualVersionCreate,
     canCreateVersion,
     handleRestoreCurrentVersion,
+    handleRevertToVersion,
     handleReturnToLatestVersion,
     canRestoreVersion,
     isOnLatestVersion,

@@ -104,6 +104,12 @@ interface WorkspaceRightHeaderProps {
   previewUrl?: string | null;
   onVersionSelect?: (versionId: string) => void;
   onAgentClick?: () => void;
+  /** Revert to a specific version - makes it the new latest */
+  onRevertToVersion?: (versionId: string) => void;
+  /** Go back to the latest version */
+  onGoToLatest?: () => void;
+  /** Whether restoring a version */
+  isRestoringVersion?: boolean;
 }
 
 export function WorkspaceRightHeader({
@@ -116,6 +122,9 @@ export function WorkspaceRightHeader({
   previewUrl,
   onVersionSelect,
   onAgentClick,
+  onRevertToVersion,
+  onGoToLatest,
+  isRestoringVersion = false,
 }: WorkspaceRightHeaderProps) {
   const navigate = useNavigate();
   const [user, setUser] = useState<any | null>(null);
@@ -421,6 +430,9 @@ export function WorkspaceRightHeader({
               versions={versions}
               currentVersionId={currentVersionId}
               onSelect={onVersionSelect}
+              onRevertToVersion={onRevertToVersion}
+              onGoToLatest={onGoToLatest}
+              isRestoring={isRestoringVersion}
             />
           )}
         </div>

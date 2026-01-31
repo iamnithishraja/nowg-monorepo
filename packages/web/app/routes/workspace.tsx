@@ -1011,6 +1011,9 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     previewUrl={controller.previewUrl}
                     onVersionSelect={controller.handleVersionSelect}
                     onAgentClick={() => setShowAgentModal(true)}
+                    onRevertToVersion={controller.handleRevertToVersion}
+                    onGoToLatest={controller.handleReturnToLatestVersion}
+                    isRestoringVersion={controller.isRestoringVersion}
                   />
 
                   {/* Right Panel Content */}
