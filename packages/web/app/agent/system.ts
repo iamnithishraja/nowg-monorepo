@@ -3,6 +3,13 @@ import type { FileNode, FileMap } from "../utils/constants";
 import { WORK_DIR } from "../utils/constants";
 import { AgentContext } from "./context";
 
+// Import provider-specific prompts
+import PROMPT_ANTHROPIC from "./prompts/anthropic.txt?raw";
+import PROMPT_GEMINI from "./prompts/gemini.txt?raw";
+import PROMPT_OPENAI from "./prompts/openai.txt?raw";
+import PROMPT_DEFAULT from "./prompts/default.txt?raw";
+import PROMPT_MAIN from "./prompts/main.txt?raw";
+
 /**
  * System prompt builder for the agent
  * 
@@ -12,6 +19,7 @@ import { AgentContext } from "./context";
  * - Agent-specific prompts
  * - Project rules (AGENTS.md, CLAUDE.md, etc.)
  * - Auto-loaded file contents
+ * - Provider-specific prompts based on model
  */
 export namespace SystemPrompt {
   /**
@@ -28,13 +36,53 @@ export namespace SystemPrompt {
     cwd?: string;
     /** Global rules from outside WebContainer (like ~/.config/opencode/AGENTS.md) */
     globalRules?: AgentContext.GlobalRulesConfig;
+    /** Model ID for provider-specific prompt selection (e.g., "anthropic/claude-3.5-sonnet") */
+    model?: string;
+  }
+
+  /**
+   * Get provider-specific prompt based on model ID
+   * 
+   * This selects the appropriate prompt based on the model:
+   * - Claude models → anthropic.txt (task management focused with todos)
+   * - GPT/O-series models → openai.txt (agent-focused, thorough)
+   * - Gemini models → gemini.txt (concise, step-by-step)
+   * - Other models → default.txt (simple, concise)
+   */
+  export function getProviderPrompt(model?: string): string {
+    if (!model) return PROMPT_MAIN;
+    
+    const modelLower = model.toLowerCase();
+    
+    // Claude models (Anthropic)
+    if (modelLower.includes("claude") || modelLower.includes("anthropic")) {
+      return PROMPT_ANTHROPIC;
+    }
+    
+    // GPT and O-series models (OpenAI)
+    if (
+      modelLower.includes("gpt-") || 
+      modelLower.includes("o1") || 
+      modelLower.includes("o3") ||
+      modelLower.includes("openai")
+    ) {
+      return PROMPT_OPENAI;
+    }
+    
+    // Gemini models (Google)
+    if (modelLower.includes("gemini") || modelLower.includes("google")) {
+      return PROMPT_GEMINI;
+    }
+    
+    // Qwen, Llama, Mistral, and other models
+    return PROMPT_DEFAULT;
   }
 
   /**
    * Build the complete system prompt with full context
    * 
    * This is the main entry point that handles:
-   * 1. Agent-specific prompt
+   * 1. Provider-specific prompt based on model
    * 2. Environment info
    * 3. Project file tree
    * 4. Project rules (AGENTS.md, CLAUDE.md) - with hierarchical search
@@ -45,8 +93,8 @@ export namespace SystemPrompt {
   export function build(options: Options = {}): string[] {
     const parts: string[] = [];
 
-    // 1. Main agent prompt
-    parts.push(agentPrompt(options.agent));
+    // 1. Main agent prompt (provider-specific if model is provided)
+    parts.push(agentPrompt(options.agent, options.model));
 
     // 2. Build context (includes file tree, rules with hierarchical search, referenced files)
     if (options.files && Object.keys(options.files).length > 0) {
@@ -83,11 +131,13 @@ export namespace SystemPrompt {
     agent?: Agent.Info;
     context: AgentContext.Context;
     customInstructions?: string;
+    /** Model ID for provider-specific prompt selection */
+    model?: string;
   }): string[] {
     const parts: string[] = [];
 
-    // Agent prompt
-    parts.push(agentPrompt(options.agent));
+    // Agent prompt (provider-specific if model is provided)
+    parts.push(agentPrompt(options.agent, options.model));
 
     // Pre-built context
     parts.push(AgentContext.formatAsPrompt(options.context));
@@ -115,15 +165,20 @@ export namespace SystemPrompt {
 
   /**
    * Get the main agent prompt based on provider/model
+   * 
+   * Priority:
+   * 1. Agent-specific prompt (if agent has custom prompt)
+   * 2. Provider-specific prompt based on model
+   * 3. Default main prompt
    */
-  export function agentPrompt(agent?: Agent.Info): string {
+  export function agentPrompt(agent?: Agent.Info, model?: string): string {
     // Use agent-specific prompt if provided
     if (agent?.prompt) {
       return agent.prompt;
     }
 
-    // Default comprehensive prompt for WebContainer environment
-    return MAIN_AGENT_PROMPT;
+    // Use provider-specific prompt based on model
+    return getProviderPrompt(model);
   }
 
   // ============================================================================
@@ -169,116 +224,3 @@ export namespace SystemPrompt {
     ].join("\n");
   }
 }
-
-/**
- * Main agent prompt - comprehensive instructions for the AI
- * 
- * This covers:
- * - WebContainer environment constraints
- * - Tool usage guidelines
- * - Code quality standards
- * - Response formatting
- */
-const MAIN_AGENT_PROMPT = `You are an expert AI coding assistant operating in a WebContainer environment.
-
-You are an interactive assistant that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
-
-# Environment
-
-You are operating in WebContainer, an in-browser Node.js runtime that emulates a Linux system. Key constraints:
-- All code executes in the browser (no cloud VM)
-- Shell emulates zsh
-- Cannot run native binaries (only JS, WebAssembly, etc.)
-- Python is limited to standard library only (no pip)
-- No C/C++ compiler available
-- Git is NOT available (do not use git commands)
-- Use npm packages for web servers (prefer Vite)
-- Prefer libsql/sqlite over native database binaries
-- diff and patch commands are NOT available (use edit tool instead)
-
-# File References
-
-When the user mentions files with @filename syntax, those files have been automatically loaded into context and their contents are available in the <referenced_files> section of this prompt. You don't need to read them again unless you need to refresh the content.
-
-# Project Rules
-
-Project rule files (AGENTS.md, CLAUDE.md, CONTEXT.md) are searched hierarchically from your current directory up to the project root. More deeply nested rule files take precedence over parent directories. Their contents will be included in the <project_instructions> section.
-
-Global rule files (from ~/.config/opencode/AGENTS.md or ~/.claude/CLAUDE.md) may also be included in the <global_instructions> section. Project-specific instructions take precedence over global instructions when they conflict.
-
-Follow these instructions as they define the conventions and patterns for this codebase.
-
-# Tools
-
-You have access to various tools for file operations, code search, and shell commands. Use these tools to:
-- Read and write files
-- Search the codebase with grep and glob
-- Execute shell commands
-- Navigate the file system
-
-# Tool Usage Guidelines
-
-1. **Use specialized tools instead of shell commands when possible:**
-   - Use \`read\` tool instead of \`cat\`
-   - Use \`write\` tool for creating/updating files
-   - Use \`edit\` tool for precise modifications
-   - Use \`grep\` tool for searching file contents
-   - Use \`glob\` tool for finding files by pattern
-   - Use \`ls\` tool for directory listings
-
-2. **When using bash:**
-   - Prefer Node.js scripts over shell scripts
-   - Always provide a description of what the command does
-   - Use appropriate timeouts for long-running commands
-
-3. **For file operations:**
-   - Always use absolute paths starting with /home/project
-   - Check if files exist before modifying
-   - Provide complete file contents (no truncation)
-
-4. **For code exploration:**
-   - Use grep to search for patterns
-   - Use glob to find files by extension or name
-   - Use codesearch for semantic code understanding
-
-# Response Style
-
-- Be concise and direct
-- Show your work with tool calls
-- Explain what you're doing briefly
-- Focus on solving the user's problem
-- Use markdown for formatting responses
-
-# Code Quality
-
-When writing code:
-- Use 2 spaces for indentation
-- Follow existing code style and conventions
-- Split functionality into smaller modules
-- Keep files focused and maintainable
-- Add appropriate error handling
-
-# Important Rules
-
-1. **Never use placeholders** - Always provide complete, working code
-2. **Don't ask permission** - Just do the task
-3. **Be proactive** - Anticipate related changes needed
-4. **Preserve existing code** - Don't remove code unless asked
-5. **Test your changes** - Run build/lint commands to verify
-
-# App Runtime
-
-**CRITICAL: The app is ALWAYS already running.** Do NOT attempt to:
-- Run \`npm run dev\`, \`npm start\`, \`npm run serve\`, or similar commands
-- Start any dev servers (Vite, webpack-dev-server, Next.js dev, etc.)
-- Run any commands that start the application
-
-The WebContainer environment automatically runs the application with hot module replacement (HMR). Any code changes you make will be automatically reflected in the running app without needing to restart it.
-
-If you need to verify changes work:
-- Changes to React/Vue/frontend code will hot-reload automatically
-- Changes to API routes or server code will also hot-reload
-- You can use \`npm run build\` or \`npm run lint\` to check for errors
-- Do NOT run dev server commands - the app is already running
-
-Remember: You are helping build real software. Your code should be production-ready, well-organized, and follow best practices.`;

@@ -496,13 +496,14 @@ export async function action({ request }: ActionFunctionArgs) {
           // Get the agent
           const agent = Agent.get(agentName) || Agent.defaultAgent();
 
-          // Build system prompt
+          // Build system prompt with provider-specific prompt based on model
           const systemParts = SystemPrompt.build({
             agent,
             files,
             fileTree,
             customInstructions,
             userMessage: prompt,
+            model, // Pass model for provider-specific prompt selection
           });
           const systemPrompt = systemParts.join("\n\n");
 

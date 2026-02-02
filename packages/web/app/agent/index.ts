@@ -44,6 +44,10 @@ export { AgentContext } from "./context";
 import PROMPT_MAIN from "./prompts/main.txt?raw";
 import PROMPT_EXPLORE from "./prompts/explore.txt?raw";
 import PROMPT_WEBCONTAINER from "./prompts/webcontainer.txt?raw";
+import PROMPT_ANTHROPIC from "./prompts/anthropic.txt?raw";
+import PROMPT_GEMINI from "./prompts/gemini.txt?raw";
+import PROMPT_OPENAI from "./prompts/openai.txt?raw";
+import PROMPT_DEFAULT from "./prompts/default.txt?raw";
 
 /**
  * Prompt constants for direct access
@@ -52,6 +56,11 @@ export const Prompts = {
   MAIN: PROMPT_MAIN,
   EXPLORE: PROMPT_EXPLORE,
   WEBCONTAINER: PROMPT_WEBCONTAINER,
+  // Provider-specific prompts
+  ANTHROPIC: PROMPT_ANTHROPIC,
+  GEMINI: PROMPT_GEMINI,
+  OPENAI: PROMPT_OPENAI,
+  DEFAULT: PROMPT_DEFAULT,
 };
 
 /**
@@ -69,6 +78,7 @@ export interface AgentRuntime {
  * This handles:
  * - Agent selection
  * - System prompt building with full context
+ * - Provider-specific prompts based on model
  * - Tool resolution
  * - Auto-loading @file references from userMessage
  * - Hierarchical project rules search (AGENTS.md, CLAUDE.md)
@@ -87,6 +97,8 @@ export async function createAgentRuntime(options: {
   cwd?: string;
   /** Global rules from outside WebContainer */
   globalRules?: import("./context").AgentContext.GlobalRulesConfig;
+  /** Model ID for provider-specific prompt selection (e.g., "anthropic/claude-3.5-sonnet") */
+  model?: string;
 }): Promise<AgentRuntime> {
   const { Agent } = await import("./agent");
   const { SystemPrompt } = await import("./system");
@@ -98,6 +110,7 @@ export async function createAgentRuntime(options: {
     : Agent.defaultAgent();
 
   // Build system prompt with full context including:
+  // - Provider-specific prompt based on model
   // - Environment info
   // - File tree
   // - Project rules (hierarchical search from cwd to root)
@@ -111,6 +124,7 @@ export async function createAgentRuntime(options: {
     userMessage: options.userMessage,
     cwd: options.cwd,
     globalRules: options.globalRules,
+    model: options.model,
   });
 
   // Resolve tools
