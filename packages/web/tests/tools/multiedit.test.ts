@@ -343,7 +343,7 @@ describe("MultiEditTool", () => {
       ).rejects.toThrow("Edit 2 of 2 failed");
     });
 
-    it("should not apply any edits if one fails", async () => {
+    it("should not apply any edits if one fails (atomic operation)", async () => {
       const mockContainer = createMockWebContainer({
         "/project/test.ts": "original content",
       });
@@ -362,9 +362,9 @@ describe("MultiEditTool", () => {
         )
       ).rejects.toThrow();
 
-      // File should not be written since we throw before write
-      // Note: In this implementation, we validate all edits in memory first
-      // and only write at the end, so this is atomic
+      // File should not be written since we apply all edits in memory first
+      // and only write at the end - this is atomic/transactional behavior
+      expect(mockContainer.fs.writeFile).not.toHaveBeenCalled();
     });
   });
 
@@ -386,7 +386,7 @@ describe("MultiEditTool", () => {
         createMockContext()
       );
 
-      expect(result.metadata.edits).toHaveLength(2);
+      expect(result.metadata.editsApplied).toBe(2);
       expect(result.metadata.totalAdditions).toBeGreaterThan(0);
       expect(result.metadata.diff).toBeDefined();
     });
@@ -508,6 +508,29 @@ describe("MultiEditTool", () => {
         "/project/test.ts",
         "function myFunction() { return otherFunction(); }"
       );
+    });
+
+    it("should only read and write file once (optimized)", async () => {
+      const mockContainer = createMockWebContainer({
+        "/project/test.ts": "a b c d e",
+      });
+      WebContainerProvider.getInstance().setContainer(mockContainer as any);
+
+      await MultiEditTool.execute(
+        {
+          filePath: "test.ts",
+          edits: [
+            { oldString: "a", newString: "1" },
+            { oldString: "b", newString: "2" },
+            { oldString: "c", newString: "3" },
+          ],
+        },
+        createMockContext()
+      );
+
+      // Should read once and write once regardless of number of edits
+      expect(mockContainer.fs.readFile).toHaveBeenCalledTimes(1);
+      expect(mockContainer.fs.writeFile).toHaveBeenCalledTimes(1);
     });
   });
 });

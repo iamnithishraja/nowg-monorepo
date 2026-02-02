@@ -578,9 +578,9 @@ interface EditMetadata {
 /**
  * Edit tool for WebContainer filesystem
  *
- * This tool performs exact string replacements in files within the WebContainer.
- * It supports various fuzzy matching strategies to handle whitespace and
- * indentation differences.
+ * OPTIMIZED: This tool performs exact string replacements in files within the WebContainer.
+ * It supports various fuzzy matching strategies to handle whitespace and indentation differences.
+ * Optimized for reliability in web container environments with fail-fast validation.
  */
 export const EditTool = Tool.define<
   z.ZodObject<{
@@ -605,24 +605,7 @@ export const EditTool = Tool.define<
   }),
 
   async execute(params, _ctx) {
-    console.log(`[EditTool] Starting edit for ${params.filePath}`);
-    const provider = WebContainerProvider.getInstance();
-
-    let webcontainer = provider.getContainerSync();
-    console.log(`[EditTool] WebContainer sync check: ${!!webcontainer}`);
-    if (!webcontainer) {
-      console.log(`[EditTool] Waiting for WebContainer (1000ms timeout)...`);
-      webcontainer = await provider.getContainer(1000);
-      console.log(`[EditTool] WebContainer after wait: ${!!webcontainer}`);
-    }
-
-    if (!webcontainer) {
-      console.error(`[EditTool] WebContainer not available after wait`);
-      throw new Error(
-        "WebContainer is not available. Please ensure the workspace is initialized."
-      );
-    }
-
+    // Validate params first (fail fast before any I/O)
     if (!params.filePath) {
       throw new Error("filePath is required");
     }
@@ -631,17 +614,31 @@ export const EditTool = Tool.define<
       throw new Error("oldString and newString must be different");
     }
 
+    console.log(`[Edit] Starting edit for ${params.filePath}`);
+
+    // Get WebContainer - fail fast if not available
+    const provider = WebContainerProvider.getInstance();
+    let webcontainer = provider.getContainerSync();
+    
+    if (!webcontainer) {
+      webcontainer = await provider.getContainer(2000);
+    }
+
+    if (!webcontainer) {
+      throw new Error(
+        "WebContainer is not available. Please ensure the workspace is initialized."
+      );
+    }
+
     const fullPath = getFullPath(params.filePath);
     const title = normalizePath(params.filePath);
 
     let contentOld = "";
     let contentNew = "";
-    let diff = "";
 
     // Handle creating new file (empty oldString)
     if (params.oldString === "") {
       contentNew = params.newString;
-      diff = generateDiff(title, contentOld, contentNew);
 
       // Create directory if needed
       const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
@@ -651,9 +648,13 @@ export const EditTool = Tool.define<
         // Directory might already exist
       }
 
+      console.log(`[Edit] Creating new file: ${fullPath}`);
       await webcontainer.fs.writeFile(fullPath, params.newString);
+      console.log(`[Edit] File created successfully`);
 
+      const diff = generateDiff(title, contentOld, contentNew);
       const newLines = contentNew.split("\n").length;
+      
       return {
         title,
         output: `Created new file with ${newLines} lines`,
@@ -665,58 +666,50 @@ export const EditTool = Tool.define<
       };
     }
 
-    // Read existing content - this will throw if file doesn't exist or is a directory
-    console.log(`[EditTool] Reading file: ${fullPath}`);
-    let bytes: Uint8Array;
+    // Read existing file
+    console.log(`[Edit] Reading file: ${fullPath}`);
     try {
-      bytes = await webcontainer.fs.readFile(fullPath);
-      console.log(`[EditTool] File read successfully, size: ${bytes.length} bytes`);
+      const bytes = await webcontainer.fs.readFile(fullPath);
+      contentOld = new TextDecoder().decode(bytes);
+      console.log(`[Edit] File read: ${bytes.length} bytes`);
     } catch (e) {
-      console.log(`[EditTool] File read error:`, e);
-      const errorMsg = (e as Error).message || "";
-      // Check if it's a directory by trying readdir
+      // Check if it's a directory
       let isDirectory = false;
       try {
-        const entries = await webcontainer.fs.readdir(fullPath);
-        if (entries.length > 0 || !errorMsg.includes("ENOENT")) {
-          isDirectory = true;
-        }
-    } catch {
-        // readdir also failed, so it's just a missing file
+        await webcontainer.fs.readdir(fullPath);
+        isDirectory = true;
+      } catch {
+        // readdir failed too, so it's just a missing file
       }
+      
       if (isDirectory) {
         throw new Error(`Path is a directory, not a file: ${params.filePath}`);
       }
       throw new Error(`File not found: ${params.filePath}`);
     }
-    contentOld = new TextDecoder().decode(bytes);
 
-    // Perform replacement
-    console.log(`[EditTool] Performing replacement, oldString length: ${params.oldString.length}, newString length: ${params.newString.length}`);
+    // Perform replacement in memory
     contentNew = replace(
       contentOld,
       params.oldString,
       params.newString,
-      params.replaceAll
+      params.replaceAll ?? false
     );
-    console.log(`[EditTool] Replacement done, content changed: ${contentOld !== contentNew}`);
 
     // Write the new content
-    console.log(`[EditTool] Writing file: ${fullPath}`);
+    console.log(`[Edit] Writing file: ${fullPath}`);
     await webcontainer.fs.writeFile(fullPath, contentNew);
-    console.log(`[EditTool] File written successfully`);
+    console.log(`[Edit] File written successfully`);
 
-    // Generate diff
-    diff = generateDiff(title, contentOld, contentNew);
-
-    // Count additions and deletions
+    // Generate diff and count changes
+    const diff = generateDiff(title, contentOld, contentNew);
     const oldLines = contentOld.split("\n");
     const newLines = contentNew.split("\n");
-    let additions = 0;
-    let deletions = 0;
-
     const oldSet = new Set(oldLines);
     const newSet = new Set(newLines);
+
+    let additions = 0;
+    let deletions = 0;
 
     for (const line of newLines) {
       if (!oldSet.has(line)) {

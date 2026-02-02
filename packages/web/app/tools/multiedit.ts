@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { Tool } from "./tool";
-import { EditTool } from "./edit";
+import { replace } from "./edit";
+import { WebContainerProvider } from "./webcontainer-provider";
+import { WORK_DIR } from "../utils/constants";
 import DESCRIPTION from "./multiedit.txt?raw";
 
 /**
@@ -8,7 +10,7 @@ import DESCRIPTION from "./multiedit.txt?raw";
  */
 function normalizePath(filePath: string): string {
   let normalized = filePath.replace(/^\/+/, "");
-  const workDirName = "project";
+  const workDirName = WORK_DIR.replace(/^\/+/, "");
   if (normalized.startsWith(workDirName + "/")) {
     normalized = normalized.slice(workDirName.length + 1);
   }
@@ -16,12 +18,76 @@ function normalizePath(filePath: string): string {
 }
 
 /**
- * Metadata for a single edit result
+ * Get the full path within the WebContainer
  */
-interface SingleEditMetadata {
-  diff: string;
-  additions: number;
-  deletions: number;
+function getFullPath(filePath: string): string {
+  const normalized = normalizePath(filePath);
+  return `${WORK_DIR}/${normalized}`;
+}
+
+/**
+ * Normalize line endings to \n
+ */
+function normalizeLineEndings(text: string): string {
+  return text.replaceAll("\r\n", "\n");
+}
+
+/**
+ * Generate a unified diff between two strings
+ */
+function generateDiff(
+  filePath: string,
+  oldContent: string,
+  newContent: string
+): string {
+  const oldLines = normalizeLineEndings(oldContent).split("\n");
+  const newLines = normalizeLineEndings(newContent).split("\n");
+
+  const diff: string[] = [];
+  diff.push(`--- ${filePath}`);
+  diff.push(`+++ ${filePath}`);
+
+  let i = 0;
+  let j = 0;
+
+  while (i < oldLines.length || j < newLines.length) {
+    if (i >= oldLines.length) {
+      diff.push(`+${newLines[j]}`);
+      j++;
+    } else if (j >= newLines.length) {
+      diff.push(`-${oldLines[i]}`);
+      i++;
+    } else if (oldLines[i] === newLines[j]) {
+      diff.push(` ${oldLines[i]}`);
+      i++;
+      j++;
+    } else {
+      let foundMatch = false;
+      for (let k = 1; k < 10 && !foundMatch; k++) {
+        if (i + k < oldLines.length && oldLines[i + k] === newLines[j]) {
+          for (let l = 0; l < k; l++) {
+            diff.push(`-${oldLines[i + l]}`);
+          }
+          i += k;
+          foundMatch = true;
+        } else if (j + k < newLines.length && oldLines[i] === newLines[j + k]) {
+          for (let l = 0; l < k; l++) {
+            diff.push(`+${newLines[j + l]}`);
+          }
+          j += k;
+          foundMatch = true;
+        }
+      }
+      if (!foundMatch) {
+        diff.push(`-${oldLines[i]}`);
+        diff.push(`+${newLines[j]}`);
+        i++;
+        j++;
+      }
+    }
+  }
+
+  return diff.join("\n");
 }
 
 /**
@@ -30,22 +96,22 @@ interface SingleEditMetadata {
 interface MultiEditMetadata {
   /** The combined diff showing all changes */
   diff: string;
-  /** Results from each individual edit */
-  edits: SingleEditMetadata[];
   /** Total number of lines added */
   totalAdditions: number;
   /** Total number of lines deleted */
   totalDeletions: number;
   /** Whether a new file was created */
   created: boolean;
+  /** Number of edits applied */
+  editsApplied: number;
 }
 
 /**
  * MultiEdit tool for WebContainer filesystem
  *
- * This tool performs multiple sequential edit operations on a single file.
- * It delegates to the EditTool for each individual edit, ensuring
- * consistent behavior and error handling.
+ * OPTIMIZED: This tool reads the file once, applies all edits in memory,
+ * then writes the file once. This is much more reliable and performant
+ * in web container environments compared to multiple read/write cycles.
  */
 export const MultiEditTool = Tool.define<
   z.ZodObject<{
@@ -81,108 +147,154 @@ export const MultiEditTool = Tool.define<
       .describe("Array of edit operations to perform sequentially on the file"),
   }),
 
-  async execute(params, ctx) {
-    // Debug logging to understand what params are received
-    console.log(`[MultiEdit] Received params:`, JSON.stringify(params, null, 2));
-    console.log(`[MultiEdit] params.filePath type:`, typeof params.filePath);
-    console.log(`[MultiEdit] params.edits type:`, typeof params.edits, Array.isArray(params.edits));
-    
+  async execute(params, _ctx) {
+    // Validate params
     if (!params.filePath) {
       throw new Error("filePath is required");
     }
 
     if (!params.edits || params.edits.length === 0) {
-      console.error(`[MultiEdit] edits validation failed:`, {
-        edits: params.edits,
-        isArray: Array.isArray(params.edits),
-        length: params.edits?.length
-      });
       throw new Error("At least one edit is required");
     }
 
+    console.log(`[MultiEdit] Starting ${params.edits.length} edits on ${params.filePath}`);
+
+    // Get WebContainer - fail fast if not available
+    const provider = WebContainerProvider.getInstance();
+    let webcontainer = provider.getContainerSync();
+    
+    if (!webcontainer) {
+      webcontainer = await provider.getContainer(2000);
+    }
+
+    if (!webcontainer) {
+      throw new Error(
+        "WebContainer is not available. Please ensure the workspace is initialized."
+      );
+    }
+
+    const fullPath = getFullPath(params.filePath);
     const title = normalizePath(params.filePath);
-    const edits: SingleEditMetadata[] = [];
+    
+    let contentOriginal = "";
+    let content = "";
     let created = false;
 
-    // Execute each edit sequentially using EditTool
-    console.log(`[MultiEdit] Starting ${params.edits.length} edits on ${params.filePath}`);
-    console.log(`[MultiEdit] Edits array details:`, params.edits.map((e, i) => ({
-      index: i,
-      oldStringLength: e.oldString?.length,
-      newStringLength: e.newString?.length,
-      replaceAll: e.replaceAll,
-      oldStringPreview: e.oldString?.substring(0, 100),
-    })));
-    
-    for (let i = 0; i < params.edits.length; i++) {
-      const edit = params.edits[i];
-
-      // Check if this is a file creation (first edit with empty oldString)
-      if (i === 0 && edit.oldString === "") {
-        created = true;
+    // Check if this is a file creation (first edit with empty oldString)
+    if (params.edits[0].oldString === "") {
+      created = true;
+      content = params.edits[0].newString;
+      console.log(`[MultiEdit] Creating new file`);
+      
+      // If there are more edits after creation, apply them
+      for (let i = 1; i < params.edits.length; i++) {
+        const edit = params.edits[i];
+        try {
+          content = replace(
+            content,
+            edit.oldString,
+            edit.newString,
+            edit.replaceAll ?? false
+          );
+        } catch (error) {
+          throw new Error(
+            `Edit ${i + 1} of ${params.edits.length} failed: ${(error as Error).message}`
+          );
+        }
+      }
+    } else {
+      // Read file once
+      console.log(`[MultiEdit] Reading file: ${fullPath}`);
+      try {
+        const bytes = await webcontainer.fs.readFile(fullPath);
+        contentOriginal = new TextDecoder().decode(bytes);
+        content = contentOriginal;
+        console.log(`[MultiEdit] File read: ${bytes.length} bytes`);
+      } catch (e) {
+        // Check if it's a directory by trying readdir
+        let isDirectory = false;
+        try {
+          const entries = await webcontainer.fs.readdir(fullPath);
+          // If readdir succeeds, it's a directory
+          isDirectory = true;
+        } catch {
+          // readdir failed too, so it's just a missing file
+        }
+        
+        if (isDirectory) {
+          throw new Error(`Path is a directory, not a file: ${params.filePath}`);
+        }
+        throw new Error(`File not found: ${params.filePath}`);
       }
 
-      console.log(`[MultiEdit] Edit ${i + 1}/${params.edits.length} | oldString preview: "${edit.oldString.substring(0, 50)}..."`);
-
-      try {
-        console.log(`[MultiEdit] Edit ${i + 1}/${params.edits.length} calling EditTool with:`, {
-          filePath: params.filePath,
-          oldStringLength: edit.oldString?.length,
-          newStringLength: edit.newString?.length,
-          oldStringType: typeof edit.oldString,
-          newStringType: typeof edit.newString,
-        });
+      // Apply all edits in memory
+      for (let i = 0; i < params.edits.length; i++) {
+        const edit = params.edits[i];
+        console.log(`[MultiEdit] Applying edit ${i + 1}/${params.edits.length}`);
         
-        const result = await EditTool.execute(
-          {
-            filePath: params.filePath,
-            oldString: edit.oldString,
-            newString: edit.newString,
-            replaceAll: edit.replaceAll,
-          },
-          ctx
-        );
-
-        edits.push(result.metadata);
-        console.log(`[MultiEdit] Edit ${i + 1}/${params.edits.length} completed successfully`);
-      } catch (error) {
-        const errorMsg = (error as Error).message;
-        const errorStack = (error as Error).stack;
-        console.error(`[MultiEdit] Edit ${i + 1}/${params.edits.length} FAILED:`, {
-          error: errorMsg,
-          stack: errorStack,
-          editDetails: {
-            filePath: params.filePath,
-            oldStringLength: edit.oldString?.length,
-            newStringLength: edit.newString?.length,
-            oldStringPreview: edit.oldString?.substring(0, 200),
-            newStringPreview: edit.newString?.substring(0, 200),
-          }
-        });
-        throw new Error(
-          `Edit ${i + 1} of ${params.edits.length} failed: ${errorMsg}`
-        );
+        try {
+          content = replace(
+            content,
+            edit.oldString,
+            edit.newString,
+            edit.replaceAll ?? false
+          );
+        } catch (error) {
+          throw new Error(
+            `Edit ${i + 1} of ${params.edits.length} failed: ${(error as Error).message}`
+          );
+        }
       }
     }
-    
-    console.log(`[MultiEdit] All ${params.edits.length} edits completed successfully`);
 
-    // Calculate totals
-    const totalAdditions = edits.reduce((sum, r) => sum + r.additions, 0);
-    const totalDeletions = edits.reduce((sum, r) => sum + r.deletions, 0);
+    // Create directory if needed (for new files)
+    if (created) {
+      const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
+      try {
+        await webcontainer.fs.mkdir(dir, { recursive: true });
+      } catch {
+        // Directory might already exist
+      }
+    }
 
-    // Combine diffs
-    const diff = edits.map((e) => e.diff).join("\n\n");
+    // Write file once
+    console.log(`[MultiEdit] Writing file: ${fullPath}`);
+    await webcontainer.fs.writeFile(fullPath, content);
+    console.log(`[MultiEdit] File written successfully`);
+
+    // Generate diff
+    const diff = generateDiff(title, contentOriginal, content);
+
+    // Count additions and deletions
+    const oldLines = contentOriginal.split("\n");
+    const newLines = content.split("\n");
+    const oldSet = new Set(oldLines);
+    const newSet = new Set(newLines);
+
+    let totalAdditions = 0;
+    let totalDeletions = 0;
+
+    for (const line of newLines) {
+      if (!oldSet.has(line)) {
+        totalAdditions++;
+      }
+    }
+
+    for (const line of oldLines) {
+      if (!newSet.has(line)) {
+        totalDeletions++;
+      }
+    }
 
     return {
       title,
       output: `Applied ${params.edits.length} edits: +${totalAdditions} -${totalDeletions} lines`,
       metadata: {
         diff,
-        edits,
         totalAdditions,
         totalDeletions,
         created,
+        editsApplied: params.edits.length,
       },
     };
   },

@@ -32,6 +32,9 @@ export function useWorkspaceChat() {
 
   // Track which assistant message is currently being streamed to
   const currentAssistantMessageId = useRef<string | null>(null);
+  
+  // Track last processed text delta to prevent duplicates (React 18 StrictMode can cause double processing)
+  const lastProcessedTextRef = useRef<{ text: string; timestamp: number } | null>(null);
 
   // Track file creation for appending to message content
   const fileCreationState = useRef({
@@ -145,6 +148,7 @@ export function useWorkspaceChat() {
     setStreamingSegments([]);
     currentToolCallsRef.current = [];
     streamingSegmentsRef.current = [];
+    lastProcessedTextRef.current = null; // Reset text deduplication tracker
     
     currentAssistantMessageId.current = id;
     return id;
@@ -872,26 +876,55 @@ export function useWorkspaceChat() {
   };
 
   // Wrapper for setCurrentToolCalls that also syncs the ref
+  // IMPORTANT: Computes new value OUTSIDE the setState callback to avoid React 18 StrictMode
+  // double-invocation issues. React can call the updater function multiple times, so we must
+  // not have side effects (like mutating refs) inside it.
+  // Also includes deduplication to prevent the same tool call from appearing twice.
   const setCurrentToolCallsWithSync = (updater: any[] | ((prev: any[]) => any[])) => {
-    setCurrentToolCalls((prev) => {
-      const newValue = typeof updater === 'function' ? updater(prev) : updater;
-      currentToolCallsRef.current = newValue;
-      return newValue;
+    // 1. Read current value from ref (source of truth)
+    const currentValue = currentToolCallsRef.current;
+    // 2. Compute new value
+    let newValue = typeof updater === 'function' ? updater(currentValue) : updater;
+    // 3. Deduplicate by tool call ID (prevents duplicates from rapid state updates)
+    const seenIds = new Set<string>();
+    newValue = newValue.filter((tc: any) => {
+      if (!tc.id) return true; // Keep items without ID
+      if (seenIds.has(tc.id)) return false; // Skip duplicates
+      seenIds.add(tc.id);
+      return true;
     });
+    // 4. Update ref synchronously (before React processes the state update)
+    currentToolCallsRef.current = newValue;
+    // 5. Set React state directly (no callback = no double-invocation issues)
+    setCurrentToolCalls(newValue);
   };
 
   // Wrapper for setStreamingSegments that also syncs the ref
+  // IMPORTANT: Same pattern as setCurrentToolCallsWithSync to avoid duplication
   const setStreamingSegmentsWithSync = (updater: StreamingSegment[] | ((prev: StreamingSegment[]) => StreamingSegment[])) => {
-    setStreamingSegments((prev) => {
-      const newValue = typeof updater === 'function' ? updater(prev) : updater;
-      streamingSegmentsRef.current = newValue;
-      return newValue;
-    });
+    // 1. Read current value from ref (source of truth)
+    const currentValue = streamingSegmentsRef.current;
+    // 2. Compute new value
+    const newValue = typeof updater === 'function' ? updater(currentValue) : updater;
+    // 3. Update ref synchronously
+    streamingSegmentsRef.current = newValue;
+    // 4. Set React state directly
+    setStreamingSegments(newValue);
   };
 
   // Append text to streaming segments (updates last text segment or creates new one)
+  // Includes deduplication to prevent the same text from being added twice in rapid succession
   const appendTextSegment = (text: string, mountedRef?: React.RefObject<boolean>) => {
     if (mountedRef?.current === false) return;
+    
+    // Deduplicate: if the same text was processed very recently (within 50ms), skip it
+    // This prevents React 18 StrictMode double-processing from causing duplicate text
+    const now = Date.now();
+    const last = lastProcessedTextRef.current;
+    if (last && last.text === text && now - last.timestamp < 50) {
+      return; // Skip duplicate
+    }
+    lastProcessedTextRef.current = { text, timestamp: now };
     
     setStreamingSegmentsWithSync((prev) => {
       const lastSegment = prev[prev.length - 1];
@@ -910,13 +943,21 @@ export function useWorkspaceChat() {
   };
 
   // Append a tool call segment
+  // Includes deduplication to prevent the same tool call from appearing twice
   const appendToolCallSegment = (toolCall: any, mountedRef?: React.RefObject<boolean>) => {
     if (mountedRef?.current === false) return;
     
-    setStreamingSegmentsWithSync((prev) => [
-      ...prev,
-      { type: 'toolCall' as const, toolCall }
-    ]);
+    setStreamingSegmentsWithSync((prev) => {
+      // Check if this tool call already exists in segments
+      const existsInSegments = prev.some(
+        (segment) => segment.type === 'toolCall' && segment.toolCall.id === toolCall.id
+      );
+      if (existsInSegments) {
+        // Already exists, don't add duplicate
+        return prev;
+      }
+      return [...prev, { type: 'toolCall' as const, toolCall }];
+    });
   };
 
   // Update a tool call in streaming segments
@@ -977,6 +1018,7 @@ export function useWorkspaceChat() {
     isStreaming,
     error,
     currentToolCalls,
+    streamingSegments, // CRITICAL: Must be included for tool call status updates to show in UI
     // Functions are stable references, but include for completeness
   ]);
 }

@@ -821,10 +821,16 @@ export async function action({ request }: ActionFunctionArgs) {
             outputTokens,
           });
 
+          // Only sync and save message when the prompt is complete (no pending tool calls)
+          // This prevents slow syncing during intermediate tool execution steps
+          // The frontend will sync files after the complete agent loop finishes
+          const isPromptComplete = pendingToolCalls.length === 0;
+
           if (
             conversationId &&
             chatId &&
-            (fullText || pendingToolCalls.length > 0)
+            isPromptComplete &&
+            fullText
           ) {
             try {
               // Notify frontend that R2 sync is starting
