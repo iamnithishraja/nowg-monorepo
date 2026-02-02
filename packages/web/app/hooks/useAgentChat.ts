@@ -226,8 +226,10 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     autoToolCalls: AgentToolCall[];
     /** Action tool calls (require acknowledgement) */
     ackToolCalls: AgentToolCall[];
-    /** Messages for continuation */
+    /** Messages for continuation (legacy format) */
     messages: CoreMessage[];
+    /** Messages for continuation (OpenCode-aligned parts-based format) */
+    messagesWithParts?: any[];
   }
 
   /**
@@ -250,6 +252,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       let toolCalls: AgentToolCall[] = [];
       let sessionId = state.sessionId;
       let messagesForContinuation: CoreMessage[] = [];
+      let messagesWithPartsForContinuation: any[] | undefined;
       let awaitingToolResults = false;
       let hasAckTools = false;
       let hasAutoTools = false;
@@ -335,7 +338,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                   }));
                 }
                 
+                // Capture both legacy and parts-based messages for continuation
                 messagesForContinuation = data.messages || [];
+                messagesWithPartsForContinuation = data.messagesWithParts;
                 awaitingToolResults = true;
                 hasAckTools = data.hasAckTools || false;
                 hasAutoTools = data.hasAutoTools || false;
@@ -357,6 +362,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                   autoToolCalls: [],
                   ackToolCalls: [],
                   messages: messagesForContinuation,
+                  messagesWithParts: messagesWithPartsForContinuation,
                 };
               }
 
@@ -400,6 +406,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         autoToolCalls,
         ackToolCalls,
         messages: messagesForContinuation,
+        messagesWithParts: messagesWithPartsForContinuation,
       };
     },
     [state.sessionId, onTextDelta, onToolCall, onStepComplete, onChatTitleUpdated]
@@ -559,8 +566,8 @@ results?: ToolResultPayload[],
           return;
         }
 
-        // Only auto tools - continue automatically
-        await continueWithResults(results, result.messages, currentStep, allToolCalls, finalText, abortSignal);
+        // Only auto tools - continue automatically with parts-based messages
+        await continueWithResults(results, result.messages, currentStep, allToolCalls, finalText, abortSignal, result.messagesWithParts);
         return;
       }
 
@@ -635,19 +642,21 @@ results?: ToolResultPayload[],
       currentStep: number,
       allToolCalls: AgentToolCall[],
       currentText: string,
-      abortSignal: AbortSignal
+      abortSignal: AbortSignal,
+      messagesWithParts?: any[] // Parts-based format (OpenCode-aligned)
     ) => {
       let step = currentStep;
       let tools = [...allToolCalls];
       let text = currentText;
       let msgs = messages;
+      let partsBasedMsgs = messagesWithParts;
 
       while (step < maxSteps) {
         if (abortSignal.aborted) {
           break;
         }
 
-        // Send tool results
+        // Send tool results with parts-based messages (OpenCode-aligned)
         const response = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -661,6 +670,9 @@ results?: ToolResultPayload[],
             maxSteps,
             sessionId: state.sessionId,
             currentStep: step,
+            // Send parts-based format if available (preferred)
+            messagesWithParts: partsBasedMsgs,
+            // Also send legacy format
             messages: msgs,
             toolResults,
           }),
@@ -743,6 +755,7 @@ results?: ToolResultPayload[],
         console.log("[useAgentChat] Auto tools only, continuing loop");
         toolResults = results;
         msgs = result.messages;
+        partsBasedMsgs = result.messagesWithParts;
       }
       
       console.log("[useAgentChat] Loop ended, max steps reached:", step, ">=", maxSteps);
@@ -886,8 +899,8 @@ results?: ToolResultPayload[],
           return;
         }
 
-        // Only auto tools - continue the loop automatically
-        await continueWithResults(results, result.messages, currentStep, allToolCalls, finalText, abortSignal);
+        // Only auto tools - continue the loop automatically with parts-based messages
+        await continueWithResults(results, result.messages, currentStep, allToolCalls, finalText, abortSignal, result.messagesWithParts);
 
       } catch (error) {
         console.error("[useAgentChat] Error in sendMessage:", error);

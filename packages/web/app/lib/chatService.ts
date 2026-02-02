@@ -552,18 +552,24 @@ export class ChatService {
         throw new Error("Conversation not found");
       }
 
-      // Extract tool calls and tool results if present
+      // Extract tool calls and tool results if present (legacy format)
       const toolCalls = (message as any).toolCalls || undefined;
       const toolResults = (message as any).toolResults || undefined;
+      
+      // Extract parts-based format if provided (OpenCode-aligned)
+      const messageParts = (message as any).parts || undefined;
+      const sessionID = (message as any).sessionID || `session-${Date.now()}`;
 
       // Determine role - support "toolcall" role for tool call messages
       const role =
         (message as any).role === "toolcall" ? "toolcall" : message.role;
 
       // Extract model and token info (only for assistant messages)
-      const model =
-        (message as any).model ||
-        (role === "assistant" ? conversation.model : undefined);
+      const modelInfo = (message as any).model;
+      const model = typeof modelInfo === "string" 
+        ? modelInfo 
+        : (modelInfo?.modelID || (role === "assistant" ? conversation.model : undefined));
+      const providerID = typeof modelInfo === "object" ? modelInfo.providerID : "openrouter";
       const tokensUsed = (message as any).tokensUsed;
       const inputTokens = (message as any).inputTokens;
       const outputTokens = (message as any).outputTokens;
@@ -579,14 +585,105 @@ export class ChatService {
           console.log(
             `[ChatService] Duplicate message with clientRequestId ${clientRequestId}, returning existing`
           );
-          return existingMessage._id.toString();
+          return { messageId: existingMessage._id.toString() };
         }
       }
 
-      // Create AgentMessage - uses simpler schema designed for agent chat
+      // Build parts array (OpenCode-aligned format)
+      // If parts provided directly, use them; otherwise convert from legacy format
+      let parts: any[] = [];
+      
+      if (messageParts && Array.isArray(messageParts)) {
+        // Use provided parts directly
+        parts = messageParts;
+      } else {
+        // Convert legacy format to parts
+        // Add text content as text part
+        if (message.content) {
+          parts.push({
+            id: `part-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            type: "text",
+            text: message.content,
+          });
+        }
+        
+        // Convert tool calls to tool parts
+        if (toolCalls && Array.isArray(toolCalls)) {
+          for (const tc of toolCalls) {
+            const toolCallId = tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`;
+            const toolName = tc.name || tc.toolName;
+            const args = tc.args || {};
+            const status = tc.status || "pending";
+            
+            let state: any;
+            if (status === "completed" || tc.result) {
+              state = {
+                status: "completed",
+                input: args,
+                output: typeof tc.result === "string" ? tc.result : (tc.result?.output || JSON.stringify(tc.result || "")),
+                title: tc.title || "",
+                metadata: tc.metadata || {},
+                time: {
+                  start: tc.startTime || Date.now(),
+                  end: tc.endTime || Date.now(),
+                },
+              };
+            } else if (status === "error") {
+              state = {
+                status: "error",
+                input: args,
+                error: tc.error || tc.result?.error || "Unknown error",
+                time: {
+                  start: tc.startTime || Date.now(),
+                  end: tc.endTime || Date.now(),
+                },
+              };
+            } else {
+              state = {
+                status: status === "executing" ? "running" : "pending",
+                input: args,
+                ...(status === "running" || status === "executing" 
+                  ? { time: { start: tc.startTime || Date.now() } } 
+                  : {}),
+              };
+            }
+            
+            parts.push({
+              id: `part-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+              type: "tool",
+              callID: toolCallId,
+              tool: toolName,
+              category: tc.category,
+              state,
+            });
+          }
+        }
+      }
+
+      // Create AgentMessage - uses OpenCode-aligned schema with parts
       const messageDoc = new AgentMessage({
         conversationId: new mongoose.Types.ObjectId(conversationId),
-        role: role,
+        sessionID: sessionID,
+        role: role === "toolcall" ? "assistant" : role,
+        time: {
+          created: Date.now(),
+          completed: role === "assistant" ? Date.now() : undefined,
+        },
+        agent: (message as any).agent || "build",
+        model: {
+          providerID: providerID,
+          modelID: model || "",
+        },
+        cost: (message as any).cost || 0,
+        tokens: {
+          input: inputTokens || 0,
+          output: outputTokens || 0,
+          reasoning: 0,
+          cache: { read: 0, write: 0 },
+        },
+        // Parts array (OpenCode-aligned)
+        parts: parts,
+        // Legacy fields for backwards compatibility
         content: message.content || "",
         toolCalls: toolCalls
           ? toolCalls.map((tc: any) => ({
@@ -601,8 +698,6 @@ export class ChatService {
             }))
           : undefined,
         toolResults: toolResults,
-        // Model and token info (assistant messages only)
-        model: model,
         tokensUsed: tokensUsed,
         inputTokens: inputTokens,
         outputTokens: outputTokens,
@@ -660,10 +755,10 @@ export class ChatService {
           const profileService = new ProfileService();
           await profileService.updateOnMessage(conversation.userId, {
             role: message.role,
-            model: (message as any).model,
-            tokensUsed: (message as any).tokensUsed,
-            inputTokens: (message as any).inputTokens,
-            outputTokens: (message as any).outputTokens,
+            model: model, // Use the extracted model string (not the raw object)
+            tokensUsed: tokensUsed,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
           });
         } catch (profileError) {
           console.error("[ChatService] Error updating profile:", profileError);

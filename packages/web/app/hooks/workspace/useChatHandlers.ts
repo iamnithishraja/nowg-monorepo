@@ -231,6 +231,7 @@ export function useChatHandlers({
 
             let currentSessionId = sessionId;
             let messagesForContinuation: any[] = [];
+            let messagesWithPartsForContinuation: any[] | undefined;
 
             if (!reader) {
               throw new Error("No response stream");
@@ -340,7 +341,10 @@ export function useChatHandlers({
                       }
                     }
 
+                    // Store both legacy and parts-based formats for continuation
+                    // Parts-based format (OpenCode-aligned) is preferred for proper tool result tracking
                     messagesForContinuation = data.messages || [];
+                    messagesWithPartsForContinuation = data.messagesWithParts;
                     const autoTools = data.autoTools || [];
                     const ackTools = data.ackTools || [];
                     const allToolsToExecute = [...autoTools, ...ackTools];
@@ -691,6 +695,8 @@ export function useChatHandlers({
 
                     // Continue agent loop with tool results
                     if (toolResults.length > 0 && currentStep < 10) {
+                      // Send continuation request with parts-based messages (OpenCode-aligned)
+                      // The backend will prefer messagesWithParts for proper tool result tracking
                       const continuationResponse = await fetch("/api/agent", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -699,6 +705,9 @@ export function useChatHandlers({
                           toolResults,
                           sessionId: currentSessionId,
                           currentStep: data.step || currentStep,
+                          // Send parts-based format if we have it (preferred)
+                          messagesWithParts: messagesWithPartsForContinuation,
+                          // Also send legacy format for backwards compatibility
                           messages: messagesForContinuation,
                           model: effectiveModel,
                           agent: agentName,

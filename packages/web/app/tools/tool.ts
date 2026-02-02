@@ -113,10 +113,14 @@ export namespace Tool {
       id,
       ...config,
       execute: async (args, ctx) => {
+        // Debug logging for tool execution
+        console.log(`[Tool.define] Executing tool "${id}" with args:`, JSON.stringify(args, null, 2).substring(0, 500));
+        
         // Validate parameters
         try {
           config.parameters.parse(args);
         } catch (error) {
+          console.error(`[Tool.define] Validation failed for "${id}":`, error);
           if (error instanceof z.ZodError && config.formatValidationError) {
             throw new Error(config.formatValidationError(error), {
               cause: error,

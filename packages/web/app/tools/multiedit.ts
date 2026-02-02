@@ -82,11 +82,21 @@ export const MultiEditTool = Tool.define<
   }),
 
   async execute(params, ctx) {
+    // Debug logging to understand what params are received
+    console.log(`[MultiEdit] Received params:`, JSON.stringify(params, null, 2));
+    console.log(`[MultiEdit] params.filePath type:`, typeof params.filePath);
+    console.log(`[MultiEdit] params.edits type:`, typeof params.edits, Array.isArray(params.edits));
+    
     if (!params.filePath) {
       throw new Error("filePath is required");
     }
 
     if (!params.edits || params.edits.length === 0) {
+      console.error(`[MultiEdit] edits validation failed:`, {
+        edits: params.edits,
+        isArray: Array.isArray(params.edits),
+        length: params.edits?.length
+      });
       throw new Error("At least one edit is required");
     }
 
@@ -96,6 +106,13 @@ export const MultiEditTool = Tool.define<
 
     // Execute each edit sequentially using EditTool
     console.log(`[MultiEdit] Starting ${params.edits.length} edits on ${params.filePath}`);
+    console.log(`[MultiEdit] Edits array details:`, params.edits.map((e, i) => ({
+      index: i,
+      oldStringLength: e.oldString?.length,
+      newStringLength: e.newString?.length,
+      replaceAll: e.replaceAll,
+      oldStringPreview: e.oldString?.substring(0, 100),
+    })));
     
     for (let i = 0; i < params.edits.length; i++) {
       const edit = params.edits[i];
@@ -108,6 +125,14 @@ export const MultiEditTool = Tool.define<
       console.log(`[MultiEdit] Edit ${i + 1}/${params.edits.length} | oldString preview: "${edit.oldString.substring(0, 50)}..."`);
 
       try {
+        console.log(`[MultiEdit] Edit ${i + 1}/${params.edits.length} calling EditTool with:`, {
+          filePath: params.filePath,
+          oldStringLength: edit.oldString?.length,
+          newStringLength: edit.newString?.length,
+          oldStringType: typeof edit.oldString,
+          newStringType: typeof edit.newString,
+        });
+        
         const result = await EditTool.execute(
           {
             filePath: params.filePath,
@@ -122,7 +147,18 @@ export const MultiEditTool = Tool.define<
         console.log(`[MultiEdit] Edit ${i + 1}/${params.edits.length} completed successfully`);
       } catch (error) {
         const errorMsg = (error as Error).message;
-        console.error(`[MultiEdit] Edit ${i + 1}/${params.edits.length} FAILED: ${errorMsg}`);
+        const errorStack = (error as Error).stack;
+        console.error(`[MultiEdit] Edit ${i + 1}/${params.edits.length} FAILED:`, {
+          error: errorMsg,
+          stack: errorStack,
+          editDetails: {
+            filePath: params.filePath,
+            oldStringLength: edit.oldString?.length,
+            newStringLength: edit.newString?.length,
+            oldStringPreview: edit.oldString?.substring(0, 200),
+            newStringPreview: edit.newString?.substring(0, 200),
+          }
+        });
         throw new Error(
           `Edit ${i + 1} of ${params.edits.length} failed: ${errorMsg}`
         );

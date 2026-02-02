@@ -10,7 +10,7 @@ import {
   UserProjectWallet,
 } from "@nowgai/shared/models";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { streamText, type CoreMessage } from "ai";
+import { streamText, type CoreMessage, type UIMessage } from "ai";
 import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
@@ -20,6 +20,14 @@ import type { FileMap, FileNode } from "~/utils/constants";
 import { ChatService } from "~/lib/chatService";
 import { connectToDatabase } from "~/lib/mongo";
 import { isWhitelistedEmail } from "~/lib/stripe";
+import {
+  convertLegacyToPartsFormat,
+  toModelMessage,
+  addToolResultsToHistory,
+  createAssistantMessageWithParts,
+} from "~/lib/agentMessageConverter";
+import type { MessageWithParts, Part, ToolPart } from "~/types/agentMessage";
+import { generateMessageId, generatePartId } from "~/models/agentMessageModel";
 
 /**
  * Agent API Endpoint
@@ -114,8 +122,10 @@ interface AgentRequest {
   requestType?: RequestType;
   /** User's prompt or message */
   prompt?: string;
-  /** Conversation history */
+  /** Conversation history (legacy format - will be converted internally) */
   messages?: CoreMessage[];
+  /** Conversation history in parts-based format (preferred, aligned with OpenCode) */
+  messagesWithParts?: MessageWithParts[];
   /** Model ID (defaults to claude-3.5-sonnet) */
   model?: string;
   /** Agent name to use (defaults to "build") */
@@ -160,6 +170,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const {
       prompt,
       messages: inputMessages = [],
+      messagesWithParts: inputMessagesWithParts,
       model = "anthropic/claude-4.5-sonnet",
       agent: agentName = "build",
       files,
@@ -514,107 +525,116 @@ export async function action({ request }: ActionFunctionArgs) {
             agent,
           });
 
-          // Build messages array
-          // Convert inputMessages to proper CoreMessage format, filtering out invalid formats
-          const messages: CoreMessage[] = [];
-
-          // Process input messages and convert to proper format
-          for (const msg of inputMessages) {
-            // Handle assistant messages with tool calls
-            if (msg.role === "assistant" && Array.isArray(msg.content)) {
-              const hasToolCalls = msg.content.some(
-                (item: any) => item.type === "tool-call"
-              );
-              if (hasToolCalls) {
-                // Extract text content and tool call info for the assistant message
-                const textItem = msg.content.find(
-                  (item: any) => item.type === "text"
-                );
-                const toolCallItems = msg.content.filter(
-                  (item: any) => item.type === "tool-call"
-                );
-
-                // Build a text representation of what the assistant did
-                // This helps the LLM understand the context of tool results
-                let assistantText =
-                  textItem && "text" in textItem ? textItem.text : "";
-
-                // Add tool call information so LLM knows what tools were called
-                if (toolCallItems.length > 0) {
-                  const toolCallsDesc = toolCallItems
-                    .map(
-                      (tc: any) =>
-                        `- Called tool "${tc.toolName}" (ID: ${tc.toolCallId})`
-                    )
-                    .join("\n");
-
-                  if (assistantText) {
-                    assistantText += "\n\n[Tool calls made:]\n" + toolCallsDesc;
-                  } else {
-                    assistantText = "[Tool calls made:]\n" + toolCallsDesc;
-                  }
-                }
-
-                if (assistantText) {
-                  messages.push({ role: "assistant", content: assistantText });
-                }
-                continue;
-              }
-            }
-
-            // For other messages, ensure content is in correct format
-            if (msg.role === "tool" && Array.isArray(msg.content)) {
-              // Tool messages should have tool-result format - keep as is if already correct
-              messages.push(msg);
-            } else if (
-              typeof msg.content === "string" ||
-              Array.isArray(msg.content)
-            ) {
-              // Valid format - user messages with string content, or properly formatted messages
-              messages.push(msg);
-            } else {
-              console.warn(
-                "[Agent API] Skipping message with invalid format:",
-                msg
-              );
-            }
+          // ============================================================================
+          // Build messages using OpenCode-aligned parts-based format
+          // This replaces the hacky text formatting with proper AI SDK format
+          // ============================================================================
+          
+          console.log("[Agent API] Building messages:", {
+            requestType,
+            hasInputMessagesWithParts: !!inputMessagesWithParts && inputMessagesWithParts.length > 0,
+            inputMessagesCount: inputMessages.length,
+            toolResultsCount: toolResults?.length || 0,
+            currentStep,
+          });
+          
+          // Convert input messages to parts-based format (like OpenCode's MessageV2.WithParts)
+          let historyWithParts: MessageWithParts[];
+          
+          if (inputMessagesWithParts && inputMessagesWithParts.length > 0) {
+            // Use parts-based format directly if provided
+            console.log("[Agent API] Using parts-based format directly");
+            historyWithParts = inputMessagesWithParts;
+          } else {
+            // Convert legacy CoreMessage format to parts-based format
+            console.log("[Agent API] Converting legacy format to parts-based");
+            historyWithParts = convertLegacyToPartsFormat(inputMessages);
           }
 
-          // If we have tool results from client, add them to continue the loop
+          // Log tool parts status before update
+          console.log("[Agent API] History before tool results update:", {
+            messageCount: historyWithParts.length,
+            toolParts: historyWithParts.flatMap(m => 
+              m.parts.filter(p => p.type === "tool").map((p: any) => ({
+                callID: p.callID,
+                tool: p.tool,
+                status: p.state?.status,
+              }))
+            ),
+          });
+
+          // If we have tool results from client, update the history with completed tool parts
+          // This is the OpenCode way - tools are stored as parts with state transitions
           if (toolResults && toolResults.length > 0) {
-            // Build a single combined tool results message for the LLM
-            // This format works better with OpenRouter and various model providers
-            // Each tool result is clearly labeled with its tool call ID and name
-            const toolResultsParts: string[] = [];
-
-            for (const tr of toolResults) {
-              const toolResultContent = tr.result.success
-                ? tr.result.output
-                : `Error: ${tr.result.error || "Tool execution failed"}`;
-
-              // Format each tool result with clear identification
-              toolResultsParts.push(
-                `=== Tool Result: ${tr.toolName} (ID: ${tr.toolCallId}) ===\n` +
-                  `Status: ${tr.result.success ? "Success" : "Error"}\n\n` +
-                  toolResultContent
-              );
-            }
-
-            // Combine all tool results into a single user message
-            // This ensures the LLM sees all results together and can properly
-            // associate them with the tool calls it made
-            const combinedToolResults: CoreMessage = {
-              role: "user",
-              content: toolResultsParts.join("\n\n" + "=".repeat(50) + "\n\n"),
-            };
-
-            messages.push(combinedToolResults);
+            console.log("[Agent API] Processing tool results:", toolResults.map(tr => ({
+              toolCallId: tr.toolCallId,
+              toolName: tr.toolName,
+              success: tr.result.success,
+              outputLength: tr.result.output?.length || 0,
+            })));
+            
+            historyWithParts = addToolResultsToHistory({
+              history: historyWithParts,
+              toolResults,
+              sessionID: sessionId,
+            });
+            
+            // Log tool parts status after update
+            console.log("[Agent API] History after tool results update:", {
+              toolParts: historyWithParts.flatMap(m => 
+                m.parts.filter(p => p.type === "tool").map((p: any) => ({
+                  callID: p.callID,
+                  tool: p.tool,
+                  status: p.state?.status,
+                }))
+              ),
+            });
           }
 
-          // Add the current prompt as user message (only on first call)
+          // Add current prompt as a new user message (only on first call)
           if (prompt && currentStep === 0) {
-            messages.push({ role: "user", content: prompt });
+            const userMessageId = generateMessageId();
+            historyWithParts.push({
+              info: {
+                id: userMessageId,
+                sessionID: sessionId,
+                role: "user",
+                time: { created: Date.now() },
+                agent: agentName,
+                model: { 
+                  providerID: "openrouter", 
+                  modelID: model 
+                },
+              },
+              parts: [{
+                id: generatePartId(),
+                sessionID: sessionId,
+                messageID: userMessageId,
+                type: "text",
+                text: prompt,
+              }],
+            });
           }
+
+          // Convert to AI SDK ModelMessage format (like OpenCode's toModelMessage)
+          // This uses proper tool-call and tool-result parts, not text hacks
+          const messages = toModelMessage(historyWithParts);
+          
+          // Log final messages being sent to LLM
+          console.log("[Agent API] Final messages for LLM:", {
+            count: messages.length,
+            roles: messages.map(m => m.role),
+            // Log tool-related content
+            toolContent: messages.flatMap((m: any) => {
+              if (m.role === 'assistant' && Array.isArray(m.content)) {
+                return m.content.filter((c: any) => c.type === 'tool-call' || c.type?.startsWith('tool-'));
+              }
+              if (m.role === 'tool') {
+                return m.content;
+              }
+              return [];
+            }),
+          });
 
           // Create OpenRouter client
           const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
@@ -810,19 +830,57 @@ export async function action({ request }: ActionFunctionArgs) {
               // Notify frontend that R2 sync is starting
               sendChunk({ type: "sync_started" });
 
+              // Build parts array for OpenCode-aligned storage
+              const partsForStorage: any[] = [];
+              
+              // Add text part if present
+              if (fullText) {
+                partsForStorage.push({
+                  id: generatePartId(),
+                  type: "text",
+                  text: fullText,
+                  time: { start: Date.now() },
+                });
+              }
+              
+              // Add tool parts
+              for (const tc of pendingToolCalls) {
+                partsForStorage.push({
+                  id: generatePartId(),
+                  type: "tool",
+                  callID: tc.id,
+                  tool: tc.name,
+                  category: getToolCategory(tc.name),
+                  state: {
+                    status: "running",
+                    input: tc.args,
+                    time: { start: Date.now() },
+                  },
+                });
+              }
+
               const assistantMessageId = await chatService.addMessageToChat(
                 conversationId,
                 chatId,
                 {
                   role: "assistant",
                   content: fullText || "",
+                  // Parts-based format (OpenCode-aligned)
+                  parts: partsForStorage,
+                  sessionID: sessionId,
+                  agent: agentName,
+                  // Legacy toolCalls for backwards compatibility
                   toolCalls: pendingToolCalls.map((tc) => ({
                     id: tc.id,
                     name: tc.name,
                     args: tc.args,
                     status: "pending", // Will be updated by frontend after execution
+                    category: getToolCategory(tc.name),
                   })),
-                  model: model,
+                  model: {
+                    providerID: "openrouter",
+                    modelID: model,
+                  },
                   tokensUsed: tokensUsed,
                   inputTokens: inputTokens,
                   outputTokens: outputTokens,
@@ -1169,25 +1227,35 @@ export async function action({ request }: ActionFunctionArgs) {
 
           // If there are pending tool calls, tell client to execute and send results back
           if (pendingToolCalls.length > 0) {
-            // Need to include the assistant message with tool calls for continuation
-            // Build content array with proper types
-            const assistantContent: Array<any> = [];
-            if (fullText) {
-              assistantContent.push({ type: "text", text: fullText });
+            // Create assistant message with tool calls in parts-based format (OpenCode-aligned)
+            // Find the last user message in history
+            let lastUserMessage: MessageWithParts | undefined;
+            for (let i = historyWithParts.length - 1; i >= 0; i--) {
+              if (historyWithParts[i].info.role === "user") {
+                lastUserMessage = historyWithParts[i];
+                break;
+              }
             }
-            for (const tc of pendingToolCalls) {
-              assistantContent.push({
-                type: "tool-call",
-                toolCallId: tc.id,
-                toolName: tc.name,
-                args: tc.args,
-              });
-            }
+            const assistantMessageWithParts = createAssistantMessageWithParts({
+              sessionID: sessionId,
+              parentID: lastUserMessage?.info.id || "",
+              text: fullText,
+              toolCalls: pendingToolCalls.map(tc => ({
+                id: tc.id,
+                name: tc.name,
+                args: tc.args as Record<string, any>,
+                category: getToolCategory(tc.name),
+              })),
+              model: { 
+                providerID: "openrouter", 
+                modelID: model 
+              },
+              tokens: { input: inputTokens, output: outputTokens },
+              cost: 0, // Will be calculated separately
+            });
 
-            const assistantMessageWithToolCalls = {
-              role: "assistant" as const,
-              content: assistantContent,
-            };
+            // Update history with the new assistant message
+            const updatedHistoryWithParts = [...historyWithParts, assistantMessageWithParts];
 
             // Determine if there are any ack tools that require user acknowledgement
             const hasAckTools = ackTools.length > 0;
@@ -1204,8 +1272,10 @@ export async function action({ request }: ActionFunctionArgs) {
               text: fullText,
               step: stepCount,
               sessionId,
-              // Send messages back so client can continue the conversation
-              messages: [...messages, assistantMessageWithToolCalls],
+              // Send parts-based messages for continuation (OpenCode-aligned)
+              messagesWithParts: updatedHistoryWithParts,
+              // Also send legacy format for backwards compatibility
+              messages: toModelMessage(updatedHistoryWithParts),
             };
 
             sendChunk(awaitingEvent);

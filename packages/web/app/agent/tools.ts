@@ -109,15 +109,27 @@ export namespace AgentTools {
       case "ZodBoolean":
         return { type: "boolean", description: def.description };
 
-      case "ZodArray":
+      case "ZodArray": {
+        // Debug: check what the array type looks like
+        const innerDef = def.type?._def;
+        if (!innerDef) {
+          console.warn(`[AgentTools] ZodArray inner type missing _def:`, def);
+        }
         return {
           type: "array",
-          items: convertZodDef(def.type._def),
+          items: innerDef ? convertZodDef(innerDef) : { type: "object" },
           description: def.description,
         };
+      }
 
-      case "ZodOptional":
-        return convertZodDef(def.innerType._def);
+      case "ZodOptional": {
+        const innerSchema = convertZodDef(def.innerType._def);
+        // Preserve description from the optional wrapper if the inner type doesn't have one
+        if (def.description && !innerSchema.description) {
+          innerSchema.description = def.description;
+        }
+        return innerSchema;
+      }
 
       case "ZodNullable":
         return {
