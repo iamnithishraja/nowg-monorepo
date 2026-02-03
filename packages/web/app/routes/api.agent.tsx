@@ -769,14 +769,18 @@ export async function action({ request }: ActionFunctionArgs) {
             const args = toolCall.args || {};
             const category = getToolCategory(toolName);
 
-            sendChunk({
-              type: "tool_call",
-              id: toolCallId,
-              name: toolName,
-              args,
-              step: stepCount,
-              category, // "auto" or "ack"
-            });
+            // Only send tool_call if not already announced via onStepFinish
+            if (!announcedToolCalls.has(toolCallId)) {
+              announcedToolCalls.add(toolCallId);
+              sendChunk({
+                type: "tool_call",
+                id: toolCallId,
+                name: toolName,
+                args,
+                step: stepCount,
+                category, // "auto" or "ack"
+              });
+            }
 
             const toolCallInfo = {
               id: toolCallId,
