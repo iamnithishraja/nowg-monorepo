@@ -128,9 +128,8 @@ export const convertToUIMessages = (messages: any[]): Message[] => {
         ? { segments: msg.segments } 
         : {}),
       // Preserve toolCalls for assistant messages (needed for file changes display)
-      ...(msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0 
-        ? { toolCalls: msg.toolCalls } 
-        : {}),
+      // Always include toolCalls array (even if empty) for proper rendering
+      toolCalls: msg.toolCalls && Array.isArray(msg.toolCalls) ? msg.toolCalls : [],
       // Preserve toolResults for agent messages
       ...(msg.toolResults && Array.isArray(msg.toolResults) && msg.toolResults.length > 0 
         ? { toolResults: msg.toolResults } 

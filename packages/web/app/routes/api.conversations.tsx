@@ -101,30 +101,58 @@ export async function loader({ request }: LoaderFunctionArgs) {
         messages: sortedMessages.map((msg: any) => {
           const messageId = msg.id || msg._id?.toString();
           
-          // Files: prefer r2Files from R2, then database r2Files, then legacy files
+          // Files: Only include for USER messages AND only actual uploaded attachments
+          // Filter out source code files (tsx, ts, js, css, etc.) - those are tool-created files
+          // User uploads are typically images, PDFs, documents
           let files: any[] | undefined = undefined;
           
-          if (msg.r2Files && msg.r2Files.length > 0) {
-            // R2 files (from R2 or database)
-            files = msg.r2Files.map((f: any) => ({
-              id: f.url || f.id || `${messageId}-${f.name}`,
-              name: f.name,
-              type: f.type,
-              size: f.size,
-              url: f.url,
-              uploadedAt: f.uploadedAt,
-              filePath: f.filePath, // Include filePath for restoration
-            }));
-          } else if (msg.files && msg.files.length > 0) {
-            // Legacy database files
-            files = msg.files.map((f: any) => ({
-              id: f._id ? f._id.toString() : f.id,
-              name: f.name,
-              type: f.type,
-              size: f.size,
-              uploadedAt: f.uploadedAt,
-              base64Data: f.base64Data, // Include file content for persistence
-            }));
+          if (msg.role === "user") {
+            // Helper to check if a file is a user upload (not code)
+            const isUserUploadedFile = (f: any) => {
+              const type = f.type || f.contentType || "";
+              const name = f.name || "";
+              // User uploads are images, PDFs, documents, etc.
+              if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/")) return true;
+              if (type === "application/pdf" || type.includes("document") || type.includes("spreadsheet")) return true;
+              // Exclude source code files (these are tool-created)
+              const ext = name.split(".").pop()?.toLowerCase() || "";
+              const codeExtensions = ["tsx", "ts", "js", "jsx", "css", "scss", "html", "json", "md", "py", "go", "rs", "java", "c", "cpp", "h", "hpp"];
+              if (codeExtensions.includes(ext)) return false;
+              // Include if it looks like a user upload
+              const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"];
+              const docExtensions = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"];
+              if (imageExtensions.includes(ext) || docExtensions.includes(ext)) return true;
+              return false;
+            };
+
+            if (msg.r2Files && msg.r2Files.length > 0) {
+              // R2 files - filter to only user uploads
+              const userUploadedFiles = msg.r2Files.filter(isUserUploadedFile);
+              if (userUploadedFiles.length > 0) {
+                files = userUploadedFiles.map((f: any) => ({
+                  id: f.url || f.id || `${messageId}-${f.name}`,
+                  name: f.name,
+                  type: f.type,
+                  size: f.size,
+                  url: f.url,
+                  uploadedAt: f.uploadedAt,
+                  filePath: f.filePath,
+                }));
+              }
+            } else if (msg.files && msg.files.length > 0) {
+              // Legacy database files - filter to only user uploads
+              const userUploadedFiles = msg.files.filter(isUserUploadedFile);
+              if (userUploadedFiles.length > 0) {
+                files = userUploadedFiles.map((f: any) => ({
+                  id: f._id ? f._id.toString() : f.id,
+                  name: f.name,
+                  type: f.type,
+                  size: f.size,
+                  uploadedAt: f.uploadedAt,
+                  base64Data: f.base64Data,
+                }));
+              }
+            }
           }
 
           return {
@@ -133,8 +161,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
             content: msg.content || "",
             timestamp: msg.timestamp || msg.createdAt,
             model: msg.model,
-            // Tool calls for assistant messages
-            toolCalls: msg.toolCalls && msg.toolCalls.length > 0
+            // Tool calls for assistant messages - always return array for consistent handling
+            toolCalls: msg.toolCalls && Array.isArray(msg.toolCalls)
               ? msg.toolCalls.map((tc: any) => ({
                   id: tc.id,
                   name: tc.name,
@@ -145,7 +173,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
                   endTime: tc.endTime,
                   category: tc.category,
                 }))
-              : undefined,
+              : [],
             files,
           };
         }),
@@ -953,18 +981,42 @@ export async function action({ request }: ActionFunctionArgs) {
           const formattedMessages = r2ChatMessages.map((msg: any) => {
             const messageId = msg.id;
             
-            // Files: use r2Files from R2
+            // Files: Only include for USER messages AND only actual uploaded attachments
+            // Filter out source code files (tsx, ts, js, css, etc.) - those are tool-created files
+            // User uploads are typically images, PDFs, documents
             let files: any[] | undefined = undefined;
-            if (msg.r2Files && msg.r2Files.length > 0) {
-              files = msg.r2Files.map((f: any) => ({
-                id: f.url || f.id || `${messageId}-${f.name}`,
-                name: f.name,
-                type: f.type,
-                size: f.size,
-                url: f.url,
-                uploadedAt: f.uploadedAt,
-                filePath: f.filePath, // Include filePath for restoration
-              }));
+            if (msg.role === "user" && msg.r2Files && msg.r2Files.length > 0) {
+              // Filter to only include user-uploaded files (images, PDFs, docs)
+              // Exclude source code files that were created by tool calls
+              const userUploadedFiles = msg.r2Files.filter((f: any) => {
+                const type = f.type || f.contentType || "";
+                const name = f.name || "";
+                // User uploads are images, PDFs, documents, etc.
+                if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/")) return true;
+                if (type === "application/pdf" || type.includes("document") || type.includes("spreadsheet")) return true;
+                // Exclude source code files (these are tool-created)
+                const ext = name.split(".").pop()?.toLowerCase() || "";
+                const codeExtensions = ["tsx", "ts", "js", "jsx", "css", "scss", "html", "json", "md", "py", "go", "rs", "java", "c", "cpp", "h", "hpp"];
+                if (codeExtensions.includes(ext)) return false;
+                // Include if it looks like a user upload (has image-like extension)
+                const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"];
+                const docExtensions = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"];
+                if (imageExtensions.includes(ext) || docExtensions.includes(ext)) return true;
+                // Default: exclude unknown types to be safe
+                return false;
+              });
+              
+              if (userUploadedFiles.length > 0) {
+                files = userUploadedFiles.map((f: any) => ({
+                  id: f.url || f.id || `${messageId}-${f.name}`,
+                  name: f.name,
+                  type: f.type,
+                  size: f.size,
+                  url: f.url,
+                  uploadedAt: f.uploadedAt,
+                  filePath: f.filePath,
+                }));
+              }
             }
 
             return {
@@ -973,10 +1025,10 @@ export async function action({ request }: ActionFunctionArgs) {
               content: msg.content || "",
               timestamp: msg.timestamp || msg.createdAt,
               model: msg.model,
-              // Tool calls for assistant messages
+              // Tool calls for assistant messages - always return array for consistent handling
               // Normalize status: when loading from R2, tool calls should be marked as completed
               // since these are historical messages and tools must have been executed
-              toolCalls: msg.toolCalls && msg.toolCalls.length > 0
+              toolCalls: msg.toolCalls && Array.isArray(msg.toolCalls)
                 ? msg.toolCalls.map((tc: any) => ({
                     id: tc.id,
                     name: tc.name,
@@ -989,7 +1041,7 @@ export async function action({ request }: ActionFunctionArgs) {
                     endTime: tc.endTime,
                     category: tc.category,
                   }))
-                : undefined,
+                : [],
               files,
             };
           });
