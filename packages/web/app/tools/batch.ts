@@ -10,7 +10,7 @@ const DISALLOWED = new Set(["batch"]);
 /**
  * Maximum number of tool calls allowed in a single batch
  */
-const MAX_BATCH_SIZE = 10;
+const MAX_BATCH_SIZE = 50;
 
 /**
  * Result of a single tool call in batch

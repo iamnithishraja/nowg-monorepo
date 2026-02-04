@@ -202,6 +202,18 @@ function ChatPanelComponent({
   );
   // keep simple chat-only view
 
+  // Debug log messages when they change
+  useEffect(() => {
+    console.log(`[ChatPanel] Messages updated - count: ${messages.length}, chatId: ${chatId}`);
+    messages.forEach((msg, idx) => {
+      const toolCalls = (msg as any).toolCalls || [];
+      console.log(`[ChatPanel] Message ${idx} - id: ${msg.id}, role: ${msg.role}, toolCalls: ${toolCalls.length}, content length: ${(msg.content || '').length}`);
+      if (toolCalls.length > 0) {
+        console.log(`[ChatPanel] Message ${idx} toolCalls:`, toolCalls);
+      }
+    });
+  }, [messages, chatId]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, isProcessingTemplate]);
@@ -1053,7 +1065,7 @@ function ChatPanelComponent({
                 )}
 
                 {/* Assistant message - clean text with file changes */}
-                {message.role === "assistant" && segments.length > 0 && (
+                {message.role === "assistant" && (segments.length > 0 || (message as any).toolCalls?.length > 0 || message.content) && (
                   <div className="w-full max-w-full space-y-2">
                     {(() => {
                       // Get the full text content
@@ -1184,32 +1196,46 @@ function ChatPanelComponent({
                       // Render segments normally, then tool calls at end (legacy fallback)
                       return (
                         <>
-                          {segments.map((segment, idx) => (
-                            <div key={`segment-${idx}`}>
-                              {segment.type === "text" && (
-                                <div className="text-sm leading-relaxed text-foreground/90">
-                                  {renderRichContent(segment.content)}
-                                </div>
-                              )}
-                              {segment.type === "checklist" && (
-                                <div className="w-full mt-4">
-                                  <FileCreationChecklist
-                                    title={segment.data.title}
-                                    files={segment.data.files}
-                                    isApplicationStarted={
-                                      segment.data.isApplicationStarted
-                                    }
-                                    command={segment.data.command}
-                                  />
-                                </div>
-                              )}
-                              {segment.type === "textAfterChecklist" && (
-                                <div className="text-sm leading-relaxed text-foreground/90 mt-4">
-                                  {renderRichContent(segment.content)}
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                          {/* Render text segments */}
+                          {segments.length > 0 ? (
+                            segments.map((segment, idx) => (
+                              <div key={`segment-${idx}`}>
+                                {segment.type === "text" && (
+                                  <div className="text-sm leading-relaxed text-foreground/90">
+                                    {renderRichContent(segment.content)}
+                                  </div>
+                                )}
+                                {segment.type === "checklist" && (
+                                  <div className="w-full mt-4">
+                                    <FileCreationChecklist
+                                      title={segment.data.title}
+                                      files={segment.data.files}
+                                      isApplicationStarted={
+                                        segment.data.isApplicationStarted
+                                      }
+                                      command={segment.data.command}
+                                    />
+                                  </div>
+                                )}
+                                {segment.type === "textAfterChecklist" && (
+                                  <div className="text-sm leading-relaxed text-foreground/90 mt-4">
+                                    {renderRichContent(segment.content)}
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            /* Fallback: if no segments but content exists, render raw content */
+                            message.content && (
+                              <div className="text-sm leading-relaxed text-foreground/90">
+                                {renderRichContent(
+                                  typeof message.content === "string"
+                                    ? message.content
+                                    : JSON.stringify(message.content)
+                                )}
+                              </div>
+                            )
+                          )}
                           {/* Tool calls at end only if no saved segments (legacy fallback) */}
                           {toolCallsToUse.length > 0 && (
                             <div className="space-y-0.5 mt-2">

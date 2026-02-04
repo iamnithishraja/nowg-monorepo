@@ -53,7 +53,7 @@ export async function processAgentResponseForChat(options: {
     files = {},
     fileTree,
     customInstructions,
-    maxSteps = 10,
+    maxSteps = 50,
     chatService,
   } = options;
 
