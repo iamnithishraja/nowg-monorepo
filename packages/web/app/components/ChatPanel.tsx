@@ -202,6 +202,18 @@ function ChatPanelComponent({
   );
   // keep simple chat-only view
 
+  // Debug log messages when they change
+  useEffect(() => {
+    console.log(`[ChatPanel] Messages updated - count: ${messages.length}, chatId: ${chatId}`);
+    messages.forEach((msg, idx) => {
+      const toolCalls = (msg as any).toolCalls || [];
+      console.log(`[ChatPanel] Message ${idx} - id: ${msg.id}, role: ${msg.role}, toolCalls: ${toolCalls.length}, content length: ${(msg.content || '').length}`);
+      if (toolCalls.length > 0) {
+        console.log(`[ChatPanel] Message ${idx} toolCalls:`, toolCalls);
+      }
+    });
+  }, [messages, chatId]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, isProcessingTemplate]);

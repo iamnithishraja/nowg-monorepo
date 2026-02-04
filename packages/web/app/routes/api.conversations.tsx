@@ -155,25 +155,44 @@ export async function loader({ request }: LoaderFunctionArgs) {
             }
           }
 
+          // Extract tool calls from legacy format or parts-based format
+          let toolCalls: any[] = [];
+          if (msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+            toolCalls = msg.toolCalls.map((tc: any) => ({
+              id: tc.id,
+              name: tc.name,
+              args: tc.args || {},
+              status: tc.status === "error" ? "error" : "completed",
+              result: tc.result,
+              startTime: tc.startTime,
+              endTime: tc.endTime,
+              category: tc.category,
+            }));
+          } else if (msg.parts && Array.isArray(msg.parts)) {
+            // Extract from parts-based format (OpenCode-aligned)
+            const toolParts = msg.parts.filter((p: any) => p.type === "tool");
+            if (toolParts.length > 0) {
+              toolCalls = toolParts.map((tp: any) => ({
+                id: tp.callID || tp.id,
+                name: tp.tool,
+                args: tp.state?.input || {},
+                status: tp.state?.status === "error" ? "error" : "completed",
+                result: tp.state?.output ? { output: tp.state.output } : undefined,
+                startTime: tp.state?.time?.start,
+                endTime: tp.state?.time?.end,
+                category: tp.category,
+              }));
+            }
+          }
+
           return {
             id: messageId,
             role: msg.role,
             content: msg.content || "",
             timestamp: msg.timestamp || msg.createdAt,
             model: msg.model,
-            // Tool calls for assistant messages - always return array for consistent handling
-            toolCalls: msg.toolCalls && Array.isArray(msg.toolCalls)
-              ? msg.toolCalls.map((tc: any) => ({
-                  id: tc.id,
-                  name: tc.name,
-                  args: tc.args,
-                  status: tc.status,
-                  result: tc.result,
-                  startTime: tc.startTime,
-                  endTime: tc.endTime,
-                  category: tc.category,
-                }))
-              : [],
+            // Tool calls - extracted from either legacy or parts format
+            toolCalls,
             files,
           };
         }),
@@ -920,6 +939,8 @@ export async function action({ request }: ActionFunctionArgs) {
         }
 
       case "getChatMessages":
+        console.log(`[getChatMessages] Request received - conversationId: ${conversationId}, chatId: ${requestBody.chatId}`);
+        
         if (!conversationId) {
           return new Response(
             JSON.stringify({
@@ -946,6 +967,8 @@ export async function action({ request }: ActionFunctionArgs) {
           ? (conversationObjForR2 as any).adminProjectId.toString()
           : undefined;
 
+        console.log(`[getChatMessages] ProjectId for R2: ${projectIdForR2}`);
+
         // Try to fetch from R2 first
         let r2ChatMessages: any[] | null = null;
         try {
@@ -955,13 +978,25 @@ export async function action({ request }: ActionFunctionArgs) {
             projectIdForR2
           );
 
+          console.log(`[getChatMessages] R2 result success: ${r2Result.success}, has data: ${!!r2Result.data}`);
+
           if (r2Result.success && r2Result.data) {
             // If chatId is provided, get messages from that chat
             if (requestBody.chatId && requestBody.chatId !== "undefined" && requestBody.chatId !== "null") {
               const chats = r2Result.data.chats || [];
+              console.log(`[getChatMessages] R2 has ${chats.length} chats, looking for chatId: ${requestBody.chatId}`);
+              console.log(`[getChatMessages] Chat IDs in R2:`, chats.map((c: any) => c.id));
+              
               const chat = chats.find((c: any) => c.id === requestBody.chatId);
+              console.log(`[getChatMessages] Found chat in R2: ${!!chat}, messages count: ${chat?.messages?.length || 0}`);
+              
               if (chat && chat.messages) {
                 r2ChatMessages = chat.messages;
+                // Log first message details for debugging
+                if (r2ChatMessages.length > 0) {
+                  const firstMsg = r2ChatMessages[0];
+                  console.log(`[getChatMessages] R2 first message - role: ${firstMsg.role}, hasToolCalls: ${!!firstMsg.toolCalls}, toolCallsLength: ${firstMsg.toolCalls?.length || 0}, hasParts: ${!!firstMsg.parts}, partsLength: ${firstMsg.parts?.length || 0}`);
+                }
               }
             } else {
               // Main conversation messages
@@ -975,11 +1010,45 @@ export async function action({ request }: ActionFunctionArgs) {
           );
         }
 
-        // If we got messages from R2, format and return them
+        // If we got messages from R2, check if they're complete
+        // R2 might be stale if it only has user message but no assistant response
+        // In that case, fall back to database which might have more recent data
+        const r2HasAssistantMessage = r2ChatMessages?.some((m: any) => m.role === "assistant");
+        const r2OnlyHasUserMessage = r2ChatMessages && r2ChatMessages.length > 0 && !r2HasAssistantMessage;
+        
+        if (r2OnlyHasUserMessage) {
+          console.log(`[getChatMessages] R2 only has user message(s), checking database for assistant messages...`);
+          // Check database for more messages
+          try {
+            const dbMessages = await chatService.getChatMessages(
+              conversationId,
+              requestBody.chatId,
+              userId
+            );
+            console.log(`[getChatMessages] Database has ${dbMessages?.length || 0} messages`);
+            if (dbMessages && dbMessages.length > r2ChatMessages.length) {
+              console.log(`[getChatMessages] Using database messages (more complete than R2)`);
+              // Database has more messages, use those instead
+              return new Response(JSON.stringify({ success: true, messages: dbMessages }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              });
+            }
+          } catch (dbError) {
+            console.warn(`[getChatMessages] Database check failed, using R2 data:`, dbError);
+          }
+        }
+        
+        // If we got messages from R2 and they seem complete, format and return them
         if (r2ChatMessages && r2ChatMessages.length > 0) {
+          console.log(`[getChatMessages] Using R2 messages, count: ${r2ChatMessages.length}`);
+          
           // Format R2 messages for frontend (ensure files are properly structured)
-          const formattedMessages = r2ChatMessages.map((msg: any) => {
+          const formattedMessages = r2ChatMessages.map((msg: any, idx: number) => {
             const messageId = msg.id;
+            
+            // Debug log raw message structure
+            console.log(`[getChatMessages] R2 msg ${idx} - id: ${messageId}, role: ${msg.role}, content length: ${(msg.content || '').length}, toolCalls: ${JSON.stringify(msg.toolCalls?.length || 0)}, parts: ${JSON.stringify(msg.parts?.length || 0)}`);
             
             // Files: Only include for USER messages AND only actual uploaded attachments
             // Filter out source code files (tsx, ts, js, css, etc.) - those are tool-created files
@@ -1019,38 +1088,62 @@ export async function action({ request }: ActionFunctionArgs) {
               }
             }
 
+            // Extract tool calls from legacy format or parts-based format
+            let toolCalls: any[] = [];
+            if (msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+              console.log(`[getChatMessages] R2 msg ${idx} - extracting from legacy toolCalls: ${msg.toolCalls.length}`);
+              toolCalls = msg.toolCalls.map((tc: any) => ({
+                id: tc.id,
+                name: tc.name,
+                args: tc.args || {},
+                status: tc.status === "error" ? "error" : "completed",
+                result: tc.result,
+                startTime: tc.startTime,
+                endTime: tc.endTime,
+                category: tc.category,
+              }));
+            } else if (msg.parts && Array.isArray(msg.parts)) {
+              // Extract from parts-based format (OpenCode-aligned)
+              const toolParts = msg.parts.filter((p: any) => p.type === "tool");
+              console.log(`[getChatMessages] R2 msg ${idx} - extracting from parts, tool parts count: ${toolParts.length}`);
+              if (toolParts.length > 0) {
+                toolCalls = toolParts.map((tp: any) => ({
+                  id: tp.callID || tp.id,
+                  name: tp.tool,
+                  args: tp.state?.input || {},
+                  status: tp.state?.status === "error" ? "error" : "completed",
+                  result: tp.state?.output ? { output: tp.state.output } : undefined,
+                  startTime: tp.state?.time?.start,
+                  endTime: tp.state?.time?.end,
+                  category: tp.category,
+                }));
+              }
+            } else {
+              console.log(`[getChatMessages] R2 msg ${idx} - NO toolCalls or parts found!`);
+            }
+
+            console.log(`[getChatMessages] R2 msg ${idx} - final toolCalls count: ${toolCalls.length}`);
+
             return {
               id: messageId,
               role: msg.role,
               content: msg.content || "",
               timestamp: msg.timestamp || msg.createdAt,
               model: msg.model,
-              // Tool calls for assistant messages - always return array for consistent handling
-              // Normalize status: when loading from R2, tool calls should be marked as completed
-              // since these are historical messages and tools must have been executed
-              toolCalls: msg.toolCalls && Array.isArray(msg.toolCalls)
-                ? msg.toolCalls.map((tc: any) => ({
-                    id: tc.id,
-                    name: tc.name,
-                    args: tc.args,
-                    // If status is missing or "pending", mark as "completed" since these are
-                    // historical messages and tools must have been executed
-                    status: tc.status === "error" ? "error" : "completed",
-                    result: tc.result,
-                    startTime: tc.startTime,
-                    endTime: tc.endTime,
-                    category: tc.category,
-                  }))
-                : [],
+              // Tool calls - extracted from either legacy or parts format
+              toolCalls,
               files,
             };
           });
 
+          console.log(`[getChatMessages] Returning ${formattedMessages.length} R2 messages`);
           return new Response(JSON.stringify({ success: true, messages: formattedMessages }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
         }
+        
+        console.log(`[getChatMessages] R2 messages not found or empty, falling back to database`);
 
         // Fallback to database
         // If chatId is not provided or invalid, return empty array (main chat)
@@ -1073,21 +1166,38 @@ export async function action({ request }: ActionFunctionArgs) {
         }
 
         try {
+          console.log(`[getChatMessages] Fetching from database - chatId: ${requestBody.chatId}`);
+          
           const messages = await chatService.getChatMessages(
             conversationId,
             requestBody.chatId,
             userId
           );
           
+          console.log(`[getChatMessages] Database returned ${messages?.length || 0} messages`);
+          
+          // Debug log each message's toolCalls
+          if (messages && messages.length > 0) {
+            messages.forEach((msg: any, idx: number) => {
+              console.log(`[getChatMessages] DB msg ${idx} - id: ${msg.id}, role: ${msg.role}, toolCalls: ${msg.toolCalls?.length || 0}, content length: ${(msg.content || '').length}`);
+              if (msg.toolCalls && msg.toolCalls.length > 0) {
+                console.log(`[getChatMessages] DB msg ${idx} - first toolCall: ${JSON.stringify(msg.toolCalls[0])}`);
+              }
+            });
+          }
+          
           // Ensure we always return an array, even if chat has no messages
           // Never fall back to conversation messages - empty chats should show empty
           const chatMessages = Array.isArray(messages) ? messages : [];
+          
+          console.log(`[getChatMessages] Returning ${chatMessages.length} database messages`);
           
           return new Response(JSON.stringify({ success: true, messages: chatMessages }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
         } catch (error: any) {
+          console.error(`[getChatMessages] Database error:`, error);
           return new Response(
             JSON.stringify({
               error: error.message || "Failed to get chat messages",
@@ -1302,19 +1412,36 @@ export async function action({ request }: ActionFunctionArgs) {
             }
           }
 
-          // If chatId is provided, update the last assistant message in that chat with r2Files
+          // If chatId is provided, update the last ASSISTANT message in that chat with r2Files
+          // IMPORTANT: Only update assistant messages, not user messages
           if (requestBody.chatId && uploadedFiles.length > 0) {
             try {
-              // Find the last assistant message in this chat
-              const chat = await (await import("~/models/chatModel")).default.findById(requestBody.chatId);
+              // Find the chat and populate messages to check their roles
+              const chat = await (await import("~/models/chatModel")).default
+                .findById(requestBody.chatId)
+                .populate('messages');
+              
               if (chat && chat.messages && chat.messages.length > 0) {
-                // Get the last message ID
-                const lastMessageId = chat.messages[chat.messages.length - 1];
+                // Find the last assistant message (not just any message)
+                let lastAssistantMessage = null;
+                for (let i = chat.messages.length - 1; i >= 0; i--) {
+                  const msg = chat.messages[i] as any;
+                  if (msg && msg.role === 'assistant') {
+                    lastAssistantMessage = msg;
+                    break;
+                  }
+                }
                 
-                // Update the message with r2Files
-                await AgentMessage.findByIdAndUpdate(lastMessageId, {
-                  $push: { r2Files: { $each: uploadedFiles } },
-                });
+                if (lastAssistantMessage) {
+                  console.log(`[syncFilesToR2] Updating assistant message ${lastAssistantMessage._id} with ${uploadedFiles.length} files`);
+                  // Update the assistant message with r2Files
+                  await AgentMessage.findByIdAndUpdate(lastAssistantMessage._id, {
+                    $push: { r2Files: { $each: uploadedFiles } },
+                  });
+                } else {
+                  console.warn(`[syncFilesToR2] No assistant message found in chat ${requestBody.chatId} - files not attached to any message`);
+                  // Don't attach files to user message - this was causing the bug
+                }
               }
             } catch (updateError: any) {
               console.error("[syncFilesToR2] Error updating message with r2Files:", updateError.message);

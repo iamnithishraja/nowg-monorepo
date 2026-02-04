@@ -26,10 +26,14 @@ export const loadConversation = async (
   conversationId: string,
   chatId?: string | null
 ) => {
+  console.log(`[loadConversation] Loading - conversationId: ${conversationId}, chatId: ${chatId}`);
+  
   let url = `/api/conversations?conversationId=${conversationId}`;
   
   // If chatId is provided, load messages for that specific chat
   if (chatId !== null && chatId !== undefined && chatId !== "null" && chatId !== "undefined") {
+    console.log(`[loadConversation] Fetching chat messages for chatId: ${chatId}`);
+    
     const response = await fetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -45,6 +49,18 @@ export const loadConversation = async (
     }
 
     const data = await response.json();
+    console.log(`[loadConversation] API response - success: ${data.success}, messages count: ${data.messages?.length || 0}`);
+    
+    // Debug log each message's toolCalls
+    if (data.messages && data.messages.length > 0) {
+      data.messages.forEach((msg: any, idx: number) => {
+        console.log(`[loadConversation] Message ${idx} - id: ${msg.id}, role: ${msg.role}, toolCalls: ${msg.toolCalls?.length || 0}, content length: ${(msg.content || '').length}`);
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          console.log(`[loadConversation] Message ${idx} toolCalls:`, msg.toolCalls);
+        }
+      });
+    }
+    
     // Ensure we always return an array - empty chats should show empty, not fall back to conversation messages
     const chatMessages = Array.isArray(data.messages) ? data.messages : [];
     
@@ -95,21 +111,27 @@ export const updateConversationUrl = (
 };
 
 export const convertToUIMessages = (messages: any[]): Message[] => {
+  console.log(`[convertToUIMessages] Input messages count: ${messages?.length || 0}`);
 
   // Filter out invalid messages and deduplicate by id
-  const validMessages = messages.filter((msg: any) => {
+  const validMessages = messages.filter((msg: any, idx: number) => {
     // Be more lenient with content filtering - only filter out completely empty messages
     // For AgentMessage, we also allow messages with toolCalls or toolResults even if content is empty
     const hasContent = msg.content !== undefined && msg.content !== null;
     const hasToolCalls = msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0;
     const hasToolResults = msg.toolResults && Array.isArray(msg.toolResults) && msg.toolResults.length > 0;
     const isValid = msg && msg.role && (hasContent || hasToolCalls || hasToolResults);
+    
+    console.log(`[convertToUIMessages] Msg ${idx} filter - role: ${msg?.role}, hasContent: ${hasContent}, hasToolCalls: ${hasToolCalls}, hasToolResults: ${hasToolResults}, isValid: ${isValid}`);
+    
     return isValid;
   });
 
+  console.log(`[convertToUIMessages] Valid messages after filter: ${validMessages.length}`);
+
   const seenIds = new Set<string>();
 
-  return validMessages
+  const result = validMessages
     .filter((msg: any) => {
       const id = msg.id || msg._id?.toString();
       if (seenIds.has(id)) {
@@ -118,30 +140,38 @@ export const convertToUIMessages = (messages: any[]): Message[] => {
       seenIds.add(id);
       return true;
     })
-    .map((msg: any, index: number) => ({
-      id: msg.id || msg._id?.toString() || `${msg.role}-${index}-${Date.now()}`,
-      role: msg.role,
-      content: msg.content || "", // Ensure content is never undefined
-      files: msg.files || undefined, // Preserve file metadata
-      // Preserve segments for interleaved text and tool call rendering
-      ...(msg.segments && Array.isArray(msg.segments) && msg.segments.length > 0 
-        ? { segments: msg.segments } 
-        : {}),
-      // Preserve toolCalls for assistant messages (needed for file changes display)
-      // Always include toolCalls array (even if empty) for proper rendering
-      toolCalls: msg.toolCalls && Array.isArray(msg.toolCalls) ? msg.toolCalls : [],
-      // Preserve toolResults for agent messages
-      ...(msg.toolResults && Array.isArray(msg.toolResults) && msg.toolResults.length > 0 
-        ? { toolResults: msg.toolResults } 
-        : {}),
-      // Preserve model and token info
-      ...(msg.model ? { model: msg.model } : {}),
-      ...(msg.tokensUsed ? { tokensUsed: msg.tokensUsed } : {}),
-      ...(msg.inputTokens ? { inputTokens: msg.inputTokens } : {}),
+    .map((msg: any, index: number) => {
+      const toolCalls = msg.toolCalls && Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
+      console.log(`[convertToUIMessages] Mapping msg ${index} - id: ${msg.id}, role: ${msg.role}, toolCalls count: ${toolCalls.length}`);
+      
+      return {
+        id: msg.id || msg._id?.toString() || `${msg.role}-${index}-${Date.now()}`,
+        role: msg.role,
+        content: msg.content || "", // Ensure content is never undefined
+        files: msg.files || undefined, // Preserve file metadata
+        // Preserve segments for interleaved text and tool call rendering
+        ...(msg.segments && Array.isArray(msg.segments) && msg.segments.length > 0 
+          ? { segments: msg.segments } 
+          : {}),
+        // Preserve toolCalls for assistant messages (needed for file changes display)
+        // Always include toolCalls array (even if empty) for proper rendering
+        toolCalls,
+        // Preserve toolResults for agent messages
+        ...(msg.toolResults && Array.isArray(msg.toolResults) && msg.toolResults.length > 0 
+          ? { toolResults: msg.toolResults } 
+          : {}),
+        // Preserve model and token info
+        ...(msg.model ? { model: msg.model } : {}),
+        ...(msg.tokensUsed ? { tokensUsed: msg.tokensUsed } : {}),
+        ...(msg.inputTokens ? { inputTokens: msg.inputTokens } : {}),
       ...(msg.outputTokens ? { outputTokens: msg.outputTokens } : {}),
       // Preserve timestamps
       ...(msg.timestamp || msg.createdAt ? { timestamp: msg.timestamp || msg.createdAt } : {}),
-    }));
+    };
+    });
+
+  console.log(`[convertToUIMessages] Final output messages count: ${result.length}`);
+  return result;
 };
 
 export function extractNowgaiActions(content: string) {

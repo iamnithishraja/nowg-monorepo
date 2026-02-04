@@ -825,17 +825,17 @@ export async function action({ request }: ActionFunctionArgs) {
             outputTokens,
           });
 
-          // Only sync and save message when the prompt is complete (no pending tool calls)
-          // This prevents slow syncing during intermediate tool execution steps
-          // The frontend will sync files after the complete agent loop finishes
-          const isPromptComplete = pendingToolCalls.length === 0;
+          // Save assistant message to database (even with pending tool calls)
+          // Tool calls will be marked as "pending" and can be updated later
+          // This ensures the assistant response is persisted before frontend executes tools
+          const hasPendingToolCalls = pendingToolCalls.length > 0;
 
           if (
             conversationId &&
             chatId &&
-            isPromptComplete &&
             fullText
           ) {
+            console.log(`[Agent API] Saving assistant message - hasPendingToolCalls: ${hasPendingToolCalls}, pendingToolCalls: ${pendingToolCalls.length}`);
             try {
               // Notify frontend that R2 sync is starting
               sendChunk({ type: "sync_started" });
@@ -869,6 +869,8 @@ export async function action({ request }: ActionFunctionArgs) {
                 });
               }
 
+              console.log(`[Agent API] Saving assistant message to chat - chatId: ${chatId}, toolCalls: ${pendingToolCalls.length}, content length: ${(fullText || '').length}`);
+              
               const assistantMessageId = await chatService.addMessageToChat(
                 conversationId,
                 chatId,
@@ -898,6 +900,8 @@ export async function action({ request }: ActionFunctionArgs) {
                 } as any,
                 userId
               );
+              
+              console.log(`[Agent API] Assistant message saved - id: ${assistantMessageId.messageId}`);
 
               // Notify frontend that R2 sync is complete
               sendChunk({ type: "sync_completed" });

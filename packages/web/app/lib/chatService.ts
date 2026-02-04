@@ -514,6 +514,8 @@ export class ChatService {
     message: Omit<Message, "id">,
     userId: string
   ): Promise<{ messageId: string; chatTitle?: string }> {
+    console.log(`[ChatService.addMessageToChat] Called - conversationId: ${conversationId}, chatId: ${chatId}, role: ${message.role}, toolCalls: ${(message as any).toolCalls?.length || 0}`);
+    
     try {
       await this.ensureConnection();
 
@@ -685,7 +687,8 @@ export class ChatService {
         parts: parts,
         // Legacy fields for backwards compatibility
         content: message.content || "",
-        toolCalls: toolCalls
+        // Always store toolCalls as array (not undefined) for consistent loading
+        toolCalls: toolCalls && Array.isArray(toolCalls)
           ? toolCalls.map((tc: any) => ({
               id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
               name: tc.name || tc.toolName,
@@ -696,8 +699,8 @@ export class ChatService {
               endTime: tc.endTime,
               category: tc.category,
             }))
-          : undefined,
-        toolResults: toolResults,
+          : [],
+        toolResults: toolResults || [],
         tokensUsed: tokensUsed,
         inputTokens: inputTokens,
         outputTokens: outputTokens,
@@ -707,6 +710,7 @@ export class ChatService {
       });
 
       const result = await messageDoc.save();
+      console.log(`[ChatService.addMessageToChat] Message saved - id: ${result._id}, role: ${message.role}`);
 
       // Automatically extract files from message content and store in R2 (for assistant messages)
       if (message.role === "assistant" && message.content) {
@@ -743,6 +747,7 @@ export class ChatService {
         $push: { messages: result._id },
         $set: { updatedAt: new Date() },
       });
+      console.log(`[ChatService.addMessageToChat] Message ${result._id} added to chat ${chatId}`);
 
       // Update conversation updatedAt but DON'T add to conversation.messages
       await Conversation.findByIdAndUpdate(conversationId, {
@@ -767,8 +772,10 @@ export class ChatService {
 
       // Sync conversation to R2 after assistant messages in chats (when LLM responds)
       if (message.role === "assistant") {
+        console.log(`[ChatService.addMessageToChat] Syncing to R2 for assistant message...`);
         try {
           await this.syncConversationToR2(conversationId, conversation.userId);
+          console.log(`[ChatService.addMessageToChat] R2 sync completed`);
         } catch (syncError) {
           console.error("[ChatService] Error syncing chat conversation to R2:", syncError);
           // Don't fail message creation if sync fails
@@ -909,31 +916,71 @@ export class ChatService {
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
 
+      console.log(`[ChatService.getChatMessages] Processing ${sortedMessages.length} messages`);
+      
       // Map to AgentMessage format with all fields
-      return sortedMessages.map((msg: any) => ({
-        id: msg._id.toString(),
-        role: msg.role,
-        content: msg.content || "",
-        // Normalize tool calls: when loading from DB, tool calls that were executed
-        // should be marked as completed. If status is "pending" but no result exists,
-        // it means the message was saved before tool execution completed - mark as completed
-        // since the conversation must have continued for the message to be saved.
-        toolCalls: (msg.toolCalls || []).map((tc: any) => ({
-          ...tc,
-          // If status is missing or "pending", mark as "completed" since these are
-          // historical messages and tools must have been executed for the conversation to continue
-          status: tc.status === "error" ? "error" : "completed",
-        })),
-        toolResults: msg.toolResults || [],
-        // Model and token info (for assistant messages)
-        model: msg.model,
-        tokensUsed: msg.tokensUsed,
-        inputTokens: msg.inputTokens,
-        outputTokens: msg.outputTokens,
-        // Timestamps
-        createdAt: msg.createdAt,
-        timestamp: msg.createdAt, // For backwards compatibility
-      }));
+      return sortedMessages.map((msg: any, idx: number) => {
+        // Debug log raw message from DB
+        console.log(`[ChatService.getChatMessages] Raw msg ${idx} - _id: ${msg._id}, role: ${msg.role}, hasToolCalls: ${!!msg.toolCalls}, toolCallsLength: ${msg.toolCalls?.length || 0}, hasParts: ${!!msg.parts}, partsLength: ${msg.parts?.length || 0}`);
+        
+        // Extract tool calls from legacy format or parts-based format
+        let toolCalls: any[] = [];
+        
+        // First try legacy toolCalls array
+        if (msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+          console.log(`[ChatService.getChatMessages] Msg ${idx} - extracting from legacy toolCalls`);
+          toolCalls = msg.toolCalls.map((tc: any) => ({
+            id: tc.id,
+            name: tc.name,
+            args: tc.args || {},
+            status: tc.status === "error" ? "error" : "completed",
+            result: tc.result,
+            startTime: tc.startTime,
+            endTime: tc.endTime,
+            category: tc.category,
+          }));
+        } 
+        // If no legacy toolCalls, extract from parts (OpenCode-aligned format)
+        else if (msg.parts && Array.isArray(msg.parts)) {
+          const toolParts = msg.parts.filter((p: any) => p.type === "tool");
+          console.log(`[ChatService.getChatMessages] Msg ${idx} - extracting from parts, found ${toolParts.length} tool parts`);
+          if (toolParts.length > 0) {
+            toolCalls = toolParts.map((tp: any) => ({
+              id: tp.callID || tp.id,
+              name: tp.tool,
+              args: tp.state?.input || {},
+              status: tp.state?.status === "error" ? "error" : "completed",
+              result: tp.state?.output ? { output: tp.state.output } : undefined,
+              startTime: tp.state?.time?.start,
+              endTime: tp.state?.time?.end,
+              category: tp.category,
+            }));
+          }
+        } else {
+          console.log(`[ChatService.getChatMessages] Msg ${idx} - NO toolCalls or parts found!`);
+        }
+
+        console.log(`[ChatService.getChatMessages] Msg ${idx} - final toolCalls count: ${toolCalls.length}`);
+
+        return {
+          id: msg._id.toString(),
+          role: msg.role,
+          content: msg.content || "",
+          // Tool calls - normalized and extracted from either format
+          toolCalls,
+          toolResults: msg.toolResults || [],
+          // Model and token info (for assistant messages)
+          model: msg.model,
+          tokensUsed: msg.tokensUsed,
+          inputTokens: msg.inputTokens,
+          outputTokens: msg.outputTokens,
+          // Timestamps
+          createdAt: msg.createdAt,
+          timestamp: msg.createdAt, // For backwards compatibility
+          // Include r2Files for file restoration
+          r2Files: msg.r2Files || [],
+        };
+      });
     } catch (error) {
       console.error("Error getting chat messages:", error);
       throw error;
@@ -1486,6 +1533,40 @@ export class ChatService {
         .sort({ timestamp: 1 })
         .lean();
 
+      // Helper to extract toolCalls from either legacy format or parts-based format
+      const extractToolCalls = (msg: any): any[] => {
+        // First try legacy toolCalls array
+        if (msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+          return msg.toolCalls.map((tc: any) => ({
+            id: tc.id,
+            name: tc.name,
+            args: tc.args || {},
+            status: tc.status || "completed",
+            result: tc.result,
+            startTime: tc.startTime,
+            endTime: tc.endTime,
+            category: tc.category,
+          }));
+        }
+        // If no legacy toolCalls, extract from parts (OpenCode-aligned format)
+        if (msg.parts && Array.isArray(msg.parts)) {
+          const toolParts = msg.parts.filter((p: any) => p.type === "tool");
+          if (toolParts.length > 0) {
+            return toolParts.map((tp: any) => ({
+              id: tp.callID || tp.id,
+              name: tp.tool,
+              args: tp.state?.input || {},
+              status: tp.state?.status || "completed",
+              result: tp.state?.output ? { output: tp.state.output } : undefined,
+              startTime: tp.state?.time?.start,
+              endTime: tp.state?.time?.end,
+              category: tp.category,
+            }));
+          }
+        }
+        return [];
+      };
+
       // Format messages for R2
       const formattedMessages = messages.map((msg: any) => ({
         id: msg._id.toString(),
@@ -1496,7 +1577,7 @@ export class ChatService {
         tokensUsed: msg.tokensUsed,
         inputTokens: msg.inputTokens,
         outputTokens: msg.outputTokens,
-        toolCalls: msg.toolCalls || [],
+        toolCalls: extractToolCalls(msg),
         r2Files: msg.r2Files ? msg.r2Files.map((f: any) => ({
           name: f.name,
           filePath: f.filePath || f.name, // Preserve filePath
@@ -1527,7 +1608,7 @@ export class ChatService {
               id: msg._id.toString(),
               role: msg.role,
               content: msg.content || "",
-              toolCalls: msg.toolCalls || [],
+              toolCalls: extractToolCalls(msg),
               toolResults: msg.toolResults || [],
               model: msg.model,
               tokensUsed: msg.tokensUsed,
