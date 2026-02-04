@@ -137,7 +137,7 @@ export namespace AgentSession {
       fileTree: config.fileTree,
       isActive: false,
       currentStep: 0,
-      maxSteps: config.maxSteps || 10,
+      maxSteps: config.maxSteps || 50,
     };
   }
 
@@ -162,7 +162,7 @@ export namespace AgentSession {
       files,
       fileTree,
       customInstructions,
-      maxSteps = 10,
+      maxSteps = 50,
       temperature,
       topP,
       abort,
@@ -359,7 +359,7 @@ export namespace AgentSession {
             messages: input.messages,
             tools,
             // @ts-ignore - maxSteps may not be in types but is supported
-            maxSteps: input.maxSteps || 10,
+            maxSteps: input.maxSteps || 50,
             temperature: input.temperature ?? input.agent.temperature,
             topP: input.topP ?? input.agent.topP,
             abortSignal: input.abort,

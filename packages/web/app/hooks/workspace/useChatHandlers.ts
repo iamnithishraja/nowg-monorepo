@@ -169,7 +169,7 @@ export function useChatHandlers({
               agent: agentName,
               files: files.filesMap || {},
               fileTree: files.fileTree,
-              maxSteps: 10,
+              maxSteps: 50,
               // Pass conversationId and chatId for message persistence
               conversationId: conversationId,
               chatId: chatId,
@@ -825,7 +825,7 @@ export function useChatHandlers({
                           agent: agentName,
                           files: files.filesMap || {},
                           fileTree: files.fileTree,
-                          maxSteps: 10,
+                          maxSteps: 50,
                           // Pass conversationId and chatId for message persistence
                           conversationId: conversationId,
                           chatId: chatId,

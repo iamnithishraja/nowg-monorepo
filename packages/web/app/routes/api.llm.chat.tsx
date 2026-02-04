@@ -830,7 +830,7 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             // Add Figma MCP tools if available
             tools: figmaTools || undefined,
             // @ts-ignore - maxSteps enables multi-step tool calling
-            maxSteps: figmaTools ? 10 : 1, // Allow multiple tool call rounds for Figma
+            maxSteps: figmaTools ? 50 : 1, // Allow multiple tool call rounds for Figma
             onStepFinish: async (stepResult: any) => {
               // Stream tool call events to frontend
               const { toolCalls, toolResults } = stepResult;

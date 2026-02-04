@@ -138,7 +138,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     files,
     fileTree,
     customInstructions,
-    maxSteps = 10,
+    maxSteps = 50,
     onTextDelta,
     onToolCall,
     onToolCallComplete,

@@ -176,7 +176,7 @@ export async function action({ request }: ActionFunctionArgs) {
       files,
       fileTree,
       customInstructions,
-      maxSteps = 10,
+      maxSteps = 50,
       toolResults,
       sessionId: inputSessionId,
       currentStep = 0,
