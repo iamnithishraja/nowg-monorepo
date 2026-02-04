@@ -799,7 +799,7 @@ export function useChatHandlers({
                       currentStep,
                     });
                     
-                    if (toolResults.length > 0 && currentStep < 10) {
+                    if (toolResults.length > 0 && currentStep < 50) {
                       // Send continuation request with parts-based messages (OpenCode-aligned)
                       // The backend will prefer messagesWithParts for proper tool result tracking
                       console.log(`[ChatHandler] Sending continuation request:`, {
