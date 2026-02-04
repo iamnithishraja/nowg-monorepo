@@ -1,4 +1,4 @@
-# Stage 1: Build with Bun
+# Stage 1: Build
 FROM oven/bun:1 AS builder
 
 WORKDIR /app
@@ -10,8 +10,8 @@ COPY tsconfig.json ./
 # Copy shared package
 COPY packages/shared ./packages/shared
 
-# Copy web package
-COPY packages/web ./packages/web
+# Copy admin-server package
+COPY packages/admin-server ./packages/admin-server
 
 # Install dependencies
 RUN bun install
@@ -20,24 +20,19 @@ RUN bun install
 WORKDIR /app/packages/shared
 RUN bun run build
 
-# Build web app
-WORKDIR /app/packages/web
-RUN bun run build
-
-# Stage 2: Production with Node.js (react-router-serve requires Node)
-FROM node:20-slim AS production
+# Stage 2: Production
+FROM oven/bun:1-slim AS production
 
 WORKDIR /app
 
-# Copy built files and dependencies
-COPY --from=builder /app/packages/web/build ./build
-COPY --from=builder /app/packages/web/package.json ./
+# Copy source files (start script runs index.ts directly)
+COPY --from=builder /app/packages/admin-server ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared/dist ./node_modules/@nowgai/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./node_modules/@nowgai/shared/
 
-# Default port 5173 (matches dev)
-EXPOSE 5173
+# Default port 3000 (from code: PORT || 3000)
+EXPOSE 3000
 
-# Same as package.json "start" script
-CMD ["npx", "react-router-serve", "./build/server/index.js"]
+# Same as package.json "start" script: bun run index.ts
+CMD ["bun", "run", "index.ts"]
