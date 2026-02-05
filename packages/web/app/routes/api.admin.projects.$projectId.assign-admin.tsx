@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import type { ActionFunctionArgs } from "react-router";
 import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
+import { sendProjectAdminAssignedEmail } from "~/lib/email";
 import { connectToDatabase } from "~/lib/mongo";
 import { isOrganizationAdmin } from "~/lib/organizationRoles";
 
@@ -204,6 +205,20 @@ export async function action({ request, params }: ActionFunctionArgs) {
     project.invitedAt = new Date();
     project.invitedBy = user.id;
     await project.save();
+
+    // Send email notification to the new project admin
+    try {
+      await sendProjectAdminAssignedEmail({
+        to: targetUser.email,
+        projectName: project.name,
+        organizationName: organization.name,
+        assignedByName: user?.name || user?.email || "Admin",
+      });
+      console.log(`✅ Email sent to project admin: ${targetUser.email}`);
+    } catch (emailError) {
+      console.error("❌ Failed to send project admin assignment email:", emailError);
+      // Don't fail the assignment if email fails
+    }
 
     return new Response(
       JSON.stringify({

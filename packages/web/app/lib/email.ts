@@ -724,6 +724,167 @@ function createOrgUserInvitationEmailTemplate({
   `;
 }
 
+interface SendProjectAdminAssignedEmailProps {
+  to: string;
+  projectName: string;
+  organizationName: string;
+  assignedByName: string;
+}
+
+export async function sendProjectAdminAssignedEmail({
+  to,
+  projectName,
+  organizationName,
+  assignedByName,
+}: SendProjectAdminAssignedEmailProps) {
+  const resendClient = getResendClient();
+  const fromEmail = getResendFrom();
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject: `You've been assigned as Project Admin for ${projectName}`,
+      html: createProjectAdminAssignedEmailTemplate({
+        projectName,
+        organizationName,
+        assignedByName,
+      }),
+    };
+
+    const result = await resendClient.emails.send(emailData);
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending project admin assigned email:", error);
+    throw new Error(
+      `Failed to send project admin assigned email: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+function createProjectAdminAssignedEmailTemplate({
+  projectName,
+  organizationName,
+  assignedByName,
+}: {
+  projectName: string;
+  organizationName: string;
+  assignedByName: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Project Admin Assignment - Nowgai</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #f8f9fa;
+        }
+        .container {
+          background: white;
+          border-radius: 12px;
+          padding: 40px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .logo {
+          font-size: 28px;
+          font-weight: bold;
+          color: #000;
+          margin-bottom: 10px;
+        }
+        .title {
+          font-size: 24px;
+          font-weight: 600;
+          color: #1a1a1a;
+          margin-bottom: 20px;
+        }
+        .message {
+          font-size: 16px;
+          color: #666;
+          margin-bottom: 30px;
+          line-height: 1.6;
+        }
+        .project-badge {
+          display: inline-block;
+          background-color: #000;
+          color: white;
+          padding: 8px 16px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 16px;
+          margin: 10px 0;
+        }
+        .role-badge {
+          display: inline-block;
+          background-color: #10b981;
+          color: white;
+          padding: 8px 16px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 14px;
+          margin: 10px 0;
+        }
+        .footer {
+          margin-top: 40px;
+          padding-top: 20px;
+          border-top: 1px solid #eee;
+          font-size: 14px;
+          color: #888;
+        }
+        .info-box {
+          background-color: #f0f9ff;
+          border: 1px solid #bae6fd;
+          border-radius: 8px;
+          padding: 15px;
+          margin: 20px 0;
+          color: #0c4a6e;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai Admin</div>
+        </div>
+        
+        <h1 class="title">You've Been Assigned as Project Admin</h1>
+        
+        <div class="message">
+          <p>Hi there,</p>
+          <p><strong>${assignedByName}</strong> has assigned you as a <strong>Project Admin</strong> for the project <strong>"${projectName}"</strong> in the organization <strong>"${organizationName}"</strong>.</p>
+          <p>Project:</p>
+          <div class="project-badge">${projectName}</div>
+          <p>Your role:</p>
+          <div class="role-badge">Project Admin</div>
+        </div>
+
+        <div class="info-box">
+          <strong>What this means:</strong> As a Project Admin, you can manage this project, add team members, and oversee all project activities. You have full administrative access to this project.
+        </div>
+        
+        <div class="footer">
+          <p>Best regards,<br>The Nowgai Admin Team</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 interface SendOrgUserInvitationEmailForNewUserProps {
   to: string;
   organizationName: string;

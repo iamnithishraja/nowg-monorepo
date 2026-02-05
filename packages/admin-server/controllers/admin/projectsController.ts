@@ -9,6 +9,7 @@ import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
 import { getUsersCollection } from "../../config/db";
 import {
+    sendProjectAdminAssignedEmail,
     sendProjectCreatedEmail
 } from "../../lib/email";
 import { isOrganizationAdmin } from "../../lib/organizationRoles";
@@ -884,6 +885,20 @@ export async function assignProjectAdmin(req: Request, res: Response) {
     console.log(
       `✅ Project admin assigned directly: ${user.email} to project ${project.name}`
     );
+
+    // Send email notification to the new project admin
+    try {
+      await sendProjectAdminAssignedEmail({
+        to: user.email,
+        projectName: project.name,
+        organizationName: organization.name,
+        assignedByName: adminUser?.name || adminUser?.email || "Admin",
+      });
+      console.log(`✅ Email sent to project admin: ${user.email}`);
+    } catch (emailError) {
+      console.error("❌ Failed to send project admin assignment email:", emailError);
+      // Don't fail the assignment if email fails
+    }
 
     return res.json({
       success: true,
