@@ -9,6 +9,7 @@ import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getUsersCollection } from "~/lib/adminHelpers";
 import { requireAdmin } from "~/lib/adminMiddleware";
+import { sendProjectAdminAssignedEmail } from "~/lib/email";
 import { getEnvWithDefault } from "~/lib/env";
 import { connectToDatabase } from "~/lib/mongo";
 import { getUserOrganizations } from "~/lib/organizationRoles";
@@ -551,6 +552,27 @@ export async function action({ request }: ActionFunctionArgs) {
             conversationError
           );
           // Don't fail project creation if conversation creation fails
+        }
+
+        // Send email notification to the project admin
+        try {
+          const { usersCollection } = await getUsersCollection();
+          const projectAdmin = await usersCollection.findOne({
+            _id: new ObjectId(projectAdminId),
+          });
+
+          if (projectAdmin && projectAdmin.email) {
+            await sendProjectAdminAssignedEmail({
+              to: projectAdmin.email,
+              projectName: project.name,
+              organizationName: organization.name,
+              assignedByName: user?.name || user?.email || "Admin",
+            });
+            console.log(`✅ Email sent to project admin: ${projectAdmin.email}`);
+          }
+        } catch (emailError) {
+          console.error("❌ Failed to send project admin assignment email:", emailError);
+          // Don't fail project creation if email fails
         }
 
         return new Response(
