@@ -1,0 +1,66 @@
+services:
+  # Main web application (React Router SSR)
+  # Uses Node.js for react-router-serve
+  web:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./packages/web/.env
+    environment:
+      # Override .env file values for Docker
+      - PORT=5173
+      - HOST=0.0.0.0
+    networks:
+      - nowgai-network
+    restart: unless-stopped
+
+  # Admin client (Vite + React SPA)
+  # Port 5174 (from vite.config.ts)
+  admin-client:
+    build:
+      context: .
+      dockerfile: packages/admin-client/Dockerfile
+    ports:
+      - "5174:5174"
+    networks:
+      - nowgai-network
+    restart: unless-stopped
+
+  # Admin server (Bun + Express)
+  # Runs: bun run index.ts (same as package.json start)
+  admin-server:
+    build:
+      context: .
+      dockerfile: packages/admin-server/Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./packages/admin-server/.env
+    networks:
+      - nowgai-network
+    restart: unless-stopped
+
+  # DataDock API (Bun + Hono)
+  # Runs: bun run dist/index.js (same as package.json start)
+  # Port 3001 to avoid conflict with admin-server
+  datadock-api:
+    build:
+      context: .
+      dockerfile: packages/datadock-api/Dockerfile
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./packages/datadock-api/.env
+    environment:
+      # Override for Docker
+      - PORT=3001
+    networks:
+      - nowgai-network
+    restart: unless-stopped
+
+networks:
+  nowgai-network:
+    driver: bridge
