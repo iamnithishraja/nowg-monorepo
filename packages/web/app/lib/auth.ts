@@ -26,7 +26,8 @@ async function createAuth() {
     await mongoClient.connect();
   }
 
-  const db = mongoClient.db("nowgai");
+  const dbName = process.env.MONGODB_DB_NAME || "nowgai";
+  const db = mongoClient.db(dbName);
 
   authInstance = betterAuth({
     secret: getEnv("BETTER_AUTH_SECRET")!,
