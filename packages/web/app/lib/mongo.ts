@@ -38,8 +38,9 @@ async function connectToDatabase() {
     }
 
     // Connect or reconnect
+    const dbName = process.env.MONGODB_DB_NAME || "nowgai";
     await mongoose.connect(uri, {
-      dbName: "nowgai",
+      dbName,
     });
 
     isConnected = true;

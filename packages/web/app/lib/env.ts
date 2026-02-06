@@ -42,8 +42,9 @@ export async function loadEnvFromDatabase(): Promise<void> {
   try {
     if (mongoose.connection.readyState !== 1) {
       // If not connected, wait for connection or connect
+      const dbName = process.env.MONGODB_DB_NAME || "nowgai";
       await mongoose.connect(process.env.MONGODB_URI!, {
-        dbName: "nowgai",
+        dbName,
       });
     }
 
@@ -169,8 +170,9 @@ export async function updateEnvKeysInCache(keys: string[]): Promise<void> {
 
   try {
     if (mongoose.connection.readyState !== 1) {
+      const dbName = process.env.MONGODB_DB_NAME || "nowgai";
       await mongoose.connect(process.env.MONGODB_URI!, {
-        dbName: "nowgai",
+        dbName,
       });
     }
 
