@@ -71,7 +71,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const mongoClient = new MongoClient(connectionString);
     await mongoClient.connect();
-    const db = mongoClient.db("nowgai");
+    const dbName = process.env.MONGODB_DB_NAME || "nowgai";
+    const db = mongoClient.db(dbName);
 
     // Convert string to ObjectId
     let objectId;

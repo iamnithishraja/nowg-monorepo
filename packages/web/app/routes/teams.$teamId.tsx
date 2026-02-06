@@ -127,7 +127,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         try {
           const mongoClient = new MongoClient(connectionString);
           await mongoClient.connect();
-          const db = mongoClient.db("nowgai");
+          const dbName = process.env.MONGODB_DB_NAME || "nowgai";
+          const db = mongoClient.db(dbName);
 
           // Convert string userIds to ObjectIds for MongoDB query
           const objectIds = userIds

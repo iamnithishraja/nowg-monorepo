@@ -15,7 +15,8 @@ export async function getUsersCollection() {
     throw new Error("Failed to get MongoDB client: client is null. Please check your MONGODB_URI environment variable and ensure the database is accessible.");
   }
   
-  const db = client.db("nowgai");
+  const dbName = process.env.MONGODB_DB_NAME || "nowgai";
+  const db = client.db(dbName);
   const usersCollection = db.collection("user");
   
   return {
