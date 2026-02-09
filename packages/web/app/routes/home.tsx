@@ -1,4 +1,4 @@
-import { UserRole } from "@nowgai/shared/types";
+import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
 import {
     ArrowSquareOut,
     ArrowUp,
@@ -225,10 +225,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     }
   }, [user]);
 
-  // Check if user is org_admin
+  // Check if user is org_admin, project_admin, or full admin
   const isOrgAdmin =
     userWithAccess?.role === UserRole.ORG_ADMIN ||
     userWithAccess?.hasOrgAdminAccess === true;
+  const isProjectAdmin =
+    userWithAccess?.role === UserRole.PROJECT_ADMIN ||
+    userWithAccess?.hasProjectAdminAccess === true;
+  const isFullAdmin = hasAdminAccess(userWithAccess?.role);
+  const canAccessAdminPanel = isFullAdmin || isOrgAdmin || isProjectAdmin;
 
   const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
 
@@ -888,13 +893,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   </>
                 )}
 
-                <DropdownMenuItem
-                  onClick={() => navigate("/admin")}
-                  className="gap-2 cursor-pointer"
-                >
-                  <Shield className="w-4 h-4" weight="bold" />
-                  Admin Panel
-                </DropdownMenuItem>
+                {canAccessAdminPanel && (
+                  <DropdownMenuItem
+                    onClick={() => navigate("/admin")}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <Shield className="w-4 h-4" weight="bold" />
+                    Admin Panel
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() => navigate("/analytics")}
                   className="gap-2 cursor-pointer"

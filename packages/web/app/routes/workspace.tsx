@@ -1014,6 +1014,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     onRevertToVersion={controller.handleRevertToVersion}
                     onGoToLatest={controller.handleReturnToLatestVersion}
                     isRestoringVersion={controller.isRestoringVersion}
+                    templateFilesState={controller.templateFilesState}
+                    conversationTitle={controller.conversationTitle || undefined}
                   />
 
                   {/* Right Panel Content */}

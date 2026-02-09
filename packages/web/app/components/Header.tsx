@@ -19,6 +19,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
 import crop from "~/assets/crop.png";
 import { authClient } from "../lib/authClient";
 import { cn } from "../lib/utils";
@@ -51,6 +52,7 @@ export default function Header({
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<any | null>(null);
+  const [userWithAccess, setUserWithAccess] = useState<any | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [isWhitelisted, setIsWhitelisted] = useState(false);
 
@@ -106,6 +108,30 @@ export default function Header({
       aborted = true;
     };
   }, []);
+
+  // Fetch user with admin access info
+  useEffect(() => {
+    let aborted = false;
+    const fetchUserAccess = async () => {
+      try {
+        const res = await fetch("/api/admin/me", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!aborted) setUserWithAccess(data);
+        }
+      } catch (error) {
+        console.error("Error fetching user access:", error);
+      }
+    };
+    if (user) {
+      fetchUserAccess();
+    }
+    return () => {
+      aborted = true;
+    };
+  }, [user]);
 
   // Fetch balance
   useEffect(() => {
@@ -350,15 +376,27 @@ export default function Header({
                     </>
                   )}
 
-                  {user && (
-                    <DropdownMenuItem
-                      onClick={() => navigate("/admin")}
-                      className="gap-2 cursor-pointer"
-                    >
-                      <Shield className="w-4 h-4" />
-                      Admin Panel
-                    </DropdownMenuItem>
-                  )}
+                  {user && (() => {
+                    const userRole = userWithAccess?.role || user?.role;
+                    const hasOrgAdminAccess = userWithAccess?.hasOrgAdminAccess || user?.hasOrgAdminAccess || false;
+                    const hasProjectAdminAccess = userWithAccess?.hasProjectAdminAccess || user?.hasProjectAdminAccess || false;
+                    const isOrgAdmin = userRole === UserRole.ORG_ADMIN || hasOrgAdminAccess;
+                    const isProjectAdmin = userRole === UserRole.PROJECT_ADMIN || hasProjectAdminAccess;
+                    const isFullAdmin = hasAdminAccess(userRole);
+                    
+                    if (isFullAdmin || isOrgAdmin || isProjectAdmin) {
+                      return (
+                        <DropdownMenuItem
+                          onClick={() => navigate("/admin")}
+                          className="gap-2 cursor-pointer"
+                        >
+                          <Shield className="w-4 h-4" />
+                          Admin Panel
+                        </DropdownMenuItem>
+                      );
+                    }
+                    return null;
+                  })()}
                   <DropdownMenuItem
                     onClick={() => navigate("/analytics")}
                     className="gap-2 cursor-pointer"
@@ -477,18 +515,30 @@ export default function Header({
                     </div>
                   </button>
 
-                  {user && (
-                    <Button
-                      onClick={() => {
-                        navigate("/admin");
-                        setIsMobileMenuOpen(false);
-                      }}
-                      variant="outline"
-                      className="w-full justify-start gap-2"
-                    >
-                      <Shield className="w-4 h-4" /> Admin Panel
-                    </Button>
-                  )}
+                  {user && (() => {
+                    const userRole = userWithAccess?.role || user?.role;
+                    const hasOrgAdminAccess = userWithAccess?.hasOrgAdminAccess || user?.hasOrgAdminAccess || false;
+                    const hasProjectAdminAccess = userWithAccess?.hasProjectAdminAccess || user?.hasProjectAdminAccess || false;
+                    const isOrgAdmin = userRole === UserRole.ORG_ADMIN || hasOrgAdminAccess;
+                    const isProjectAdmin = userRole === UserRole.PROJECT_ADMIN || hasProjectAdminAccess;
+                    const isFullAdmin = hasAdminAccess(userRole);
+                    
+                    if (isFullAdmin || isOrgAdmin || isProjectAdmin) {
+                      return (
+                        <Button
+                          onClick={() => {
+                            navigate("/admin");
+                            setIsMobileMenuOpen(false);
+                          }}
+                          variant="outline"
+                          className="w-full justify-start gap-2"
+                        >
+                          <Shield className="w-4 h-4" /> Admin Panel
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })()}
                   <Button
                     onClick={() => {
                       navigate("/analytics");

@@ -12,6 +12,7 @@ import {
   CurrencyDollar,
   Database,
   DeviceMobile,
+  Download,
   GitBranch,
   GithubLogo,
   Globe,
@@ -21,13 +22,15 @@ import {
   User as UserIcon,
   Users
 } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router";
+import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
 import { useGitHubAuth } from "~/hooks/useGitHubAuth";
 import { useGitHubRepository } from "~/hooks/useGitHubRepository";
 import { authClient } from "../lib/authClient";
 import { cn } from "../lib/utils";
 import { useIsSyncingToR2 } from "../stores/useWorkspaceStore";
+import { downloadCodebaseAsZip, getProjectName } from "../lib/downloadCodebase";
 import { UnifiedDeploymentDialog, useDeployDialog } from "./DeployDialog";
 import { GitHubDeleteDialog } from "./github/GitHubDeleteDialog";
 import { GitHubRepositoryDialog } from "./github/GitHubRepositoryDialog";
@@ -94,6 +97,12 @@ const SupabaseIcon = ({ className }: { className?: string }) => (
 
 type TabType = "files" | "preview";
 
+interface FileItem {
+  name: string;
+  path: string;
+  content: string;
+}
+
 interface WorkspaceRightHeaderProps {
   conversationId?: string;
   messageCount?: number;
@@ -110,6 +119,10 @@ interface WorkspaceRightHeaderProps {
   onGoToLatest?: () => void;
   /** Whether restoring a version */
   isRestoringVersion?: boolean;
+  /** Files to download */
+  templateFilesState?: FileItem[];
+  /** Conversation title for download filename */
+  conversationTitle?: string;
 }
 
 export function WorkspaceRightHeader({
@@ -125,6 +138,8 @@ export function WorkspaceRightHeader({
   onRevertToVersion,
   onGoToLatest,
   isRestoringVersion = false,
+  templateFilesState = [],
+  conversationTitle,
 }: WorkspaceRightHeaderProps) {
   const navigate = useNavigate();
   const [user, setUser] = useState<any | null>(null);
@@ -133,6 +148,7 @@ export function WorkspaceRightHeader({
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
   const [showGitHubDeleteDialog, setShowGitHubDeleteDialog] = useState(false);
   const [isGitHubDeleting, setIsGitHubDeleting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   // R2 sync status
   const isSyncingToR2 = useIsSyncingToR2();
@@ -181,6 +197,8 @@ export function WorkspaceRightHeader({
     versions.length
   );
 
+  const [userWithAccess, setUserWithAccess] = useState<any | null>(null);
+
   // Fetch user session
   useEffect(() => {
     let aborted = false;
@@ -221,6 +239,30 @@ export function WorkspaceRightHeader({
       aborted = true;
     };
   }, []);
+
+  // Fetch user with admin access info
+  useEffect(() => {
+    let aborted = false;
+    const fetchUserAccess = async () => {
+      try {
+        const res = await fetch("/api/admin/me", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!aborted) setUserWithAccess(data);
+        }
+      } catch (error) {
+        console.error("Error fetching user access:", error);
+      }
+    };
+    if (user) {
+      fetchUserAccess();
+    }
+    return () => {
+      aborted = true;
+    };
+  }, [user]);
 
   // Fetch balance
   useEffect(() => {
@@ -322,6 +364,26 @@ export function WorkspaceRightHeader({
     setShowGitHubDialog(false);
     clearGitHubMessages();
   };
+
+  const handleDownloadCodebase = useCallback(async () => {
+    if (templateFilesState.length === 0) {
+      alert("No files to download. Create some files first!");
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+      const projectName = getProjectName(conversationTitle);
+      await downloadCodebaseAsZip(templateFilesState, projectName);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert(
+        error instanceof Error ? error.message : "Failed to download codebase"
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [templateFilesState, conversationTitle]);
 
   const hasRepository = repositoryStatus?.hasRepository || false;
   const isSynced = repositoryStatus?.isSynced !== false;
@@ -566,18 +628,16 @@ export function WorkspaceRightHeader({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Share Button */}
+          {/* Download Button */}
           <Button
             variant="ghost"
             size="sm"
             className="h-8 px-3 rounded-lg text-white/70 hover:text-white hover:bg-white/[0.08] text-xs font-medium"
-            onClick={() => {
-              if (conversationId) {
-                navigator.clipboard.writeText(window.location.href);
-              }
-            }}
+            onClick={handleDownloadCodebase}
+            disabled={isDownloading || templateFilesState.length === 0}
           >
-            Share
+            <Download className="w-3.5 h-3.5 mr-1.5" />
+            {isDownloading ? "Downloading..." : "Download"}
           </Button>
 
           {/* User Avatar */}
@@ -681,15 +741,27 @@ export function WorkspaceRightHeader({
                 <Database className="w-4 h-4" />
                 Supabase Projects
               </DropdownMenuItem>
-              {user && (
-                <DropdownMenuItem
-                  onClick={() => navigate("/admin")}
-                  className="gap-2 cursor-pointer"
-                >
-                  <Shield className="w-4 h-4" />
-                  Admin Panel
-                </DropdownMenuItem>
-              )}
+              {user && (() => {
+                const userRole = userWithAccess?.role || user?.role;
+                const hasOrgAdminAccess = userWithAccess?.hasOrgAdminAccess || user?.hasOrgAdminAccess || false;
+                const hasProjectAdminAccess = userWithAccess?.hasProjectAdminAccess || user?.hasProjectAdminAccess || false;
+                const isOrgAdmin = userRole === UserRole.ORG_ADMIN || hasOrgAdminAccess;
+                const isProjectAdmin = userRole === UserRole.PROJECT_ADMIN || hasProjectAdminAccess;
+                const isFullAdmin = hasAdminAccess(userRole);
+                
+                if (isFullAdmin || isOrgAdmin || isProjectAdmin) {
+                  return (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin")}
+                      className="gap-2 cursor-pointer"
+                    >
+                      <Shield className="w-4 h-4" />
+                      Admin Panel
+                    </DropdownMenuItem>
+                  );
+                }
+                return null;
+              })()}
               <DropdownMenuSeparator className="bg-white/[0.08]" />
               <DropdownMenuItem
                 onClick={handleSignOut}
