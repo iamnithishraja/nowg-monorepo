@@ -1,31 +1,31 @@
 import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
 import {
-    ArrowSquareOut,
-    ArrowUp,
-    Bell,
-    BookOpen,
-    CaretRight,
-    ChartBar,
-    ChatCircle,
-    CurrencyDollar,
-    Database,
-    Gear,
-    GitBranch,
-    GithubLogo,
-    Lightning,
-    Palette,
-    PlusCircle,
-    Shield,
-    SignOut,
-    Sparkle,
-    SpinnerGap,
-    Users
+  ArrowSquareOut,
+  ArrowUp,
+  Bell,
+  BookOpen,
+  CaretRight,
+  ChartBar,
+  ChatCircle,
+  CurrencyDollar,
+  Database,
+  Gear,
+  GitBranch,
+  GithubLogo,
+  Lightning,
+  Palette,
+  PlusCircle,
+  Shield,
+  SignOut,
+  Sparkle,
+  SpinnerGap,
+  Users,
 } from "@phosphor-icons/react";
 import { memo, useEffect, useRef, useState } from "react";
 import { redirect, useNavigate } from "react-router";
 import {
-    DatabaseConnectionDialog,
-    type DbProvider,
+  DatabaseConnectionDialog,
+  type DbProvider,
 } from "../components/DatabaseConnectionDialog";
 import FigmaImportModal from "../components/FigmaImportModal";
 import { FilePreview } from "../components/FileUpload";
@@ -37,34 +37,34 @@ import { Button } from "../components/ui/button";
 import { ColorSchemeDialog } from "../components/ui/ColorSchemeDialog";
 
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "../components/ui/dialog";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { ScrollArea } from "../components/ui/scroll-area";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "../components/ui/tooltip";
 import { OPENROUTER_MODELS } from "../consts/models";
 import { useFileHandling } from "../hooks/useFileHandling";
@@ -79,6 +79,33 @@ import type { DesignScheme } from "../types/design-scheme";
 import { getShortcutLabel } from "../utils/platform";
 import type { Route } from "./+types/home";
 
+// Environment Badge Component
+const EnvironmentBadge = memo(function EnvironmentBadge() {
+  const [env, setEnv] = useState<{ label: string; color: string } | null>(null);
+
+  useEffect(() => {
+    const hostname = window.location.hostname;
+
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      setEnv({ label: "DEV", color: "bg-blue-500/90" });
+    } else if (hostname === "stg.nowg.ai") {
+      setEnv({ label: "STAGING", color: "bg-yellow-500/90" });
+    } else if (hostname === "app.nowg.ai") {
+      setEnv({ label: "PROD", color: "bg-green-500/90" });
+    }
+  }, []);
+
+  if (!env) return null;
+
+  return (
+    <div
+      className={`${env.color} text-white text-xs font-bold px-2.5 py-1 rounded-md shadow-lg`}
+    >
+      {env.label}
+    </div>
+  );
+});
+
 // Memoized Avatar component - extracted to avoid recreation on every render
 interface HomeAvatarProps {
   displayName?: string;
@@ -86,7 +113,11 @@ interface HomeAvatarProps {
   size?: number;
 }
 
-const HomeAvatar = memo(function HomeAvatar({ displayName, imageUrl, size = 8 }: HomeAvatarProps) {
+const HomeAvatar = memo(function HomeAvatar({
+  displayName,
+  imageUrl,
+  size = 8,
+}: HomeAvatarProps) {
   const [broken, setBroken] = useState(false);
   const sizeClass = size === 10 ? "w-10 h-10" : "w-8 h-8";
 
@@ -238,7 +269,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
 
   // Get sidebar context from localStorage (set by AppSidebar)
-  const [sidebarContext, setSidebarContext] = useState<"personal" | "organization">(
+  const [sidebarContext, setSidebarContext] = useState<
+    "personal" | "organization"
+  >(
     // Default value - will be updated by useEffect on client side
     "personal"
   );
@@ -298,8 +331,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       }
     };
 
-    window.addEventListener("sidebarContextChange", handleContextChange as EventListener);
-    return () => window.removeEventListener("sidebarContextChange", handleContextChange as EventListener);
+    window.addEventListener(
+      "sidebarContextChange",
+      handleContextChange as EventListener
+    );
+    return () =>
+      window.removeEventListener(
+        "sidebarContextChange",
+        handleContextChange as EventListener
+      );
   }, []);
 
   // Poll localStorage periodically to ensure sync (fallback mechanism)
@@ -315,7 +355,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
     return () => clearInterval(pollInterval);
   }, [sidebarContext]);
-
 
   // Use hooks for org admin data and project creation
   const { organizations, availableUsers, isLoadingUsers } = useOrgAdminData(
@@ -543,7 +582,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     }
 
     // Determine project type based on sidebar context
-    const shouldCreateOrgProject = isOrgAdmin && sidebarContext === "organization" && organizations.length > 0;
+    const shouldCreateOrgProject =
+      isOrgAdmin &&
+      sidebarContext === "organization" &&
+      organizations.length > 0;
 
     // If user is org_admin and in organization context and has organizations, show project admin assignment dialog
     if (shouldCreateOrgProject) {
@@ -802,6 +844,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {/* Header - Right side only */}
         <header className="relative z-10 flex items-center justify-end px-6 py-4">
           <div className="flex items-center gap-3">
+            {/* Environment Badge */}
+            <EnvironmentBadge />
+
             {/* Balance Display */}
             {balance !== null && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
@@ -836,7 +881,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     className="w-full text-left"
                   >
                     <div className="flex items-center gap-3 cursor-pointer">
-                      <HomeAvatar displayName={displayName} imageUrl={imageUrl} size={10} />
+                      <HomeAvatar
+                        displayName={displayName}
+                        imageUrl={imageUrl}
+                        size={10}
+                      />
                       <div className="min-w-0">
                         <div className="font-semibold truncate text-white">
                           {user?.name || "User"}
