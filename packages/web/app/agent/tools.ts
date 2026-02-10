@@ -29,14 +29,15 @@ export namespace AgentTools {
   }
 
   /**
-   * Tools that require WebContainer for execution.
+   * Tools that require client-side execution (WebContainer or browser context).
    * These tools will NOT have execute functions on the server - they are
    * executed on the client side only.
    * 
    * Server-safe tools (NOT in this list):
-   * - webfetch: HTTP fetch API
-   * - websearch: Web search API
-   * - codesearch: Exa Code API (HTTP-based)
+   * - websearch: Web search API (calls external Exa API directly)
+   * 
+   * NOTE: webfetch and codesearch call relative URLs (/api/...) so they
+   * need client-side execution to have proper URL context.
    */
   const WEBCONTAINER_TOOLS = new Set([
     "read",
@@ -49,6 +50,8 @@ export namespace AgentTools {
     "multiedit",
     "bash",
     "batch", // batch can call other tools that need WebContainer
+    "webfetch", // calls /api/webfetch - needs client context
+    "codesearch", // calls /api/codesearch - needs client context
   ]);
 
   /**
@@ -200,7 +203,8 @@ export namespace AgentTools {
     }
 
     // For server-safe tools, provide execute function
-    // Cast through unknown to avoid strict type checking on the execute return type
+    // The AI SDK expects the execute function to return the OUTPUT directly (string),
+    // not wrapped in an object. The output is what gets sent back to the model.
     const serverTool = {
       type: "function" as const,
       description: toolInfo.description,
@@ -216,18 +220,15 @@ export namespace AgentTools {
 
         try {
           const result = await toolInfo.execute(args, toolCtx);
-          return {
-            ...result,
-            success: true,
-          };
+          // Return just the output string - this is what the AI SDK expects
+          // The model will receive this as the tool result
+          console.log(`[AgentTools] Tool "${toolInfo.id}" executed successfully, output length: ${result.output?.length || 0}`);
+          return result.output;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          return {
-            title: "Error",
-            output: `Tool execution failed: ${errorMessage}`,
-            metadata: { error: errorMessage },
-            success: false,
-          };
+          console.error(`[AgentTools] Tool "${toolInfo.id}" execution failed:`, errorMessage);
+          // Return error message as the output
+          return `Tool execution failed: ${errorMessage}`;
         }
       },
     };

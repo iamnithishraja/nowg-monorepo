@@ -10,7 +10,7 @@ import {
   UserProjectWallet,
 } from "@nowgai/shared/models";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { streamText, type CoreMessage, type UIMessage } from "ai";
+import { streamText, stepCountIs, type CoreMessage, type UIMessage } from "ai";
 import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
@@ -63,21 +63,32 @@ import { generateMessageId, generatePartId } from "~/models/agentMessageModel";
 
 /**
  * Tool categories for execution flow control
+ * NOTE: Server-side tools (websearch, codesearch) are NOT included here
+ * because they execute on the server via AI SDK and don't need client handling
  */
 export const TOOL_CATEGORIES = {
-  /** Read-only tools that auto-continue the loop */
-  AUTO_CONTINUE: new Set(["read", "grep", "ls", "glob", "codesearch", "lsp"]),
-  /** Action tools that require acknowledgement */
+  /** Read-only tools that auto-continue the loop (client-side execution) */
+  AUTO_CONTINUE: new Set(["read", "grep", "ls", "glob", "lsp", "codesearch"]),
+  /** Action tools that require acknowledgement (client-side execution) */
   REQUIRES_ACK: new Set([
     "edit",
     "write",
     "multiedit",
     "bash",
-    "webfetch",
-    "websearch",
     "batch",
+    "webfetch", // webfetch is client-side, calls /api/webfetch
   ]),
 } as const;
+
+/**
+ * Server-side tools that are executed by the AI SDK during streamText.
+ * These tools have execute functions on the server and should NOT be sent
+ * to the client for execution - they're already executed.
+ * The AI SDK handles the tool call -> result -> continue flow automatically.
+ */
+const SERVER_EXECUTED_TOOLS = new Set([
+  "websearch", // Only websearch runs server-side (calls external Exa API directly)
+]);
 
 /**
  * Get the category of a tool
@@ -657,7 +668,10 @@ export async function action({ request }: ActionFunctionArgs) {
           // Track tool calls that have been announced (sent to frontend)
           const announcedToolCalls = new Set<string>();
 
-          // Stream the response (single step - tools run client-side)
+          // Stream the response
+          // stopWhen controls when to stop the multi-step loop
+          // Server-executed tools (websearch, webfetch, codesearch) execute and continue automatically
+          // Client-side tools will still be collected and sent to frontend
           let result;
           try {
             result = streamText({
@@ -665,13 +679,23 @@ export async function action({ request }: ActionFunctionArgs) {
               system: systemPrompt,
               messages,
               tools,
+              // Allow up to 5 steps for server-side tool execution
+              // This lets the AI call websearch, get results, and continue
+              stopWhen: stepCountIs(5),
               onStepFinish: async (step: any) => {
                 // Capture tool calls from each step and send immediately
+                // Skip server-executed tools - they're handled by the AI SDK
                 const stepToolCalls = step.toolCalls || [];
                 for (const toolCall of stepToolCalls) {
                   const args = toolCall.args || (toolCall as any).input || {};
                   const toolCallId = toolCall.toolCallId || toolCall.id;
                   const toolName = toolCall.toolName || toolCall.name;
+
+                  // Skip server-executed tools - they're already done by AI SDK
+                  if (SERVER_EXECUTED_TOOLS.has(toolName)) {
+                    console.log(`[Agent API] onStepFinish: Skipping server-executed tool: ${toolName}`);
+                    continue;
+                  }
 
                   // Only add if not already collected
                   if (
@@ -760,6 +784,8 @@ export async function action({ request }: ActionFunctionArgs) {
             responseToolCalls = collectedToolCalls;
           }
           // Process tool calls and categorize them
+          // Server-executed tools (websearch, webfetch, codesearch) are already executed
+          // by the AI SDK during streamText, so we don't send them to the client
           const autoTools: typeof pendingToolCalls = [];
           const ackTools: typeof pendingToolCalls = [];
 
@@ -768,6 +794,13 @@ export async function action({ request }: ActionFunctionArgs) {
             const toolCallId = toolCall.toolCallId || toolCall.id;
             const args = toolCall.args || {};
             const category = getToolCategory(toolName);
+
+            // Skip server-executed tools - they're already done
+            // The AI SDK executed them and got results during streamText
+            if (SERVER_EXECUTED_TOOLS.has(toolName)) {
+              console.log(`[Agent API] Skipping server-executed tool: ${toolName} (${toolCallId})`);
+              continue;
+            }
 
             // Only send tool_call if not already announced via onStepFinish
             if (!announcedToolCalls.has(toolCallId)) {
