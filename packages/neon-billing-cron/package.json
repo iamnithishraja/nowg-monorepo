@@ -1,0 +1,33 @@
+{
+  "name": "@nowgai/neon-billing-cron",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Cron job service for Neon billing using Hono",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir=dist --target=node",
+    "start": "bun run dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "cron",
+    "neon",
+    "billing",
+    "hono"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hono/node-server": "^1.19.7",
+    "@nowgai/shared": "workspace:*",
+    "hono": "^4.11.1",
+    "mongoose": "^8.18.2",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.9.3"
+  }
+}
