@@ -61,6 +61,20 @@ services:
       - nowgai-network
     restart: unless-stopped
 
+  neon-billing-cron:
+    build:
+      context: .
+      dockerfile: packages/neon-billing-cron/Dockerfile
+    ports:
+      - "3002:3002"
+    env_file:
+      - ./packages/neon-billing-cron/.env
+    environment:
+      - PORT=3002
+    networks:
+      - nowgai-network
+    restart: unless-stopped
+
 networks:
   nowgai-network:
     driver: bridge
