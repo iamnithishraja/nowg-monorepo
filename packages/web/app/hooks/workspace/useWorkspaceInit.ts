@@ -1020,10 +1020,6 @@ export function useWorkspaceInit({
                     const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
                     setIsReconstructingFiles(false);
                   }
-                } else {
-                  // Switching between chats in the same conversation OR WebContainer already has files
-                  // Preserve WebContainer state and preview - don't restore files
-                  console.log("[useWorkspaceInit] Skipping file restoration for chat - preserving WebContainer state");
                 }
                 setHasHandledInitialPrompt(true);
               } else {
@@ -1047,7 +1043,6 @@ export function useWorkspaceInit({
                 if (isSameConversation && hasActivePreview) {
                   // Just restore UI state from the files we already have
                   // The WebContainer still has all the files and dev server running
-                  console.log("[useWorkspaceInit] Skipping restoration - same conversation with active preview");
                 } else if (uiMessages && uiMessages.length > 0) {
                   // Restore files - prefer R2 restore first (has latest files from all chats),
                   // then snapshot (fast fallback), then message reconstruction (legacy)
@@ -1061,7 +1056,6 @@ export function useWorkspaceInit({
 
                     // Try R2 restore first - it has the authoritative latest state from all chats
                     // This ensures files modified in chats are reflected in main conversation
-                    console.log("[File Restore] Trying R2 restore first (has latest files from all chats)...");
                     const r2Restored = await restoreFilesFromR2(
                       urlConversationId,
                       files,
@@ -1071,7 +1065,6 @@ export function useWorkspaceInit({
 
                     // If R2 restore failed, try snapshot (fast fallback)
                     if (!r2Restored) {
-                      console.log("[File Restore] R2 restore failed, trying snapshot...");
                       const snapshotRestored = await restoreFilesFromSnapshot(
                         urlConversationId,
                         uiMessages,
@@ -1187,31 +1180,14 @@ export function useWorkspaceInit({
     
     const reloadChatMessages = async () => {
       try {
-        console.log(`[useWorkspaceInit] Reloading chat messages - chatId: ${chatId}`);
-        
         // Clear messages first to prevent showing old messages
         chat.setMessages([]);
         
         const data = await loadConversation(urlConversationId, chatId);
         
-        console.log(`[useWorkspaceInit] Loaded data - messages count: ${data.messages?.length || 0}`);
-        
         // Ensure messages is always an array - empty chats should show empty
         const messages = Array.isArray(data.messages) ? data.messages : [];
-        
-        // Debug log raw messages before conversion
-        messages.forEach((msg: any, idx: number) => {
-          console.log(`[useWorkspaceInit] Raw message ${idx} - id: ${msg.id}, role: ${msg.role}, toolCalls: ${msg.toolCalls?.length || 0}`);
-        });
-        
         const uiMessages = convertToUIMessages(messages);
-        
-        console.log(`[useWorkspaceInit] Converted UI messages count: ${uiMessages.length}`);
-        
-        // Debug log UI messages
-        uiMessages.forEach((msg: any, idx: number) => {
-          console.log(`[useWorkspaceInit] UI message ${idx} - id: ${msg.id}, role: ${msg.role}, toolCalls: ${msg.toolCalls?.length || 0}`);
-        });
         
         // Always set messages, even if empty (this ensures empty chats show empty)
         chat.setMessages(uiMessages);

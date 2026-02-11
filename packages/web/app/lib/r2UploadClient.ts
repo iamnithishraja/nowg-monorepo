@@ -65,6 +65,8 @@ export async function uploadFilesToR2WithPresignedUrls(
       return { success: true, uploadedFiles: [], failedFiles: [] };
     }
 
+    console.log(`[R2 Sync] Starting client-side upload of ${filesToSync.length} files to R2...`);
+
     // Step 1: Get pre-signed URLs from server
     const presignedResponse = await fetch("/api/conversations", {
       method: "POST",
@@ -204,6 +206,8 @@ export async function uploadFilesToR2WithPresignedUrls(
         // Don't fail the whole operation
       }
     }
+
+    console.log(`[R2 Sync] Completed: ${uploadedFiles.length} uploaded, ${failedFiles.length} failed`);
 
     return {
       success: failedFiles.length === 0,

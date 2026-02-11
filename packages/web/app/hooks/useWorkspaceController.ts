@@ -838,14 +838,13 @@ conversationId
           }
         } catch {}
       },
-      // R2 sync status handlers
+      // R2 sync status handlers - server-side DB sync (conversation.json)
+      // We ignore these now since client handles file upload loader separately
       onSyncStarted: () => {
-        const { setIsSyncingToR2 } = useWorkspaceStore.getState();
-        setIsSyncingToR2(true);
+        // Ignore - client-side file upload handles the loader
       },
       onSyncCompleted: () => {
-        const { setIsSyncingToR2 } = useWorkspaceStore.getState();
-        setIsSyncingToR2(false);
+        // Ignore - client-side file upload handles the loader
       },
       onMessageComplete: (content: string) => {
         // Extract and set project title FIRST

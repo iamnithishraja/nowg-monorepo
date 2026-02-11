@@ -888,13 +888,9 @@ export function useChatHandlers({
                     assistantText = assistantText || data.text || "";
                     return { text: assistantText, toolCalls: allToolCalls };
                   } else if (data.type === "sync_started") {
-                    // R2 sync has started
-                    const { setIsSyncingToR2 } = useWorkspaceStore.getState();
-                    setIsSyncingToR2(true);
+                    // Server-side DB sync started (conversation.json) - ignore, client handles file upload loader
                   } else if (data.type === "sync_completed") {
-                    // R2 sync has completed
-                    const { setIsSyncingToR2 } = useWorkspaceStore.getState();
-                    setIsSyncingToR2(false);
+                    // Server-side DB sync completed - ignore, client handles file upload loader
                   }
                 } catch (parseError) {
                   // Log parse errors instead of silently ignoring
@@ -1002,6 +998,8 @@ export function useChatHandlers({
                   ["edit", "write", "multiedit"].includes(tc.name) &&
                   tc.status !== "error"
               );
+
+              console.log(`[R2 Sync] Tool calls: ${result.toolCalls.length}, file-modifying: ${fileModifyingTools.length}`);
 
               if (fileModifyingTools.length > 0) {
                 // Get current files from WebContainer
