@@ -872,6 +872,7 @@ conversationId
       },
       onDone: () => {
         (async () => {
+          console.log(`%c[R2 Sync] 🎯 onDone callback triggered - streaming complete`, 'color: #8b5cf6; font-weight: bold; font-size: 14px');
           if (isMountedRef.current) {
             chat.setIsStreaming(false);
             // Mark all remaining file indicators as completed (removes spinners)
@@ -882,13 +883,59 @@ conversationId
             setActiveTab("preview" as any);
             void captureVersionSnapshot();
 
-            // Save snapshot to IndexedDB for fast future restore
             // Use refs because state/closures are stale when this callback fires
             const currentConvId =
               streamingConversationIdRef.current || conversationId;
             // Use latestFilesRef to get current files (closure has stale state)
             const currentFiles = latestFilesRef.current;
+            
+            console.log(`%c[R2 Sync] 🔍 onDone check: conversationId=${currentConvId}, filesCount=${currentFiles?.length || 0}`, 'color: #8b5cf6; font-weight: bold');
+            
             if (currentConvId && currentFiles.length > 0) {
+              // Sync files to R2 from frontend (client-side upload)
+              const { setIsSyncingToR2 } = useWorkspaceStore.getState();
+              try {
+                console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = true`, 'color: #8b5cf6; font-weight: bold');
+                setIsSyncingToR2(true);
+                
+                const { uploadFilesToR2WithPresignedUrls, syncConversationJsonToR2 } = await import(
+                  "../lib/r2UploadClient"
+                );
+                
+                const filesToSync = currentFiles.map((f: any) => ({
+                  path: f.path,
+                  content: f.content,
+                }));
+                
+                console.log(`%c[R2 Sync] 📤 Starting client-side upload of ${filesToSync.length} files...`, 'color: #8b5cf6; font-weight: bold');
+                
+                const uploadResult = await uploadFilesToR2WithPresignedUrls(
+                  currentConvId,
+                  undefined, // No chatId for main conversation
+                  filesToSync
+                );
+
+                if (uploadResult.success) {
+                  console.log(
+                    `%c[R2 Sync] ✅ Successfully uploaded ${uploadResult.uploadedFiles.length} files`, 'color: #22c55e; font-weight: bold'
+                  );
+                } else {
+                  console.warn(
+                    `%c[R2 Sync] ⚠️ Some files failed to upload:`, 'color: #f59e0b; font-weight: bold',
+                    uploadResult.failedFiles
+                  );
+                }
+
+                // Also sync conversation.json (metadata) to R2
+                await syncConversationJsonToR2(currentConvId);
+              } catch (syncError) {
+                console.error(`%c[R2 Sync] ❌ Error syncing files to R2:`, 'color: #ef4444; font-weight: bold', syncError);
+              } finally {
+                console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = false`, 'color: #8b5cf6; font-weight: bold');
+                setIsSyncingToR2(false);
+              }
+
+              // Also save snapshot to IndexedDB for fast future restore
               try {
                 const snapshot = filesToSnapshot(
                   currentFiles.map((f: any) => ({

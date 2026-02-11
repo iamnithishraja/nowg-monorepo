@@ -360,36 +360,8 @@ export class ChatService {
 
       const result = await messageDoc.save();
 
-      // Automatically extract files from message content and store in R2 (for assistant messages)
-      if (message.role === "assistant" && message.content) {
-        try {
-          const { extractAndStoreFilesFromMessage } =
-            await import("./extractAndStoreFiles");
-          const uploadedFiles = await extractAndStoreFilesFromMessage(
-            result._id.toString(),
-            conversationId,
-            conversation.userId,
-            message.content,
-            message.role
-          );
-
-          // Update message with R2 file references
-          if (uploadedFiles.length > 0) {
-            await Messages.findByIdAndUpdate(result._id, {
-              $set: { r2Files: uploadedFiles },
-            });
-            console.log(
-              `[ChatService] Automatically stored ${uploadedFiles.length} files in R2 for message ${result._id}`
-            );
-          }
-        } catch (fileExtractionError) {
-          console.error(
-            "[ChatService] Error extracting and storing files:",
-            fileExtractionError
-          );
-          // Don't fail message creation if file extraction fails
-        }
-      }
+      // Note: File extraction and R2 upload is now handled by the frontend
+      // using pre-signed URLs for better performance and to offload server bandwidth
 
       // Update conversation metadata
       await Conversation.findByIdAndUpdate(conversationId, {
@@ -712,35 +684,8 @@ export class ChatService {
       const result = await messageDoc.save();
       console.log(`[ChatService.addMessageToChat] Message saved - id: ${result._id}, role: ${message.role}`);
 
-      // Automatically extract files from message content and store in R2 (for assistant messages)
-      if (message.role === "assistant" && message.content) {
-        try {
-          const { extractAndStoreFilesFromMessage } = await import("./extractAndStoreFiles");
-          const uploadedFiles = await extractAndStoreFilesFromMessage(
-            result._id.toString(),
-            conversationId,
-            conversation.userId,
-            message.content,
-            message.role
-          );
-
-          // Update AgentMessage with R2 file references
-          if (uploadedFiles.length > 0) {
-            await AgentMessage.findByIdAndUpdate(result._id, {
-              $set: { r2Files: uploadedFiles },
-            });
-            console.log(
-              `[ChatService] Automatically stored ${uploadedFiles.length} files in R2 for chat message ${result._id}`
-            );
-          }
-        } catch (fileExtractionError) {
-          console.error(
-            "[ChatService] Error extracting and storing files from chat message:",
-            fileExtractionError
-          );
-          // Don't fail message creation if file extraction fails
-        }
-      }
+      // Note: File extraction and R2 upload is now handled by the frontend
+      // using pre-signed URLs for better performance and to offload server bandwidth
 
       // Add message reference to chat (but NOT to conversation.messages)
       await Chat.findByIdAndUpdate(chatId, {

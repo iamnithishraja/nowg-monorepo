@@ -47,6 +47,12 @@ export async function uploadFilesToR2WithPresignedUrls(
   const uploadedFiles: UploadResult["uploadedFiles"] = [];
   const failedFiles: UploadResult["failedFiles"] = [];
 
+  console.log(`%c[R2 Sync] 🚀 uploadFilesToR2WithPresignedUrls called`, 'color: #8b5cf6; font-weight: bold', {
+    conversationId,
+    chatId,
+    filesCount: files?.length || 0,
+  });
+
   try {
     // Filter out files that shouldn't be synced
     const filesToSync = files.filter((file) => {
@@ -62,10 +68,11 @@ export async function uploadFilesToR2WithPresignedUrls(
     });
 
     if (filesToSync.length === 0) {
+      console.log(`%c[R2 Sync] ⚠️ No files to sync after filtering`, 'color: #f59e0b; font-weight: bold');
       return { success: true, uploadedFiles: [], failedFiles: [] };
     }
 
-    console.log(`[R2 Sync] Starting client-side upload of ${filesToSync.length} files to R2...`);
+    console.log(`%c[R2 Sync] 📤 Starting client-side upload of ${filesToSync.length} files to R2...`, 'color: #8b5cf6; font-weight: bold');
 
     // Step 1: Get pre-signed URLs from server
     const presignedResponse = await fetch("/api/conversations", {
@@ -207,7 +214,7 @@ export async function uploadFilesToR2WithPresignedUrls(
       }
     }
 
-    console.log(`[R2 Sync] Completed: ${uploadedFiles.length} uploaded, ${failedFiles.length} failed`);
+    console.log(`%c[R2 Sync] ✅ Completed: ${uploadedFiles.length} uploaded, ${failedFiles.length} failed`, 'color: #22c55e; font-weight: bold');
 
     return {
       success: failedFiles.length === 0,
@@ -215,7 +222,7 @@ export async function uploadFilesToR2WithPresignedUrls(
       failedFiles,
     };
   } catch (error: any) {
-    console.error("[R2Upload] Error in uploadFilesToR2WithPresignedUrls:", error);
+    console.error(`%c[R2 Sync] ❌ Error in uploadFilesToR2WithPresignedUrls:`, 'color: #ef4444; font-weight: bold', error);
     return {
       success: false,
       uploadedFiles,
@@ -224,5 +231,41 @@ export async function uploadFilesToR2WithPresignedUrls(
         { filePath: "unknown", error: error.message || "Unknown error" },
       ],
     };
+  }
+}
+
+/**
+ * Trigger server to sync conversation.json to R2
+ * This syncs the conversation metadata (messages, chats, etc.)
+ */
+export async function syncConversationJsonToR2(
+  conversationId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log(`%c[R2 Sync] 📋 Syncing conversation.json for ${conversationId}...`, 'color: #8b5cf6; font-weight: bold');
+    
+    const response = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "syncConversationJson",
+        conversationId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[R2 Sync] Failed to sync conversation.json:", errorText);
+      return { success: false, error: errorText };
+    }
+
+    const result = await response.json();
+    if (result.success) {
+      console.log(`[R2 Sync] conversation.json synced successfully`);
+    }
+    return result;
+  } catch (error: any) {
+    console.error("[R2 Sync] Error syncing conversation.json:", error);
+    return { success: false, error: error.message || "Unknown error" };
   }
 }

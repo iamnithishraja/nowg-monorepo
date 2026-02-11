@@ -999,7 +999,7 @@ export function useChatHandlers({
                   tc.status !== "error"
               );
 
-              console.log(`[R2 Sync] Tool calls: ${result.toolCalls.length}, file-modifying: ${fileModifyingTools.length}`);
+              console.log(`%c[R2 Sync] 🔍 Tool calls: ${result.toolCalls.length}, file-modifying: ${fileModifyingTools.length}`, 'color: #8b5cf6; font-weight: bold');
 
               if (fileModifyingTools.length > 0) {
                 // Get current files from WebContainer
@@ -1061,12 +1061,15 @@ export function useChatHandlers({
                     // Sync files to R2 using pre-signed URLs (client-side upload)
                     const { setIsSyncingToR2 } = useWorkspaceStore.getState();
                     try {
+                      console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = true (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
                       setIsSyncingToR2(true);
                       
                       // Use client-side upload with pre-signed URLs
                       const { uploadFilesToR2WithPresignedUrls } = await import(
                         "../../lib/r2UploadClient"
                       );
+                      
+                      console.log(`%c[R2 Sync] 📤 Starting upload of ${filesToSync.length} files (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
                       
                       const uploadResult = await uploadFilesToR2WithPresignedUrls(
                         conversationId,
@@ -1076,20 +1079,27 @@ export function useChatHandlers({
 
                       if (uploadResult.success) {
                         console.log(
-                          `[ChatHandler] Successfully uploaded ${uploadResult.uploadedFiles.length} files to R2`
+                          `%c[R2 Sync] ✅ Successfully uploaded ${uploadResult.uploadedFiles.length} files to R2`, 'color: #22c55e; font-weight: bold'
                         );
                       } else {
                         console.warn(
-                          "[ChatHandler] Some files failed to upload to R2:",
+                          `%c[R2 Sync] ⚠️ Some files failed to upload to R2:`, 'color: #f59e0b; font-weight: bold',
                           uploadResult.failedFiles
                         );
                       }
+
+                      // Also sync conversation.json (metadata) to R2
+                      const { syncConversationJsonToR2 } = await import(
+                        "../../lib/r2UploadClient"
+                      );
+                      await syncConversationJsonToR2(conversationId);
                     } catch (syncError) {
                       console.error(
-                        "[ChatHandler] Error syncing files to R2:",
+                        `%c[R2 Sync] ❌ Error syncing files to R2:`, 'color: #ef4444; font-weight: bold',
                         syncError
                       );
                     } finally {
+                      console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = false (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
                       setIsSyncingToR2(false);
                     }
 

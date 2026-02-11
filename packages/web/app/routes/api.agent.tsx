@@ -870,8 +870,7 @@ export async function action({ request }: ActionFunctionArgs) {
           ) {
             console.log(`[Agent API] Saving assistant message - hasPendingToolCalls: ${hasPendingToolCalls}, pendingToolCalls: ${pendingToolCalls.length}`);
             try {
-              // Notify frontend that R2 sync is starting
-              sendChunk({ type: "sync_started" });
+              // Note: R2 file sync is now handled by the frontend using pre-signed URLs
 
               // Build parts array for OpenCode-aligned storage
               const partsForStorage: any[] = [];
@@ -936,8 +935,6 @@ export async function action({ request }: ActionFunctionArgs) {
               
               console.log(`[Agent API] Assistant message saved - id: ${assistantMessageId.messageId}`);
 
-              // Notify frontend that R2 sync is complete
-              sendChunk({ type: "sync_completed" });
               sendChunk({
                 type: "assistant_message_saved",
                 messageId: assistantMessageId,
@@ -947,8 +944,6 @@ export async function action({ request }: ActionFunctionArgs) {
                 "[Agent API] Failed to save assistant message:",
                 saveError
               );
-              // Make sure to complete sync state even on error
-              sendChunk({ type: "sync_completed" });
               // Don't fail the request, just log the error
             }
           }

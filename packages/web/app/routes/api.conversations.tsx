@@ -1612,6 +1612,53 @@ export async function action({ request }: ActionFunctionArgs) {
           );
         }
 
+      case "syncConversationJson":
+        // Sync conversation.json to R2 (triggered from frontend after file uploads)
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          await connectToDatabase();
+
+          // Verify conversation belongs to user
+          const convForJsonSync = await Conversation.findById(conversationId);
+          if (!convForJsonSync || convForJsonSync.userId.toString() !== userId) {
+            return new Response(
+              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              {
+                status: 404,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          // Sync conversation.json to R2
+          await chatService.syncConversationToR2Public(conversationId, userId);
+
+          return new Response(
+            JSON.stringify({ success: true }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        } catch (error: any) {
+          console.error("[syncConversationJson] Error:", error);
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to sync conversation.json",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
       case "confirmR2Uploads":
         // Confirm that files were uploaded to R2 and update database records
         if (!conversationId) {

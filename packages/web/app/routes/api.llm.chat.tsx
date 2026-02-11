@@ -1441,13 +1441,14 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             tokensUsed,
           });
 
+          // Send done event to trigger client-side R2 file upload
+          sendChunk({ type: "done" });
+
           // No placeholder replacement needed
           const contentToSave = accumulatedText.trim();
 
-          // Notify frontend that R2 sync is starting
-          sendChunk({ type: "sync_started" });
-
-          // Save to database with token usage (this triggers R2 sync internally)
+          // Save to database with token usage
+          // Note: R2 file sync is now handled by the frontend using pre-signed URLs
           await chatService.addMessage(currentConversationId, {
             role: "assistant",
             content: contentToSave,
@@ -1456,9 +1457,6 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             inputTokens,
             outputTokens,
           });
-
-          // Notify frontend that R2 sync is complete
-          sendChunk({ type: "sync_completed" });
 
           // Always track analytics for org/project conversations, even if whitelisted
           // Whitelisting only affects balance deduction, not analytics tracking
