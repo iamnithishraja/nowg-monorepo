@@ -1002,131 +1002,82 @@ export function useChatHandlers({
               console.log(`%c[R2 Sync] 🔍 Tool calls: ${result.toolCalls.length}, file-modifying: ${fileModifyingTools.length}`, 'color: #8b5cf6; font-weight: bold');
 
               if (fileModifyingTools.length > 0) {
-                // Get current files from WebContainer
-                const { WebContainerProvider } =
-                  await import("../../tools/webcontainer-provider");
-                const { WORK_DIR } = await import("../../utils/constants");
-                const container =
-                  WebContainerProvider.getInstance().getContainerSync();
+                // When files are modified in agentic chat, sync ALL files to R2
+                // This ensures that when reloading the conversation, all files are available
+                // Previously we only synced modified files, which caused missing files on reload
+                
+                // Get ALL current files from files state
+                const allFiles = files.templateFilesState || [];
+                
+                if (allFiles.length > 0) {
+                  const filesToSync = allFiles.map((f: any) => ({
+                    path: f.path,
+                    content: f.content,
+                  }));
 
-                if (container) {
-                  // Read all files from WebContainer
-                  const filesToSync: Array<{ path: string; content: string }> =
-                    [];
+                  // Sync ALL files to R2 using pre-signed URLs (client-side upload)
+                  const { setIsSyncingToR2 } = useWorkspaceStore.getState();
+                  try {
+                    console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = true (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
+                    setIsSyncingToR2(true);
+                    
+                    // Use client-side upload with pre-signed URLs
+                    const { uploadFilesToR2WithPresignedUrls } = await import(
+                      "../../lib/r2UploadClient"
+                    );
+                    
+                    console.log(`%c[R2 Sync] 📤 Starting upload of ALL ${filesToSync.length} files (agentic chat - ensures complete restore on reload)`, 'color: #8b5cf6; font-weight: bold');
+                    
+                    const uploadResult = await uploadFilesToR2WithPresignedUrls(
+                      conversationId,
+                      chatId || undefined,
+                      filesToSync
+                    );
 
-                  // Get the list of files that were modified
-                  const modifiedPaths = new Set<string>();
-                  for (const tc of fileModifyingTools) {
-                    const filePath = tc.args?.filePath || tc.args?.path;
-                    if (filePath) {
-                      modifiedPaths.add(filePath);
-                    }
-                    // Handle multiedit operations
-                    if (tc.name === "multiedit" && tc.args?.operations) {
-                      for (const op of tc.args.operations) {
-                        const opPath = op.filePath || op.path;
-                        if (opPath) modifiedPaths.add(opPath);
-                      }
-                    }
-                  }
-
-                  // Read each modified file from WebContainer
-                  for (const filePath of modifiedPaths) {
-                    try {
-                      let normalizedPath = filePath;
-                      if (!normalizedPath.startsWith("/")) {
-                        normalizedPath = `/${normalizedPath}`;
-                      }
-                      if (!normalizedPath.startsWith(WORK_DIR)) {
-                        normalizedPath = `${WORK_DIR}${normalizedPath.startsWith("/") ? "" : "/"}${normalizedPath}`;
-                      }
-
-                      const bytes = await container.fs.readFile(normalizedPath);
-                      const content = new TextDecoder().decode(bytes);
-
-                      // Store with relative path (without WORK_DIR prefix)
-                      const relativePath = normalizedPath
-                        .replace(WORK_DIR, "")
-                        .replace(/^\/+/, "");
-                      filesToSync.push({ path: relativePath, content });
-                    } catch (readError) {
+                    if (uploadResult.success) {
+                      console.log(
+                        `%c[R2 Sync] ✅ Successfully uploaded ${uploadResult.uploadedFiles.length} files to R2`, 'color: #22c55e; font-weight: bold'
+                      );
+                    } else {
                       console.warn(
-                        `[ChatHandler] Could not read file ${filePath} for sync:`,
-                        readError
+                        `%c[R2 Sync] ⚠️ Some files failed to upload to R2:`, 'color: #f59e0b; font-weight: bold',
+                        uploadResult.failedFiles
                       );
                     }
+
+                    // Also sync conversation.json (metadata) to R2
+                    const { syncConversationJsonToR2 } = await import(
+                      "../../lib/r2UploadClient"
+                    );
+                    await syncConversationJsonToR2(conversationId);
+                  } catch (syncError) {
+                    console.error(
+                      `%c[R2 Sync] ❌ Error syncing files to R2:`, 'color: #ef4444; font-weight: bold',
+                      syncError
+                    );
+                  } finally {
+                    console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = false (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
+                    setIsSyncingToR2(false);
                   }
 
-                  if (filesToSync.length > 0) {
-                    // Sync files to R2 using pre-signed URLs (client-side upload)
-                    const { setIsSyncingToR2 } = useWorkspaceStore.getState();
-                    try {
-                      console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = true (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
-                      setIsSyncingToR2(true);
-                      
-                      // Use client-side upload with pre-signed URLs
-                      const { uploadFilesToR2WithPresignedUrls } = await import(
-                        "../../lib/r2UploadClient"
-                      );
-                      
-                      console.log(`%c[R2 Sync] 📤 Starting upload of ${filesToSync.length} files (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
-                      
-                      const uploadResult = await uploadFilesToR2WithPresignedUrls(
-                        conversationId,
-                        chatId || undefined,
-                        filesToSync
-                      );
+                  // Also save IndexedDB snapshot for the MAIN conversation (not the chat)
+                  // This ensures fast restore when returning to main conversation
+                  try {
+                    const { saveSnapshot, filesToSnapshot } =
+                      await import("../../lib/chatPersistence");
 
-                      if (uploadResult.success) {
-                        console.log(
-                          `%c[R2 Sync] ✅ Successfully uploaded ${uploadResult.uploadedFiles.length} files to R2`, 'color: #22c55e; font-weight: bold'
-                        );
-                      } else {
-                        console.warn(
-                          `%c[R2 Sync] ⚠️ Some files failed to upload to R2:`, 'color: #f59e0b; font-weight: bold',
-                          uploadResult.failedFiles
-                        );
-                      }
-
-                      // Also sync conversation.json (metadata) to R2
-                      const { syncConversationJsonToR2 } = await import(
-                        "../../lib/r2UploadClient"
-                      );
-                      await syncConversationJsonToR2(conversationId);
-                    } catch (syncError) {
-                      console.error(
-                        `%c[R2 Sync] ❌ Error syncing files to R2:`, 'color: #ef4444; font-weight: bold',
-                        syncError
-                      );
-                    } finally {
-                      console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = false (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
-                      setIsSyncingToR2(false);
-                    }
-
-                    // Also save IndexedDB snapshot for the MAIN conversation (not the chat)
-                    // This ensures fast restore when returning to main conversation
-                    try {
-                      const { saveSnapshot, filesToSnapshot } =
-                        await import("../../lib/chatPersistence");
-
-                      // Get ALL current files from files state (not just modified ones)
-                      // This ensures the snapshot has the complete current state
-                      const allFiles = files.templateFilesState || [];
-                      if (allFiles.length > 0) {
-                        const snapshot = filesToSnapshot(
-                          allFiles.map((f: any) => ({
-                            path: f.path,
-                            content: f.content,
-                          }))
-                        );
-                        await saveSnapshot(conversationId, snapshot);
-                      }
-                    } catch (snapshotError) {
-                      console.error(
-                        "[ChatHandler] Error saving IndexedDB snapshot:",
-                        snapshotError
-                      );
-                    }
+                    const snapshot = filesToSnapshot(
+                      filesToSync.map((f: any) => ({
+                        path: f.path,
+                        content: f.content,
+                      }))
+                    );
+                    await saveSnapshot(conversationId, snapshot);
+                  } catch (snapshotError) {
+                    console.error(
+                      "[ChatHandler] Error saving IndexedDB snapshot:",
+                      snapshotError
+                    );
                   }
                 }
               }
