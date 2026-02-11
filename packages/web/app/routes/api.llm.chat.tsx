@@ -29,6 +29,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
+    // Ensure database connection and environment variables are loaded first
+    // This is critical for AWS ECS where env vars are stored in MongoDB
+    await connectToDatabase();
+
     // Get authenticated user session
     const authInstance = await auth;
     const session = await authInstance.api.getSession({
@@ -1825,9 +1829,24 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
     });
   } catch (error) {
     console.error("LLM API error:", error);
-    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    // Include more details in error response for debugging (but don't expose sensitive info)
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const isEnvError = errorMessage.includes("OPENROUTER_API_KEY") || 
+                       errorMessage.includes("environment") ||
+                       errorMessage.includes("MongoDB");
+    
+    return new Response(
+      JSON.stringify({ 
+        error: isEnvError 
+          ? "Server configuration error. Please try again in a moment." 
+          : "Internal Server Error",
+        // Include error type for debugging (safe to expose)
+        errorType: isEnvError ? "config_error" : "internal_error"
+      }), 
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 }
