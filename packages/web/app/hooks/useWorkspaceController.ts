@@ -1495,20 +1495,22 @@ conversationId
           const { setIsSyncingToR2 } = useWorkspaceStore.getState();
           try {
             setIsSyncingToR2(true);
-            const syncResponse = await fetch("/api/conversations", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "syncFilesToR2",
-                conversationId,
-                files: filesToSync,
-              }),
-            });
+            
+            // Use client-side upload with pre-signed URLs
+            const { uploadFilesToR2WithPresignedUrls } = await import(
+              "../lib/r2UploadClient"
+            );
+            
+            const uploadResult = await uploadFilesToR2WithPresignedUrls(
+              conversationId,
+              undefined, // No chatId for revert
+              filesToSync
+            );
 
-            if (!syncResponse.ok) {
+            if (!uploadResult.success) {
               console.warn(
-                "[Revert] Failed to sync reverted files to R2:",
-                await syncResponse.text()
+                "[Revert] Some files failed to sync to R2:",
+                uploadResult.failedFiles
               );
             }
           } catch (syncError) {

@@ -1,0 +1,224 @@
+/**
+ * Client-side R2 upload utilities using pre-signed URLs
+ * This offloads upload bandwidth from the server to the client browser
+ */
+
+interface FileToUpload {
+  path: string;
+  content: string;
+}
+
+interface PresignedUrlInfo {
+  fileName: string;
+  filePath: string;
+  uploadUrl: string;
+  publicUrl: string;
+  objectKey: string;
+  contentType: string;
+}
+
+interface UploadResult {
+  success: boolean;
+  uploadedFiles: Array<{
+    fileName: string;
+    filePath: string;
+    publicUrl: string;
+    contentType: string;
+    size: number;
+  }>;
+  failedFiles: Array<{
+    filePath: string;
+    error: string;
+  }>;
+}
+
+/**
+ * Upload files to R2 using pre-signed URLs
+ * 1. Get pre-signed URLs from the server
+ * 2. Upload files directly to R2 from the browser
+ * 3. Confirm uploads with the server
+ */
+export async function uploadFilesToR2WithPresignedUrls(
+  conversationId: string,
+  chatId: string | undefined,
+  files: FileToUpload[],
+  onProgress?: (uploaded: number, total: number) => void
+): Promise<UploadResult> {
+  const uploadedFiles: UploadResult["uploadedFiles"] = [];
+  const failedFiles: UploadResult["failedFiles"] = [];
+
+  try {
+    // Filter out files that shouldn't be synced
+    const filesToSync = files.filter((file) => {
+      if (!file.path || !file.content) return false;
+      if (
+        file.path.includes("node_modules") ||
+        file.path.includes("package-lock.json") ||
+        file.path.includes(".git/")
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    if (filesToSync.length === 0) {
+      return { success: true, uploadedFiles: [], failedFiles: [] };
+    }
+
+    // Step 1: Get pre-signed URLs from server
+    const presignedResponse = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "getPresignedUploadUrls",
+        conversationId,
+        chatId,
+        files: filesToSync.map((f) => ({ path: f.path, content: f.content })),
+      }),
+    });
+
+    if (!presignedResponse.ok) {
+      const errorText = await presignedResponse.text();
+      console.error("[R2Upload] Failed to get pre-signed URLs:", errorText);
+      return {
+        success: false,
+        uploadedFiles: [],
+        failedFiles: filesToSync.map((f) => ({
+          filePath: f.path,
+          error: "Failed to get pre-signed URL",
+        })),
+      };
+    }
+
+    const presignedData = await presignedResponse.json();
+    if (!presignedData.success || !presignedData.urls) {
+      return {
+        success: false,
+        uploadedFiles: [],
+        failedFiles: filesToSync.map((f) => ({
+          filePath: f.path,
+          error: presignedData.error || "Failed to get pre-signed URLs",
+        })),
+      };
+    }
+
+    const urlMap = new Map<string, PresignedUrlInfo>();
+    for (const urlInfo of presignedData.urls) {
+      urlMap.set(urlInfo.filePath, urlInfo);
+    }
+
+    // Step 2: Upload files directly to R2 using pre-signed URLs
+    let uploadedCount = 0;
+    const totalFiles = filesToSync.length;
+
+    // Upload in parallel with concurrency limit
+    const CONCURRENCY_LIMIT = 5;
+    const chunks: FileToUpload[][] = [];
+    for (let i = 0; i < filesToSync.length; i += CONCURRENCY_LIMIT) {
+      chunks.push(filesToSync.slice(i, i + CONCURRENCY_LIMIT));
+    }
+
+    for (const chunk of chunks) {
+      const uploadPromises = chunk.map(async (file) => {
+        const filePath = file.path.replace(/^\/+/, "");
+        const urlInfo = urlMap.get(filePath);
+
+        if (!urlInfo) {
+          failedFiles.push({
+            filePath: file.path,
+            error: "No pre-signed URL available",
+          });
+          return;
+        }
+
+        try {
+          // Convert content to blob
+          const blob = new Blob([file.content], { type: urlInfo.contentType });
+
+          // Upload directly to R2
+          const uploadResponse = await fetch(urlInfo.uploadUrl, {
+            method: "PUT",
+            body: blob,
+            headers: {
+              "Content-Type": urlInfo.contentType,
+            },
+          });
+
+          if (uploadResponse.ok) {
+            uploadedFiles.push({
+              fileName: urlInfo.fileName,
+              filePath: urlInfo.filePath,
+              publicUrl: urlInfo.publicUrl,
+              contentType: urlInfo.contentType,
+              size: blob.size,
+            });
+            uploadedCount++;
+            onProgress?.(uploadedCount, totalFiles);
+          } else {
+            const errorText = await uploadResponse.text();
+            console.error(
+              `[R2Upload] Failed to upload ${file.path}:`,
+              uploadResponse.status,
+              errorText
+            );
+            failedFiles.push({
+              filePath: file.path,
+              error: `Upload failed: ${uploadResponse.status}`,
+            });
+          }
+        } catch (uploadError: any) {
+          console.error(`[R2Upload] Error uploading ${file.path}:`, uploadError);
+          failedFiles.push({
+            filePath: file.path,
+            error: uploadError.message || "Upload error",
+          });
+        }
+      });
+
+      await Promise.all(uploadPromises);
+    }
+
+    // Step 3: Confirm uploads with server (update database records)
+    if (uploadedFiles.length > 0) {
+      try {
+        const confirmResponse = await fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "confirmR2Uploads",
+            conversationId,
+            chatId,
+            uploadedFiles: uploadedFiles,
+          }),
+        });
+
+        if (!confirmResponse.ok) {
+          console.warn(
+            "[R2Upload] Failed to confirm uploads:",
+            await confirmResponse.text()
+          );
+          // Don't fail the whole operation - files are uploaded, just not confirmed
+        }
+      } catch (confirmError) {
+        console.error("[R2Upload] Error confirming uploads:", confirmError);
+        // Don't fail the whole operation
+      }
+    }
+
+    return {
+      success: failedFiles.length === 0,
+      uploadedFiles,
+      failedFiles,
+    };
+  } catch (error: any) {
+    console.error("[R2Upload] Error in uploadFilesToR2WithPresignedUrls:", error);
+    return {
+      success: false,
+      uploadedFiles,
+      failedFiles: [
+        ...failedFiles,
+        { filePath: "unknown", error: error.message || "Unknown error" },
+      ],
+    };
+  }
+}

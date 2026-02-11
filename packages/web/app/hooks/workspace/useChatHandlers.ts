@@ -1060,27 +1060,30 @@ export function useChatHandlers({
                   }
 
                   if (filesToSync.length > 0) {
-                    // Sync files to R2
+                    // Sync files to R2 using pre-signed URLs (client-side upload)
                     const { setIsSyncingToR2 } = useWorkspaceStore.getState();
                     try {
                       setIsSyncingToR2(true);
-                      const syncResponse = await fetch("/api/conversations", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          action: "syncFilesToR2",
-                          conversationId,
-                          chatId,
-                          files: filesToSync,
-                        }),
-                      });
+                      
+                      // Use client-side upload with pre-signed URLs
+                      const { uploadFilesToR2WithPresignedUrls } = await import(
+                        "../../lib/r2UploadClient"
+                      );
+                      
+                      const uploadResult = await uploadFilesToR2WithPresignedUrls(
+                        conversationId,
+                        chatId || undefined,
+                        filesToSync
+                      );
 
-                      if (syncResponse.ok) {
-                        const syncResult = await syncResponse.json();
+                      if (uploadResult.success) {
+                        console.log(
+                          `[ChatHandler] Successfully uploaded ${uploadResult.uploadedFiles.length} files to R2`
+                        );
                       } else {
                         console.warn(
-                          "[ChatHandler] Failed to sync files to R2:",
-                          await syncResponse.text()
+                          "[ChatHandler] Some files failed to upload to R2:",
+                          uploadResult.failedFiles
                         );
                       }
                     } catch (syncError) {

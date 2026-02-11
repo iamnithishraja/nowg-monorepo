@@ -4,7 +4,7 @@ import { auth } from "~/lib/auth";
 import { extractNowgaiActions } from "~/utils/workspaceApi";
 import { createClientFileStorageService } from "~/lib/clientFileStorage";
 import { EnhancedChatPersistence } from "~/lib/enhancedPersistence";
-import { getConversationFromR2, uploadFileToR2, fetchFileFromR2 } from "~/lib/r2Storage";
+import { getConversationFromR2, uploadFileToR2, fetchFileFromR2, generatePresignedUploadUrls } from "~/lib/r2Storage";
 import { Conversation } from "@nowgai/shared/models";
 import AgentMessage from "~/models/agentMessageModel";
 import { connectToDatabase } from "~/lib/mongo";
@@ -1471,6 +1471,254 @@ export async function action({ request }: ActionFunctionArgs) {
           return new Response(
             JSON.stringify({
               error: error.message || "Failed to sync files to R2",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+      case "getPresignedUploadUrls":
+        // Generate pre-signed URLs for frontend to upload files directly to R2
+        // This offloads upload bandwidth from the server to the client
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        if (!requestBody.files || !Array.isArray(requestBody.files) || requestBody.files.length === 0) {
+          return new Response(
+            JSON.stringify({ error: "Files array is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          await connectToDatabase();
+
+          // Verify conversation belongs to user
+          const convForPresigned = await Conversation.findById(conversationId);
+          if (!convForPresigned || convForPresigned.userId.toString() !== userId) {
+            return new Response(
+              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              {
+                status: 404,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          const projectIdForPresigned = convForPresigned.adminProjectId
+            ? convForPresigned.adminProjectId.toString()
+            : undefined;
+
+          // Content type mapping
+          const contentTypeMap: Record<string, string> = {
+            js: "application/javascript",
+            jsx: "application/javascript",
+            ts: "application/typescript",
+            tsx: "application/typescript",
+            json: "application/json",
+            html: "text/html",
+            css: "text/css",
+            md: "text/markdown",
+            txt: "text/plain",
+            py: "text/x-python",
+            java: "text/x-java",
+            cpp: "text/x-c++src",
+            c: "text/x-csrc",
+            go: "text/x-go",
+            rs: "text/x-rust",
+            php: "text/x-php",
+            rb: "text/x-ruby",
+            sh: "text/x-shellscript",
+            yml: "text/yaml",
+            yaml: "text/yaml",
+            xml: "application/xml",
+            svg: "image/svg+xml",
+          };
+
+          // Prepare files for pre-signed URL generation
+          const filesToSign = requestBody.files
+            .filter((file: any) => {
+              if (!file.path) return false;
+              // Skip node_modules and other ignored files
+              if (
+                file.path.includes("node_modules") ||
+                file.path.includes("package-lock.json") ||
+                file.path.includes(".git/")
+              ) {
+                return false;
+              }
+              return true;
+            })
+            .map((file: any) => {
+              const extension = file.path.split(".").pop()?.toLowerCase() || "";
+              const contentType = contentTypeMap[extension] || "text/plain";
+              const fileName = file.path.split("/").pop() || file.path;
+              const filePath = file.path.replace(/^\/+/, "");
+              return {
+                fileName,
+                contentType,
+                filePath,
+                originalPath: file.path,
+                size: file.content ? Buffer.from(file.content, "utf-8").length : 0,
+              };
+            });
+
+          // Generate pre-signed URLs
+          const presignedResult = await generatePresignedUploadUrls(
+            userId,
+            conversationId,
+            filesToSign,
+            projectIdForPresigned,
+            3600 // 1 hour expiry
+          );
+
+          if (!presignedResult.success || !presignedResult.urls) {
+            return new Response(
+              JSON.stringify({
+                error: presignedResult.error || "Failed to generate pre-signed URLs",
+              }),
+              { status: 500, headers: { "Content-Type": "application/json" } }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              urls: presignedResult.urls,
+              conversationId,
+              chatId: requestBody.chatId,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        } catch (error: any) {
+          console.error("[getPresignedUploadUrls] Error:", error);
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to generate pre-signed URLs",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+      case "confirmR2Uploads":
+        // Confirm that files were uploaded to R2 and update database records
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ error: "ConversationId is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        if (!requestBody.uploadedFiles || !Array.isArray(requestBody.uploadedFiles)) {
+          return new Response(
+            JSON.stringify({ error: "uploadedFiles array is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        try {
+          await connectToDatabase();
+
+          // Verify conversation belongs to user
+          const convForConfirm = await Conversation.findById(conversationId);
+          if (!convForConfirm || convForConfirm.userId.toString() !== userId) {
+            return new Response(
+              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              {
+                status: 404,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          const uploadedFiles = requestBody.uploadedFiles.map((file: any) => ({
+            name: file.fileName,
+            filePath: file.filePath,
+            contentType: file.contentType,
+            size: file.size || 0,
+            url: file.publicUrl,
+            uploadedAt: new Date(),
+          }));
+
+          // If chatId is provided, update the last ASSISTANT message with r2Files
+          if (requestBody.chatId && uploadedFiles.length > 0) {
+            try {
+              const chat = await (await import("~/models/chatModel")).default
+                .findById(requestBody.chatId)
+                .populate("messages");
+
+              if (chat && chat.messages && chat.messages.length > 0) {
+                let lastAssistantMessage = null;
+                for (let i = chat.messages.length - 1; i >= 0; i--) {
+                  const msg = chat.messages[i] as any;
+                  if (msg && msg.role === "assistant") {
+                    lastAssistantMessage = msg;
+                    break;
+                  }
+                }
+
+                if (lastAssistantMessage) {
+                  console.log(
+                    `[confirmR2Uploads] Updating assistant message ${lastAssistantMessage._id} with ${uploadedFiles.length} files`
+                  );
+                  await AgentMessage.findByIdAndUpdate(lastAssistantMessage._id, {
+                    $push: { r2Files: { $each: uploadedFiles } },
+                  });
+                }
+              }
+            } catch (updateError: any) {
+              console.error(
+                "[confirmR2Uploads] Error updating message with r2Files:",
+                updateError.message
+              );
+            }
+          }
+
+          // Sync conversation to R2 to update conversation.json
+          try {
+            const chatService = new ChatService();
+            await chatService.syncConversationToR2Public(conversationId, userId);
+          } catch (syncError: any) {
+            console.error(
+              "[confirmR2Uploads] Error syncing conversation to R2:",
+              syncError.message
+            );
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              confirmedCount: uploadedFiles.length,
+              files: uploadedFiles.map((f: any) => ({ path: f.filePath, url: f.url })),
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        } catch (error: any) {
+          console.error("[confirmR2Uploads] Error:", error);
+          return new Response(
+            JSON.stringify({
+              error: error.message || "Failed to confirm uploads",
             }),
             { status: 400, headers: { "Content-Type": "application/json" } }
           );
