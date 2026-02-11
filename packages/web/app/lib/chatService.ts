@@ -332,31 +332,42 @@ export class ChatService {
       // Extract tool calls if present (for assistant messages)
       const toolCalls = (message as any).toolCalls || undefined;
 
-      const messageDoc = new Messages({
+      // Build message document data - only include clientRequestId if it has a value
+      // This is important for the sparse unique index to work correctly
+      const messageData: Record<string, any> = {
         conversationId,
         role: message.role,
         content: message.content,
         timestamp: new Date(),
-        clientRequestId: (message as any).clientRequestId || undefined,
         model: modelToUse,
         tokensUsed: tokensUsed,
         inputTokens: inputTokens,
         outputTokens: outputTokens,
         files: [], // Initialize empty files array (legacy)
         r2Files: [], // Initialize empty R2 files array
-        toolCalls: toolCalls
-          ? toolCalls.map((tc: any) => ({
-              id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
-              name: tc.name || tc.toolName,
-              args: tc.args || {},
-              status: tc.status || "completed",
-              result: tc.result,
-              startTime: tc.startTime,
-              endTime: tc.endTime,
-              category: tc.category,
-            }))
-          : undefined,
-      });
+      };
+
+      // Only add clientRequestId if it exists (sparse index requires field to be absent, not null)
+      const clientRequestId = (message as any).clientRequestId;
+      if (clientRequestId) {
+        messageData.clientRequestId = clientRequestId;
+      }
+
+      // Only add toolCalls if present
+      if (toolCalls) {
+        messageData.toolCalls = toolCalls.map((tc: any) => ({
+          id: tc.id || tc.toolCallId || `${Date.now()}-${Math.random()}`,
+          name: tc.name || tc.toolName,
+          args: tc.args || {},
+          status: tc.status || "completed",
+          result: tc.result,
+          startTime: tc.startTime,
+          endTime: tc.endTime,
+          category: tc.category,
+        }));
+      }
+
+      const messageDoc = new Messages(messageData);
 
       const result = await messageDoc.save();
 
@@ -635,7 +646,9 @@ export class ChatService {
       }
 
       // Create AgentMessage - uses OpenCode-aligned schema with parts
-      const messageDoc = new AgentMessage({
+      // Build message data - only include clientRequestId if it has a value
+      // This is important for the sparse unique index to work correctly
+      const agentMessageData: Record<string, any> = {
         conversationId: new mongoose.Types.ObjectId(conversationId),
         sessionID: sessionID,
         role: role === "toolcall" ? "assistant" : role,
@@ -676,10 +689,16 @@ export class ChatService {
         tokensUsed: tokensUsed,
         inputTokens: inputTokens,
         outputTokens: outputTokens,
-        clientRequestId: clientRequestId,
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      };
+
+      // Only add clientRequestId if it exists (sparse index requires field to be absent, not null)
+      if (clientRequestId) {
+        agentMessageData.clientRequestId = clientRequestId;
+      }
+
+      const messageDoc = new AgentMessage(agentMessageData);
 
       const result = await messageDoc.save();
       console.log(`[ChatService.addMessageToChat] Message saved - id: ${result._id}, role: ${message.role}`);
