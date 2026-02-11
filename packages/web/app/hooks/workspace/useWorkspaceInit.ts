@@ -970,8 +970,10 @@ export function useWorkspaceInit({
                 // Only restore files when:
                 // 1. Direct navigation to chat URL (fresh page load) - !isSameConversation && !hasActivePreview
                 // 2. WebContainer is empty (no active preview) AND it's a different conversation
+                // 3. Files are not in UI state (templateFilesState is empty)
                 const hasActivePreview = !!getPreviewUrl();
-                const shouldRestoreFiles = !isSameConversation && !hasActivePreview;
+                const hasFilesInState = files.templateFilesState.length > 0;
+                const shouldRestoreFiles = (!isSameConversation && !hasActivePreview) || !hasFilesInState;
                 
                 if (shouldRestoreFiles) {
                   // Direct navigation to chat URL (fresh page load) - restore files from main conversation so tools can work
@@ -1028,6 +1030,7 @@ export function useWorkspaceInit({
                 // This keeps the dev server alive and avoids re-running npm install
 
                 const hasActivePreview = !!getPreviewUrl();
+                const hasFilesInState = files.templateFilesState.length > 0;
                 
                 // Also log to server for debugging
                 fetch("/api/conversations", {
@@ -1036,11 +1039,11 @@ export function useWorkspaceInit({
                   credentials: "include",
                   body: JSON.stringify({
                     action: "debug",
-                    debug: `Main conv branch: isSameConversation=${isSameConversation}, hasActivePreview=${hasActivePreview}, uiMessages=${uiMessages?.length || 0}`,
+                    debug: `Main conv branch: isSameConversation=${isSameConversation}, hasActivePreview=${hasActivePreview}, hasFilesInState=${hasFilesInState}, uiMessages=${uiMessages?.length || 0}`,
                   }),
                 }).catch(() => {});
 
-                if (isSameConversation && hasActivePreview) {
+                if (isSameConversation && hasActivePreview && hasFilesInState) {
                   // Just restore UI state from the files we already have
                   // The WebContainer still has all the files and dev server running
                 } else if (uiMessages && uiMessages.length > 0) {
