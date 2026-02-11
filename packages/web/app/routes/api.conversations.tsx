@@ -4,7 +4,12 @@ import { auth } from "~/lib/auth";
 import { extractNowgaiActions } from "~/utils/workspaceApi";
 import { createClientFileStorageService } from "~/lib/clientFileStorage";
 import { EnhancedChatPersistence } from "~/lib/enhancedPersistence";
-import { getConversationFromR2, uploadFileToR2, fetchFileFromR2, generatePresignedUploadUrls } from "~/lib/r2Storage";
+import {
+  getConversationFromR2,
+  uploadFileToR2,
+  fetchFileFromR2,
+  generatePresignedUploadUrls,
+} from "~/lib/r2Storage";
 import { Conversation } from "@nowgai/shared/models";
 import AgentMessage from "~/models/agentMessageModel";
 import { connectToDatabase } from "~/lib/mongo";
@@ -23,7 +28,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -37,7 +42,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       // Get conversation metadata from database (for title, model, etc.)
       const conversation = await chatService.getConversation(
         conversationId,
-        userId
+        userId,
       );
       if (!conversation) {
         return new Response(
@@ -45,7 +50,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           {
             status: 404,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -61,7 +66,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         const r2Result = await getConversationFromR2(
           userId,
           conversationId,
-          projectId
+          projectId,
         );
 
         if (r2Result.success && r2Result.data && r2Result.data.messages) {
@@ -70,7 +75,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       } catch (r2Error) {
         console.warn(
           `[API] Failed to fetch from R2, falling back to database:`,
-          r2Error
+          r2Error,
         );
       }
 
@@ -89,7 +94,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const sortedMessages = messages.sort(
         (a: any, b: any) =>
           new Date(a.timestamp || a.createdAt).getTime() -
-          new Date(b.timestamp || b.createdAt).getTime()
+          new Date(b.timestamp || b.createdAt).getTime(),
       );
 
       const responseData = {
@@ -100,28 +105,75 @@ export async function loader({ request }: LoaderFunctionArgs) {
         },
         messages: sortedMessages.map((msg: any) => {
           const messageId = msg.id || msg._id?.toString();
-          
+
           // Files: Only include for USER messages AND only actual uploaded attachments
           // Filter out source code files (tsx, ts, js, css, etc.) - those are tool-created files
           // User uploads are typically images, PDFs, documents
           let files: any[] | undefined = undefined;
-          
+
           if (msg.role === "user") {
             // Helper to check if a file is a user upload (not code)
             const isUserUploadedFile = (f: any) => {
               const type = f.type || f.contentType || "";
               const name = f.name || "";
               // User uploads are images, PDFs, documents, etc.
-              if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/")) return true;
-              if (type === "application/pdf" || type.includes("document") || type.includes("spreadsheet")) return true;
+              if (
+                type.startsWith("image/") ||
+                type.startsWith("video/") ||
+                type.startsWith("audio/")
+              )
+                return true;
+              if (
+                type === "application/pdf" ||
+                type.includes("document") ||
+                type.includes("spreadsheet")
+              )
+                return true;
               // Exclude source code files (these are tool-created)
               const ext = name.split(".").pop()?.toLowerCase() || "";
-              const codeExtensions = ["tsx", "ts", "js", "jsx", "css", "scss", "html", "json", "md", "py", "go", "rs", "java", "c", "cpp", "h", "hpp"];
+              const codeExtensions = [
+                "tsx",
+                "ts",
+                "js",
+                "jsx",
+                "css",
+                "scss",
+                "html",
+                "json",
+                "md",
+                "py",
+                "go",
+                "rs",
+                "java",
+                "c",
+                "cpp",
+                "h",
+                "hpp",
+              ];
               if (codeExtensions.includes(ext)) return false;
               // Include if it looks like a user upload
-              const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"];
-              const docExtensions = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"];
-              if (imageExtensions.includes(ext) || docExtensions.includes(ext)) return true;
+              const imageExtensions = [
+                "png",
+                "jpg",
+                "jpeg",
+                "gif",
+                "webp",
+                "svg",
+                "ico",
+                "bmp",
+              ];
+              const docExtensions = [
+                "pdf",
+                "doc",
+                "docx",
+                "xls",
+                "xlsx",
+                "ppt",
+                "pptx",
+                "txt",
+              ];
+              if (imageExtensions.includes(ext) || docExtensions.includes(ext))
+                return true;
               return false;
             };
 
@@ -157,7 +209,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
           // Extract tool calls from legacy format or parts-based format
           let toolCalls: any[] = [];
-          if (msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+          if (
+            msg.toolCalls &&
+            Array.isArray(msg.toolCalls) &&
+            msg.toolCalls.length > 0
+          ) {
             toolCalls = msg.toolCalls.map((tc: any) => ({
               id: tc.id,
               name: tc.name,
@@ -177,7 +233,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
                 name: tp.tool,
                 args: tp.state?.input || {},
                 status: tp.state?.status === "error" ? "error" : "completed",
-                result: tp.state?.output ? { output: tp.state.output } : undefined,
+                result: tp.state?.output
+                  ? { output: tp.state.output }
+                  : undefined,
                 startTime: tp.state?.time?.start,
                 endTime: tp.state?.time?.end,
                 category: tp.category,
@@ -258,7 +316,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Conversations API error:", error);
@@ -283,13 +341,13 @@ export async function action({ request }: ActionFunctionArgs) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     const userId = session.user.id;
     const url = new URL(request.url);
-    
+
     // Parse request body with error handling
     let requestBody;
     try {
@@ -301,7 +359,7 @@ export async function action({ request }: ActionFunctionArgs) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -327,11 +385,15 @@ export async function action({ request }: ActionFunctionArgs) {
     } = requestBody;
 
     // Get conversationId from URL params or request body (URL takes precedence for consistency)
-    const conversationId = url.searchParams.get("conversationId") || bodyConversationId;
+    const conversationId =
+      url.searchParams.get("conversationId") || bodyConversationId;
 
     // Debug action for client-side logging visibility
     if (actionType === "debug") {
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const chatService = new ChatService();
@@ -346,7 +408,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -354,7 +416,7 @@ export async function action({ request }: ActionFunctionArgs) {
           userId,
           model,
           firstMessage || title,
-          filesMap || {}
+          filesMap || {},
         );
 
         // If firstMessage is provided, save it as the first user message
@@ -377,7 +439,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
               // Filter only image files
               const imageFiles = uploadedFiles.filter(
-                (f: any) => f.type && f.type.startsWith("image/")
+                (f: any) => f.type && f.type.startsWith("image/"),
               );
 
               if (imageFiles.length > 0) {
@@ -389,7 +451,7 @@ export async function action({ request }: ActionFunctionArgs) {
                     type: f.type,
                     size: f.size,
                     base64Data: f.base64Data,
-                  }))
+                  })),
                 );
               }
             } catch (fileError) {
@@ -404,7 +466,7 @@ export async function action({ request }: ActionFunctionArgs) {
           try {
             await chatService.updateConversationFiles(
               newConversationId,
-              filesMap
+              filesMap,
             );
           } catch (error) {
             console.error("Error updating conversation with files:", error);
@@ -413,7 +475,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
         const newConversation = await chatService.getConversation(
           newConversationId,
-          userId
+          userId,
         );
 
         return new Response(
@@ -430,7 +492,7 @@ export async function action({ request }: ActionFunctionArgs) {
           {
             status: 201,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
 
       case "updateTitle":
@@ -440,14 +502,14 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         // Verify ownership
         const conversation = await chatService.getConversation(
           conversationId,
-          userId
+          userId,
         );
         if (!conversation) {
           return new Response(
@@ -455,7 +517,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 404,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -473,14 +535,14 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         // Verify ownership
         const conversationForStar = await chatService.getConversation(
           conversationId,
-          userId
+          userId,
         );
         if (!conversationForStar) {
           return new Response(
@@ -488,13 +550,13 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 404,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         const newStarredStatus = await chatService.toggleStarred(
           conversationId,
-          userId
+          userId,
         );
 
         return new Response(
@@ -502,7 +564,7 @@ export async function action({ request }: ActionFunctionArgs) {
           {
             status: 200,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
 
       case "updateMessageModel":
@@ -514,14 +576,14 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         // Verify ownership
         const conversationForModelUpdate = await chatService.getConversation(
           conversationId,
-          userId
+          userId,
         );
         if (!conversationForModelUpdate) {
           return new Response(
@@ -529,7 +591,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 404,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -538,7 +600,7 @@ export async function action({ request }: ActionFunctionArgs) {
             messageId,
             conversationId,
             userId,
-            model
+            model,
           );
 
           return new Response(JSON.stringify({ success: true }), {
@@ -553,7 +615,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -564,7 +626,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -586,7 +648,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 404,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -599,14 +661,14 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         // Verify ownership
         const conversationForMessage = await chatService.getConversation(
           conversationId,
-          userId
+          userId,
         );
         if (!conversationForMessage) {
           return new Response(
@@ -614,7 +676,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 404,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -640,13 +702,13 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         const newMessageId = await chatService.addMessage(
           conversationId,
-          messageObj
+          messageObj,
         );
 
         return new Response(
@@ -654,7 +716,7 @@ export async function action({ request }: ActionFunctionArgs) {
           {
             status: 200,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
 
       case "revert":
@@ -666,14 +728,14 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         // Verify ownership
         const conversationForRevert = await chatService.getConversation(
           conversationId,
-          userId
+          userId,
         );
         if (!conversationForRevert) {
           return new Response(
@@ -681,7 +743,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 404,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -743,7 +805,7 @@ export async function action({ request }: ActionFunctionArgs) {
           const firstAIMessage = allMessages[nextAIMessageIndex];
           const isTemplateOnly =
             firstAIMessage.content.includes(
-              "Nowgai is initializing your project"
+              "Nowgai is initializing your project",
             ) &&
             firstAIMessage.content.includes("vite-react-typescript-starter");
 
@@ -804,7 +866,7 @@ export async function action({ request }: ActionFunctionArgs) {
         if (totalTokensToAdd > 0) {
           await chatService.addAdditionalTokens(
             conversationId,
-            totalTokensToAdd
+            totalTokensToAdd,
           );
         }
 
@@ -819,7 +881,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
         await chatService.updateConversationMessages(
           conversationId,
-          remainingMessageIds
+          remainingMessageIds,
         );
 
         // Get updated messages after deletion
@@ -867,7 +929,7 @@ export async function action({ request }: ActionFunctionArgs) {
           {
             status: 200,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
 
       case "createChat":
@@ -877,7 +939,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -886,7 +948,7 @@ export async function action({ request }: ActionFunctionArgs) {
           const chatId = await chatService.createChat(
             conversationId,
             userId,
-            title
+            title,
           );
 
           return new Response(JSON.stringify({ success: true, chatId }), {
@@ -895,17 +957,22 @@ export async function action({ request }: ActionFunctionArgs) {
           });
         } catch (error: any) {
           console.error("Error creating chat:", error);
-          const errorMessage = error?.message || error?.toString() || "Failed to create chat";
-          const statusCode = errorMessage.includes("not found") || errorMessage.includes("unauthorized") ? 404 : 400;
+          const errorMessage =
+            error?.message || error?.toString() || "Failed to create chat";
+          const statusCode =
+            errorMessage.includes("not found") ||
+            errorMessage.includes("unauthorized")
+              ? 404
+              : 400;
           return new Response(
             JSON.stringify({
               error: errorMessage,
               message: errorMessage,
             }),
-            { 
-              status: statusCode, 
-              headers: { "Content-Type": "application/json" } 
-            }
+            {
+              status: statusCode,
+              headers: { "Content-Type": "application/json" },
+            },
           );
         }
 
@@ -916,14 +983,14 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         try {
           const chats = await chatService.getConversationChats(
             conversationId,
-            userId
+            userId,
           );
           return new Response(JSON.stringify({ success: true, chats }), {
             status: 200,
@@ -934,13 +1001,15 @@ export async function action({ request }: ActionFunctionArgs) {
             JSON.stringify({
               error: error.message || "Failed to get chats",
             }),
-            { status: 400, headers: { "Content-Type": "application/json" } }
+            { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
 
       case "getChatMessages":
-        console.log(`[getChatMessages] Request received - conversationId: ${conversationId}, chatId: ${requestBody.chatId}`);
-        
+        console.log(
+          `[getChatMessages] Request received - conversationId: ${conversationId}, chatId: ${requestBody.chatId}`,
+        );
+
         if (!conversationId) {
           return new Response(
             JSON.stringify({
@@ -949,16 +1018,19 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         // Get conversation to get userId and projectId for R2 fetch
-        const conversationForR2 = await chatService.getConversation(conversationId, userId);
+        const conversationForR2 = await chatService.getConversation(
+          conversationId,
+          userId,
+        );
         if (!conversationForR2) {
           return new Response(
             JSON.stringify({ error: "Conversation not found" }),
-            { status: 404, headers: { "Content-Type": "application/json" } }
+            { status: 404, headers: { "Content-Type": "application/json" } },
           );
         }
 
@@ -975,27 +1047,42 @@ export async function action({ request }: ActionFunctionArgs) {
           const r2Result = await getConversationFromR2(
             userId,
             conversationId,
-            projectIdForR2
+            projectIdForR2,
           );
 
-          console.log(`[getChatMessages] R2 result success: ${r2Result.success}, has data: ${!!r2Result.data}`);
+          console.log(
+            `[getChatMessages] R2 result success: ${r2Result.success}, has data: ${!!r2Result.data}`,
+          );
 
           if (r2Result.success && r2Result.data) {
             // If chatId is provided, get messages from that chat
-            if (requestBody.chatId && requestBody.chatId !== "undefined" && requestBody.chatId !== "null") {
+            if (
+              requestBody.chatId &&
+              requestBody.chatId !== "undefined" &&
+              requestBody.chatId !== "null"
+            ) {
               const chats = r2Result.data.chats || [];
-              console.log(`[getChatMessages] R2 has ${chats.length} chats, looking for chatId: ${requestBody.chatId}`);
-              console.log(`[getChatMessages] Chat IDs in R2:`, chats.map((c: any) => c.id));
-              
+              console.log(
+                `[getChatMessages] R2 has ${chats.length} chats, looking for chatId: ${requestBody.chatId}`,
+              );
+              console.log(
+                `[getChatMessages] Chat IDs in R2:`,
+                chats.map((c: any) => c.id),
+              );
+
               const chat = chats.find((c: any) => c.id === requestBody.chatId);
-              console.log(`[getChatMessages] Found chat in R2: ${!!chat}, messages count: ${chat?.messages?.length || 0}`);
-              
+              console.log(
+                `[getChatMessages] Found chat in R2: ${!!chat}, messages count: ${chat?.messages?.length || 0}`,
+              );
+
               if (chat && chat.messages) {
                 r2ChatMessages = chat.messages;
                 // Log first message details for debugging
                 if (r2ChatMessages.length > 0) {
                   const firstMsg = r2ChatMessages[0];
-                  console.log(`[getChatMessages] R2 first message - role: ${firstMsg.role}, hasToolCalls: ${!!firstMsg.toolCalls}, toolCallsLength: ${firstMsg.toolCalls?.length || 0}, hasParts: ${!!firstMsg.parts}, partsLength: ${firstMsg.parts?.length || 0}`);
+                  console.log(
+                    `[getChatMessages] R2 first message - role: ${firstMsg.role}, hasToolCalls: ${!!firstMsg.toolCalls}, toolCallsLength: ${firstMsg.toolCalls?.length || 0}, hasParts: ${!!firstMsg.parts}, partsLength: ${firstMsg.parts?.length || 0}`,
+                  );
                 }
               }
             } else {
@@ -1006,151 +1093,257 @@ export async function action({ request }: ActionFunctionArgs) {
         } catch (r2Error) {
           console.warn(
             `[API] Failed to fetch from R2, using database:`,
-            r2Error
+            r2Error,
           );
         }
 
         // If we got messages from R2, check if they're complete
         // R2 might be stale if it only has user message but no assistant response
         // In that case, fall back to database which might have more recent data
-        const r2HasAssistantMessage = r2ChatMessages?.some((m: any) => m.role === "assistant");
-        const r2OnlyHasUserMessage = r2ChatMessages && r2ChatMessages.length > 0 && !r2HasAssistantMessage;
-        
+        const r2HasAssistantMessage = r2ChatMessages?.some(
+          (m: any) => m.role === "assistant",
+        );
+        const r2OnlyHasUserMessage =
+          r2ChatMessages && r2ChatMessages.length > 0 && !r2HasAssistantMessage;
+
         if (r2OnlyHasUserMessage) {
-          console.log(`[getChatMessages] R2 only has user message(s), checking database for assistant messages...`);
+          console.log(
+            `[getChatMessages] R2 only has user message(s), checking database for assistant messages...`,
+          );
           // Check database for more messages
           try {
             const dbMessages = await chatService.getChatMessages(
               conversationId,
               requestBody.chatId,
-              userId
+              userId,
             );
-            console.log(`[getChatMessages] Database has ${dbMessages?.length || 0} messages`);
+            console.log(
+              `[getChatMessages] Database has ${dbMessages?.length || 0} messages`,
+            );
             if (dbMessages && dbMessages.length > r2ChatMessages.length) {
-              console.log(`[getChatMessages] Using database messages (more complete than R2)`);
+              console.log(
+                `[getChatMessages] Using database messages (more complete than R2)`,
+              );
               // Database has more messages, use those instead
-              return new Response(JSON.stringify({ success: true, messages: dbMessages }), {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-              });
+              return new Response(
+                JSON.stringify({ success: true, messages: dbMessages }),
+                {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" },
+                },
+              );
             }
           } catch (dbError) {
-            console.warn(`[getChatMessages] Database check failed, using R2 data:`, dbError);
+            console.warn(
+              `[getChatMessages] Database check failed, using R2 data:`,
+              dbError,
+            );
           }
         }
-        
+
         // If we got messages from R2 and they seem complete, format and return them
         if (r2ChatMessages && r2ChatMessages.length > 0) {
-          console.log(`[getChatMessages] Using R2 messages, count: ${r2ChatMessages.length}`);
-          
+          console.log(
+            `[getChatMessages] Using R2 messages, count: ${r2ChatMessages.length}`,
+          );
+
           // Format R2 messages for frontend (ensure files are properly structured)
-          const formattedMessages = r2ChatMessages.map((msg: any, idx: number) => {
-            const messageId = msg.id;
-            
-            // Debug log raw message structure
-            console.log(`[getChatMessages] R2 msg ${idx} - id: ${messageId}, role: ${msg.role}, content length: ${(msg.content || '').length}, toolCalls: ${JSON.stringify(msg.toolCalls?.length || 0)}, parts: ${JSON.stringify(msg.parts?.length || 0)}`);
-            
-            // Files: Only include for USER messages AND only actual uploaded attachments
-            // Filter out source code files (tsx, ts, js, css, etc.) - those are tool-created files
-            // User uploads are typically images, PDFs, documents
-            let files: any[] | undefined = undefined;
-            if (msg.role === "user" && msg.r2Files && msg.r2Files.length > 0) {
-              // Filter to only include user-uploaded files (images, PDFs, docs)
-              // Exclude source code files that were created by tool calls
-              const userUploadedFiles = msg.r2Files.filter((f: any) => {
-                const type = f.type || f.contentType || "";
-                const name = f.name || "";
-                // User uploads are images, PDFs, documents, etc.
-                if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/")) return true;
-                if (type === "application/pdf" || type.includes("document") || type.includes("spreadsheet")) return true;
-                // Exclude source code files (these are tool-created)
-                const ext = name.split(".").pop()?.toLowerCase() || "";
-                const codeExtensions = ["tsx", "ts", "js", "jsx", "css", "scss", "html", "json", "md", "py", "go", "rs", "java", "c", "cpp", "h", "hpp"];
-                if (codeExtensions.includes(ext)) return false;
-                // Include if it looks like a user upload (has image-like extension)
-                const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"];
-                const docExtensions = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"];
-                if (imageExtensions.includes(ext) || docExtensions.includes(ext)) return true;
-                // Default: exclude unknown types to be safe
-                return false;
-              });
-              
-              if (userUploadedFiles.length > 0) {
-                files = userUploadedFiles.map((f: any) => ({
-                  id: f.url || f.id || `${messageId}-${f.name}`,
-                  name: f.name,
-                  type: f.type,
-                  size: f.size,
-                  url: f.url,
-                  uploadedAt: f.uploadedAt,
-                  filePath: f.filePath,
-                }));
+          const formattedMessages = r2ChatMessages.map(
+            (msg: any, idx: number) => {
+              const messageId = msg.id;
+
+              // Debug log raw message structure
+              console.log(
+                `[getChatMessages] R2 msg ${idx} - id: ${messageId}, role: ${msg.role}, content length: ${(msg.content || "").length}, toolCalls: ${JSON.stringify(msg.toolCalls?.length || 0)}, parts: ${JSON.stringify(msg.parts?.length || 0)}`,
+              );
+
+              // Files: Only include for USER messages AND only actual uploaded attachments
+              // Filter out source code files (tsx, ts, js, css, etc.) - those are tool-created files
+              // User uploads are typically images, PDFs, documents
+              let files: any[] | undefined = undefined;
+              if (
+                msg.role === "user" &&
+                msg.r2Files &&
+                msg.r2Files.length > 0
+              ) {
+                // Filter to only include user-uploaded files (images, PDFs, docs)
+                // Exclude source code files that were created by tool calls
+                const userUploadedFiles = msg.r2Files.filter((f: any) => {
+                  const type = f.type || f.contentType || "";
+                  const name = f.name || "";
+                  // User uploads are images, PDFs, documents, etc.
+                  if (
+                    type.startsWith("image/") ||
+                    type.startsWith("video/") ||
+                    type.startsWith("audio/")
+                  )
+                    return true;
+                  if (
+                    type === "application/pdf" ||
+                    type.includes("document") ||
+                    type.includes("spreadsheet")
+                  )
+                    return true;
+                  // Exclude source code files (these are tool-created)
+                  const ext = name.split(".").pop()?.toLowerCase() || "";
+                  const codeExtensions = [
+                    "tsx",
+                    "ts",
+                    "js",
+                    "jsx",
+                    "css",
+                    "scss",
+                    "html",
+                    "json",
+                    "md",
+                    "py",
+                    "go",
+                    "rs",
+                    "java",
+                    "c",
+                    "cpp",
+                    "h",
+                    "hpp",
+                  ];
+                  if (codeExtensions.includes(ext)) return false;
+                  // Include if it looks like a user upload (has image-like extension)
+                  const imageExtensions = [
+                    "png",
+                    "jpg",
+                    "jpeg",
+                    "gif",
+                    "webp",
+                    "svg",
+                    "ico",
+                    "bmp",
+                  ];
+                  const docExtensions = [
+                    "pdf",
+                    "doc",
+                    "docx",
+                    "xls",
+                    "xlsx",
+                    "ppt",
+                    "pptx",
+                    "txt",
+                  ];
+                  if (
+                    imageExtensions.includes(ext) ||
+                    docExtensions.includes(ext)
+                  )
+                    return true;
+                  // Default: exclude unknown types to be safe
+                  return false;
+                });
+
+                if (userUploadedFiles.length > 0) {
+                  files = userUploadedFiles.map((f: any) => ({
+                    id: f.url || f.id || `${messageId}-${f.name}`,
+                    name: f.name,
+                    type: f.type,
+                    size: f.size,
+                    url: f.url,
+                    uploadedAt: f.uploadedAt,
+                    filePath: f.filePath,
+                  }));
+                }
               }
-            }
 
-            // Extract tool calls from legacy format or parts-based format
-            let toolCalls: any[] = [];
-            if (msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
-              console.log(`[getChatMessages] R2 msg ${idx} - extracting from legacy toolCalls: ${msg.toolCalls.length}`);
-              toolCalls = msg.toolCalls.map((tc: any) => ({
-                id: tc.id,
-                name: tc.name,
-                args: tc.args || {},
-                status: tc.status === "error" ? "error" : "completed",
-                result: tc.result,
-                startTime: tc.startTime,
-                endTime: tc.endTime,
-                category: tc.category,
-              }));
-            } else if (msg.parts && Array.isArray(msg.parts)) {
-              // Extract from parts-based format (OpenCode-aligned)
-              const toolParts = msg.parts.filter((p: any) => p.type === "tool");
-              console.log(`[getChatMessages] R2 msg ${idx} - extracting from parts, tool parts count: ${toolParts.length}`);
-              if (toolParts.length > 0) {
-                toolCalls = toolParts.map((tp: any) => ({
-                  id: tp.callID || tp.id,
-                  name: tp.tool,
-                  args: tp.state?.input || {},
-                  status: tp.state?.status === "error" ? "error" : "completed",
-                  result: tp.state?.output ? { output: tp.state.output } : undefined,
-                  startTime: tp.state?.time?.start,
-                  endTime: tp.state?.time?.end,
-                  category: tp.category,
+              // Extract tool calls from legacy format or parts-based format
+              let toolCalls: any[] = [];
+              if (
+                msg.toolCalls &&
+                Array.isArray(msg.toolCalls) &&
+                msg.toolCalls.length > 0
+              ) {
+                console.log(
+                  `[getChatMessages] R2 msg ${idx} - extracting from legacy toolCalls: ${msg.toolCalls.length}`,
+                );
+                toolCalls = msg.toolCalls.map((tc: any) => ({
+                  id: tc.id,
+                  name: tc.name,
+                  args: tc.args || {},
+                  status: tc.status === "error" ? "error" : "completed",
+                  result: tc.result,
+                  startTime: tc.startTime,
+                  endTime: tc.endTime,
+                  category: tc.category,
                 }));
+              } else if (msg.parts && Array.isArray(msg.parts)) {
+                // Extract from parts-based format (OpenCode-aligned)
+                const toolParts = msg.parts.filter(
+                  (p: any) => p.type === "tool",
+                );
+                console.log(
+                  `[getChatMessages] R2 msg ${idx} - extracting from parts, tool parts count: ${toolParts.length}`,
+                );
+                if (toolParts.length > 0) {
+                  toolCalls = toolParts.map((tp: any) => ({
+                    id: tp.callID || tp.id,
+                    name: tp.tool,
+                    args: tp.state?.input || {},
+                    status:
+                      tp.state?.status === "error" ? "error" : "completed",
+                    result: tp.state?.output
+                      ? { output: tp.state.output }
+                      : undefined,
+                    startTime: tp.state?.time?.start,
+                    endTime: tp.state?.time?.end,
+                    category: tp.category,
+                  }));
+                }
+              } else {
+                console.log(
+                  `[getChatMessages] R2 msg ${idx} - NO toolCalls or parts found!`,
+                );
               }
-            } else {
-              console.log(`[getChatMessages] R2 msg ${idx} - NO toolCalls or parts found!`);
-            }
 
-            console.log(`[getChatMessages] R2 msg ${idx} - final toolCalls count: ${toolCalls.length}`);
+              console.log(
+                `[getChatMessages] R2 msg ${idx} - final toolCalls count: ${toolCalls.length}`,
+              );
 
-            return {
-              id: messageId,
-              role: msg.role,
-              content: msg.content || "",
-              timestamp: msg.timestamp || msg.createdAt,
-              model: msg.model,
-              // Tool calls - extracted from either legacy or parts format
-              toolCalls,
-              files,
-            };
-          });
+              return {
+                id: messageId,
+                role: msg.role,
+                content: msg.content || "",
+                timestamp: msg.timestamp || msg.createdAt,
+                model: msg.model,
+                // Tool calls - extracted from either legacy or parts format
+                toolCalls,
+                files,
+              };
+            },
+          );
 
-          console.log(`[getChatMessages] Returning ${formattedMessages.length} R2 messages`);
-          return new Response(JSON.stringify({ success: true, messages: formattedMessages }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
+          console.log(
+            `[getChatMessages] Returning ${formattedMessages.length} R2 messages`,
+          );
+          return new Response(
+            JSON.stringify({ success: true, messages: formattedMessages }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
         }
-        
-        console.log(`[getChatMessages] R2 messages not found or empty, falling back to database`);
+
+        console.log(
+          `[getChatMessages] R2 messages not found or empty, falling back to database`,
+        );
 
         // Fallback to database
         // If chatId is not provided or invalid, return empty array (main chat)
-        if (!requestBody.chatId || requestBody.chatId === "undefined" || requestBody.chatId === "null") {
+        if (
+          !requestBody.chatId ||
+          requestBody.chatId === "undefined" ||
+          requestBody.chatId === "null"
+        ) {
           // Return all conversation messages (main chat)
           try {
-            const messages = await chatService.getMessages(conversationId, 1000);
+            const messages = await chatService.getMessages(
+              conversationId,
+              1000,
+            );
             return new Response(JSON.stringify({ success: true, messages }), {
               status: 200,
               headers: { "Content-Type": "application/json" },
@@ -1160,49 +1353,62 @@ export async function action({ request }: ActionFunctionArgs) {
               JSON.stringify({
                 error: error.message || "Failed to get messages",
               }),
-              { status: 400, headers: { "Content-Type": "application/json" } }
+              { status: 400, headers: { "Content-Type": "application/json" } },
             );
           }
         }
 
         try {
-          console.log(`[getChatMessages] Fetching from database - chatId: ${requestBody.chatId}`);
-          
+          console.log(
+            `[getChatMessages] Fetching from database - chatId: ${requestBody.chatId}`,
+          );
+
           const messages = await chatService.getChatMessages(
             conversationId,
             requestBody.chatId,
-            userId
+            userId,
           );
-          
-          console.log(`[getChatMessages] Database returned ${messages?.length || 0} messages`);
-          
+
+          console.log(
+            `[getChatMessages] Database returned ${messages?.length || 0} messages`,
+          );
+
           // Debug log each message's toolCalls
           if (messages && messages.length > 0) {
             messages.forEach((msg: any, idx: number) => {
-              console.log(`[getChatMessages] DB msg ${idx} - id: ${msg.id}, role: ${msg.role}, toolCalls: ${msg.toolCalls?.length || 0}, content length: ${(msg.content || '').length}`);
+              console.log(
+                `[getChatMessages] DB msg ${idx} - id: ${msg.id}, role: ${msg.role}, toolCalls: ${msg.toolCalls?.length || 0}, content length: ${(msg.content || "").length}`,
+              );
               if (msg.toolCalls && msg.toolCalls.length > 0) {
-                console.log(`[getChatMessages] DB msg ${idx} - first toolCall: ${JSON.stringify(msg.toolCalls[0])}`);
+                console.log(
+                  `[getChatMessages] DB msg ${idx} - first toolCall: ${JSON.stringify(msg.toolCalls[0])}`,
+                );
               }
             });
           }
-          
+
           // Ensure we always return an array, even if chat has no messages
           // Never fall back to conversation messages - empty chats should show empty
           const chatMessages = Array.isArray(messages) ? messages : [];
-          
-          console.log(`[getChatMessages] Returning ${chatMessages.length} database messages`);
-          
-          return new Response(JSON.stringify({ success: true, messages: chatMessages }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
+
+          console.log(
+            `[getChatMessages] Returning ${chatMessages.length} database messages`,
+          );
+
+          return new Response(
+            JSON.stringify({ success: true, messages: chatMessages }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
         } catch (error: any) {
           console.error(`[getChatMessages] Database error:`, error);
           return new Response(
             JSON.stringify({
               error: error.message || "Failed to get chat messages",
             }),
-            { status: 400, headers: { "Content-Type": "application/json" } }
+            { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
 
@@ -1213,18 +1419,15 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         if (!requestBody.chatId) {
-          return new Response(
-            JSON.stringify({ error: "ChatId is required" }),
-            {
-              status: 400,
-              headers: { "Content-Type": "application/json" },
-            }
-          );
+          return new Response(JSON.stringify({ error: "ChatId is required" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
         }
 
         if (!requestBody.message) {
@@ -1233,7 +1436,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -1258,7 +1461,7 @@ export async function action({ request }: ActionFunctionArgs) {
               {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
-              }
+              },
             );
           }
 
@@ -1266,20 +1469,20 @@ export async function action({ request }: ActionFunctionArgs) {
             conversationId,
             requestBody.chatId,
             messageObj,
-            userId
+            userId,
           );
 
           // Return messageId and optionally the generated chat title
           return new Response(
-            JSON.stringify({ 
-              success: true, 
+            JSON.stringify({
+              success: true,
               messageId: result.messageId,
               chatTitle: result.chatTitle, // Will be populated for first user message
             }),
             {
               status: 200,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         } catch (error: any) {
           console.error("Error adding chat message:", error);
@@ -1287,7 +1490,7 @@ export async function action({ request }: ActionFunctionArgs) {
             JSON.stringify({
               error: error.message || "Failed to add chat message",
             }),
-            { status: 400, headers: { "Content-Type": "application/json" } }
+            { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
 
@@ -1300,7 +1503,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -1310,22 +1513,24 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         try {
           await connectToDatabase();
-          
+
           // Verify conversation belongs to user
           const conversation = await Conversation.findById(conversationId);
           if (!conversation || conversation.userId.toString() !== userId) {
             return new Response(
-              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              JSON.stringify({
+                error: "Conversation not found or unauthorized",
+              }),
               {
                 status: 404,
                 headers: { "Content-Type": "application/json" },
-              }
+              },
             );
           }
 
@@ -1371,11 +1576,13 @@ export async function action({ request }: ActionFunctionArgs) {
           // Upload each file to R2
           for (const file of requestBody.files) {
             if (!file.path || !file.content) continue;
-            
+
             // Skip node_modules and other ignored files
-            if (file.path.includes("node_modules") || 
-                file.path.includes("package-lock.json") ||
-                file.path.includes(".git/")) {
+            if (
+              file.path.includes("node_modules") ||
+              file.path.includes("package-lock.json") ||
+              file.path.includes(".git/")
+            ) {
               continue;
             }
 
@@ -1394,7 +1601,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 fileName,
                 contentType,
                 projectId,
-                filePath
+                filePath,
               );
 
               if (uploadResult.success && uploadResult.url) {
@@ -1408,7 +1615,10 @@ export async function action({ request }: ActionFunctionArgs) {
                 });
               }
             } catch (fileError: any) {
-              console.error(`[syncFilesToR2] Error uploading ${file.path}:`, fileError.message);
+              console.error(
+                `[syncFilesToR2] Error uploading ${file.path}:`,
+                fileError.message,
+              );
             }
           }
 
@@ -1419,52 +1629,71 @@ export async function action({ request }: ActionFunctionArgs) {
               // Find the chat and populate messages to check their roles
               const chat = await (await import("~/models/chatModel")).default
                 .findById(requestBody.chatId)
-                .populate('messages');
-              
+                .populate("messages");
+
               if (chat && chat.messages && chat.messages.length > 0) {
                 // Find the last assistant message (not just any message)
                 let lastAssistantMessage = null;
                 for (let i = chat.messages.length - 1; i >= 0; i--) {
                   const msg = chat.messages[i] as any;
-                  if (msg && msg.role === 'assistant') {
+                  if (msg && msg.role === "assistant") {
                     lastAssistantMessage = msg;
                     break;
                   }
                 }
-                
+
                 if (lastAssistantMessage) {
-                  console.log(`[syncFilesToR2] Updating assistant message ${lastAssistantMessage._id} with ${uploadedFiles.length} files`);
+                  console.log(
+                    `[syncFilesToR2] Updating assistant message ${lastAssistantMessage._id} with ${uploadedFiles.length} files`,
+                  );
                   // Update the assistant message with r2Files
-                  await AgentMessage.findByIdAndUpdate(lastAssistantMessage._id, {
-                    $push: { r2Files: { $each: uploadedFiles } },
-                  });
+                  await AgentMessage.findByIdAndUpdate(
+                    lastAssistantMessage._id,
+                    {
+                      $push: { r2Files: { $each: uploadedFiles } },
+                    },
+                  );
                 } else {
-                  console.warn(`[syncFilesToR2] No assistant message found in chat ${requestBody.chatId} - files not attached to any message`);
+                  console.warn(
+                    `[syncFilesToR2] No assistant message found in chat ${requestBody.chatId} - files not attached to any message`,
+                  );
                   // Don't attach files to user message - this was causing the bug
                 }
               }
             } catch (updateError: any) {
-              console.error("[syncFilesToR2] Error updating message with r2Files:", updateError.message);
+              console.error(
+                "[syncFilesToR2] Error updating message with r2Files:",
+                updateError.message,
+              );
             }
           }
 
           // Sync conversation to R2 to update conversation.json with latest files
           try {
-            await chatService.syncConversationToR2Public(conversationId, userId);
+            await chatService.syncConversationToR2Public(
+              conversationId,
+              userId,
+            );
           } catch (syncError: any) {
-            console.error("[syncFilesToR2] Error syncing conversation to R2:", syncError.message);
+            console.error(
+              "[syncFilesToR2] Error syncing conversation to R2:",
+              syncError.message,
+            );
           }
 
           return new Response(
             JSON.stringify({
               success: true,
               uploadedCount: uploadedFiles.length,
-              files: uploadedFiles.map(f => ({ path: f.filePath, url: f.url })),
+              files: uploadedFiles.map((f) => ({
+                path: f.filePath,
+                url: f.url,
+              })),
             }),
             {
               status: 200,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         } catch (error: any) {
           console.error("[syncFilesToR2] Error:", error);
@@ -1472,7 +1701,7 @@ export async function action({ request }: ActionFunctionArgs) {
             JSON.stringify({
               error: error.message || "Failed to sync files to R2",
             }),
-            { status: 400, headers: { "Content-Type": "application/json" } }
+            { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
 
@@ -1485,17 +1714,21 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
-        if (!requestBody.files || !Array.isArray(requestBody.files) || requestBody.files.length === 0) {
+        if (
+          !requestBody.files ||
+          !Array.isArray(requestBody.files) ||
+          requestBody.files.length === 0
+        ) {
           return new Response(
             JSON.stringify({ error: "Files array is required" }),
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -1504,13 +1737,18 @@ export async function action({ request }: ActionFunctionArgs) {
 
           // Verify conversation belongs to user
           const convForPresigned = await Conversation.findById(conversationId);
-          if (!convForPresigned || convForPresigned.userId.toString() !== userId) {
+          if (
+            !convForPresigned ||
+            convForPresigned.userId.toString() !== userId
+          ) {
             return new Response(
-              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              JSON.stringify({
+                error: "Conversation not found or unauthorized",
+              }),
               {
                 status: 404,
                 headers: { "Content-Type": "application/json" },
-              }
+              },
             );
           }
 
@@ -1568,7 +1806,9 @@ export async function action({ request }: ActionFunctionArgs) {
                 contentType,
                 filePath,
                 originalPath: file.path,
-                size: file.content ? Buffer.from(file.content, "utf-8").length : 0,
+                size: file.content
+                  ? Buffer.from(file.content, "utf-8").length
+                  : 0,
               };
             });
 
@@ -1578,15 +1818,16 @@ export async function action({ request }: ActionFunctionArgs) {
             conversationId,
             filesToSign,
             projectIdForPresigned,
-            3600 // 1 hour expiry
+            3600, // 1 hour expiry
           );
 
           if (!presignedResult.success || !presignedResult.urls) {
             return new Response(
               JSON.stringify({
-                error: presignedResult.error || "Failed to generate pre-signed URLs",
+                error:
+                  presignedResult.error || "Failed to generate pre-signed URLs",
               }),
-              { status: 500, headers: { "Content-Type": "application/json" } }
+              { status: 500, headers: { "Content-Type": "application/json" } },
             );
           }
 
@@ -1600,7 +1841,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 200,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         } catch (error: any) {
           console.error("[getPresignedUploadUrls] Error:", error);
@@ -1608,7 +1849,7 @@ export async function action({ request }: ActionFunctionArgs) {
             JSON.stringify({
               error: error.message || "Failed to generate pre-signed URLs",
             }),
-            { status: 400, headers: { "Content-Type": "application/json" } }
+            { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
 
@@ -1620,7 +1861,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -1629,33 +1870,35 @@ export async function action({ request }: ActionFunctionArgs) {
 
           // Verify conversation belongs to user
           const convForJsonSync = await Conversation.findById(conversationId);
-          if (!convForJsonSync || convForJsonSync.userId.toString() !== userId) {
+          if (
+            !convForJsonSync ||
+            convForJsonSync.userId.toString() !== userId
+          ) {
             return new Response(
-              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              JSON.stringify({
+                error: "Conversation not found or unauthorized",
+              }),
               {
                 status: 404,
                 headers: { "Content-Type": "application/json" },
-              }
+              },
             );
           }
 
           // Sync conversation.json to R2
           await chatService.syncConversationToR2Public(conversationId, userId);
 
-          return new Response(
-            JSON.stringify({ success: true }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            }
-          );
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
         } catch (error: any) {
           console.error("[syncConversationJson] Error:", error);
           return new Response(
             JSON.stringify({
               error: error.message || "Failed to sync conversation.json",
             }),
-            { status: 400, headers: { "Content-Type": "application/json" } }
+            { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
 
@@ -1667,17 +1910,20 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
-        if (!requestBody.uploadedFiles || !Array.isArray(requestBody.uploadedFiles)) {
+        if (
+          !requestBody.uploadedFiles ||
+          !Array.isArray(requestBody.uploadedFiles)
+        ) {
           return new Response(
             JSON.stringify({ error: "uploadedFiles array is required" }),
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
@@ -1688,11 +1934,13 @@ export async function action({ request }: ActionFunctionArgs) {
           const convForConfirm = await Conversation.findById(conversationId);
           if (!convForConfirm || convForConfirm.userId.toString() !== userId) {
             return new Response(
-              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              JSON.stringify({
+                error: "Conversation not found or unauthorized",
+              }),
               {
                 status: 404,
                 headers: { "Content-Type": "application/json" },
-              }
+              },
             );
           }
 
@@ -1705,18 +1953,48 @@ export async function action({ request }: ActionFunctionArgs) {
             uploadedAt: new Date(),
           }));
 
-          // If chatId is provided, update the last ASSISTANT message with r2Files
-          if (requestBody.chatId && uploadedFiles.length > 0) {
+          // Update the last ASSISTANT message with r2Files
+          // This works for both main conversation (no chatId) and chats (with chatId)
+          if (uploadedFiles.length > 0) {
             try {
-              const chat = await (await import("~/models/chatModel")).default
-                .findById(requestBody.chatId)
-                .populate("messages");
+              if (requestBody.chatId) {
+                // For chats, find the last assistant message in the chat
+                const chat = await (await import("~/models/chatModel")).default
+                  .findById(requestBody.chatId)
+                  .populate("messages");
 
-              if (chat && chat.messages && chat.messages.length > 0) {
+                if (chat && chat.messages && chat.messages.length > 0) {
+                  let lastAssistantMessage = null;
+                  for (let i = chat.messages.length - 1; i >= 0; i--) {
+                    const msg = chat.messages[i] as any;
+                    if (msg && msg.role === "assistant") {
+                      lastAssistantMessage = msg;
+                      break;
+                    }
+                  }
+
+                  if (lastAssistantMessage) {
+                    console.log(
+                      `[confirmR2Uploads] Updating chat assistant message ${lastAssistantMessage._id} with ${uploadedFiles.length} files`,
+                    );
+                    await AgentMessage.findByIdAndUpdate(
+                      lastAssistantMessage._id,
+                      {
+                        $push: { r2Files: { $each: uploadedFiles } },
+                      },
+                    );
+                  }
+                }
+              } else {
+                // For main conversation, find the last assistant message in the conversation
+                const conversationMessages = await AgentMessage.find({
+                  conversationId: conversationId,
+                  chatId: { $exists: false }, // Only main conversation messages (not in any chat)
+                }).sort({ createdAt: -1 }).limit(10);
+
                 let lastAssistantMessage = null;
-                for (let i = chat.messages.length - 1; i >= 0; i--) {
-                  const msg = chat.messages[i] as any;
-                  if (msg && msg.role === "assistant") {
+                for (const msg of conversationMessages) {
+                  if (msg.role === "assistant") {
                     lastAssistantMessage = msg;
                     break;
                   }
@@ -1724,17 +2002,24 @@ export async function action({ request }: ActionFunctionArgs) {
 
                 if (lastAssistantMessage) {
                   console.log(
-                    `[confirmR2Uploads] Updating assistant message ${lastAssistantMessage._id} with ${uploadedFiles.length} files`
+                    `[confirmR2Uploads] Updating main conversation assistant message ${lastAssistantMessage._id} with ${uploadedFiles.length} files`,
                   );
-                  await AgentMessage.findByIdAndUpdate(lastAssistantMessage._id, {
-                    $push: { r2Files: { $each: uploadedFiles } },
-                  });
+                  await AgentMessage.findByIdAndUpdate(
+                    lastAssistantMessage._id,
+                    {
+                      $push: { r2Files: { $each: uploadedFiles } },
+                    },
+                  );
+                } else {
+                  console.warn(
+                    `[confirmR2Uploads] No assistant message found in main conversation ${conversationId} - files uploaded but not attached to message`,
+                  );
                 }
               }
             } catch (updateError: any) {
               console.error(
                 "[confirmR2Uploads] Error updating message with r2Files:",
-                updateError.message
+                updateError.message,
               );
             }
           }
@@ -1742,11 +2027,14 @@ export async function action({ request }: ActionFunctionArgs) {
           // Sync conversation to R2 to update conversation.json
           try {
             const chatService = new ChatService();
-            await chatService.syncConversationToR2Public(conversationId, userId);
+            await chatService.syncConversationToR2Public(
+              conversationId,
+              userId,
+            );
           } catch (syncError: any) {
             console.error(
               "[confirmR2Uploads] Error syncing conversation to R2:",
-              syncError.message
+              syncError.message,
             );
           }
 
@@ -1754,12 +2042,15 @@ export async function action({ request }: ActionFunctionArgs) {
             JSON.stringify({
               success: true,
               confirmedCount: uploadedFiles.length,
-              files: uploadedFiles.map((f: any) => ({ path: f.filePath, url: f.url })),
+              files: uploadedFiles.map((f: any) => ({
+                path: f.filePath,
+                url: f.url,
+              })),
             }),
             {
               status: 200,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         } catch (error: any) {
           console.error("[confirmR2Uploads] Error:", error);
@@ -1767,7 +2058,7 @@ export async function action({ request }: ActionFunctionArgs) {
             JSON.stringify({
               error: error.message || "Failed to confirm uploads",
             }),
-            { status: 400, headers: { "Content-Type": "application/json" } }
+            { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
 
@@ -1780,22 +2071,24 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 400,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         }
 
         try {
           await connectToDatabase();
-          
+
           // Verify conversation belongs to user
           const convForFiles = await Conversation.findById(conversationId);
           if (!convForFiles || convForFiles.userId.toString() !== userId) {
             return new Response(
-              JSON.stringify({ error: "Conversation not found or unauthorized" }),
+              JSON.stringify({
+                error: "Conversation not found or unauthorized",
+              }),
               {
                 status: 404,
                 headers: { "Content-Type": "application/json" },
-              }
+              },
             );
           }
 
@@ -1804,20 +2097,27 @@ export async function action({ request }: ActionFunctionArgs) {
             : undefined;
 
           // Fetch conversation data from R2
-          const r2Result = await getConversationFromR2(userId, conversationId, projId);
+          const r2Result = await getConversationFromR2(
+            userId,
+            conversationId,
+            projId,
+          );
 
           if (!r2Result.success || !r2Result.data) {
-            console.warn("[getFilesFromR2] Failed to fetch conversation from R2:", r2Result.error);
+            console.warn(
+              "[getFilesFromR2] Failed to fetch conversation from R2:",
+              r2Result.error,
+            );
             return new Response(
-              JSON.stringify({ 
-                success: false, 
+              JSON.stringify({
+                success: false,
                 error: r2Result.error || "Conversation not found in R2",
-                files: [] 
+                files: [],
               }),
               {
                 status: 200,
                 headers: { "Content-Type": "application/json" },
-              }
+              },
             );
           }
 
@@ -1832,7 +2132,7 @@ export async function action({ request }: ActionFunctionArgs) {
             uploadedAt: Date | string;
             messageTimestamp: Date | string;
           }
-          
+
           const allR2Files: R2FileInfo[] = [];
 
           // Get files from main conversation messages
@@ -1849,7 +2149,8 @@ export async function action({ request }: ActionFunctionArgs) {
                     filePath: filePath,
                     type: file.contentType || file.type || "text/plain", // Support both old 'type' and new 'contentType'
                     uploadedAt: file.uploadedAt || msg.timestamp || new Date(),
-                    messageTimestamp: msg.timestamp || msg.createdAt || new Date(),
+                    messageTimestamp:
+                      msg.timestamp || msg.createdAt || new Date(),
                   });
                   mainFilesCount++;
                 }
@@ -1872,8 +2173,13 @@ export async function action({ request }: ActionFunctionArgs) {
                       name: file.name,
                       filePath: filePath,
                       type: file.contentType || file.type || "text/plain", // Support both old 'type' and new 'contentType'
-                      uploadedAt: file.uploadedAt || msg.timestamp || msg.createdAt || new Date(),
-                      messageTimestamp: msg.timestamp || msg.createdAt || new Date(),
+                      uploadedAt:
+                        file.uploadedAt ||
+                        msg.timestamp ||
+                        msg.createdAt ||
+                        new Date(),
+                      messageTimestamp:
+                        msg.timestamp || msg.createdAt || new Date(),
                     });
                     chatFilesCount++;
                   }
@@ -1883,29 +2189,28 @@ export async function action({ request }: ActionFunctionArgs) {
           }
 
           if (allR2Files.length === 0) {
-            return new Response(
-              JSON.stringify({ success: true, files: [] }),
-              {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-              }
-            );
+            return new Response(JSON.stringify({ success: true, files: [] }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
           }
 
           // Group files by path, keeping the latest version
           const filesByPath = new Map<string, R2FileInfo>();
-          
+
           for (const file of allR2Files) {
             const normalizedPath = file.filePath.replace(/^\/+/, "");
             const existing = filesByPath.get(normalizedPath);
-            
+
             if (!existing) {
               filesByPath.set(normalizedPath, file);
             } else {
               // Keep the latest version by message timestamp
-              const existingMsgTime = new Date(existing.messageTimestamp).getTime();
+              const existingMsgTime = new Date(
+                existing.messageTimestamp,
+              ).getTime();
               const currentMsgTime = new Date(file.messageTimestamp).getTime();
-              
+
               if (currentMsgTime > existingMsgTime) {
                 filesByPath.set(normalizedPath, file);
               } else if (currentMsgTime === existingMsgTime) {
@@ -1920,24 +2225,37 @@ export async function action({ request }: ActionFunctionArgs) {
           }
 
           // Fetch actual file content from R2
-          const filesWithContent: Array<{ path: string; name: string; content: string; type: string }> = [];
-          const fetchPromises = Array.from(filesByPath.entries()).map(async ([filePath, fileInfo]) => {
-            try {
-              const fetchResult = await fetchFileFromR2(fileInfo.url);
-              if (fetchResult.success && fetchResult.content) {
-                filesWithContent.push({
-                  path: filePath,
-                  name: fileInfo.name,
-                  content: fetchResult.content,
-                  type: fileInfo.type,
-                });
-              } else {
-                console.warn(`[getFilesFromR2] Failed to fetch file ${filePath}:`, fetchResult.error);
+          const filesWithContent: Array<{
+            path: string;
+            name: string;
+            content: string;
+            type: string;
+          }> = [];
+          const fetchPromises = Array.from(filesByPath.entries()).map(
+            async ([filePath, fileInfo]) => {
+              try {
+                const fetchResult = await fetchFileFromR2(fileInfo.url);
+                if (fetchResult.success && fetchResult.content) {
+                  filesWithContent.push({
+                    path: filePath,
+                    name: fileInfo.name,
+                    content: fetchResult.content,
+                    type: fileInfo.type,
+                  });
+                } else {
+                  console.warn(
+                    `[getFilesFromR2] Failed to fetch file ${filePath}:`,
+                    fetchResult.error,
+                  );
+                }
+              } catch (fetchError: any) {
+                console.error(
+                  `[getFilesFromR2] Error fetching file ${filePath}:`,
+                  fetchError.message,
+                );
               }
-            } catch (fetchError: any) {
-              console.error(`[getFilesFromR2] Error fetching file ${filePath}:`, fetchError.message);
-            }
-          });
+            },
+          );
 
           await Promise.all(fetchPromises);
 
@@ -1952,7 +2270,7 @@ export async function action({ request }: ActionFunctionArgs) {
             {
               status: 200,
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
         } catch (error: any) {
           console.error("[getFilesFromR2] Error:", error);
@@ -1960,7 +2278,7 @@ export async function action({ request }: ActionFunctionArgs) {
             JSON.stringify({
               error: error.message || "Failed to get files from R2",
             }),
-            { status: 400, headers: { "Content-Type": "application/json" } }
+            { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
 
