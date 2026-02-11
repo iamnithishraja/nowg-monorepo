@@ -79,33 +79,6 @@ import type { DesignScheme } from "../types/design-scheme";
 import { getShortcutLabel } from "../utils/platform";
 import type { Route } from "./+types/home";
 
-// Environment Badge Component
-const EnvironmentBadge = memo(function EnvironmentBadge() {
-  const [env, setEnv] = useState<{ label: string; color: string } | null>(null);
-
-  useEffect(() => {
-    const hostname = window.location.hostname;
-
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      setEnv({ label: "DEV", color: "bg-blue-500/90" });
-    } else if (hostname === "stg.nowg.ai") {
-      setEnv({ label: "STAGING", color: "bg-yellow-500/90" });
-    } else if (hostname === "app.nowg.ai") {
-      setEnv({ label: "PROD", color: "bg-green-500/90" });
-    }
-  }, []);
-
-  if (!env) return null;
-
-  return (
-    <div
-      className={`${env.color} text-white text-xs font-bold px-2.5 py-1 rounded-md shadow-lg`}
-    >
-      {env.label}
-    </div>
-  );
-});
-
 // Memoized Avatar component - extracted to avoid recreation on every render
 interface HomeAvatarProps {
   displayName?: string;
@@ -844,9 +817,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {/* Header - Right side only */}
         <header className="relative z-10 flex items-center justify-end px-6 py-4">
           <div className="flex items-center gap-3">
-            {/* Environment Badge */}
-            <EnvironmentBadge />
-
             {/* Balance Display */}
             {balance !== null && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
