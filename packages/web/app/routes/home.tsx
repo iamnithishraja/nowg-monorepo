@@ -23,7 +23,7 @@ import {
   Star,
   Users,
 } from "@phosphor-icons/react";
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { redirect, useNavigate } from "react-router";
 import {
   DatabaseConnectionDialog,
@@ -169,10 +169,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [designScheme, setDesignScheme] = useState<DesignScheme | undefined>();
   const [enableDesignScheme, setEnableDesignScheme] = useState<boolean>(false);
-  const [showSearchDialog, setShowSearchDialog] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [isWhitelisted, setIsWhitelisted] = useState(false);
   const [showProjectAdminDialog, setShowProjectAdminDialog] = useState(false);
@@ -184,7 +180,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const [selectedProjectAdminId, setSelectedProjectAdminId] =
     useState<string>("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   const {
@@ -474,66 +469,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     }
   }, [checkSupabaseToken]);
 
-  // Focus search input when dialog opens and fetch projects
-  useEffect(() => {
-    if (showSearchDialog) {
-      setTimeout(() => searchInputRef.current?.focus(), 50);
-      // Fetch all conversations/projects for search
-      fetchProjectsForSearch();
-    } else {
-      setSearchQuery("");
-      setSearchResults([]);
-    }
-  }, [showSearchDialog]);
-
-  // Fetch projects for search
-  const fetchProjectsForSearch = async () => {
-    setIsSearching(true);
-    try {
-      const response = await fetch("/api/conversations");
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.conversations || []);
-      }
-    } catch (error) {
-      console.error("Error fetching projects for search:", error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // Filter and deduplicate search results based on query
-  const filteredSearchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const query = searchQuery.toLowerCase();
-    const filtered = searchResults.filter((project: any) => {
-      const title = (project.title || "").toLowerCase();
-      return title.includes(query);
-    });
-    // Remove duplicates based on ID
-    const seen = new Set();
-    return filtered.filter((project: any) => {
-      if (seen.has(project.id)) return false;
-      seen.add(project.id);
-      return true;
-    });
-  }, [searchQuery, searchResults]);
-
-  // Highlight search terms in text
-  const highlightText = (text: string, query: string): React.ReactNode => {
-    if (!query.trim()) return text;
-    const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
-    return parts.map((part, i) =>
-      part.toLowerCase() === query.toLowerCase() ? (
-        <mark key={i} className="bg-purple-500/30 text-purple-200 px-0.5 rounded">
-          {part}
-        </mark>
-      ) : (
-        part
-      )
-    );
-  };
 
   // Handle Supabase toggle
   const handleSupabaseToggle = (checked: boolean) => {
@@ -860,10 +795,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <div className="h-screen w-screen bg-[#0c0c0c] text-white flex overflow-hidden">
       {/* Sidebar */}
-      <ProjectSidebar
-        user={user}
-        onSearchClick={() => setShowSearchDialog(true)}
-      />
+      <ProjectSidebar user={user} />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -1400,97 +1332,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </div>
         </main>
       </div>
-
-      {/* Search Dialog */}
-      <Dialog open={showSearchDialog} onOpenChange={setShowSearchDialog}>
-        <DialogContent className="max-w-2xl p-0 bg-[#1a1a1a] border-white/10">
-          <DialogHeader className="px-5 pt-5 pb-3 border-b border-white/10">
-            <DialogTitle className="text-base font-semibold text-white">
-              Search Projects
-            </DialogTitle>
-          </DialogHeader>
-          <div className="px-5 pt-4 pb-3">
-            <div className="relative">
-              <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-              <Input
-                ref={searchInputRef}
-                placeholder="Search projects by name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-10 pl-10 pr-4 text-sm bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20"
-              />
-            </div>
-          </div>
-          <div className="border-t border-white/10 max-h-[50vh] overflow-y-auto">
-            <div className="px-2 py-2">
-              {isSearching ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <SpinnerGap className="w-5 h-5 animate-spin text-purple-400 mb-2" />
-                  <div className="text-sm text-white/50">Loading projects...</div>
-                </div>
-              ) : searchQuery.trim() === "" ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <MagnifyingGlass className="w-8 h-8 text-white/20 mb-3" />
-                  <div className="text-sm text-white/50">Type to search across your projects</div>
-                  <div className="text-xs text-white/30 mt-1">
-                    {searchResults.length > 0 && `${searchResults.length} project${searchResults.length !== 1 ? 's' : ''} available`}
-                  </div>
-                </div>
-              ) : filteredSearchResults.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <MagnifyingGlass className="w-8 h-8 text-white/20 mb-3" />
-                  <div className="text-sm text-white/50">No projects found</div>
-                  <div className="text-xs text-white/30 mt-1">
-                    No matches for "{searchQuery}"
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <div className="px-3 py-1.5 text-xs font-medium text-white/40 uppercase tracking-wider">
-                    {filteredSearchResults.length} result{filteredSearchResults.length !== 1 ? 's' : ''}
-                  </div>
-                  {filteredSearchResults.map((project: any) => (
-                    <button
-                      key={project.id}
-                      onClick={() => {
-                        setShowSearchDialog(false);
-                        navigate(`/workspace?conversationId=${project.id}`);
-                      }}
-                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 active:bg-white/8 transition-all group border border-transparent hover:border-white/5"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 p-1.5 rounded-md bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
-                          <ChatCircle className="w-4 h-4 text-purple-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-white group-hover:text-purple-200 transition-colors break-words">
-                            {highlightText(project.title || "Untitled Project", searchQuery)}
-                          </div>
-                          {project.updatedAt && (
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <div className="text-xs text-white/40">
-                                Updated {new Date(project.updatedAt).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric'
-                                })}
-                              </div>
-                              {project.starred && (
-                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <CaretRight className="w-4 h-4 text-white/20 group-hover:text-white/40 transition-colors shrink-0 mt-0.5" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Modals */}
       <GitHubImportModal
