@@ -137,6 +137,8 @@ function ProjectSidebarComponent({
     "recent"
   );
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [visibleMonthsCount, setVisibleMonthsCount] = useState(2); // Show first 2 months initially
 
   // Edit/Delete state
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -407,6 +409,69 @@ function ProjectSidebarComponent({
 
     return projectsToShow;
   }, [filteredProjects, projectView]);
+
+  // Group projects by month - MEMOIZED
+  const projectsByMonth = useMemo(() => {
+    const grouped: Record<string, Project[]> = {};
+    
+    displayedProjects.forEach((project) => {
+      const date = new Date(project.updatedAt);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!grouped[monthKey]) {
+        grouped[monthKey] = [];
+      }
+      grouped[monthKey].push(project);
+    });
+
+    // Sort months in descending order (newest first)
+    const sortedMonths = Object.keys(grouped).sort((a, b) => {
+      return b.localeCompare(a);
+    });
+
+    return { grouped, sortedMonths };
+  }, [displayedProjects]);
+
+  // Format month label for display
+  const formatMonthLabel = useCallback((monthKey: string) => {
+    const [year, month] = monthKey.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }, []);
+
+  // Toggle month expansion
+  const toggleMonthExpansion = useCallback((monthKey: string) => {
+    setExpandedMonths((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(monthKey)) {
+        newSet.delete(monthKey);
+      } else {
+        newSet.add(monthKey);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Initialize expanded months on mount or when projects change
+  useEffect(() => {
+    if (projectsByMonth.sortedMonths.length > 0 && expandedMonths.size === 0) {
+      // Expand the first (most recent) month by default
+      setExpandedMonths(new Set([projectsByMonth.sortedMonths[0]]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectsByMonth.sortedMonths]);
+
+  // Reset visible months count when switching views
+  useEffect(() => {
+    setVisibleMonthsCount(2); // Reset to show first 2 months
+  }, [projectView]);
+
+  // Debug: Log month count (remove after debugging)
+  useEffect(() => {
+    if (projectsByMonth.sortedMonths.length > 0) {
+      console.log('Total months:', projectsByMonth.sortedMonths.length, 'Visible:', visibleMonthsCount, 'Should show button:', projectsByMonth.sortedMonths.length > visibleMonthsCount);
+    }
+  }, [projectsByMonth.sortedMonths.length, visibleMonthsCount]);
 
   // Format date for display - MEMOIZED
   const formatDate = useCallback((dateString: string) => {
@@ -826,7 +891,7 @@ function ProjectSidebarComponent({
                   <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1">
                     All Projects
                   </div>
-                  <div className="space-y-0.5">
+                  <div className="space-y-1">
                     {isLoading ? (
                       <div className="flex items-center justify-center py-4">
                         <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
@@ -836,92 +901,143 @@ function ProjectSidebarComponent({
                         No projects yet
                       </p>
                     ) : (
-                      displayedProjects.map((project) => (
-                        <div
-                          key={project.id}
-                          className="group relative max-w-54"
-                        >
-                          <Link
-                            to={`/workspace?conversationId=${project.id}`}
-                            className={cn(
-                              "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
-                              currentProjectId === project.id
-                                ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
-                                : "text-white/60 hover:text-white hover:bg-white/[0.04]"
-                            )}
-                            onClick={() => setOpenDropdownId(null)}
-                          >
-                            <ChatTeardropDots className="w-5 h-5 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="truncate font-medium text-sm block">
-                                  {project.title || "Untitled Project"}
-                                </span>
-                                {project.starred && (
-                                  <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
-                                )}
-                              </div>
-                              <div className="text-[10px] text-white/30 truncate">
-                                {formatDate(project.updatedAt)}
-                              </div>
-                            </div>
-                          </Link>
-
-                          {/* Actions Menu */}
-                          <DropdownMenu
-                            open={openDropdownId === project.id}
-                            onOpenChange={(open) =>
-                              setOpenDropdownId(open ? project.id : null)
-                            }
-                          >
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                }}
-                              >
-                                <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="w-40 bg-[#1a1a1a] border-white/10"
-                              onClick={(e) => e.stopPropagation()}
+                      <>
+                        {projectsByMonth.sortedMonths.slice(0, visibleMonthsCount).map((monthKey) => {
+                        const monthProjects = projectsByMonth.grouped[monthKey];
+                        const isExpanded = expandedMonths.has(monthKey);
+                        
+                        return (
+                          <div key={monthKey} className="space-y-0.5">
+                            {/* Month Header with Expand/Collapse */}
+                            <button
+                              onClick={() => {
+                                setOpenDropdownId(null);
+                                toggleMonthExpansion(monthKey);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30 hover:text-white/50 transition-colors"
                             >
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleStarToggle(project.id);
-                                  setOpenDropdownId(null);
-                                }}
-                                className="gap-2 cursor-pointer"
-                              >
-                                <Star
-                                  className={cn(
-                                    "w-5 h-5",
-                                    project.starred && "fill-current"
-                                  )}
-                                />
-                                {project.starred ? "Unstar" : "Star"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setProjectToDelete(project);
-                                  setDeleteDialogOpen(true);
-                                  setOpenDropdownId(null);
-                                }}
-                                className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
-                              >
-                                <Trash className="w-5 h-5" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      ))
+                              {isExpanded ? (
+                                <CaretDown className="w-4 h-4" />
+                              ) : (
+                                <CaretRight className="w-4 h-4" />
+                              )}
+                              <span className="flex-1 text-left">
+                                {formatMonthLabel(monthKey)}
+                              </span>
+                              <span className="text-white/20">
+                                ({monthProjects.length})
+                              </span>
+                            </button>
+
+                            {/* Projects under this month */}
+                            {isExpanded && (
+                              <div className="ml-2 space-y-0.5">
+                                {monthProjects.map((project) => (
+                                  <div
+                                    key={project.id}
+                                    className="group relative max-w-54"
+                                  >
+                                    <Link
+                                      to={`/workspace?conversationId=${project.id}`}
+                                      className={cn(
+                                        "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
+                                        currentProjectId === project.id
+                                          ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
+                                          : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                                      )}
+                                      onClick={() => setOpenDropdownId(null)}
+                                    >
+                                      <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <span className="truncate font-medium text-sm block">
+                                            {project.title || "Untitled Project"}
+                                          </span>
+                                          {project.starred && (
+                                            <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
+                                          )}
+                                        </div>
+                                        <div className="text-[10px] text-white/30 truncate">
+                                          {formatDate(project.updatedAt)}
+                                        </div>
+                                      </div>
+                                    </Link>
+
+                                    {/* Actions Menu */}
+                                    <DropdownMenu
+                                      open={openDropdownId === project.id}
+                                      onOpenChange={(open) =>
+                                        setOpenDropdownId(open ? project.id : null)
+                                      }
+                                    >
+                                      <DropdownMenuTrigger asChild>
+                                        <button
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                          }}
+                                        >
+                                          <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent
+                                        align="end"
+                                        className="w-40 bg-[#1a1a1a] border-white/10"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStarToggle(project.id);
+                                            setOpenDropdownId(null);
+                                          }}
+                                          className="gap-2 cursor-pointer"
+                                        >
+                                          <Star
+                                            className={cn(
+                                              "w-5 h-5",
+                                              project.starred && "fill-current"
+                                            )}
+                                          />
+                                          {project.starred ? "Unstar" : "Star"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setProjectToDelete(project);
+                                            setDeleteDialogOpen(true);
+                                            setOpenDropdownId(null);
+                                          }}
+                                          className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
+                                        >
+                                          <Trash className="w-5 h-5" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                        })}
+                        {/* Load More Button */}
+                        {projectsByMonth.sortedMonths.length > visibleMonthsCount ? (
+                          <div className="mt-3 pt-2 border-t border-white/10">
+                            <button
+                              onClick={() => {
+                                setVisibleMonthsCount(prev => prev + 2); // Load 2 more months at a time
+                              }}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-white/80 hover:text-white bg-white/5 hover:bg-white/10 transition-colors border border-white/10 hover:border-white/20"
+                            >
+                              <span>Load More Months ({projectsByMonth.sortedMonths.length - visibleMonthsCount} remaining)</span>
+                              <CaretDown className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
                     )}
                   </div>
                 </div>
@@ -933,7 +1049,7 @@ function ProjectSidebarComponent({
                   <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1">
                     Starred Projects
                   </div>
-                  <div className="space-y-0.5">
+                  <div className="space-y-1">
                     {isLoading ? (
                       <div className="flex items-center justify-center py-4">
                         <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
@@ -943,92 +1059,143 @@ function ProjectSidebarComponent({
                         No starred projects yet
                       </p>
                     ) : (
-                      displayedProjects.map((project) => (
-                        <div
-                          key={project.id}
-                          className="group relative max-w-54"
-                        >
-                          <Link
-                            to={`/workspace?conversationId=${project.id}`}
-                            className={cn(
-                              "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
-                              currentProjectId === project.id
-                                ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
-                                : "text-white/60 hover:text-white hover:bg-white/[0.04]"
-                            )}
-                            onClick={() => setOpenDropdownId(null)}
-                          >
-                            <ChatTeardropDots className="w-5 h-5 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="truncate font-medium text-sm block">
-                                  {project.title || "Untitled Project"}
-                                </span>
-                                {project.starred && (
-                                  <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
-                                )}
-                              </div>
-                              <div className="text-[10px] text-white/30 truncate">
-                                {formatDate(project.updatedAt)}
-                              </div>
-                            </div>
-                          </Link>
-
-                          {/* Actions Menu */}
-                          <DropdownMenu
-                            open={openDropdownId === project.id}
-                            onOpenChange={(open) =>
-                              setOpenDropdownId(open ? project.id : null)
-                            }
-                          >
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                }}
-                              >
-                                <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="w-40 bg-[#1a1a1a] border-white/10"
-                              onClick={(e) => e.stopPropagation()}
+                      <>
+                        {projectsByMonth.sortedMonths.slice(0, visibleMonthsCount).map((monthKey) => {
+                        const monthProjects = projectsByMonth.grouped[monthKey];
+                        const isExpanded = expandedMonths.has(monthKey);
+                        
+                        return (
+                          <div key={monthKey} className="space-y-0.5">
+                            {/* Month Header with Expand/Collapse */}
+                            <button
+                              onClick={() => {
+                                setOpenDropdownId(null);
+                                toggleMonthExpansion(monthKey);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30 hover:text-white/50 transition-colors"
                             >
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleStarToggle(project.id);
-                                  setOpenDropdownId(null);
-                                }}
-                                className="gap-2 cursor-pointer"
-                              >
-                                <Star
-                                  className={cn(
-                                    "w-5 h-5",
-                                    project.starred && "fill-current"
-                                  )}
-                                />
-                                {project.starred ? "Unstar" : "Star"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setProjectToDelete(project);
-                                  setDeleteDialogOpen(true);
-                                  setOpenDropdownId(null);
-                                }}
-                                className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
-                              >
-                                <Trash className="w-5 h-5" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      ))
+                              {isExpanded ? (
+                                <CaretDown className="w-4 h-4" />
+                              ) : (
+                                <CaretRight className="w-4 h-4" />
+                              )}
+                              <span className="flex-1 text-left">
+                                {formatMonthLabel(monthKey)}
+                              </span>
+                              <span className="text-white/20">
+                                ({monthProjects.length})
+                              </span>
+                            </button>
+
+                            {/* Projects under this month */}
+                            {isExpanded && (
+                              <div className="ml-2 space-y-0.5">
+                                {monthProjects.map((project) => (
+                                  <div
+                                    key={project.id}
+                                    className="group relative max-w-54"
+                                  >
+                                    <Link
+                                      to={`/workspace?conversationId=${project.id}`}
+                                      className={cn(
+                                        "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
+                                        currentProjectId === project.id
+                                          ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
+                                          : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                                      )}
+                                      onClick={() => setOpenDropdownId(null)}
+                                    >
+                                      <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <span className="truncate font-medium text-sm block">
+                                            {project.title || "Untitled Project"}
+                                          </span>
+                                          {project.starred && (
+                                            <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
+                                          )}
+                                        </div>
+                                        <div className="text-[10px] text-white/30 truncate">
+                                          {formatDate(project.updatedAt)}
+                                        </div>
+                                      </div>
+                                    </Link>
+
+                                    {/* Actions Menu */}
+                                    <DropdownMenu
+                                      open={openDropdownId === project.id}
+                                      onOpenChange={(open) =>
+                                        setOpenDropdownId(open ? project.id : null)
+                                      }
+                                    >
+                                      <DropdownMenuTrigger asChild>
+                                        <button
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                          }}
+                                        >
+                                          <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent
+                                        align="end"
+                                        className="w-40 bg-[#1a1a1a] border-white/10"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStarToggle(project.id);
+                                            setOpenDropdownId(null);
+                                          }}
+                                          className="gap-2 cursor-pointer"
+                                        >
+                                          <Star
+                                            className={cn(
+                                              "w-5 h-5",
+                                              project.starred && "fill-current"
+                                            )}
+                                          />
+                                          {project.starred ? "Unstar" : "Star"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setProjectToDelete(project);
+                                            setDeleteDialogOpen(true);
+                                            setOpenDropdownId(null);
+                                          }}
+                                          className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
+                                        >
+                                          <Trash className="w-5 h-5" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                        })}
+                        {/* Load More Button */}
+                        {projectsByMonth.sortedMonths.length > visibleMonthsCount ? (
+                          <div className="mt-3 pt-2 border-t border-white/10">
+                            <button
+                              onClick={() => {
+                                setVisibleMonthsCount(prev => prev + 2); // Load 2 more months at a time
+                              }}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-white/80 hover:text-white bg-white/5 hover:bg-white/10 transition-colors border border-white/10 hover:border-white/20"
+                            >
+                              <span>Load More Months ({projectsByMonth.sortedMonths.length - visibleMonthsCount} remaining)</span>
+                              <CaretDown className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
                     )}
                   </div>
                 </div>
