@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "packages/datadock-api/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - ".github/workflows/deploy-datadock-api-ecs.yml"
+  workflow_dispatch:
 
 env:
   AWS_REGION: ap-south-1

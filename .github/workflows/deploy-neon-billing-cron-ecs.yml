@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "packages/neon-billing-cron/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - ".github/workflows/deploy-neon-billing-cron-ecs.yml"
+  workflow_dispatch:
 
 env:
   AWS_REGION: ap-south-1

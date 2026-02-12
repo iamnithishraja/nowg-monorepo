@@ -5,9 +5,13 @@ on:
     branches:
       - main
     paths:
-      - 'packages/admin-client/**'
-      - 'packages/admin-server/**'
-      - '.github/workflows/deploy-admin-all.yml'
+      - "packages/admin-client/**"
+      - "packages/admin-server/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - ".github/workflows/deploy-admin-all.yml"
   workflow_dispatch:
 
 jobs:
@@ -44,7 +48,7 @@ jobs:
         run: |
           # Create deployment directory on EC2
           ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ~/admin-server'
-          
+
           # Upload built server bundle (self-contained)
           scp -i ~/.ssh/deploy_key -r packages/admin-server/dist \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/admin-server/
