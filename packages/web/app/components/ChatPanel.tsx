@@ -392,10 +392,17 @@ function ChatPanelComponent({
     try {
       const text = formatMessagesAsText();
       
+      // Get title - use conversationTitle, or extract from first user message as fallback
+      const firstUserMessage = messages.find((m) => m.role === "user");
+      const extractedTitle = firstUserMessage && typeof firstUserMessage.content === "string"
+        ? firstUserMessage.content.slice(0, 50).trim() + (firstUserMessage.content.length > 50 ? "..." : "")
+        : null;
+      const projectTitle = conversationTitle || extractedTitle || "Chat History";
+      
       // Create download data with metadata
       const downloadData = {
         metadata: {
-          projectTitle: conversationTitle || "Untitled Project",
+          projectTitle,
           conversationId: conversationId || null,
           chatId: chatId || null,
           exportedAt: new Date().toISOString(),
@@ -446,7 +453,7 @@ function ChatPanelComponent({
       // Create download link
       const url = URL.createObjectURL(jsonBlob);
       const link = document.createElement("a");
-      const sanitizedTitle = (conversationTitle || "chat-history")
+      const sanitizedTitle = (projectTitle)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "")
