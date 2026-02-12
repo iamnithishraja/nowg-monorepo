@@ -717,7 +717,7 @@ export function WorkspaceChatInput({
               {/* Divider */}
               <div className="w-px h-5 bg-border/30" />
 
-              {/* Edit Canvas Button - With Text */}
+              {/* Edit Button */}
               <Button
                 onClick={() => {
                   if (!isEditActive) {
@@ -753,8 +753,31 @@ export function WorkspaceChatInput({
                 }
               >
                 <SelectionPlus className="w-3.5 h-3.5" />
-                Edit Canvas
+                Edit
               </Button>
+
+              {/* Cancel Edit Button - Shows when edit mode is active */}
+              {isEditActive && (
+                <Button
+                  onClick={() => {
+                    setIsEditActive(false);
+                    const event = new CustomEvent("toggleInspector", {
+                      detail: { enabled: false },
+                    });
+                    window.dispatchEvent(event);
+                    try {
+                      window.dispatchEvent(new CustomEvent("endEditMode"));
+                    } catch {}
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs gap-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+                  title="Cancel edit mode and revert changes"
+                >
+                  <Square className="w-3 h-3" />
+                  Cancel
+                </Button>
+              )}
 
               {/* Spacer */}
               <div className="flex-1" />
