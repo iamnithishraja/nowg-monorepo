@@ -466,13 +466,6 @@ function ProjectSidebarComponent({
     setVisibleMonthsCount(2); // Reset to show first 2 months
   }, [projectView]);
 
-  // Debug: Log month count (remove after debugging)
-  useEffect(() => {
-    if (projectsByMonth.sortedMonths.length > 0) {
-      console.log('Total months:', projectsByMonth.sortedMonths.length, 'Visible:', visibleMonthsCount, 'Should show button:', projectsByMonth.sortedMonths.length > visibleMonthsCount);
-    }
-  }, [projectsByMonth.sortedMonths.length, visibleMonthsCount]);
-
   // Format date for display - MEMOIZED
   const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
@@ -1024,19 +1017,19 @@ function ProjectSidebarComponent({
                         );
                         })}
                         {/* Load More Button */}
-                        {projectsByMonth.sortedMonths.length > visibleMonthsCount ? (
-                          <div className="mt-3 pt-2 border-t border-white/10">
+                        {projectsByMonth.sortedMonths.length > visibleMonthsCount && (
+                          <div className="mt-4 pt-3 border-t border-white/10">
                             <button
                               onClick={() => {
                                 setVisibleMonthsCount(prev => prev + 2); // Load 2 more months at a time
                               }}
-                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-white/80 hover:text-white bg-white/5 hover:bg-white/10 transition-colors border border-white/10 hover:border-white/20"
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
                             >
-                              <span>Load More Months ({projectsByMonth.sortedMonths.length - visibleMonthsCount} remaining)</span>
                               <CaretDown className="w-4 h-4" />
+                              <span>Load More Months</span>
                             </button>
                           </div>
-                        ) : null}
+                        )}
                       </>
                     )}
                   </div>
@@ -1182,19 +1175,19 @@ function ProjectSidebarComponent({
                         );
                         })}
                         {/* Load More Button */}
-                        {projectsByMonth.sortedMonths.length > visibleMonthsCount ? (
-                          <div className="mt-3 pt-2 border-t border-white/10">
+                        {projectsByMonth.sortedMonths.length > visibleMonthsCount && (
+                          <div className="mt-4 pt-3 border-t border-white/10">
                             <button
                               onClick={() => {
                                 setVisibleMonthsCount(prev => prev + 2); // Load 2 more months at a time
                               }}
-                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-white/80 hover:text-white bg-white/5 hover:bg-white/10 transition-colors border border-white/10 hover:border-white/20"
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
                             >
-                              <span>Load More Months ({projectsByMonth.sortedMonths.length - visibleMonthsCount} remaining)</span>
                               <CaretDown className="w-4 h-4" />
+                              <span>Load More Months</span>
                             </button>
                           </div>
-                        ) : null}
+                        )}
                       </>
                     )}
                   </div>

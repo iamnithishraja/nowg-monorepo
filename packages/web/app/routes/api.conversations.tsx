@@ -263,7 +263,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     // Otherwise, get all user conversations (personal + team)
-    const { personal, team } = await chatService.getUserConversations(userId);
+    // Use a high limit (1000) to fetch all conversations since we paginate by month on frontend
+    const { personal, team } = await chatService.getUserConversations(userId, 1000);
 
     // Format personal conversations
     const personalFormatted = personal.map((conv) => ({
