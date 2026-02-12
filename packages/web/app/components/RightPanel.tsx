@@ -603,7 +603,8 @@ function RightPanelComponent({
             <div className="flex-1 min-h-0 rounded-lg overflow-hidden">
               <PreviewPanel
                 previewUrl={previewUrl}
-                isLoading={!previewUrl}
+                isLoading={isLoading || !previewUrl}
+                terminalLines={terminalLines}
                 onElementSelected={onElementSelected}
                 onInspectorEnable={onInspectorEnable}
               />

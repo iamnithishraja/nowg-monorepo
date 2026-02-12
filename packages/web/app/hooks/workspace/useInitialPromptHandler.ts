@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import type { Message } from "../../types/chat";
 import { OPENROUTER_MODELS } from "../../consts/models";
 import { createClientFileStorageService } from "../../lib/clientFileStorage";
+import { useWorkspaceStore } from "../../stores/useWorkspaceStore";
 
 interface InitialPromptDeps {
   chat: any;
@@ -133,6 +134,17 @@ export function useInitialPromptHandler({
 
       setIsProcessingTemplate(true);
       chat.setError(null);
+
+      // Reset command progress at the start of a new prompt
+      const { setCommandProgress } = useWorkspaceStore.getState();
+      setCommandProgress({
+        phase: "preparing",
+        message: "Processing your request",
+        details: "Analyzing prompt and setting up workspace...",
+        progress: 5,
+        startTime: Date.now(),
+        error: null,
+      });
 
       try {
         if (importedFiles && importedFiles.length > 0) {

@@ -527,6 +527,17 @@ conversationId
         (f: any) => f.path === wcPath
       );
 
+      // Update command progress to show file creation
+      const { setCommandProgress } = useWorkspaceStore.getState() as any;
+      setCommandProgress({
+        phase: "preparing",
+        message: "Creating files",
+        details: `Writing ${fileName}...`,
+        progress: 10,
+        startTime: Date.now(),
+        error: null,
+      });
+
       // Show in-progress indicator immediately when LLM starts generating the file
       chat.addFileCreationIndicator(
         fileName,
@@ -634,6 +645,16 @@ conversationId
         command.includes("npm i ") ||
         command === "npm i";
 
+      // Track if this is a dev server command
+      const isDevServer =
+        command.includes("npm run dev") ||
+        command.includes("npm start") ||
+        command.includes("yarn dev") ||
+        command.includes("pnpm dev") ||
+        command.includes("bun dev") ||
+        command.includes("vite") ||
+        command.includes("next dev");
+
       if (isNpmInstall) {
         npmInstallHandledRef.current = true;
       }
@@ -653,11 +674,41 @@ conversationId
         await runLinear(wcFiles);
       }
 
-      // Append banner to terminal via store
-      const { appendTerminalLine, setIsTerminalRunning } =
+      // Append banner to terminal via store and set initial progress
+      const { appendTerminalLine, setIsTerminalRunning, setCommandProgress } =
         useWorkspaceStore.getState() as any;
       setIsTerminalRunning(true);
       appendTerminalLine(`$ ${command}`);
+
+      // Set initial command progress based on command type
+      if (isNpmInstall) {
+        setCommandProgress({
+          phase: "installing",
+          message: "Installing dependencies",
+          details: "Fetching and linking packages...",
+          progress: 20,
+          startTime: Date.now(),
+          error: null,
+        });
+      } else if (isDevServer) {
+        setCommandProgress({
+          phase: "starting",
+          message: "Starting development server",
+          details: "Booting up the dev server...",
+          progress: 70,
+          startTime: Date.now(),
+          error: null,
+        });
+      } else {
+        setCommandProgress({
+          phase: "preparing",
+          message: "Running command",
+          details: command.substring(0, 50) + (command.length > 50 ? "..." : ""),
+          progress: 10,
+          startTime: Date.now(),
+          error: null,
+        });
+      }
 
       // Try to restore node_modules from cache if this is an npm install command
       // Cache is populated by background preload from GitHub repo on home page load
@@ -697,9 +748,59 @@ conversationId
 
       // Stream terminal output to store and detect preview URL lines
       const detach = onTerminalOutput((line: string) => {
+        const { setCommandProgress } = useWorkspaceStore.getState() as any;
+        
         // Detect Vite/WebContainer URL lines
         const urlMatch = line.match(/https?:\/\/[^\s]+/);
-        if (urlMatch && !previewUrl) setPreviewUrl(urlMatch[0]);
+        if (urlMatch && !previewUrl) {
+          setPreviewUrl(urlMatch[0]);
+          // Update progress to ready
+          setCommandProgress({
+            phase: "ready",
+            message: "Preview ready",
+            details: "Your application is running",
+            progress: 100,
+          });
+          // Auto-refresh preview when URL is detected
+          window.dispatchEvent(
+            new CustomEvent("preview-control", {
+              detail: { action: "refresh" },
+            })
+          );
+        }
+        
+        // Detect server ready patterns and update progress
+        const lowerLine = line.toLowerCase();
+        if (/ready in|local:|localhost:|compiled successfully|listening on|running at|➜\s+local:/i.test(line)) {
+          setCommandProgress({
+            phase: "ready",
+            message: "Server is ready",
+            details: "Waiting for preview URL...",
+            progress: 95,
+          });
+        } else if (/starting.*dev|vite|next dev|webpack|dev server/i.test(lowerLine)) {
+          setCommandProgress({
+            phase: "starting",
+            message: "Starting development server",
+            details: "Booting up the dev server...",
+            progress: 75,
+          });
+        } else if (/added\s+\d+\s+packages?|audited\s+\d+\s+packages?|up to date|done in\s+\d/i.test(lowerLine)) {
+          setCommandProgress({
+            phase: "building",
+            message: "Dependencies installed",
+            details: "Preparing to start server...",
+            progress: 55,
+          });
+        } else if (/resolving|fetching|linking|installing|preinstall|postinstall/i.test(lowerLine)) {
+          setCommandProgress({
+            phase: "installing",
+            message: "Installing dependencies",
+            details: "Fetching and linking packages...",
+            progress: 35,
+          });
+        }
+        
         // Filter noisy extension warnings
         const noisy = /origins don't match|preloaded using link preload/i.test(
           line
@@ -734,16 +835,55 @@ conversationId
         true
       )
         .then(async () => {
+          const { setCommandProgress, resetCommandProgress } = useWorkspaceStore.getState() as any;
+          
           // Refresh preview after npm install completes to pick up new dependencies
           if (isNpmInstall) {
+            setCommandProgress({
+              phase: "building",
+              message: "Dependencies installed",
+              details: "Ready to start server...",
+              progress: 55,
+            });
             window.dispatchEvent(
               new CustomEvent("preview-control", {
                 detail: { action: "refresh" },
               })
             );
           }
+          
+          // If dev server command completed successfully, check for preview URL
+          if (isDevServer) {
+            // Give the server a moment to output the URL
+            setTimeout(() => {
+              const currentPreviewUrl = useWorkspaceStore.getState().previewUrl;
+              if (currentPreviewUrl) {
+                setCommandProgress({
+                  phase: "ready",
+                  message: "Preview ready",
+                  details: "Your application is running",
+                  progress: 100,
+                });
+                // Auto-refresh preview
+                window.dispatchEvent(
+                  new CustomEvent("preview-control", {
+                    detail: { action: "refresh" },
+                  })
+                );
+              }
+            }, 500);
+          }
         })
-        .catch(() => {})
+        .catch((error) => {
+          const { setCommandProgress } = useWorkspaceStore.getState() as any;
+          setCommandProgress({
+            phase: "error",
+            message: "Command failed",
+            details: error?.message || "An error occurred",
+            progress: 0,
+            error: error?.message || "Command execution failed",
+          });
+        })
         .finally(() => {
           setIsTerminalRunning(false);
           detach();

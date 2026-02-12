@@ -4,6 +4,25 @@ import { shallow } from "zustand/shallow";
 export type TabType = "files" | "preview";
 export type ChatMode = "build" | "ask";
 
+// Command progress phases
+export type CommandProgressPhase = 
+  | "idle"
+  | "preparing"
+  | "installing"
+  | "building"
+  | "starting"
+  | "ready"
+  | "error";
+
+export interface CommandProgressState {
+  phase: CommandProgressPhase;
+  message: string;
+  details: string;
+  progress: number; // 0-100
+  startTime: number | null;
+  error: string | null;
+}
+
 interface WorkspaceState {
   selectedModel: string;
   conversationId: string | null;
@@ -23,6 +42,8 @@ interface WorkspaceState {
   chatMode: ChatMode;
   // R2 sync state
   isSyncingToR2: boolean;
+  // Command progress state
+  commandProgress: CommandProgressState;
   setSelectedModel: (model: string) => void;
   setConversationId: (id: string | null) => void;
   setConversationTitle: (title: string | null) => void;
@@ -38,10 +59,23 @@ interface WorkspaceState {
   setIsEditActive: (v: boolean) => void;
   setChatMode: (mode: ChatMode) => void;
   setIsSyncingToR2: (v: boolean) => void;
+  // Command progress actions
+  setCommandProgress: (progress: Partial<CommandProgressState>) => void;
+  resetCommandProgress: () => void;
 }
 
 // Max terminal lines to prevent memory bloat
 const MAX_TERMINAL_LINES = 1000;
+
+// Default command progress state
+const defaultCommandProgress: CommandProgressState = {
+  phase: "idle",
+  message: "",
+  details: "",
+  progress: 0,
+  startTime: null,
+  error: null,
+};
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   selectedModel: "",
@@ -58,6 +92,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   isTerminalRunning: false,
   chatMode: "build",
   isSyncingToR2: false,
+  commandProgress: { ...defaultCommandProgress },
   setSelectedModel: (model) => set({ selectedModel: model }),
   setConversationId: (id) => set({ conversationId: id }),
   setConversationTitle: (title) => set({ conversationTitle: title }),
@@ -81,6 +116,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setIsEditActive: (v) => set({ isEditActive: v }),
   setChatMode: (mode) => set({ chatMode: mode }),
   setIsSyncingToR2: (v) => set({ isSyncingToR2: v }),
+  setCommandProgress: (progress) =>
+    set((state) => ({
+      commandProgress: { ...state.commandProgress, ...progress },
+    })),
+  resetCommandProgress: () => set({ commandProgress: { ...defaultCommandProgress } }),
 }));
 
 // ============================================
@@ -173,4 +213,19 @@ export const useConversationId = () =>
 
 export const useIsSyncingToR2 = () =>
   useWorkspaceStore((state) => state.isSyncingToR2);
+
+// Command progress selector
+export const useCommandProgress = () =>
+  useWorkspaceStore((state) => state.commandProgress);
+
+// Command progress state selector with actions
+export const useCommandProgressState = () =>
+  useWorkspaceStore(
+    (state) => ({
+      commandProgress: state.commandProgress,
+      setCommandProgress: state.setCommandProgress,
+      resetCommandProgress: state.resetCommandProgress,
+    }),
+    shallow
+  );
 

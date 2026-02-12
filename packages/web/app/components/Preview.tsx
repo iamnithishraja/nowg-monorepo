@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Globe } from "lucide-react";
 import { classNames } from "../lib/classNames";
+import { CommandProgress } from "./CommandProgress";
 
 interface PreviewPanelProps {
   previewUrl: string | null | undefined;
@@ -396,7 +397,7 @@ export default function PreviewPanel({
 
   if (isLoading && !previewUrl) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#0a0a0f] overflow-hidden relative">
+      <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0f] overflow-hidden relative">
         {/* Smooth animated space background */}
         <div className="absolute inset-0">
           {/* Gradient orbs - smooth continuous rotation */}
@@ -437,8 +438,8 @@ export default function PreviewPanel({
           ))}
         </div>
 
-        {/* Main animated orb */}
-        <div className="relative z-10 flex items-center justify-center">
+        {/* Main animated orb - centered */}
+        <div className="relative z-10 flex items-center justify-center flex-1">
           <div className="relative">
             {/* Outer glow - smooth rotation */}
             <div className="absolute -inset-8 bg-gradient-to-r from-purple-500/25 via-cyan-500/25 to-pink-500/25 rounded-full blur-2xl animate-[smoothSpin_8s_linear_infinite]" />
@@ -489,6 +490,15 @@ export default function PreviewPanel({
               />
             ))}
           </div>
+        </div>
+
+        {/* Command Progress Component - positioned at bottom */}
+        <div className="relative z-10 pb-12">
+          <CommandProgress 
+            terminalLines={terminalLines} 
+            previewUrl={previewUrl}
+            isLoading={isLoading}
+          />
         </div>
 
         {/* Smooth keyframe animations */}
