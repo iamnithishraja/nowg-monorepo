@@ -923,6 +923,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       currentToolCalls={(controller as any).currentToolCalls || []}
                       streamingSegments={(controller as any).streamingSegments || []}
                       chatId={currentChatId}
+                      conversationTitle={controller.conversationTitle || undefined}
                       onFileClick={(filePath) => {
                         // Normalize path for the file tree (relative path without leading slash)
                         let normalizedPath = filePath;

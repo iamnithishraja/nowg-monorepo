@@ -78,6 +78,7 @@ interface ChatPanelProps {
   isStreamingText?: boolean; // True when text is actively being streamed
   chatId?: string | null; // Chat ID to detect if we're in a chat
   onFileClick?: (filePath: string) => void; // Callback when a file in tool call is clicked
+  conversationTitle?: string; // Conversation/project title for metadata
 }
 
 // Memoized file attachment component
@@ -195,6 +196,7 @@ function ChatPanelComponent({
   isStreamingText = false,
   chatId,
   onFileClick,
+  conversationTitle,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [fileDataMap, setFileDataMap] = useState<Map<string, string>>(
@@ -296,6 +298,171 @@ function ChatPanelComponent({
     },
     [userMessages]
   );
+
+  // Format all messages as text for copying/downloading
+  const formatMessagesAsText = useCallback(() => {
+    const lines: string[] = [];
+    
+    // Add project metadata header
+    if (conversationTitle) {
+      lines.push(`Project: ${conversationTitle}`);
+      lines.push("");
+    }
+    if (conversationId) {
+      lines.push(`Conversation ID: ${conversationId}`);
+      lines.push("");
+    }
+    if (chatId) {
+      lines.push(`Chat ID: ${chatId}`);
+      lines.push("");
+    }
+    lines.push("=".repeat(60));
+    lines.push("");
+
+    // Format each message
+    messages.forEach((message, index) => {
+      const timestamp = formatMessageTime(
+        (message as any).createdAt || (message as any).timestamp
+      );
+      
+      // Handle toolcall role for agentic chats
+      const role = message.role === "toolcall" ? "ASSISTANT (Tool Call)" : message.role.toUpperCase();
+      lines.push(`[${index + 1}] ${role}${timestamp ? ` - ${timestamp}` : ""}`);
+      lines.push("-".repeat(60));
+      
+      // Add message content
+      if (typeof message.content === "string") {
+        const cleanContent = cleanMessageContent(message);
+        if (cleanContent) {
+          lines.push(cleanContent);
+        }
+      } else if (message.content) {
+        lines.push(JSON.stringify(message.content, null, 2));
+      }
+      
+      // Add tool calls if present (for both assistant and toolcall messages)
+      const toolCalls = (message as any).toolCalls || [];
+      if (toolCalls.length > 0) {
+        lines.push("");
+        lines.push("Tool Calls:");
+        toolCalls.forEach((tc: any, idx: number) => {
+          lines.push(`  ${idx + 1}. ${tc.name || "Unknown Tool"}`);
+          if (tc.args) {
+            lines.push(`     Arguments: ${JSON.stringify(tc.args, null, 2)}`);
+          }
+          if (tc.result) {
+            const resultOutput = tc.result.output || tc.result.error || JSON.stringify(tc.result);
+            lines.push(`     Result: ${resultOutput}`);
+          }
+        });
+      }
+      
+      // Add tool results if present
+      const toolResults = (message as any).toolResults || [];
+      if (toolResults.length > 0) {
+        lines.push("");
+        lines.push("Tool Results:");
+        toolResults.forEach((tr: any, idx: number) => {
+          lines.push(`  ${idx + 1}. ${tr.toolName || "Unknown Tool"}`);
+          if (tr.output) {
+            lines.push(`     Output: ${tr.output}`);
+          }
+        });
+      }
+      
+      // Add file attachments if present
+      if (message.files && message.files.length > 0) {
+        lines.push("");
+        lines.push("Attachments:");
+        message.files.forEach((file) => {
+          lines.push(`  - ${file.name} (${file.type})`);
+        });
+      }
+      
+      lines.push("");
+      lines.push("=".repeat(60));
+      lines.push("");
+    });
+    
+    return lines.join("\n");
+  }, [messages, conversationTitle, conversationId, chatId]);
+
+  // Handle download chat history
+  const handleDownloadHistory = useCallback(async () => {
+    try {
+      const text = formatMessagesAsText();
+      
+      // Create download data with metadata
+      const downloadData = {
+        metadata: {
+          projectTitle: conversationTitle || "Untitled Project",
+          conversationId: conversationId || null,
+          chatId: chatId || null,
+          exportedAt: new Date().toISOString(),
+          messageCount: messages.length,
+        },
+        messages: messages.map((msg) => {
+          const baseMessage: any = {
+            id: msg.id,
+            role: msg.role,
+            content: typeof msg.content === "string" ? cleanMessageContent(msg) : msg.content,
+            timestamp: (msg as any).createdAt || (msg as any).timestamp || null,
+          };
+          
+          // Add model info if present
+          if ((msg as any).model) {
+            baseMessage.model = (msg as any).model;
+          }
+          
+          // Add tool calls (including for agentic chats)
+          if ((msg as any).toolCalls) {
+            baseMessage.toolCalls = (msg as any).toolCalls;
+          }
+          
+          // Add tool results
+          if ((msg as any).toolResults) {
+            baseMessage.toolResults = (msg as any).toolResults;
+          }
+          
+          // Add file metadata (not the actual files, just references)
+          if (msg.files) {
+            baseMessage.files = msg.files.map((f) => ({
+              id: f.id,
+              name: f.name,
+              type: f.type,
+              size: (f as any).size || null,
+            }));
+          }
+          
+          return baseMessage;
+        }),
+      };
+      
+      // Create JSON blob
+      const jsonBlob = new Blob([JSON.stringify(downloadData, null, 2)], {
+        type: "application/json",
+      });
+      
+      // Create download link
+      const url = URL.createObjectURL(jsonBlob);
+      const link = document.createElement("a");
+      const sanitizedTitle = (conversationTitle || "chat-history")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 50);
+      link.href = url;
+      link.download = `${sanitizedTitle}-${Date.now()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download chat history:", error);
+    }
+  }, [formatMessagesAsText, messages, conversationTitle, conversationId, chatId]);
 
   // Clean message content by removing artifacts and handling special components
   const cleanMessageContent = (message: Message) => {
@@ -1004,51 +1171,63 @@ function ChatPanelComponent({
 
                 {/* User message - styled as a premium card */}
                 {message.role === "user" && (
-                  <div className="flex items-start gap-2 justify-end w-full">
-                    {/* Revert button to the left of bubble */}
-                    {onRevert &&
-                      message.role === "user" &&
-                      !getIsLastUserMessage(message.id) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity h-7 px-2 py-1 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 shrink-0 mt-2 rounded-lg"
-                          onClick={() => onRevert?.(message.id)}
-                          title="Revert back to this message"
-                        >
-                          <RotateCcw className="w-3 h-3 mr-1" />
-                          <span className="text-xs whitespace-nowrap">
-                            Revert
-                          </span>
-                        </Button>
-                      )}
-                    <div className="max-w-[90%]">
-                      {/* User message card - dark container */}
-                      <div className="bg-[#1a1a1a] border border-white/8 rounded-2xl p-4">
-                        {/* Display uploaded files */}
-                        {message.files && message.files.length > 0 && (
-                          <div className="mb-3 flex flex-wrap gap-2">
-                            {message.files.map((file) => {
-                              const fileData = fileDataMap.get(file.id);
-                              const isImage = file.type.startsWith("image/");
-
-                              return (
-                                <FileAttachmentItem
-                                  key={file.id}
-                                  file={file}
-                                  fileData={fileData}
-                                  isImage={isImage}
-                                />
-                              );
-                            })}
-                          </div>
+                  <div className="flex flex-col items-end w-full">
+                    <div className="flex items-start gap-2 justify-end w-full">
+                      {/* Revert button to the left of bubble */}
+                      {onRevert &&
+                        message.role === "user" &&
+                        !getIsLastUserMessage(message.id) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity h-7 px-2 py-1 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 shrink-0 mt-2 rounded-lg"
+                            onClick={() => onRevert?.(message.id)}
+                            title="Revert back to this message"
+                          >
+                            <RotateCcw className="w-3 h-3 mr-1" />
+                            <span className="text-xs whitespace-nowrap">
+                              Revert
+                            </span>
+                          </Button>
                         )}
-                        <div className="text-sm leading-relaxed text-foreground">
-                          {segments[0].type === "text" &&
-                            renderRichContent(segments[0].content)}
+                      <div className="max-w-[90%]">
+                        {/* User message card - dark container */}
+                        <div className="bg-[#1a1a1a] border border-white/8 rounded-2xl p-4">
+                          {/* Display uploaded files */}
+                          {message.files && message.files.length > 0 && (
+                            <div className="mb-3 flex flex-wrap gap-2">
+                              {message.files.map((file) => {
+                                const fileData = fileDataMap.get(file.id);
+                                const isImage = file.type.startsWith("image/");
+
+                                return (
+                                  <FileAttachmentItem
+                                    key={file.id}
+                                    file={file}
+                                    fileData={fileData}
+                                    isImage={isImage}
+                                  />
+                                );
+                              })}
+                            </div>
+                          )}
+                          <div className="text-sm leading-relaxed text-foreground">
+                            {segments[0].type === "text" &&
+                              renderRichContent(segments[0].content)}
+                          </div>
                         </div>
                       </div>
                     </div>
+                    {/* Download button - below user message, only on first user message */}
+                    {messages.findIndex((m) => m.role === "user") === messages.indexOf(message) && messages.length > 1 && (
+                      <button
+                        onClick={handleDownloadHistory}
+                        className="mt-1.5 mr-1 p-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                        title="Download chat history"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 )}
 
