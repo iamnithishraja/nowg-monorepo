@@ -1,10 +1,13 @@
-import { ArrowLeft, DollarSign, User as UserIcon, Zap } from "lucide-react";
-import { Link, redirect } from "react-router";
+import { ArrowLeft, DollarSign, User as UserIcon, Zap, Pencil, Check, X, Loader2 } from "lucide-react";
+import { Link, redirect, useRevalidator } from "react-router";
+import { useState } from "react";
 import GradientGlow from "../components/GradientGlow";
 import { ProjectSidebar } from "../components/ProjectSidebar";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
 import { auth } from "../lib/auth";
+import { authClient } from "../lib/authClient";
 import { connectToDatabase } from "../lib/mongo";
 import { isWhitelistedEmail } from "../lib/stripe";
 import type { Route } from "./+types/profile";
@@ -68,6 +71,19 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
     isWhitelisted: boolean;
   };
 
+  const revalidator = useRevalidator();
+
+  // Editing states
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [editedName, setEditedName] = useState(user?.name || "");
+  const [editedEmail, setEditedEmail] = useState(user?.email || "");
+  const [nameLoading, setNameLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+
   const displayName = user?.name || user?.email || "User";
 
   const initials = (() => {
@@ -80,6 +96,88 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
     const handle = source.includes("@") ? source.split("@")[0] : source;
     return handle.slice(0, 2).toUpperCase();
   })();
+
+  const handleSaveName = async () => {
+    if (!editedName.trim()) {
+      setNameError("Name cannot be empty");
+      return;
+    }
+    
+    setNameLoading(true);
+    setNameError(null);
+    
+    try {
+      const result = await authClient.updateUser({
+        name: editedName.trim(),
+      });
+      
+      if (result.error) {
+        setNameError(result.error.message || "Failed to update name");
+        return;
+      }
+      
+      setIsEditingName(false);
+      revalidator.revalidate();
+    } catch (err: any) {
+      setNameError(err.message || "Failed to update name");
+    } finally {
+      setNameLoading(false);
+    }
+  };
+
+  const handleSaveEmail = async () => {
+    if (!editedEmail.trim()) {
+      setEmailError("Email cannot be empty");
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editedEmail.trim())) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
+    
+    if (editedEmail.trim().toLowerCase() === user?.email?.toLowerCase()) {
+      setIsEditingEmail(false);
+      return;
+    }
+    
+    setEmailLoading(true);
+    setEmailError(null);
+    setEmailSuccess(null);
+    
+    try {
+      const result = await authClient.changeEmail({
+        newEmail: editedEmail.trim(),
+        callbackURL: "/profile",
+      });
+      
+      if (result.error) {
+        setEmailError(result.error.message || "Failed to update email");
+        return;
+      }
+      
+      setEmailSuccess("Verification email sent! Please check your inbox to confirm the change.");
+      setIsEditingEmail(false);
+      setEditedEmail(user?.email || ""); // Reset to current email
+    } catch (err: any) {
+      setEmailError(err.message || "Failed to update email");
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleCancelName = () => {
+    setIsEditingName(false);
+    setEditedName(user?.name || "");
+    setNameError(null);
+  };
+
+  const handleCancelEmail = () => {
+    setIsEditingEmail(false);
+    setEditedEmail(user?.email || "");
+    setEmailError(null);
+  };
 
   const Avatar = ({ size = "lg" }: { size?: "sm" | "lg" }) => {
     const imageUrl = user?.image || undefined;
@@ -159,21 +257,142 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Name Field */}
                       <div>
                         <label className="text-sm text-tertiary">Name</label>
-                        <div className="mt-1 px-3 py-2 rounded-lg border border-subtle bg-surface-2/50 text-secondary">
-                          {user?.name || "—"}
-                        </div>
+                        {isEditingName ? (
+                          <div className="mt-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={editedName}
+                                onChange={(e) => setEditedName(e.target.value)}
+                                className="flex-1 bg-surface-2/50 border-subtle text-secondary"
+                                placeholder="Enter your name"
+                                disabled={nameLoading}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSaveName();
+                                  if (e.key === "Escape") handleCancelName();
+                                }}
+                                autoFocus
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={handleSaveName}
+                                disabled={nameLoading}
+                                className="h-9 w-9 text-green-500 hover:text-green-400 hover:bg-green-500/10"
+                              >
+                                {nameLoading ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Check className="w-4 h-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={handleCancelName}
+                                disabled={nameLoading}
+                                className="h-9 w-9 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            {nameError && (
+                              <p className="text-xs text-red-500">{nameError}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-1 flex items-center gap-2">
+                            <div className="flex-1 px-3 py-2 rounded-lg border border-subtle bg-surface-2/50 text-secondary">
+                              {user?.name || "—"}
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditedName(user?.name || "");
+                                setIsEditingName(true);
+                              }}
+                              className="h-9 w-9 text-tertiary hover:text-primary"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Email Field */}
                       <div>
                         <label className="text-sm text-tertiary">Email</label>
-                        <div className="mt-1 px-3 py-2 rounded-lg border border-subtle bg-surface-2/50 text-secondary">
-                          {user?.email || "—"}
-                        </div>
+                        {isEditingEmail ? (
+                          <div className="mt-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="email"
+                                value={editedEmail}
+                                onChange={(e) => setEditedEmail(e.target.value)}
+                                className="flex-1 bg-surface-2/50 border-subtle text-secondary"
+                                placeholder="Enter your email"
+                                disabled={emailLoading}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSaveEmail();
+                                  if (e.key === "Escape") handleCancelEmail();
+                                }}
+                                autoFocus
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={handleSaveEmail}
+                                disabled={emailLoading}
+                                className="h-9 w-9 text-green-500 hover:text-green-400 hover:bg-green-500/10"
+                              >
+                                {emailLoading ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Check className="w-4 h-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={handleCancelEmail}
+                                disabled={emailLoading}
+                                className="h-9 w-9 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            {emailError && (
+                              <p className="text-xs text-red-500">{emailError}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 px-3 py-2 rounded-lg border border-subtle bg-surface-2/50 text-secondary">
+                                {user?.email || "—"}
+                              </div>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEditedEmail(user?.email || "");
+                                  setIsEditingEmail(true);
+                                  setEmailSuccess(null);
+                                }}
+                                className="h-9 w-9 text-tertiary hover:text-primary"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            {emailSuccess && (
+                              <p className="text-xs text-green-500">{emailSuccess}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="text-xs text-tertiary">
-                      Profile editing will be available soon.
                     </div>
                   </CardContent>
                 </Card>
