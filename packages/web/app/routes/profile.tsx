@@ -75,14 +75,9 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
 
   // Editing states
   const [isEditingName, setIsEditingName] = useState(false);
-  const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [editedName, setEditedName] = useState(user?.name || "");
-  const [editedEmail, setEditedEmail] = useState(user?.email || "");
   const [nameLoading, setNameLoading] = useState(false);
-  const [emailLoading, setEmailLoading] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
 
   const displayName = user?.name || user?.email || "User";
 
@@ -125,58 +120,10 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
     }
   };
 
-  const handleSaveEmail = async () => {
-    if (!editedEmail.trim()) {
-      setEmailError("Email cannot be empty");
-      return;
-    }
-    
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(editedEmail.trim())) {
-      setEmailError("Please enter a valid email address");
-      return;
-    }
-    
-    if (editedEmail.trim().toLowerCase() === user?.email?.toLowerCase()) {
-      setIsEditingEmail(false);
-      return;
-    }
-    
-    setEmailLoading(true);
-    setEmailError(null);
-    setEmailSuccess(null);
-    
-    try {
-      const result = await authClient.changeEmail({
-        newEmail: editedEmail.trim(),
-        callbackURL: "/profile",
-      });
-      
-      if (result.error) {
-        setEmailError(result.error.message || "Failed to update email");
-        return;
-      }
-      
-      setEmailSuccess("Verification email sent! Please check your inbox to confirm the change.");
-      setIsEditingEmail(false);
-      setEditedEmail(user?.email || ""); // Reset to current email
-    } catch (err: any) {
-      setEmailError(err.message || "Failed to update email");
-    } finally {
-      setEmailLoading(false);
-    }
-  };
-
   const handleCancelName = () => {
     setIsEditingName(false);
     setEditedName(user?.name || "");
     setNameError(null);
-  };
-
-  const handleCancelEmail = () => {
-    setIsEditingEmail(false);
-    setEditedEmail(user?.email || "");
-    setEmailError(null);
   };
 
   const Avatar = ({ size = "lg" }: { size?: "sm" | "lg" }) => {
@@ -205,7 +152,7 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
   return (
     <div className="h-screen w-screen bg-canvas text-white flex overflow-hidden">
       {/* Sidebar */}
-      <ProjectSidebar user={user} />
+      <ProjectSidebar user={user ? { ...user, image: user.image ?? undefined } : undefined} />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -325,73 +272,11 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                       {/* Email Field */}
                       <div>
                         <label className="text-sm text-tertiary">Email</label>
-                        {isEditingEmail ? (
-                          <div className="mt-1 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="email"
-                                value={editedEmail}
-                                onChange={(e) => setEditedEmail(e.target.value)}
-                                className="flex-1 bg-surface-2/50 border-subtle text-secondary"
-                                placeholder="Enter your email"
-                                disabled={emailLoading}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSaveEmail();
-                                  if (e.key === "Escape") handleCancelEmail();
-                                }}
-                                autoFocus
-                              />
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={handleSaveEmail}
-                                disabled={emailLoading}
-                                className="h-9 w-9 text-green-500 hover:text-green-400 hover:bg-green-500/10"
-                              >
-                                {emailLoading ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Check className="w-4 h-4" />
-                                )}
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={handleCancelEmail}
-                                disabled={emailLoading}
-                                className="h-9 w-9 text-red-500 hover:text-red-400 hover:bg-red-500/10"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                            {emailError && (
-                              <p className="text-xs text-red-500">{emailError}</p>
-                            )}
+                        <div className="mt-1">
+                          <div className="px-3 py-2 rounded-lg border border-subtle bg-surface-2/50 text-secondary">
+                            {user?.email || "—"}
                           </div>
-                        ) : (
-                          <div className="mt-1 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 px-3 py-2 rounded-lg border border-subtle bg-surface-2/50 text-secondary">
-                                {user?.email || "—"}
-                              </div>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditedEmail(user?.email || "");
-                                  setIsEditingEmail(true);
-                                  setEmailSuccess(null);
-                                }}
-                                className="h-9 w-9 text-tertiary hover:text-primary"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                            </div>
-                            {emailSuccess && (
-                              <p className="text-xs text-green-500">{emailSuccess}</p>
-                            )}
-                          </div>
-                        )}
+                        </div>
                       </div>
                     </div>
                     <div className="pt-4 border-t border-subtle">

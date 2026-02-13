@@ -1,6 +1,7 @@
 import {
   Bell,
   Buildings,
+  Calendar,
   Cardholder,
   CaretDown,
   CaretRight,
@@ -63,6 +64,9 @@ interface Organization {
 
 const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
 const SIDEBAR_CONTEXT_STORAGE_KEY = "web-sidebar-context";
+const TIME_FILTER_STORAGE_KEY = "nowgai:projectTimeFilter";
+
+type TimeFilter = "all" | "thisMonth" | "lastMonth" | "thisYear" | "lastYear" | "last3Months" | "last6Months";
 
 // User avatar component - extracted and memoized
 interface UserAvatarProps {
@@ -136,6 +140,7 @@ function ProjectSidebarComponent({
   const [projectView, setProjectView] = useState<"recent" | "all" | "starred">(
     "recent"
   );
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [visibleMonthsCount, setVisibleMonthsCount] = useState(2); // Show first 2 months initially
@@ -250,7 +255,7 @@ function ProjectSidebarComponent({
     );
   };
 
-  // Load persisted workspace selection
+  // Load persisted workspace selection and time filter
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -258,13 +263,17 @@ function ProjectSidebarComponent({
       if (stored) {
         setSelectedWorkspace(stored);
       }
+      const storedFilter = window.localStorage.getItem(TIME_FILTER_STORAGE_KEY);
+      if (storedFilter && ["all", "thisMonth", "lastMonth", "thisYear", "lastYear", "last3Months", "last6Months"].includes(storedFilter)) {
+        setTimeFilter(storedFilter as TimeFilter);
+      }
     } catch (err) {
-      console.error("Error reading workspace from localStorage:", err);
+      console.error("Error reading from localStorage:", err);
     }
     setHasLoadedWorkspaceFromStorage(true);
   }, []);
 
-  // Persist workspace selection
+  // Persist workspace selection and time filter
   useEffect(() => {
     if (typeof window === "undefined" || !hasLoadedWorkspaceFromStorage) return;
     try {
@@ -273,6 +282,15 @@ function ProjectSidebarComponent({
       console.error("Error saving workspace to localStorage:", err);
     }
   }, [selectedWorkspace, hasLoadedWorkspaceFromStorage]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(TIME_FILTER_STORAGE_KEY, timeFilter);
+    } catch (err) {
+      console.error("Error saving time filter to localStorage:", err);
+    }
+  }, [timeFilter]);
 
   // Keep chat creation context in sync with selected workspace (home.tsx uses this)
   useEffect(() => {
@@ -381,19 +399,68 @@ function ProjectSidebarComponent({
     [projects]
   );
 
+  // Filter projects by time frame - MEMOIZED
+  const filterProjectsByTime = useCallback((projects: Project[], filter: TimeFilter): Project[] => {
+    if (filter === "all") return projects;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    return projects.filter((project) => {
+      const projectDate = new Date(project.updatedAt);
+      const projectDateOnly = new Date(projectDate.getFullYear(), projectDate.getMonth(), projectDate.getDate());
+
+      switch (filter) {
+        case "thisMonth": {
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          return projectDateOnly >= startOfMonth;
+        }
+        case "lastMonth": {
+          const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+          return projectDateOnly >= startOfLastMonth && projectDateOnly <= endOfLastMonth;
+        }
+        case "thisYear": {
+          const startOfYear = new Date(now.getFullYear(), 0, 1);
+          return projectDateOnly >= startOfYear;
+        }
+        case "lastYear": {
+          const startOfLastYear = new Date(now.getFullYear() - 1, 0, 1);
+          const endOfLastYear = new Date(now.getFullYear() - 1, 11, 31);
+          return projectDateOnly >= startOfLastYear && projectDateOnly <= endOfLastYear;
+        }
+        case "last3Months": {
+          const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+          return projectDateOnly >= threeMonthsAgo;
+        }
+        case "last6Months": {
+          const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+          return projectDateOnly >= sixMonthsAgo;
+        }
+        default:
+          return true;
+      }
+    });
+  }, []);
+
   // Get recent projects (last 5) - MEMOIZED (for display in recent section)
   const recentProjects = useMemo(
-    () =>
-      [...filteredProjects]
+    () => {
+      let recent = [...filteredProjects]
         .sort(
           (a, b) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        )
-        .slice(0, 5),
-    [filteredProjects]
+        );
+      
+      // Apply time filter to recent projects too
+      recent = filterProjectsByTime(recent, timeFilter);
+      
+      return recent.slice(0, 5);
+    },
+    [filteredProjects, timeFilter, filterProjectsByTime]
   );
 
-  // Get projects based on view - MEMOIZED
+  // Get projects based on view and time filter - MEMOIZED
   const displayedProjects = useMemo(() => {
     let projectsToShow = [...filteredProjects];
 
@@ -407,8 +474,11 @@ function ProjectSidebarComponent({
       );
     }
 
+    // Apply time filter
+    projectsToShow = filterProjectsByTime(projectsToShow, timeFilter);
+
     return projectsToShow;
-  }, [filteredProjects, projectView]);
+  }, [filteredProjects, projectView, timeFilter, filterProjectsByTime]);
 
   // Group projects by month - MEMOIZED
   const projectsByMonth = useMemo(() => {
@@ -461,10 +531,10 @@ function ProjectSidebarComponent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectsByMonth.sortedMonths]);
 
-  // Reset visible months count when switching views
+  // Reset visible months count when switching views or time filter
   useEffect(() => {
     setVisibleMonthsCount(2); // Reset to show first 2 months
-  }, [projectView]);
+  }, [projectView, timeFilter]);
 
   // Format date for display - MEMOIZED
   const formatDate = useCallback((dateString: string) => {
@@ -707,31 +777,123 @@ function ProjectSidebarComponent({
             {!isCollapsed && "Search"}
           </button>
 
-          {/* Projects Section */}
-          {!isCollapsed && (
-            <>
-              <div className="pt-4 pb-2">
-                <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                  Projects
-                </span>
-              </div>
+              {/* Projects Section */}
+              {!isCollapsed && (
+                <>
+                  <div className="pt-4 pb-2">
+                    <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                      Projects
+                    </span>
+                  </div>
 
-              <button
-                onClick={() => {
-                  setOpenDropdownId(null);
-                  // Toggle: if already "all", go back to "recent", otherwise set to "all"
-                  setProjectView(projectView === "all" ? "recent" : "all");
-                }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  projectView === "all"
-                    ? "bg-white/[0.08] text-white"
-                    : "text-white/60 hover:text-white hover:bg-white/[0.04]"
-                )}
-              >
-                <Cardholder className="w-4 h-4" />
-                All Projects
-              </button>
+                  {/* Time Filter Dropdown */}
+                  <div className="px-3 mb-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-colors group">
+                          <Calendar className="w-4 h-4 text-white/60" />
+                          <span className="flex-1 text-left text-white text-sm font-medium truncate">
+                            {timeFilter === "all" && "All Time"}
+                            {timeFilter === "thisMonth" && "This Month"}
+                            {timeFilter === "lastMonth" && "Last Month"}
+                            {timeFilter === "thisYear" && "This Year"}
+                            {timeFilter === "lastYear" && "Last Year"}
+                            {timeFilter === "last3Months" && "Last 3 Months"}
+                            {timeFilter === "last6Months" && "Last 6 Months"}
+                          </span>
+                          <CaretDown className="w-4 h-4 text-white/40 group-hover:text-white/60 transition-colors" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        className="w-56 bg-[#1a1a1a] border-white/10"
+                      >
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("all")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "all" && "bg-white/10"
+                          )}
+                        >
+                          <Calendar className="w-4 h-4" />
+                          All Time
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-white/10" />
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("thisMonth")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "thisMonth" && "bg-white/10"
+                          )}
+                        >
+                          This Month
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("lastMonth")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "lastMonth" && "bg-white/10"
+                          )}
+                        >
+                          Last Month
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("last3Months")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "last3Months" && "bg-white/10"
+                          )}
+                        >
+                          Last 3 Months
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("last6Months")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "last6Months" && "bg-white/10"
+                          )}
+                        >
+                          Last 6 Months
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-white/10" />
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("thisYear")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "thisYear" && "bg-white/10"
+                          )}
+                        >
+                          This Year
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("lastYear")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "lastYear" && "bg-white/10"
+                          )}
+                        >
+                          Last Year
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setOpenDropdownId(null);
+                      // Toggle: if already "all", go back to "recent", otherwise set to "all"
+                      setProjectView(projectView === "all" ? "recent" : "all");
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      projectView === "all"
+                        ? "bg-white/[0.08] text-white"
+                        : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                    )}
+                  >
+                    <Cardholder className="w-4 h-4" />
+                    All Projects
+                  </button>
 
               <button
                 onClick={() => {

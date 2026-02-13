@@ -31,9 +31,12 @@ import { authClient } from "../lib/authClient";
 import { cn } from "../lib/utils";
 import { useIsSyncingToR2 } from "../stores/useWorkspaceStore";
 import { downloadCodebaseAsZip, getProjectName } from "../lib/downloadCodebase";
+import { downloadMessagesAsHTML } from "../lib/downloadMessages";
 import { UnifiedDeploymentDialog, useDeployDialog } from "./DeployDialog";
 import { GitHubDeleteDialog } from "./github/GitHubDeleteDialog";
 import { GitHubRepositoryDialog } from "./github/GitHubRepositoryDialog";
+import { DownloadModal } from "./DownloadModal";
+import type { Message } from "../types/chat";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -123,6 +126,10 @@ interface WorkspaceRightHeaderProps {
   templateFilesState?: FileItem[];
   /** Conversation title for download filename */
   conversationTitle?: string;
+  /** Messages for downloading chat history */
+  messages?: Message[];
+  /** Chat ID for downloading messages */
+  chatId?: string;
 }
 
 export function WorkspaceRightHeader({
@@ -140,6 +147,8 @@ export function WorkspaceRightHeader({
   isRestoringVersion = false,
   templateFilesState = [],
   conversationTitle,
+  messages = [],
+  chatId,
 }: WorkspaceRightHeaderProps) {
   const navigate = useNavigate();
   const [user, setUser] = useState<any | null>(null);
@@ -149,6 +158,7 @@ export function WorkspaceRightHeader({
   const [showGitHubDeleteDialog, setShowGitHubDeleteDialog] = useState(false);
   const [isGitHubDeleting, setIsGitHubDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   
   // R2 sync status
   const isSyncingToR2 = useIsSyncingToR2();
@@ -384,6 +394,42 @@ export function WorkspaceRightHeader({
       setIsDownloading(false);
     }
   }, [templateFilesState, conversationTitle]);
+
+  const handleDownloadMessages = useCallback(() => {
+    if (messages.length === 0) {
+      alert("No messages to download.");
+      return;
+    }
+
+    try {
+      downloadMessagesAsHTML(messages, conversationTitle, conversationId, chatId);
+    } catch (error) {
+      console.error("Failed to download messages:", error);
+      alert(
+        error instanceof Error ? error.message : "Failed to download messages"
+      );
+    }
+  }, [messages, conversationTitle, conversationId, chatId]);
+
+  const handleDownloadClick = useCallback(() => {
+    // Show modal if we have both codebase and messages, or just messages
+    // If only codebase exists, download directly (for backwards compatibility)
+    const hasCodebase = templateFilesState.length > 0;
+    const hasMessages = messages.length > 0;
+
+    if (hasCodebase && hasMessages) {
+      // Show modal to choose
+      setShowDownloadModal(true);
+    } else if (hasCodebase) {
+      // Only codebase, download directly
+      handleDownloadCodebase();
+    } else if (hasMessages) {
+      // Only messages, download directly
+      handleDownloadMessages();
+    } else {
+      alert("No files or messages to download.");
+    }
+  }, [templateFilesState.length, messages.length, handleDownloadCodebase, handleDownloadMessages]);
 
   const hasRepository = repositoryStatus?.hasRepository || false;
   const isSynced = repositoryStatus?.isSynced !== false;
@@ -633,8 +679,8 @@ export function WorkspaceRightHeader({
             variant="ghost"
             size="sm"
             className="h-8 px-3 rounded-lg text-white/70 hover:text-white hover:bg-white/[0.08] text-xs font-medium"
-            onClick={handleDownloadCodebase}
-            disabled={isDownloading || templateFilesState.length === 0}
+            onClick={handleDownloadClick}
+            disabled={isDownloading || (templateFilesState.length === 0 && messages.length === 0)}
           >
             <Download className="w-3.5 h-3.5 mr-1.5" />
             {isDownloading ? "Downloading..." : "Download"}
@@ -825,6 +871,15 @@ export function WorkspaceRightHeader({
         onDelete={handleGitHubDelete}
         isDeleting={isGitHubDeleting}
         error={gitHubError}
+      />
+
+      {/* Download Modal */}
+      <DownloadModal
+        open={showDownloadModal}
+        onOpenChange={setShowDownloadModal}
+        onDownloadCodebase={handleDownloadCodebase}
+        onDownloadMessages={handleDownloadMessages}
+        hasCodebase={templateFilesState.length > 0}
       />
     </>
   );

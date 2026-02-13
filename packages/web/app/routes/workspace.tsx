@@ -1017,6 +1017,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     isRestoringVersion={controller.isRestoringVersion}
                     templateFilesState={controller.templateFilesState}
                     conversationTitle={controller.conversationTitle || undefined}
+                    messages={controller.messages}
+                    chatId={currentChatId || undefined}
                   />
 
                   {/* Right Panel Content */}

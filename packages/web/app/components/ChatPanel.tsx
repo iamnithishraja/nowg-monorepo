@@ -1225,16 +1225,6 @@ function ChatPanelComponent({
                         </div>
                       </div>
                     </div>
-                    {/* Download button - below user message, only on first user message */}
-                    {messages.findIndex((m) => m.role === "user") === messages.indexOf(message) && messages.length > 1 && (
-                      <button
-                        onClick={handleDownloadHistory}
-                        className="mt-1.5 mr-1 p-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                        title="Download chat history"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                    )}
                   </div>
                 )}
 

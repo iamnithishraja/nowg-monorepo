@@ -92,17 +92,6 @@ async function createAuth() {
           required: false,
         },
       },
-      changeEmail: {
-        enabled: true,
-        sendChangeEmailVerification: async ({ user, newEmail, url }) => {
-          await sendVerificationEmail({
-            to: newEmail,
-            subject: "Verify your new email address - Nowgai",
-            verificationUrl: url,
-            userName: user.name || user.email,
-          });
-        },
-      },
     },
   });
 
