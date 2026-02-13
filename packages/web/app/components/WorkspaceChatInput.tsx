@@ -356,7 +356,7 @@ export function WorkspaceChatInput({
                         ? `Ask a question... (${shortcutLabel} to send)`
                         : `Describe what you want to build... (${shortcutLabel} to start)`}
                     disabled={isDisabled || isEnhancing}
-                    className="w-full h-24 resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none p-3"
+                    className="w-full min-h-[96px] max-h-[120px] resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none p-3"
                   />
                 </div>
 
@@ -606,7 +606,7 @@ export function WorkspaceChatInput({
                     : "What shall we build today?"
                 }
                 disabled={isDisabled || isEnhancing}
-                className="w-full min-h-20 resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none px-4 py-3 bg-transparent text-primary placeholder-tertiary text-sm"
+                className="w-full min-h-[80px] max-h-[200px] resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none px-4 py-3 bg-transparent text-primary placeholder-tertiary text-sm"
               />
             </div>
 
