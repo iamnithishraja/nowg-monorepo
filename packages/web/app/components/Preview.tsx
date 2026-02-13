@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Globe } from "lucide-react";
 import { classNames } from "../lib/classNames";
-import { CommandProgress } from "./CommandProgress";
 
 interface PreviewPanelProps {
   previewUrl: string | null | undefined;
@@ -325,211 +324,62 @@ export default function PreviewPanel({
     return "#1a1a1a";
   }, []);
 
-  // Derive a friendly loading state from terminal output
-  const loadingInfo = useMemo(() => {
-    // Consider only recent non-command output to avoid treating echoed commands as progress
-    const recent = (terminalLines || []).slice(-120);
-    const nonCommandLines = recent.filter((l) => !/^\s*\$\s/.test(l));
-    const text = nonCommandLines.join("\n");
-    const hasActivity = nonCommandLines.length > 0;
-
-    // Detect install activity vs completion (npm/pnpm/yarn/bun)
-    const installActive =
-      /(resolving|fetching|linking|installing|preinstall|postinstall|lockfile|progress|package\(s\))/i.test(
-        text
-      );
-    const installDone =
-      /(added\s+\d+\s+packages?|audited\s+\d+\s+packages?|up to date|Already up to date|Done in\s+\d|finished in\s+\d|success\s+Saved lockfile|lockfile up to date|installed in\s+\d)/i.test(
-        text
-      );
-
-    // Detect dev server activity vs ready
-    const serverActive =
-      /(dev server|starting.*dev|vite|next dev|webpack|listening|server started|building for development|compiling)/i.test(
-        text
-      );
-    const serverReady =
-      /(ready in|Local:|compiled successfully|listening on|running at|http:\/\/|https:\/\/)/i.test(
-        text
-      );
-
-    // Friendly message + details
-    const message = installActive && !installDone
-      ? "Installing dependencies"
-      : serverActive
-      ? "Starting development server"
-      : hasActivity
-      ? "Setting things up"
-      : "Preparing workspace";
-
-    const details =
-      installActive && !installDone
-        ? "Fetching packages and linking modules..."
-        : serverActive
-        ? "Booting the dev server and preparing your preview..."
-        : hasActivity
-        ? "Applying project files and initializing the environment..."
-        : "Spinning up a lightweight runtime...";
-
-    // Steps and completion
-    // Always consider environment preparation done to avoid an empty first step feel
-    const donePrepare = true;
-    const doneInstall = installDone;
-    const doneStart = serverReady || !!previewUrl;
-    const doneOpen = !!previewUrl;
-    const steps = [
-      { label: "Prepare environment", done: donePrepare },
-      { label: "Install dependencies", done: doneInstall },
-      { label: "Start dev server", done: doneStart },
-      { label: "Open preview", done: doneOpen },
-    ];
-
-    // Progress with a baseline 25% so it never feels stuck at 0
-    let progress = 25;
-    if (installActive && !installDone) progress = Math.max(progress, 40);
-    if (doneInstall) progress = Math.max(progress, 55);
-    if (serverActive && !serverReady) progress = Math.max(progress, 70);
-    if (doneStart) progress = Math.max(progress, 85);
-    if (doneOpen) progress = 100;
-
-    return { message, details, steps, progress };
-  }, [terminalLines, previewUrl]);
+  // TODO: Replace this placeholder with your video URL
+  const PREVIEW_VIDEO_URL = "https://res.cloudinary.com/drqyjtqgu/video/upload/v1770994514/329209_small_dzydp1.mp4";
 
   if (isLoading && !previewUrl) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0f] overflow-hidden relative">
-        {/* Smooth animated space background */}
+      <div className="h-full flex flex-col bg-[#0a0a0f] overflow-hidden relative">
+        {/* Video Background */}
         <div className="absolute inset-0">
-          {/* Gradient orbs - smooth continuous rotation */}
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[100px] animate-[smoothDrift_20s_linear_infinite]" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-cyan-500/20 rounded-full blur-[100px] animate-[smoothDrift_25s_linear_infinite_reverse]" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-pink-500/10 rounded-full blur-[120px] animate-[smoothDrift_30s_linear_infinite]" />
-          
-          {/* Stars - gentle consistent glow */}
-          {Array.from({ length: 60 }).map((_, i) => (
-            <div
-              key={`star-${i}`}
-              className="absolute rounded-full bg-white animate-[gentleGlow_3s_linear_infinite]"
-              style={{
-                animationDelay: `${(i * 0.05)}s`,
-                left: `${(i * 17) % 100}%`,
-                top: `${(i * 23) % 100}%`,
-                width: `${1.5 + (i % 3)}px`,
-                height: `${1.5 + (i % 3)}px`,
-              }}
-            />
-          ))}
-
-          {/* Floating particles - smooth linear drift */}
-          {Array.from({ length: 15 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute rounded-full animate-[smoothFloat_12s_linear_infinite]"
-              style={{
-                animationDelay: `${i * 0.8}s`,
-                left: `${(i * 7) % 100}%`,
-                top: `${(i * 13) % 100}%`,
-                width: `${4 + (i % 4)}px`,
-                height: `${4 + (i % 4)}px`,
-                background: ['#a855f7', '#06b6d4', '#ec4899', '#8b5cf6', '#14b8a6'][i % 5],
-                opacity: 0.5,
-              }}
-            />
-          ))}
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="w-full h-full object-cover"
+          >
+            <source src={PREVIEW_VIDEO_URL} type="video/mp4" />
+          </video>
+          {/* Gradient overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-transparent to-[#0a0a0f]/50" />
         </div>
 
-        {/* Main animated orb - centered */}
-        <div className="relative z-10 flex items-center justify-center flex-1">
-          <div className="relative">
-            {/* Outer glow - smooth rotation */}
-            <div className="absolute -inset-8 bg-gradient-to-r from-purple-500/25 via-cyan-500/25 to-pink-500/25 rounded-full blur-2xl animate-[smoothSpin_8s_linear_infinite]" />
-            
-            {/* Outer rotating ring */}
-            <div className="absolute -inset-4 w-40 h-40 rounded-full border-2 border-transparent border-t-purple-500 border-r-cyan-500 animate-[smoothSpin_6s_linear_infinite]" />
-            
-            {/* Middle rotating ring (opposite direction) */}
-            <div className="absolute -inset-2 w-36 h-36 rounded-full border-2 border-transparent border-b-pink-500 border-l-purple-500 animate-[smoothSpin_5s_linear_infinite_reverse]" />
-            
-            {/* Inner rotating ring */}
-            <div className="absolute inset-0 w-32 h-32 rounded-full border-2 border-transparent border-t-cyan-400 border-r-purple-400 animate-[smoothSpin_4s_linear_infinite]" />
-            
-            {/* Core orb container */}
-            <div className="relative w-32 h-32 flex items-center justify-center">
-              {/* Glow behind orb - smooth rotation */}
-              <div className="absolute inset-2 bg-gradient-to-br from-purple-500 via-cyan-500 to-pink-500 rounded-full opacity-50 blur-md animate-[smoothSpin_10s_linear_infinite]" />
+        {/* Main Content */}
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-8">
+          {/* Animated Logo/Icon */}
+          <div className="mb-6">
+            <div className="relative">
+              {/* Glow effect */}
+              <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/40 via-cyan-500/40 to-pink-500/40 rounded-2xl blur-xl animate-pulse" />
               
-              {/* Main orb */}
-              <div className="relative w-24 h-24 bg-gradient-to-br from-purple-600 via-cyan-500 to-pink-500 rounded-full flex items-center justify-center shadow-2xl shadow-purple-500/50 animate-[smoothSpin_15s_linear_infinite]">
-                {/* Inner highlight */}
-                <div className="absolute top-2 left-4 w-8 h-4 bg-white/30 rounded-full blur-sm" />
-                
-                {/* Icon - smooth float */}
-                <div className="text-white drop-shadow-lg animate-[smoothFloat_4s_linear_infinite]">
-                  <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
+              {/* Icon container */}
+              <div className="relative w-16 h-16 bg-gradient-to-br from-purple-600 via-cyan-500 to-pink-500 rounded-xl flex items-center justify-center shadow-2xl shadow-purple-500/40">
+                <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </div>
             </div>
+          </div>
 
-            {/* Orbiting dots - consistent speed */}
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="absolute w-3 h-3 rounded-full animate-[orbit_6s_linear_infinite]"
-                style={{
-                  background: ['#a855f7', '#06b6d4', '#ec4899', '#8b5cf6', '#14b8a6', '#f472b6'][i],
-                  animationDelay: `${i * -1}s`,
-                  top: '50%',
-                  left: '50%',
-                  marginTop: '-6px',
-                  marginLeft: '-6px',
-                  transformOrigin: '6px 6px',
-                  boxShadow: `0 0 12px ${['#a855f7', '#06b6d4', '#ec4899', '#8b5cf6', '#14b8a6', '#f472b6'][i]}`,
-                }}
-              />
-            ))}
+          {/* Title */}
+          <h2 className="text-xl font-semibold text-white mb-2 text-center">
+            Building Your App
+          </h2>
+          
+          {/* Simple animated dots */}
+          <div className="flex items-center gap-1 mt-4">
+            <div className="w-2 h-2 bg-purple-500 rounded-full animate-[bounce_1s_ease-in-out_infinite]" />
+            <div className="w-2 h-2 bg-cyan-500 rounded-full animate-[bounce_1s_ease-in-out_0.2s_infinite]" />
+            <div className="w-2 h-2 bg-pink-500 rounded-full animate-[bounce_1s_ease-in-out_0.4s_infinite]" />
           </div>
         </div>
 
-        {/* Command Progress Component - positioned at bottom */}
-        <div className="relative z-10 pb-12">
-          <CommandProgress 
-            terminalLines={terminalLines} 
-            previewUrl={previewUrl}
-            isLoading={isLoading}
-          />
-        </div>
-
-        {/* Smooth keyframe animations */}
+        {/* Keyframe animations */}
         <style>{`
-          @keyframes smoothSpin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-          
-          @keyframes smoothFloat {
-            0% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
-            100% { transform: translateY(0); }
-          }
-          
-          @keyframes smoothDrift {
-            0% { transform: translate(0, 0) rotate(0deg); }
-            25% { transform: translate(20px, -20px) rotate(90deg); }
-            50% { transform: translate(0, -10px) rotate(180deg); }
-            75% { transform: translate(-20px, -20px) rotate(270deg); }
-            100% { transform: translate(0, 0) rotate(360deg); }
-          }
-          
-          @keyframes orbit {
-            from { transform: rotate(0deg) translateX(80px) rotate(0deg); }
-            to { transform: rotate(360deg) translateX(80px) rotate(-360deg); }
-          }
-          
-          @keyframes gentleGlow {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 0.7; }
+          @keyframes bounce {
+            0%, 100% { transform: translateY(0); opacity: 1; }
+            50% { transform: translateY(-8px); opacity: 0.7; }
           }
         `}</style>
       </div>
@@ -583,92 +433,36 @@ export default function PreviewPanel({
           <>
             {iframeLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0f] z-10 overflow-hidden">
-                {/* Smooth animated space background */}
+                {/* Gradient background */}
                 <div className="absolute inset-0">
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-purple-600/15 rounded-full blur-[80px] animate-[smoothDrift_20s_linear_infinite]" />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-cyan-500/15 rounded-full blur-[60px] animate-[smoothDrift_25s_linear_infinite_reverse]" />
-                  
-                  {/* Stars - gentle consistent glow */}
-                  {Array.from({ length: 30 }).map((_, i) => (
-                    <div
-                      key={`preview-star-${i}`}
-                      className="absolute rounded-full bg-white animate-[gentleGlow_3s_linear_infinite]"
-                      style={{
-                        animationDelay: `${(i * 0.1)}s`,
-                        left: `${(i * 17) % 100}%`,
-                        top: `${(i * 23) % 100}%`,
-                        width: `${1.5 + (i % 3)}px`,
-                        height: `${1.5 + (i % 3)}px`,
-                      }}
-                    />
-                  ))}
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-[#0a0a0f] to-cyan-900/20" />
                 </div>
                 
-                {/* Animated orb */}
-                <div className="relative z-10">
-                  <div className="relative">
-                    {/* Outer glow - smooth rotation */}
-                    <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/20 via-cyan-500/20 to-pink-500/20 rounded-full blur-xl animate-[smoothSpin_8s_linear_infinite]" />
-                    
-                    {/* Rotating rings - consistent speed */}
-                    <div className="absolute -inset-2 w-24 h-24 rounded-full border-2 border-transparent border-t-purple-500 border-r-cyan-500 animate-[smoothSpin_5s_linear_infinite]" />
-                    <div className="absolute inset-0 w-20 h-20 rounded-full border-2 border-transparent border-b-pink-500 border-l-purple-500 animate-[smoothSpin_4s_linear_infinite_reverse]" />
-                    
-                    {/* Core orb */}
-                    <div className="relative w-20 h-20 flex items-center justify-center">
-                      <div className="absolute inset-2 bg-gradient-to-br from-purple-500 via-cyan-500 to-pink-500 rounded-full opacity-40 blur-sm animate-[smoothSpin_10s_linear_infinite]" />
-                      <div className="relative w-14 h-14 bg-gradient-to-br from-purple-600 via-cyan-500 to-pink-500 rounded-full flex items-center justify-center shadow-xl shadow-purple-500/40 animate-[smoothSpin_12s_linear_infinite]">
-                        <svg className="w-6 h-6 text-white animate-[smoothFloat_4s_linear_infinite]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
+                {/* Loading content */}
+                <div className="relative z-10 flex flex-col items-center">
+                  {/* Animated icon */}
+                  <div className="relative mb-4">
+                    <div className="absolute -inset-3 bg-gradient-to-r from-purple-500/20 via-cyan-500/20 to-pink-500/20 rounded-full blur-lg animate-pulse" />
+                    <div className="relative w-14 h-14 bg-gradient-to-br from-purple-600 via-cyan-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/30">
+                      <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     </div>
-
-                    {/* Orbiting dots - consistent speed */}
-                    {[0, 1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="absolute w-2 h-2 rounded-full animate-[orbitSmall_5s_linear_infinite]"
-                        style={{
-                          background: ['#a855f7', '#06b6d4', '#ec4899', '#8b5cf6'][i],
-                          animationDelay: `${i * -1.25}s`,
-                          top: '50%',
-                          left: '50%',
-                          marginTop: '-4px',
-                          marginLeft: '-4px',
-                          transformOrigin: '4px 4px',
-                          boxShadow: `0 0 8px ${['#a855f7', '#06b6d4', '#ec4899', '#8b5cf6'][i]}`,
-                        }}
-                      />
-                    ))}
+                  </div>
+                  
+                  <p className="text-white/70 text-sm font-medium">Loading preview...</p>
+                  
+                  {/* Simple progress bar */}
+                  <div className="mt-3 w-32 h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full animate-[loadingBar_1.5s_ease-in-out_infinite]" />
                   </div>
                 </div>
 
-                {/* Smooth keyframes */}
                 <style>{`
-                  @keyframes smoothSpin {
-                    from { transform: rotate(0deg); }
-                    to { transform: rotate(360deg); }
-                  }
-                  @keyframes smoothFloat {
-                    0% { transform: translateY(0); }
-                    50% { transform: translateY(-6px); }
-                    100% { transform: translateY(0); }
-                  }
-                  @keyframes smoothDrift {
-                    0% { transform: translate(0, 0) rotate(0deg); }
-                    25% { transform: translate(15px, -15px) rotate(90deg); }
-                    50% { transform: translate(0, -8px) rotate(180deg); }
-                    75% { transform: translate(-15px, -15px) rotate(270deg); }
-                    100% { transform: translate(0, 0) rotate(360deg); }
-                  }
-                  @keyframes orbitSmall {
-                    from { transform: rotate(0deg) translateX(50px) rotate(0deg); }
-                    to { transform: rotate(360deg) translateX(50px) rotate(-360deg); }
-                  }
-                  @keyframes gentleGlow {
-                    0%, 100% { opacity: 0.4; }
-                    50% { opacity: 0.7; }
+                  @keyframes loadingBar {
+                    0% { width: 0%; margin-left: 0; }
+                    50% { width: 70%; margin-left: 0; }
+                    100% { width: 0%; margin-left: 100%; }
                   }
                 `}</style>
               </div>
