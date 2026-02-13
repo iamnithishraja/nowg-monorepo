@@ -3,6 +3,7 @@ import { Link, redirect, useRevalidator } from "react-router";
 import { useState } from "react";
 import GradientGlow from "../components/GradientGlow";
 import { ProjectSidebar } from "../components/ProjectSidebar";
+import { ContributionGraph } from "../components/ContributionGraph";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -10,6 +11,7 @@ import { auth } from "../lib/auth";
 import { authClient } from "../lib/authClient";
 import { connectToDatabase } from "../lib/mongo";
 import { isWhitelistedEmail } from "../lib/stripe";
+import { getMessageModel } from "../models/messageModel";
 import type { Route } from "./+types/profile";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -40,6 +42,66 @@ export async function loader({ request }: Route.LoaderArgs) {
     await profile.save();
   }
 
+  // Fetch user message activity data (all years)
+  // NOTE: This runs server-side in the loader for performance - we don't want to fetch
+  // all messages client-side. Loaders run on the server before rendering.
+  // We fetch all years so the year filter can work client-side without additional requests.
+  const Messages = getMessageModel();
+
+  // Aggregate user messages by date (counts user activity/contributions)
+  // This runs server-side in the loader for performance - avoids fetching all messages client-side
+  let editData: Array<{ date: string; count: number }> = [];
+  
+  try {
+    editData = await Messages.aggregate([
+      {
+        $lookup: {
+          from: "conversations",
+          localField: "conversationId",
+          foreignField: "_id",
+          as: "conversation",
+        },
+      },
+      {
+        $unwind: {
+          path: "$conversation",
+          preserveNullAndEmptyArrays: false, // Only include messages with valid conversations
+        },
+      },
+      {
+        $match: {
+          "conversation.userId": user.id,
+          role: "user", // Count user messages, not assistant responses
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$timestamp",
+            },
+          },
+          count: { $sum: 1 }, // Count messages per day
+        },
+      },
+      {
+        $project: {
+          date: "$_id",
+          count: 1,
+          _id: 0,
+        },
+      },
+      {
+        $sort: { date: 1 },
+      },
+    ]);
+  } catch (error) {
+    console.error("[Profile] Error fetching contribution data:", error);
+    // Return empty array on error - component will show 0 contributions
+    editData = [];
+  }
+
   return {
     user: {
       id: user.id,
@@ -54,6 +116,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     },
     balance: profile.balance || 0,
     isWhitelisted: whitelisted,
+    edits: editData,
   };
 }
 
@@ -65,10 +128,11 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function Profile({ loaderData }: Route.ComponentProps) {
-  const { user, balance, isWhitelisted } = loaderData as {
+  const { user, balance, isWhitelisted, edits } = loaderData as {
     user: { id: string; name?: string; email?: string; image?: string | null };
     balance: number;
     isWhitelisted: boolean;
+    edits: Array<{ date: string; count: number }>;
   };
 
   const revalidator = useRevalidator();
@@ -364,6 +428,11 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+
+            {/* Contribution Graph */}
+            <div className="mt-6">
+              <ContributionGraph edits={edits || []} projectName="Nowgai" />
             </div>
           </div>
         </main>

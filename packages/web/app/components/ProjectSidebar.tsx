@@ -66,7 +66,20 @@ const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
 const SIDEBAR_CONTEXT_STORAGE_KEY = "web-sidebar-context";
 const TIME_FILTER_STORAGE_KEY = "nowgai:projectTimeFilter";
 
-type TimeFilter = "all" | "thisMonth" | "lastMonth" | "thisYear" | "lastYear" | "last3Months" | "last6Months";
+type TimeFilter = 
+  | "all" 
+  | "today" 
+  | "yesterday"
+  | "thisWeek" 
+  | "lastWeek" 
+  | "last7Days"
+  | "last30Days"
+  | "thisMonth" 
+  | "lastMonth" 
+  | "last3Months" 
+  | "last6Months" 
+  | "thisYear" 
+  | "lastYear";
 
 // User avatar component - extracted and memoized
 interface UserAvatarProps {
@@ -264,7 +277,8 @@ function ProjectSidebarComponent({
         setSelectedWorkspace(stored);
       }
       const storedFilter = window.localStorage.getItem(TIME_FILTER_STORAGE_KEY);
-      if (storedFilter && ["all", "thisMonth", "lastMonth", "thisYear", "lastYear", "last3Months", "last6Months"].includes(storedFilter)) {
+      const validFilters = ["all", "today", "yesterday", "thisWeek", "lastWeek", "last7Days", "last30Days", "thisMonth", "lastMonth", "last3Months", "last6Months", "thisYear", "lastYear"];
+      if (storedFilter && validFilters.includes(storedFilter)) {
         setTimeFilter(storedFilter as TimeFilter);
       }
     } catch (err) {
@@ -411,6 +425,38 @@ function ProjectSidebarComponent({
       const projectDateOnly = new Date(projectDate.getFullYear(), projectDate.getMonth(), projectDate.getDate());
 
       switch (filter) {
+        case "today": {
+          return projectDateOnly.getTime() === today.getTime();
+        }
+        case "yesterday": {
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          return projectDateOnly.getTime() === yesterday.getTime();
+        }
+        case "thisWeek": {
+          const dayOfWeek = now.getDay();
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - dayOfWeek);
+          return projectDateOnly >= startOfWeek;
+        }
+        case "lastWeek": {
+          const dayOfWeek = now.getDay();
+          const startOfLastWeek = new Date(today);
+          startOfLastWeek.setDate(today.getDate() - dayOfWeek - 7);
+          const endOfLastWeek = new Date(today);
+          endOfLastWeek.setDate(today.getDate() - dayOfWeek - 1);
+          return projectDateOnly >= startOfLastWeek && projectDateOnly <= endOfLastWeek;
+        }
+        case "last7Days": {
+          const sevenDaysAgo = new Date(today);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          return projectDateOnly >= sevenDaysAgo;
+        }
+        case "last30Days": {
+          const thirtyDaysAgo = new Date(today);
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return projectDateOnly >= thirtyDaysAgo;
+        }
         case "thisMonth": {
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
           return projectDateOnly >= startOfMonth;
@@ -420,6 +466,14 @@ function ProjectSidebarComponent({
           const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
           return projectDateOnly >= startOfLastMonth && projectDateOnly <= endOfLastMonth;
         }
+        case "last3Months": {
+          const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+          return projectDateOnly >= threeMonthsAgo;
+        }
+        case "last6Months": {
+          const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+          return projectDateOnly >= sixMonthsAgo;
+        }
         case "thisYear": {
           const startOfYear = new Date(now.getFullYear(), 0, 1);
           return projectDateOnly >= startOfYear;
@@ -428,14 +482,6 @@ function ProjectSidebarComponent({
           const startOfLastYear = new Date(now.getFullYear() - 1, 0, 1);
           const endOfLastYear = new Date(now.getFullYear() - 1, 11, 31);
           return projectDateOnly >= startOfLastYear && projectDateOnly <= endOfLastYear;
-        }
-        case "last3Months": {
-          const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-          return projectDateOnly >= threeMonthsAgo;
-        }
-        case "last6Months": {
-          const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-          return projectDateOnly >= sixMonthsAgo;
         }
         default:
           return true;
@@ -464,21 +510,28 @@ function ProjectSidebarComponent({
   const displayedProjects = useMemo(() => {
     let projectsToShow = [...filteredProjects];
 
+    // Apply time filter first
+    projectsToShow = filterProjectsByTime(projectsToShow, timeFilter);
+
     if (projectView === "starred") {
       projectsToShow = projectsToShow.filter((p) => p.starred === true);
-    } else if (projectView === "all") {
-      // Show ALL projects sorted by date
+    } else if (projectView === "all" || projectView === "recent") {
+      // Show ALL projects sorted by date (when filter is active, show all filtered results)
       projectsToShow = projectsToShow.sort(
         (a, b) =>
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       );
     }
 
-    // Apply time filter
-    projectsToShow = filterProjectsByTime(projectsToShow, timeFilter);
-
     return projectsToShow;
   }, [filteredProjects, projectView, timeFilter, filterProjectsByTime]);
+
+  // Auto-switch to "all" view when a filter is applied (except "all")
+  useEffect(() => {
+    if (timeFilter !== "all" && projectView === "recent") {
+      setProjectView("all");
+    }
+  }, [timeFilter, projectView]);
 
   // Group projects by month - MEMOIZED
   const projectsByMonth = useMemo(() => {
@@ -790,23 +843,45 @@ function ProjectSidebarComponent({
                   <div className="px-3 mb-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-colors group">
-                          <Calendar className="w-4 h-4 text-white/60" />
-                          <span className="flex-1 text-left text-white text-sm font-medium truncate">
+                        <button className={cn(
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors group",
+                          timeFilter !== "all"
+                            ? "bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/15"
+                            : "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
+                        )}>
+                          <Calendar className={cn(
+                            "w-4 h-4 shrink-0",
+                            timeFilter !== "all" ? "text-purple-400" : "text-white/60"
+                          )} />
+                          <span className="flex-1 text-left text-sm font-medium truncate">
                             {timeFilter === "all" && "All Time"}
+                            {timeFilter === "today" && "Today"}
+                            {timeFilter === "yesterday" && "Yesterday"}
+                            {timeFilter === "thisWeek" && "This Week"}
+                            {timeFilter === "lastWeek" && "Last Week"}
+                            {timeFilter === "last7Days" && "Last 7 Days"}
+                            {timeFilter === "last30Days" && "Last 30 Days"}
                             {timeFilter === "thisMonth" && "This Month"}
                             {timeFilter === "lastMonth" && "Last Month"}
-                            {timeFilter === "thisYear" && "This Year"}
-                            {timeFilter === "lastYear" && "Last Year"}
                             {timeFilter === "last3Months" && "Last 3 Months"}
                             {timeFilter === "last6Months" && "Last 6 Months"}
+                            {timeFilter === "thisYear" && "This Year"}
+                            {timeFilter === "lastYear" && "Last Year"}
                           </span>
-                          <CaretDown className="w-4 h-4 text-white/40 group-hover:text-white/60 transition-colors" />
+                          {timeFilter !== "all" && (
+                            <span className="text-xs text-purple-400 font-medium shrink-0">
+                              {displayedProjects.length}
+                            </span>
+                          )}
+                          <CaretDown className={cn(
+                            "w-4 h-4 shrink-0 transition-colors",
+                            timeFilter !== "all" ? "text-purple-400/60 group-hover:text-purple-400" : "text-white/40 group-hover:text-white/60"
+                          )} />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="start"
-                        className="w-56 bg-[#1a1a1a] border-white/10"
+                        className="w-64 bg-[#1a1a1a] border-white/10 max-h-[60vh] overflow-y-auto"
                       >
                         <DropdownMenuItem
                           onClick={() => setTimeFilter("all")}
@@ -816,9 +891,77 @@ function ProjectSidebarComponent({
                           )}
                         >
                           <Calendar className="w-4 h-4" />
-                          All Time
+                          <span className="flex-1">All Time</span>
+                          {timeFilter === "all" && (
+                            <span className="text-xs text-white/40">{filteredProjects.length}</span>
+                          )}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-white/10" />
+                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                          Recent
+                        </div>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("today")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "today" && "bg-white/10"
+                          )}
+                        >
+                          Today
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("yesterday")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "yesterday" && "bg-white/10"
+                          )}
+                        >
+                          Yesterday
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("thisWeek")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "thisWeek" && "bg-white/10"
+                          )}
+                        >
+                          This Week
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("lastWeek")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "lastWeek" && "bg-white/10"
+                          )}
+                        >
+                          Last Week
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-white/10" />
+                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                          Days
+                        </div>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("last7Days")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "last7Days" && "bg-white/10"
+                          )}
+                        >
+                          Last 7 Days
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTimeFilter("last30Days")}
+                          className={cn(
+                            "gap-2 cursor-pointer",
+                            timeFilter === "last30Days" && "bg-white/10"
+                          )}
+                        >
+                          Last 30 Days
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-white/10" />
+                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                          Months
+                        </div>
                         <DropdownMenuItem
                           onClick={() => setTimeFilter("thisMonth")}
                           className={cn(
@@ -856,6 +999,9 @@ function ProjectSidebarComponent({
                           Last 6 Months
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-white/10" />
+                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                          Years
+                        </div>
                         <DropdownMenuItem
                           onClick={() => setTimeFilter("thisYear")}
                           className={cn(
@@ -881,18 +1027,22 @@ function ProjectSidebarComponent({
                   <button
                     onClick={() => {
                       setOpenDropdownId(null);
-                      // Toggle: if already "all", go back to "recent", otherwise set to "all"
-                      setProjectView(projectView === "all" ? "recent" : "all");
+                      // If filter is active, keep "all" view; otherwise toggle
+                      if (timeFilter !== "all") {
+                        setProjectView("all");
+                      } else {
+                        setProjectView(projectView === "all" ? "recent" : "all");
+                      }
                     }}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      projectView === "all"
+                      (projectView === "all" || timeFilter !== "all")
                         ? "bg-white/[0.08] text-white"
                         : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                     )}
                   >
                     <Cardholder className="w-4 h-4" />
-                    All Projects
+                    {timeFilter !== "all" ? "Filtered Projects" : "All Projects"}
                   </button>
 
               <button
@@ -919,8 +1069,8 @@ function ProjectSidebarComponent({
                 Starred
               </button>
 
-              {/* Recent Projects - Only show when not viewing All or Starred */}
-              {projectView === "recent" && (
+              {/* Recent Projects - Only show when not viewing All or Starred and no filter is active */}
+              {projectView === "recent" && timeFilter === "all" && (
                 <div className="pt-4">
                   <button
                     onClick={() => {
@@ -1040,11 +1190,22 @@ function ProjectSidebarComponent({
                 </div>
               )}
 
-              {/* All Projects - Show when selected */}
-              {projectView === "all" && (
+              {/* All Projects - Show when selected or when filter is active */}
+              {(projectView === "all" || timeFilter !== "all") && (
                 <div className="pt-4">
-                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1">
-                    All Projects
+                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1 flex items-center justify-between">
+                    <span>
+                      {timeFilter !== "all" ? "Filtered Projects" : "All Projects"}
+                    </span>
+                    {timeFilter !== "all" && (
+                      <button
+                        onClick={() => setTimeFilter("all")}
+                        className="text-[9px] text-purple-400 hover:text-purple-300 transition-colors"
+                        title="Clear filter"
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
                   <div className="space-y-1">
                     {isLoading ? (
@@ -1052,9 +1213,21 @@ function ProjectSidebarComponent({
                         <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
                       </div>
                     ) : displayedProjects.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-white/30">
-                        No projects yet
-                      </p>
+                      <div className="px-3 py-4 text-center">
+                        <p className="text-xs text-white/30 mb-1">
+                          {timeFilter !== "all" 
+                            ? `No projects found for this time period`
+                            : "No projects yet"}
+                        </p>
+                        {timeFilter !== "all" && (
+                          <button
+                            onClick={() => setTimeFilter("all")}
+                            className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                          >
+                            Clear filter
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <>
                         {projectsByMonth.sortedMonths.slice(0, visibleMonthsCount).map((monthKey) => {
@@ -1210,9 +1383,21 @@ function ProjectSidebarComponent({
                         <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
                       </div>
                     ) : displayedProjects.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-white/30">
-                        No starred projects yet
-                      </p>
+                      <div className="px-3 py-4 text-center">
+                        <p className="text-xs text-white/30 mb-1">
+                          {timeFilter !== "all" 
+                            ? `No starred projects found for this time period`
+                            : "No starred projects yet"}
+                        </p>
+                        {timeFilter !== "all" && (
+                          <button
+                            onClick={() => setTimeFilter("all")}
+                            className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                          >
+                            Clear filter
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <>
                         {projectsByMonth.sortedMonths.slice(0, visibleMonthsCount).map((monthKey) => {
