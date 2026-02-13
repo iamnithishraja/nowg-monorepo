@@ -10,11 +10,15 @@ import {
   Compass,
   Cube,
   DotsThreeOutline,
+  Funnel,
+  Globe,
   House,
   KanbanIcon,
   MagnifyingGlass,
   PencilSimple,
+  Robot,
   SidebarSimple,
+  SortAscending,
   SpinnerGap,
   Star,
   Trash,
@@ -54,6 +58,8 @@ interface Project {
   organizationId?: string;
   organizationName?: string;
   starred?: boolean;
+  model?: string;
+  deploymentUrl?: string | null;
 }
 
 interface Organization {
@@ -64,22 +70,19 @@ interface Organization {
 
 const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
 const SIDEBAR_CONTEXT_STORAGE_KEY = "web-sidebar-context";
-const TIME_FILTER_STORAGE_KEY = "nowgai:projectTimeFilter";
+const FILTERS_STORAGE_KEY = "nowgai:projectFilters";
 
-type TimeFilter = 
-  | "all" 
-  | "today" 
-  | "yesterday"
-  | "thisWeek" 
-  | "lastWeek" 
-  | "last7Days"
-  | "last30Days"
-  | "thisMonth" 
-  | "lastMonth" 
-  | "last3Months" 
-  | "last6Months" 
-  | "thisYear" 
-  | "lastYear";
+// Simplified time filter
+type TimeFilter = "all" | "today" | "thisWeek" | "thisMonth" | "thisYear";
+
+// Sort order
+type SortOrder = "updatedDesc" | "updatedAsc" | "createdDesc" | "createdAsc" | "alphabetical";
+
+// Deployment filter
+type DeploymentFilter = "all" | "deployed" | "notDeployed";
+
+// Model filter - will be dynamically populated
+type ModelFilter = "all" | string;
 
 // User avatar component - extracted and memoized
 interface UserAvatarProps {
@@ -153,7 +156,14 @@ function ProjectSidebarComponent({
   const [projectView, setProjectView] = useState<"recent" | "all" | "starred">(
     "recent"
   );
+  
+  // Filter states
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("updatedDesc");
+  const [deploymentFilter, setDeploymentFilter] = useState<DeploymentFilter>("all");
+  const [modelFilter, setModelFilter] = useState<ModelFilter>("all");
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+  
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [visibleMonthsCount, setVisibleMonthsCount] = useState(2); // Show first 2 months initially
@@ -268,7 +278,7 @@ function ProjectSidebarComponent({
     );
   };
 
-  // Load persisted workspace selection and time filter
+  // Load persisted workspace selection and filters
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -276,10 +286,22 @@ function ProjectSidebarComponent({
       if (stored) {
         setSelectedWorkspace(stored);
       }
-      const storedFilter = window.localStorage.getItem(TIME_FILTER_STORAGE_KEY);
-      const validFilters = ["all", "today", "yesterday", "thisWeek", "lastWeek", "last7Days", "last30Days", "thisMonth", "lastMonth", "last3Months", "last6Months", "thisYear", "lastYear"];
-      if (storedFilter && validFilters.includes(storedFilter)) {
-        setTimeFilter(storedFilter as TimeFilter);
+      // Load all filters from single storage key
+      const storedFilters = window.localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (storedFilters) {
+        const filters = JSON.parse(storedFilters);
+        if (filters.timeFilter && ["all", "today", "thisWeek", "thisMonth", "thisYear"].includes(filters.timeFilter)) {
+          setTimeFilter(filters.timeFilter);
+        }
+        if (filters.sortOrder && ["updatedDesc", "updatedAsc", "createdDesc", "createdAsc", "alphabetical"].includes(filters.sortOrder)) {
+          setSortOrder(filters.sortOrder);
+        }
+        if (filters.deploymentFilter && ["all", "deployed", "notDeployed"].includes(filters.deploymentFilter)) {
+          setDeploymentFilter(filters.deploymentFilter);
+        }
+        if (filters.modelFilter) {
+          setModelFilter(filters.modelFilter);
+        }
       }
     } catch (err) {
       console.error("Error reading from localStorage:", err);
@@ -287,7 +309,7 @@ function ProjectSidebarComponent({
     setHasLoadedWorkspaceFromStorage(true);
   }, []);
 
-  // Persist workspace selection and time filter
+  // Persist workspace selection
   useEffect(() => {
     if (typeof window === "undefined" || !hasLoadedWorkspaceFromStorage) return;
     try {
@@ -297,14 +319,20 @@ function ProjectSidebarComponent({
     }
   }, [selectedWorkspace, hasLoadedWorkspaceFromStorage]);
 
+  // Persist all filters
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(TIME_FILTER_STORAGE_KEY, timeFilter);
+      window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
+        timeFilter,
+        sortOrder,
+        deploymentFilter,
+        modelFilter,
+      }));
     } catch (err) {
-      console.error("Error saving time filter to localStorage:", err);
+      console.error("Error saving filters to localStorage:", err);
     }
-  }, [timeFilter]);
+  }, [timeFilter, sortOrder, deploymentFilter, modelFilter]);
 
   // Keep chat creation context in sync with selected workspace (home.tsx uses this)
   useEffect(() => {
@@ -360,6 +388,8 @@ function ProjectSidebarComponent({
                 organizationId: conv.organization?.id || null,
                 organizationName: conv.organization?.name || null,
                 starred: conv.starred || false,
+                model: conv.model || null,
+                deploymentUrl: conv.deploymentUrl || null,
               })
             );
             orgs = orgData.organizations || [];
@@ -376,6 +406,8 @@ function ProjectSidebarComponent({
             updatedAt: conv.updatedAt || conv.lastMessageAt,
             type: "personal" as const,
             starred: conv.starred || false,
+            model: conv.model || null,
+            deploymentUrl: conv.deploymentUrl || null,
           }));
 
         setProjects([...personalProjects, ...orgConversations]);
@@ -413,7 +445,29 @@ function ProjectSidebarComponent({
     [projects]
   );
 
-  // Filter projects by time frame - MEMOIZED
+  // Get unique models from projects for the filter dropdown
+  const availableModels = useMemo(() => {
+    const models = new Set<string>();
+    filteredProjects.forEach((p) => {
+      if (p.model) models.add(p.model);
+    });
+    return Array.from(models).sort();
+  }, [filteredProjects]);
+
+  // Check if any filter is active
+  const hasActiveFilters = useMemo(() => {
+    return timeFilter !== "all" || sortOrder !== "updatedDesc" || deploymentFilter !== "all" || modelFilter !== "all";
+  }, [timeFilter, sortOrder, deploymentFilter, modelFilter]);
+
+  // Clear all filters
+  const clearAllFilters = useCallback(() => {
+    setTimeFilter("all");
+    setSortOrder("updatedDesc");
+    setDeploymentFilter("all");
+    setModelFilter("all");
+  }, []);
+
+  // Filter projects by time frame - MEMOIZED (simplified)
   const filterProjectsByTime = useCallback((projects: Project[], filter: TimeFilter): Project[] => {
     if (filter === "all") return projects;
 
@@ -428,60 +482,19 @@ function ProjectSidebarComponent({
         case "today": {
           return projectDateOnly.getTime() === today.getTime();
         }
-        case "yesterday": {
-          const yesterday = new Date(today);
-          yesterday.setDate(yesterday.getDate() - 1);
-          return projectDateOnly.getTime() === yesterday.getTime();
-        }
         case "thisWeek": {
           const dayOfWeek = now.getDay();
           const startOfWeek = new Date(today);
           startOfWeek.setDate(today.getDate() - dayOfWeek);
           return projectDateOnly >= startOfWeek;
         }
-        case "lastWeek": {
-          const dayOfWeek = now.getDay();
-          const startOfLastWeek = new Date(today);
-          startOfLastWeek.setDate(today.getDate() - dayOfWeek - 7);
-          const endOfLastWeek = new Date(today);
-          endOfLastWeek.setDate(today.getDate() - dayOfWeek - 1);
-          return projectDateOnly >= startOfLastWeek && projectDateOnly <= endOfLastWeek;
-        }
-        case "last7Days": {
-          const sevenDaysAgo = new Date(today);
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          return projectDateOnly >= sevenDaysAgo;
-        }
-        case "last30Days": {
-          const thirtyDaysAgo = new Date(today);
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return projectDateOnly >= thirtyDaysAgo;
-        }
         case "thisMonth": {
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
           return projectDateOnly >= startOfMonth;
         }
-        case "lastMonth": {
-          const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-          return projectDateOnly >= startOfLastMonth && projectDateOnly <= endOfLastMonth;
-        }
-        case "last3Months": {
-          const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-          return projectDateOnly >= threeMonthsAgo;
-        }
-        case "last6Months": {
-          const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-          return projectDateOnly >= sixMonthsAgo;
-        }
         case "thisYear": {
           const startOfYear = new Date(now.getFullYear(), 0, 1);
           return projectDateOnly >= startOfYear;
-        }
-        case "lastYear": {
-          const startOfLastYear = new Date(now.getFullYear() - 1, 0, 1);
-          const endOfLastYear = new Date(now.getFullYear() - 1, 11, 31);
-          return projectDateOnly >= startOfLastYear && projectDateOnly <= endOfLastYear;
         }
         default:
           return true;
@@ -489,49 +502,82 @@ function ProjectSidebarComponent({
     });
   }, []);
 
+  // Filter projects by deployment status
+  const filterByDeployment = useCallback((projects: Project[], filter: DeploymentFilter): Project[] => {
+    if (filter === "all") return projects;
+    return projects.filter((p) => {
+      if (filter === "deployed") return !!p.deploymentUrl;
+      if (filter === "notDeployed") return !p.deploymentUrl;
+      return true;
+    });
+  }, []);
+
+  // Filter projects by model
+  const filterByModel = useCallback((projects: Project[], filter: ModelFilter): Project[] => {
+    if (filter === "all") return projects;
+    return projects.filter((p) => p.model === filter);
+  }, []);
+
+  // Sort projects
+  const sortProjects = useCallback((projects: Project[], order: SortOrder): Project[] => {
+    const sorted = [...projects];
+    switch (order) {
+      case "updatedDesc":
+        return sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      case "updatedAsc":
+        return sorted.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+      case "createdDesc":
+        return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      case "createdAsc":
+        return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      case "alphabetical":
+        return sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+      default:
+        return sorted;
+    }
+  }, []);
+
   // Get recent projects (last 5) - MEMOIZED (for display in recent section)
   const recentProjects = useMemo(
     () => {
-      let recent = [...filteredProjects]
-        .sort(
-          (a, b) =>
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
+      let recent = [...filteredProjects];
       
-      // Apply time filter to recent projects too
+      // Apply all filters
       recent = filterProjectsByTime(recent, timeFilter);
+      recent = filterByDeployment(recent, deploymentFilter);
+      recent = filterByModel(recent, modelFilter);
+      recent = sortProjects(recent, sortOrder);
       
       return recent.slice(0, 5);
     },
-    [filteredProjects, timeFilter, filterProjectsByTime]
+    [filteredProjects, timeFilter, deploymentFilter, modelFilter, sortOrder, filterProjectsByTime, filterByDeployment, filterByModel, sortProjects]
   );
 
-  // Get projects based on view and time filter - MEMOIZED
+  // Get projects based on view and all filters - MEMOIZED
   const displayedProjects = useMemo(() => {
     let projectsToShow = [...filteredProjects];
 
-    // Apply time filter first
+    // Apply all filters
     projectsToShow = filterProjectsByTime(projectsToShow, timeFilter);
+    projectsToShow = filterByDeployment(projectsToShow, deploymentFilter);
+    projectsToShow = filterByModel(projectsToShow, modelFilter);
 
     if (projectView === "starred") {
       projectsToShow = projectsToShow.filter((p) => p.starred === true);
-    } else if (projectView === "all" || projectView === "recent") {
-      // Show ALL projects sorted by date (when filter is active, show all filtered results)
-      projectsToShow = projectsToShow.sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
     }
+
+    // Apply sort order
+    projectsToShow = sortProjects(projectsToShow, sortOrder);
 
     return projectsToShow;
-  }, [filteredProjects, projectView, timeFilter, filterProjectsByTime]);
+  }, [filteredProjects, projectView, timeFilter, deploymentFilter, modelFilter, sortOrder, filterProjectsByTime, filterByDeployment, filterByModel, sortProjects]);
 
-  // Auto-switch to "all" view when a filter is applied (except "all")
+  // Auto-switch to "all" view when any filter is applied
   useEffect(() => {
-    if (timeFilter !== "all" && projectView === "recent") {
+    if (hasActiveFilters && projectView === "recent") {
       setProjectView("all");
     }
-  }, [timeFilter, projectView]);
+  }, [hasActiveFilters, projectView]);
 
   // Group projects by month - MEMOIZED
   const projectsByMonth = useMemo(() => {
@@ -833,202 +879,186 @@ function ProjectSidebarComponent({
               {/* Projects Section */}
               {!isCollapsed && (
                 <>
-                  <div className="pt-4 pb-2">
-                    <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                  <div className="pt-4 pb-2 flex items-center justify-between px-3">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">
                       Projects
                     </span>
+                    <button
+                      onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+                      className={cn(
+                        "flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors",
+                        hasActiveFilters
+                          ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+                          : "text-white/40 hover:text-white/60 hover:bg-white/5"
+                      )}
+                    >
+                      <Funnel className="w-3 h-3" />
+                      {hasActiveFilters && (
+                        <span className="text-[10px]">{displayedProjects.length}</span>
+                      )}
+                    </button>
                   </div>
 
-                  {/* Time Filter Dropdown */}
-                  <div className="px-3 mb-2">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors group",
-                          timeFilter !== "all"
-                            ? "bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/15"
-                            : "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
-                        )}>
-                          <Calendar className={cn(
-                            "w-4 h-4 shrink-0",
-                            timeFilter !== "all" ? "text-purple-400" : "text-white/60"
-                          )} />
-                          <span className="flex-1 text-left text-sm font-medium truncate">
-                            {timeFilter === "all" && "All Time"}
-                            {timeFilter === "today" && "Today"}
-                            {timeFilter === "yesterday" && "Yesterday"}
-                            {timeFilter === "thisWeek" && "This Week"}
-                            {timeFilter === "lastWeek" && "Last Week"}
-                            {timeFilter === "last7Days" && "Last 7 Days"}
-                            {timeFilter === "last30Days" && "Last 30 Days"}
-                            {timeFilter === "thisMonth" && "This Month"}
-                            {timeFilter === "lastMonth" && "Last Month"}
-                            {timeFilter === "last3Months" && "Last 3 Months"}
-                            {timeFilter === "last6Months" && "Last 6 Months"}
-                            {timeFilter === "thisYear" && "This Year"}
-                            {timeFilter === "lastYear" && "Last Year"}
-                          </span>
-                          {timeFilter !== "all" && (
-                            <span className="text-xs text-purple-400 font-medium shrink-0">
-                              {displayedProjects.length}
-                            </span>
-                          )}
-                          <CaretDown className={cn(
-                            "w-4 h-4 shrink-0 transition-colors",
-                            timeFilter !== "all" ? "text-purple-400/60 group-hover:text-purple-400" : "text-white/40 group-hover:text-white/60"
-                          )} />
+                  {/* Filters Panel */}
+                  {showFiltersPanel && (
+                    <div className="px-3 mb-3 space-y-2">
+                      {/* Clear All Button */}
+                      {hasActiveFilters && (
+                        <button
+                          onClick={clearAllFilters}
+                          className="w-full text-xs text-purple-400 hover:text-purple-300 py-1 transition-colors"
+                        >
+                          Clear all filters
                         </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="start"
-                        className="w-64 bg-[#1a1a1a] border-white/10 max-h-[60vh] overflow-y-auto"
-                      >
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("all")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "all" && "bg-white/10"
-                          )}
-                        >
-                          <Calendar className="w-4 h-4" />
-                          <span className="flex-1">All Time</span>
-                          {timeFilter === "all" && (
-                            <span className="text-xs text-white/40">{filteredProjects.length}</span>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-white/10" />
-                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                          Recent
+                      )}
+
+                      {/* Time Filter */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Time
+                        </label>
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            { value: "today", label: "Today" },
+                            { value: "thisWeek", label: "Week" },
+                            { value: "thisMonth", label: "Month" },
+                            { value: "thisYear", label: "Year" },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                // Toggle: if already selected, reset to all
+                                if (timeFilter === option.value) {
+                                  setTimeFilter("all");
+                                } else {
+                                  setTimeFilter(option.value as TimeFilter);
+                                }
+                              }}
+                              className={cn(
+                                "px-2 py-1 text-xs rounded transition-colors",
+                                timeFilter === option.value
+                                  ? "bg-purple-500/20 text-purple-400"
+                                  : "bg-white/5 text-white/60 hover:bg-white/10"
+                              )}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
                         </div>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("today")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "today" && "bg-white/10"
-                          )}
-                        >
-                          Today
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("yesterday")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "yesterday" && "bg-white/10"
-                          )}
-                        >
-                          Yesterday
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("thisWeek")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "thisWeek" && "bg-white/10"
-                          )}
-                        >
-                          This Week
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("lastWeek")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "lastWeek" && "bg-white/10"
-                          )}
-                        >
-                          Last Week
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-white/10" />
-                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                          Days
+                      </div>
+
+                      {/* Sort Order - only show non-default options, clicking toggles */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
+                          <SortAscending className="w-3 h-3" />
+                          Sort
+                          <span className="text-white/20 font-normal normal-case">(default: recent)</span>
+                        </label>
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            { value: "createdDesc", label: "Newest" },
+                            { value: "createdAsc", label: "Oldest" },
+                            { value: "alphabetical", label: "A-Z" },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                // Toggle: if already selected, reset to default
+                                if (sortOrder === option.value) {
+                                  setSortOrder("updatedDesc");
+                                } else {
+                                  setSortOrder(option.value as SortOrder);
+                                }
+                              }}
+                              className={cn(
+                                "px-2 py-1 text-xs rounded transition-colors",
+                                sortOrder === option.value
+                                  ? "bg-purple-500/20 text-purple-400"
+                                  : "bg-white/5 text-white/60 hover:bg-white/10"
+                              )}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
                         </div>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("last7Days")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "last7Days" && "bg-white/10"
-                          )}
-                        >
-                          Last 7 Days
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("last30Days")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "last30Days" && "bg-white/10"
-                          )}
-                        >
-                          Last 30 Days
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-white/10" />
-                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                          Months
+                      </div>
+
+                      {/* Deployment Filter */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
+                          <Globe className="w-3 h-3" />
+                          Deployment
+                        </label>
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            { value: "deployed", label: "Deployed" },
+                            { value: "notDeployed", label: "Not Deployed" },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                // Toggle: if already selected, reset to all
+                                if (deploymentFilter === option.value) {
+                                  setDeploymentFilter("all");
+                                } else {
+                                  setDeploymentFilter(option.value as DeploymentFilter);
+                                }
+                              }}
+                              className={cn(
+                                "px-2 py-1 text-xs rounded transition-colors",
+                                deploymentFilter === option.value
+                                  ? "bg-purple-500/20 text-purple-400"
+                                  : "bg-white/5 text-white/60 hover:bg-white/10"
+                              )}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
                         </div>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("thisMonth")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "thisMonth" && "bg-white/10"
-                          )}
-                        >
-                          This Month
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("lastMonth")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "lastMonth" && "bg-white/10"
-                          )}
-                        >
-                          Last Month
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("last3Months")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "last3Months" && "bg-white/10"
-                          )}
-                        >
-                          Last 3 Months
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("last6Months")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "last6Months" && "bg-white/10"
-                          )}
-                        >
-                          Last 6 Months
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-white/10" />
-                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                          Years
+                      </div>
+
+                      {/* Model Filter */}
+                      {availableModels.length > 0 && (
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
+                            <Robot className="w-3 h-3" />
+                            Model
+                          </label>
+                          <div className="flex flex-wrap gap-1">
+                            {availableModels.map((model) => (
+                              <button
+                                key={model}
+                                onClick={() => {
+                                  // Toggle: if already selected, deselect (reset to all)
+                                  if (modelFilter === model) {
+                                    setModelFilter("all");
+                                  } else {
+                                    setModelFilter(model);
+                                  }
+                                }}
+                                className={cn(
+                                  "px-2 py-1 text-xs rounded transition-colors truncate max-w-[80px]",
+                                  modelFilter === model
+                                    ? "bg-purple-500/20 text-purple-400"
+                                    : "bg-white/5 text-white/60 hover:bg-white/10"
+                                )}
+                                title={model}
+                              >
+                                {model.split('/').pop()?.split('-')[0] || model}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("thisYear")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "thisYear" && "bg-white/10"
-                          )}
-                        >
-                          This Year
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTimeFilter("lastYear")}
-                          className={cn(
-                            "gap-2 cursor-pointer",
-                            timeFilter === "lastYear" && "bg-white/10"
-                          )}
-                        >
-                          Last Year
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                      )}
+                    </div>
+                  )}
 
                   <button
                     onClick={() => {
                       setOpenDropdownId(null);
                       // If filter is active, keep "all" view; otherwise toggle
-                      if (timeFilter !== "all") {
+                      if (hasActiveFilters) {
                         setProjectView("all");
                       } else {
                         setProjectView(projectView === "all" ? "recent" : "all");
@@ -1036,13 +1066,18 @@ function ProjectSidebarComponent({
                     }}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      (projectView === "all" || timeFilter !== "all")
+                      (projectView === "all" || hasActiveFilters)
                         ? "bg-white/[0.08] text-white"
                         : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                     )}
                   >
                     <Cardholder className="w-4 h-4" />
-                    {timeFilter !== "all" ? "Filtered Projects" : "All Projects"}
+                    <span className="flex-1 text-left">
+                      {hasActiveFilters ? "Filtered" : "All Projects"}
+                    </span>
+                    {hasActiveFilters && (
+                      <span className="text-xs text-purple-400">{displayedProjects.length}</span>
+                    )}
                   </button>
 
               <button
@@ -1070,7 +1105,7 @@ function ProjectSidebarComponent({
               </button>
 
               {/* Recent Projects - Only show when not viewing All or Starred and no filter is active */}
-              {projectView === "recent" && timeFilter === "all" && (
+              {projectView === "recent" && !hasActiveFilters && (
                 <div className="pt-4">
                   <button
                     onClick={() => {
@@ -1191,17 +1226,17 @@ function ProjectSidebarComponent({
               )}
 
               {/* All Projects - Show when selected or when filter is active */}
-              {(projectView === "all" || timeFilter !== "all") && (
+              {(projectView === "all" || hasActiveFilters) && (
                 <div className="pt-4">
                   <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1 flex items-center justify-between">
                     <span>
-                      {timeFilter !== "all" ? "Filtered Projects" : "All Projects"}
+                      {hasActiveFilters ? "Filtered Projects" : "All Projects"}
                     </span>
-                    {timeFilter !== "all" && (
+                    {hasActiveFilters && (
                       <button
-                        onClick={() => setTimeFilter("all")}
+                        onClick={clearAllFilters}
                         className="text-[9px] text-purple-400 hover:text-purple-300 transition-colors"
-                        title="Clear filter"
+                        title="Clear all filters"
                       >
                         Clear
                       </button>
@@ -1215,16 +1250,16 @@ function ProjectSidebarComponent({
                     ) : displayedProjects.length === 0 ? (
                       <div className="px-3 py-4 text-center">
                         <p className="text-xs text-white/30 mb-1">
-                          {timeFilter !== "all" 
-                            ? `No projects found for this time period`
+                          {hasActiveFilters 
+                            ? `No projects match your filters`
                             : "No projects yet"}
                         </p>
-                        {timeFilter !== "all" && (
+                        {hasActiveFilters && (
                           <button
-                            onClick={() => setTimeFilter("all")}
+                            onClick={clearAllFilters}
                             className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
                           >
-                            Clear filter
+                            Clear filters
                           </button>
                         )}
                       </div>
@@ -1385,16 +1420,16 @@ function ProjectSidebarComponent({
                     ) : displayedProjects.length === 0 ? (
                       <div className="px-3 py-4 text-center">
                         <p className="text-xs text-white/30 mb-1">
-                          {timeFilter !== "all" 
-                            ? `No starred projects found for this time period`
+                          {hasActiveFilters 
+                            ? `No starred projects match your filters`
                             : "No starred projects yet"}
                         </p>
-                        {timeFilter !== "all" && (
+                        {hasActiveFilters && (
                           <button
-                            onClick={() => setTimeFilter("all")}
+                            onClick={clearAllFilters}
                             className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
                           >
-                            Clear filter
+                            Clear filters
                           </button>
                         )}
                       </div>

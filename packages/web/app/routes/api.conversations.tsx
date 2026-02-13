@@ -10,7 +10,7 @@ import {
   fetchFileFromR2,
   generatePresignedUploadUrls,
 } from "~/lib/r2Storage";
-import { Conversation } from "@nowgai/shared/models";
+import { Conversation, Deployment } from "@nowgai/shared/models";
 import AgentMessage from "~/models/agentMessageModel";
 import { connectToDatabase } from "~/lib/mongo";
 
@@ -266,6 +266,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // Use a high limit (1000) to fetch all conversations since we paginate by month on frontend
     const { personal, team } = await chatService.getUserConversations(userId, 1000);
 
+    // Get all conversation IDs to fetch deployments
+    const allConvIds = [
+      ...personal.map((c) => c._id),
+      ...team.map((c: any) => c._id),
+    ];
+
+    // Fetch deployments for all conversations in one query
+    const deployments = await Deployment.find({
+      conversationId: { $in: allConvIds },
+      status: "success",
+    })
+      .sort({ deployedAt: -1 })
+      .lean();
+
+    // Create a map of conversationId -> latest deployment URL
+    const deploymentMap = new Map<string, string>();
+    deployments.forEach((d: any) => {
+      const convId = d.conversationId.toString();
+      // Only store the first (latest) deployment for each conversation
+      if (!deploymentMap.has(convId)) {
+        deploymentMap.set(convId, d.deploymentUrl);
+      }
+    });
+
     // Format personal conversations
     const personalFormatted = personal.map((conv) => ({
       id: conv._id.toString(),
@@ -275,7 +299,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       updatedAt: conv.updatedAt,
       lastMessageAt: conv.updatedAt, // Use updatedAt as lastMessageAt
       messageCount: conv.messages?.length || 0,
-      deploymentUrl: (conv as any).deploymentUrl || null,
+      deploymentUrl: deploymentMap.get(conv._id.toString()) || null,
       adminProjectId: (conv as any).adminProjectId || null,
       teamId: null,
       teamName: null,
@@ -292,7 +316,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       updatedAt: conv.updatedAt,
       lastMessageAt: conv.updatedAt,
       messageCount: conv.messages?.length || 0,
-      deploymentUrl: (conv as any).deploymentUrl || null,
+      deploymentUrl: deploymentMap.get(conv._id.toString()) || null,
       adminProjectId: (conv as any).adminProjectId || null,
       teamId: conv.teamId?._id?.toString() || conv.teamId?.toString() || null,
       teamName: conv.teamId?.name || null,
