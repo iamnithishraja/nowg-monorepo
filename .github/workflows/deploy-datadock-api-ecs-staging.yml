@@ -1,25 +1,25 @@
-name: Deploy Web to ECS
+name: Deploy DataDock API to ECS (Staging)
 
 on:
   push:
     branches:
       - main
     paths:
-      - "packages/web/**"
+      - "packages/datadock-api/**"
       - "packages/shared/**"
       - "package.json"
       - "bun.lock"
       - "tsconfig.json"
-      - ".github/workflows/deploy-web-ecs.yml"
+      - ".github/workflows/deploy-datadock-api-ecs-staging.yml"
   workflow_dispatch:
 
 env:
   AWS_REGION: ap-south-1
-  ECR_REPOSITORY: nowgai-web
+  ECR_REPOSITORY: nowgai-datadock-api
   ECS_CLUSTER: nowgai-cluster
-  ECS_SERVICE: nowgai-web-service
-  ECS_TASK_DEFINITION: nowgai-web-task
-  CONTAINER_NAME: nowgai-web
+  ECS_SERVICE: nowgai-datadock-api-service
+  ECS_TASK_DEFINITION: nowgai-datadock-api-task
+  CONTAINER_NAME: nowgai-datadock-api
 
 jobs:
   deploy:
@@ -47,7 +47,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -f packages/web/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -f packages/datadock-api/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
@@ -76,4 +76,4 @@ jobs:
           wait-for-service-stability: true
 
       - name: Done
-        run: echo "✅ Deployed to ECS successfully!"
+        run: echo "✅ Deployed DataDock API to ECS successfully!"

@@ -1,25 +1,25 @@
-name: Deploy Neon Billing Cron to ECS
+name: Deploy Web to ECS (Staging)
 
 on:
   push:
     branches:
       - main
     paths:
-      - "packages/neon-billing-cron/**"
+      - "packages/web/**"
       - "packages/shared/**"
       - "package.json"
       - "bun.lock"
       - "tsconfig.json"
-      - ".github/workflows/deploy-neon-billing-cron-ecs.yml"
+      - ".github/workflows/deploy-web-ecs-staging.yml"
   workflow_dispatch:
 
 env:
   AWS_REGION: ap-south-1
-  ECR_REPOSITORY: nowgai-neon-billing-cron
+  ECR_REPOSITORY: nowgai-web
   ECS_CLUSTER: nowgai-cluster
-  ECS_SERVICE: nowgai-neon-billing-cron-service
-  ECS_TASK_DEFINITION: nowgai-neon-billing-cron-task
-  CONTAINER_NAME: nowgai-neon-billing-cron
+  ECS_SERVICE: nowgai-web-service
+  ECS_TASK_DEFINITION: nowgai-web-task
+  CONTAINER_NAME: nowgai-web
 
 jobs:
   deploy:
@@ -47,7 +47,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -f packages/neon-billing-cron/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -f packages/web/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
@@ -76,4 +76,4 @@ jobs:
           wait-for-service-stability: true
 
       - name: Done
-        run: echo "✅ Deployed Neon Billing Cron to ECS successfully!"
+        run: echo "✅ Deployed to ECS successfully!"
