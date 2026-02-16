@@ -332,8 +332,8 @@ export default function PreviewPanel({
     { 
       id: "1", 
       url: PREVIEW_VIDEO_URL, 
-      title: "Publish your project",
-      description: "Instantly publish to lovable.app, buy a domain, or connect your own. Update anytime."
+      title: "Nowgai Cloud",
+      description: "Describe features, get full apps. Data, hosting, auth, AI included."
     },
     { 
       id: "2", 

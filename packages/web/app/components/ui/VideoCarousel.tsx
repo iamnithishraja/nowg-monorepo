@@ -15,24 +15,89 @@ interface VideoCarouselProps {
 
 export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
   const [current, setCurrent] = React.useState(0);
+  const [isPlaying, setIsPlaying] = React.useState(true);
+  const videoRefs = React.useRef<(HTMLVideoElement | null)[]>([]);
 
   const prev = () => setCurrent((c) => (c === 0 ? videos.length - 1 : c - 1));
   const next = () => setCurrent((c) => (c === videos.length - 1 ? 0 : c + 1));
 
-  return (
-    <div className={`relative h-full w-full flex items-center justify-center ${className}`} style={{ background: "#2c2c33" }}>
+  const togglePlayPause = () => {
+    setIsPlaying((p) => {
+      const newState = !p;
+      videoRefs.current.forEach((v) => {
+        if (v) {
+          if (newState) v.play().catch(() => {});
+          else v.pause();
+        }
+      });
+      return newState;
+    });
+  };
 
-      {/* ---- left dots ---- */}
-      <div className="absolute left-5 top-1/2 -translate-y-1/2 flex flex-col items-center gap-[6px] z-10">
+  React.useEffect(() => {
+    if (!isPlaying) return;
+    const timer = setInterval(() => {
+      setCurrent((c) => (c === videos.length - 1 ? 0 : c + 1));
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [isPlaying, videos.length]);
+
+  return (
+    <div
+      className={`relative h-full w-full flex items-center justify-center ${className}`}
+      style={{ background: "#2c2c33" }}
+    >
+      {/* ---- Getting ready spinner ---- */}
+      <div
+        style={{
+          position: "absolute",
+          top: "12%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <LoadingSpinner />
+        <span
+          style={{
+            color: "rgba(255,255,255,.65)",
+            fontSize: 14,
+            fontWeight: 500,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Getting ready...
+        </span>
+      </div>
+
+      {/* ---- Left dot indicators ---- */}
+      <div
+        style={{
+          position: "absolute",
+          left: 24,
+          top: "50%",
+          transform: "translateY(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 7,
+          zIndex: 10,
+        }}
+      >
         {videos.map((_, i) => (
           <button
             key={i}
             onClick={() => setCurrent(i)}
             style={{
               width: 5,
-              height: i === current ? 20 : 5,
+              height: i === current ? 22 : 5,
               borderRadius: 99,
-              background: i === current ? "rgba(255,255,255,.85)" : "rgba(255,255,255,.2)",
+              background:
+                i === current
+                  ? "rgba(255,255,255,.8)"
+                  : "rgba(255,255,255,.18)",
               transition: "all .3s ease",
               border: "none",
               padding: 0,
@@ -42,109 +107,271 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
         ))}
       </div>
 
-      {/* ---- centre column ---- */}
-      <div style={{ width: "62%", maxWidth: 480, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+      {/* ---- Centre column ---- */}
+      <div
+        style={{
+          width: "60%",
+          maxWidth: 520,
+          marginTop: 40,
+        }}
+      >
+        {/* Stacked-card wrapper (video + text all inside) */}
+        <div style={{ position: "relative", width: "100%", paddingBottom: "88%" }}>
+          {/* Card behind-2 (smallest, topmost) */}
+          <div
+            style={{
+              position: "absolute",
+              left: "6%",
+              right: "6%",
+              top: 0,
+              bottom: "6%",
+              borderRadius: 16,
+              background: "rgba(255,255,255,.025)",
+            }}
+          />
 
-        {/* stacked-card wrapper */}
-        <div style={{ position: "relative", width: "100%", paddingBottom: "82%" }}>
+          {/* Card behind-1 */}
+          <div
+            style={{
+              position: "absolute",
+              left: "3%",
+              right: "3%",
+              top: "3%",
+              bottom: "3%",
+              borderRadius: 16,
+              background: "rgba(255,255,255,.05)",
+            }}
+          />
 
-          {/* card behind-2 */}
-          <div style={{
-            position: "absolute", left: "5%", right: "5%", top: 0, bottom: "4%",
-            borderRadius: 16, background: "rgba(255,255,255,.03)",
-          }} />
+          {/* Front card — gradient border wrapper */}
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: "6%",
+              bottom: 0,
+              borderRadius: 16,
+              padding: 2,
+              background: "rgba(255,255,255,.10)",
+            }}
+          >
+            {/* Inner dark fill — contains BOTH video and text */}
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                borderRadius: 14,
+                background: "#35353d",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              {/* Video section */}
+              <div
+                style={{
+                  flex: 1,
+                  margin: 6,
+                  marginBottom: 0,
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  position: "relative",
+                  minHeight: 0,
+                }}
+              >
+                {videos.map((v, i) => (
+                  <video
+                    key={v.id}
+                    ref={(el) => {
+                      videoRefs.current[i] = el;
+                    }}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    style={{
+                      position: i === 0 ? "relative" : "absolute",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      opacity: i === current ? 1 : 0,
+                      transition: "opacity .5s ease",
+                      display: "block",
+                    }}
+                  >
+                    <source src={v.url} type="video/mp4" />
+                  </video>
+                ))}
+              </div>
 
-          {/* card behind-1 */}
-          <div style={{
-            position: "absolute", left: "2.5%", right: "2.5%", top: "2%", bottom: "2%",
-            borderRadius: 16, background: "rgba(255,255,255,.06)",
-          }} />
-
-          {/* front card */}
-          <div style={{
-            position: "absolute", inset: "4% 0 0 0",
-            borderRadius: 16,
-            background: "rgba(255,255,255,.10)",
-            padding: 8,
-            overflow: "hidden",
-          }}>
-            <div style={{ width: "100%", height: "100%", borderRadius: 10, overflow: "hidden", position: "relative" }}>
-              {videos.map((v, i) => (
-                <video
-                  key={v.id}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
+              {/* Text section — inside the card */}
+              <div style={{ padding: "16px 18px 20px" }}>
+                <h3
                   style={{
-                    position: i === 0 ? "relative" : "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    opacity: i === current ? 1 : 0,
-                    transition: "opacity .4s ease",
-                    display: "block",
+                    color: "#fff",
+                    fontSize: 19,
+                    fontWeight: 600,
+                    lineHeight: 1.3,
+                    margin: 0,
                   }}
                 >
-                  <source src={v.url} type="video/mp4" />
-                </video>
-              ))}
+                  {videos[current].title}
+                </h3>
+                <p
+                  style={{
+                    color: "#9a9aa3",
+                    fontSize: 13.5,
+                    lineHeight: 1.55,
+                    marginTop: 6,
+                    marginBottom: 0,
+                  }}
+                >
+                  {videos[current].description}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-
-        {/* text */}
-        <h3 style={{ color: "#fff", fontSize: 17, fontWeight: 600, marginTop: 20, lineHeight: 1.3 }}>
-          {videos[current].title}
-        </h3>
-        <p style={{ color: "#9a9aa3", fontSize: 13, lineHeight: 1.55, marginTop: 4 }}>
-          {videos[current].description}
-        </p>
       </div>
 
-      {/* ---- right arrows ---- */}
-      <div className="absolute right-5 top-1/2 -translate-y-1/2 flex flex-col items-center gap-[6px] z-10">
-        <NavBtn onClick={prev}><ChevronUp size={16} /></NavBtn>
-        <GridIcon />
-        <NavBtn onClick={next}><ChevronDown size={16} /></NavBtn>
+      {/* ---- Right navigation controls ---- */}
+      <div
+        style={{
+          position: "absolute",
+          right: 24,
+          top: "50%",
+          transform: "translateY(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 7,
+          zIndex: 10,
+        }}
+      >
+        <NavBtn onClick={prev}>
+          <ChevronUp size={16} />
+        </NavBtn>
+        <PausePlayBtn isPlaying={isPlaying} onClick={togglePlayPause} />
+        <NavBtn onClick={next}>
+          <ChevronDown size={16} />
+        </NavBtn>
       </div>
+
+      <style>{`
+        @keyframes carousel-spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
 
-function NavBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+/* ---- Sub-components ---- */
+
+function LoadingSpinner() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      style={{ animation: "carousel-spin 1s linear infinite" }}
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="rgba(255,255,255,.1)"
+        strokeWidth="2.5"
+      />
+      <path
+        d="M12 2a10 10 0 0 1 10 10"
+        stroke="rgba(255,255,255,.5)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function NavBtn({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
       style={{
-        width: 32, height: 32, borderRadius: "50%",
-        background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.10)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: "#8a8a94", cursor: "pointer", transition: "background .15s",
+        width: 34,
+        height: 34,
+        borderRadius: "50%",
+        background: "rgba(255,255,255,.06)",
+        border: "1px solid rgba(255,255,255,.10)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#8a8a94",
+        cursor: "pointer",
+        transition: "background .15s",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,.12)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,.06)"; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,.12)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,.06)";
+      }}
     >
       {children}
     </button>
   );
 }
 
-function GridIcon() {
+function PausePlayBtn({
+  isPlaying,
+  onClick,
+}: {
+  isPlaying: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div style={{
-      width: 32, height: 32, borderRadius: 8,
-      background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.10)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="#8a8a94">
-        <rect x="1" y="1" width="6" height="6" rx="1.5" />
-        <rect x="9" y="1" width="6" height="6" rx="1.5" />
-        <rect x="1" y="9" width="6" height="6" rx="1.5" />
-        <rect x="9" y="9" width="6" height="6" rx="1.5" />
-      </svg>
-    </div>
+    <button
+      onClick={onClick}
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        background: "rgba(255,255,255,.06)",
+        border: "1px solid rgba(255,255,255,.10)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#8a8a94",
+        cursor: "pointer",
+        transition: "background .15s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,.12)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,.06)";
+      }}
+    >
+      {isPlaying ? (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+          <rect x="2" y="1" width="3.5" height="12" rx="1" />
+          <rect x="8.5" y="1" width="3.5" height="12" rx="1" />
+        </svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+          <path d="M3 1.5v11l9-5.5L3 1.5z" />
+        </svg>
+      )}
+    </button>
   );
 }
 
