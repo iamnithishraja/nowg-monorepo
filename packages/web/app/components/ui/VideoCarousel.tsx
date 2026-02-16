@@ -1,11 +1,13 @@
 import * as React from "react";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, Volume2, VolumeX } from "lucide-react";
 
 interface VideoItem {
   id: string;
   url: string;
   title?: string;
   description?: string;
+  hasAudio?: boolean;
+  duration: number;
 }
 
 interface VideoCarouselProps {
@@ -16,7 +18,14 @@ interface VideoCarouselProps {
 export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
   const [current, setCurrent] = React.useState(0);
   const [isPlaying, setIsPlaying] = React.useState(true);
+  const [isMuted, setIsMuted] = React.useState(true);
   const videoRefs = React.useRef<(HTMLVideoElement | null)[]>([]);
+  const isPlayingRef = React.useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+
+  const advance = React.useCallback(() => {
+    setCurrent((c) => (c === videos.length - 1 ? 0 : c + 1));
+  }, [videos.length]);
 
   const prev = () => setCurrent((c) => (c === 0 ? videos.length - 1 : c - 1));
   const next = () => setCurrent((c) => (c === videos.length - 1 ? 0 : c + 1));
@@ -24,30 +33,54 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
   const togglePlayPause = () => {
     setIsPlaying((p) => {
       const newState = !p;
-      videoRefs.current.forEach((v) => {
-        if (v) {
-          if (newState) v.play().catch(() => {});
-          else v.pause();
-        }
-      });
+      const v = videoRefs.current[current];
+      if (v) {
+        if (newState) v.play().catch(() => {});
+        else v.pause();
+      }
       return newState;
     });
   };
 
+  const toggleMute = () => {
+    setIsMuted((m) => {
+      const newMuted = !m;
+      videoRefs.current.forEach((v) => {
+        if (v) v.muted = newMuted;
+      });
+      return newMuted;
+    });
+  };
+
+  // Play current video, pause others, advance after duration via setTimeout
   React.useEffect(() => {
-    if (!isPlaying) return;
-    const timer = setInterval(() => {
-      setCurrent((c) => (c === videos.length - 1 ? 0 : c + 1));
-    }, 6000);
-    return () => clearInterval(timer);
-  }, [isPlaying, videos.length]);
+    videoRefs.current.forEach((v, i) => {
+      if (!v) return;
+      if (i === current) {
+        v.currentTime = 0;
+        if (isPlayingRef.current) {
+          const p = v.play();
+          if (p) p.catch(() => { v.muted = true; v.play().catch(() => {}); });
+        }
+      } else {
+        v.pause();
+      }
+    });
+
+    const ms = videos[current].duration * 1000;
+    const timer = setTimeout(advance, ms);
+
+    return () => clearTimeout(timer);
+  }, [current, advance, videos]);
+
+  const currentHasAudio = videos[current]?.hasAudio;
 
   return (
     <div
       className={`relative h-full w-full flex items-center justify-center ${className}`}
-      style={{ background: "#2c2c33" }}
+      style={{ background: "#080808" }}
     >
-      {/* ---- Getting ready spinner ---- */}
+      {/* ---- Getting ready ---- */}
       <div
         style={{
           position: "absolute",
@@ -62,7 +95,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
         <GettingReadyIcon />
         <span
           style={{
-            color: "rgba(255,255,255,.65)",
+            color: "rgba(255,255,255,.55)",
             fontSize: 14,
             fontWeight: 500,
             whiteSpace: "nowrap",
@@ -96,8 +129,8 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
               borderRadius: 99,
               background:
                 i === current
-                  ? "rgba(255,255,255,.8)"
-                  : "rgba(255,255,255,.18)",
+                  ? "#7b4cff"
+                  : "rgba(123,76,255,.25)",
               transition: "all .3s ease",
               border: "none",
               padding: 0,
@@ -128,7 +161,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
               top: 0,
               bottom: "10%",
               borderRadius: 16,
-              background: "#44444d",
+              background: "#1a1030",
             }}
           />
 
@@ -141,7 +174,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
               top: "5%",
               bottom: "5%",
               borderRadius: 16,
-              background: "#4a4a52",
+              background: "#221545",
             }}
           />
 
@@ -155,7 +188,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
               bottom: 0,
               borderRadius: 16,
               padding: 2,
-              background: "rgba(255,255,255,.10)",
+              background: "rgba(123,76,255,.25)",
             }}
           >
             {/* Inner dark fill — contains BOTH video and text */}
@@ -164,7 +197,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
                 width: "100%",
                 height: "100%",
                 borderRadius: 14,
-                background: "#35353d",
+                background: "#0c0c0c",
                 display: "flex",
                 flexDirection: "column",
                 overflow: "hidden",
@@ -188,10 +221,10 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
                     ref={(el) => {
                       videoRefs.current[i] = el;
                     }}
-                    autoPlay
+                    src={v.url}
                     muted
-                    loop
                     playsInline
+                    preload="auto"
                     style={{
                       position: i === 0 ? "relative" : "absolute",
                       inset: 0,
@@ -202,10 +235,41 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
                       transition: "opacity .5s ease",
                       display: "block",
                     }}
-                  >
-                    <source src={v.url} type="video/mp4" />
-                  </video>
+                  />
                 ))}
+
+                {/* Mute/unmute button — only when current video has audio */}
+                {currentHasAudio && (
+                  <button
+                    onClick={toggleMute}
+                    style={{
+                      position: "absolute",
+                      bottom: 10,
+                      right: 10,
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: "rgba(0,0,0,.55)",
+                      border: "1px solid rgba(255,255,255,.12)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      cursor: "pointer",
+                      backdropFilter: "blur(8px)",
+                      transition: "background .15s",
+                      zIndex: 5,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(123,76,255,.5)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(0,0,0,.55)";
+                    }}
+                  >
+                    {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                  </button>
+                )}
               </div>
 
               {/* Text section — inside the card */}
@@ -223,7 +287,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
                 </h3>
                 <p
                   style={{
-                    color: "#9a9aa3",
+                    color: "rgba(255,255,255,.45)",
                     fontSize: 13.5,
                     lineHeight: 1.55,
                     marginTop: 6,
@@ -260,13 +324,6 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
           <ChevronDown size={16} />
         </NavBtn>
       </div>
-
-      <style>{`
-        @keyframes carousel-spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
@@ -280,7 +337,7 @@ function GettingReadyIcon() {
       height="18"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="rgba(255,255,255,.55)"
+      stroke="rgba(123,76,255,.7)"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -305,20 +362,20 @@ function NavBtn({
         width: 34,
         height: 34,
         borderRadius: "50%",
-        background: "rgba(255,255,255,.06)",
-        border: "1px solid rgba(255,255,255,.10)",
+        background: "rgba(123,76,255,.08)",
+        border: "1px solid rgba(123,76,255,.20)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#8a8a94",
+        color: "rgba(123,76,255,.7)",
         cursor: "pointer",
         transition: "background .15s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,.12)";
+        e.currentTarget.style.background = "rgba(123,76,255,.18)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,.06)";
+        e.currentTarget.style.background = "rgba(123,76,255,.08)";
       }}
     >
       {children}
@@ -340,20 +397,20 @@ function PausePlayBtn({
         width: 34,
         height: 34,
         borderRadius: 10,
-        background: "rgba(255,255,255,.06)",
-        border: "1px solid rgba(255,255,255,.10)",
+        background: "rgba(123,76,255,.08)",
+        border: "1px solid rgba(123,76,255,.20)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#8a8a94",
+        color: "rgba(123,76,255,.7)",
         cursor: "pointer",
         transition: "background .15s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,.12)";
+        e.currentTarget.style.background = "rgba(123,76,255,.18)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,.06)";
+        e.currentTarget.style.background = "rgba(123,76,255,.08)";
       }}
     >
       {isPlaying ? (

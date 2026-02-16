@@ -325,33 +325,37 @@ export default function PreviewPanel({
     return "#1a1a1a";
   }, []);
 
-  // Preview videos for the carousel - using the same video 3 times as requested
   const PREVIEW_VIDEO_URL = "https://res.cloudinary.com/drqyjtqgu/video/upload/v1770994514/329209_small_dzydp1.mp4";
-  
+  const FIRST_VIDEO_URL = "https://res.cloudinary.com/drqyjtqgu/video/upload/v1771230938/AI_generated_video_20260216080837_itc49h.mp4";
+
   const previewVideos = [
     { 
       id: "1", 
-      url: PREVIEW_VIDEO_URL, 
+      url: FIRST_VIDEO_URL, 
       title: "Nowgai Cloud",
-      description: "Describe features, get full apps. Data, hosting, auth, AI included."
+      description: "Describe features, get full apps. Data, hosting, auth, AI included.",
+      hasAudio: true,
+      duration: 43,
     },
     { 
       id: "2", 
       url: PREVIEW_VIDEO_URL, 
       title: "Build with AI",
-      description: "Describe what you want to build and watch as AI creates your application in real-time."
+      description: "Describe what you want to build and watch as AI creates your application in real-time.",
+      duration: 7,
     },
     { 
       id: "3", 
       url: PREVIEW_VIDEO_URL, 
       title: "Deploy instantly",
-      description: "One-click deployment to production. Share your app with the world in seconds."
+      description: "One-click deployment to production. Share your app with the world in seconds.",
+      duration: 7,
     },
   ];
 
   if (isLoading && !previewUrl) {
     return (
-      <div className="h-full flex flex-col overflow-hidden" style={{ background: "#2c2c33" }}>
+      <div className="h-full flex flex-col overflow-hidden" style={{ background: "#080808" }}>
         <VideoCarousel videos={previewVideos} className="flex-1" />
       </div>
     );
