@@ -116,7 +116,9 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
         }}
       >
         {/* Stacked-card wrapper (video + text all inside) */}
-        <div style={{ position: "relative", width: "100%", paddingBottom: "88%" }}>
+        <div
+          style={{ position: "relative", width: "100%", paddingBottom: "88%" }}
+        >
           {/* Card behind-2 (smallest, topmost) */}
           <div
             style={{
@@ -126,7 +128,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
               top: 0,
               bottom: "10%",
               borderRadius: 16,
-              background: "#3d3d45",
+              background: "#44444d",
             }}
           />
 
@@ -139,7 +141,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
               top: "5%",
               bottom: "5%",
               borderRadius: 16,
-              background: "#424249",
+              background: "#4a4a52",
             }}
           />
 
