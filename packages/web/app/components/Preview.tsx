@@ -329,59 +329,30 @@ export default function PreviewPanel({
   const PREVIEW_VIDEO_URL = "https://res.cloudinary.com/drqyjtqgu/video/upload/v1770994514/329209_small_dzydp1.mp4";
   
   const previewVideos = [
-    { id: "1", url: PREVIEW_VIDEO_URL, title: "Building Your App" },
-    { id: "2", url: PREVIEW_VIDEO_URL, title: "Creating Components" },
-    { id: "3", url: PREVIEW_VIDEO_URL, title: "Deploying to Production" },
+    { 
+      id: "1", 
+      url: PREVIEW_VIDEO_URL, 
+      title: "Publish your project",
+      description: "Instantly publish to lovable.app, buy a domain, or connect your own. Update anytime."
+    },
+    { 
+      id: "2", 
+      url: PREVIEW_VIDEO_URL, 
+      title: "Build with AI",
+      description: "Describe what you want to build and watch as AI creates your application in real-time."
+    },
+    { 
+      id: "3", 
+      url: PREVIEW_VIDEO_URL, 
+      title: "Deploy instantly",
+      description: "One-click deployment to production. Share your app with the world in seconds."
+    },
   ];
 
   if (isLoading && !previewUrl) {
     return (
-      <div className="h-full flex flex-col bg-[#0a0a0f] overflow-hidden relative">
-        {/* Video Carousel - Lovable Style */}
+      <div className="h-full flex flex-col overflow-hidden" style={{ background: "#2c2c33" }}>
         <VideoCarousel videos={previewVideos} className="flex-1" />
-        
-        {/* Bottom Content Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 z-30 pb-16 pt-8 px-8 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/90 to-transparent">
-          <div className="max-w-md mx-auto text-center">
-            {/* Animated Logo/Icon */}
-            <div className="mb-4 flex justify-center">
-              <div className="relative">
-                {/* Glow effect */}
-                <div className="absolute -inset-3 bg-gradient-to-r from-purple-500/40 via-cyan-500/40 to-pink-500/40 rounded-xl blur-lg animate-pulse" />
-                
-                {/* Icon container */}
-                <div className="relative w-12 h-12 bg-gradient-to-br from-purple-600 via-cyan-500 to-pink-500 rounded-lg flex items-center justify-center shadow-xl shadow-purple-500/40">
-                  <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Title */}
-            <h2 className="text-lg font-semibold text-white mb-1">
-              Building Your App
-            </h2>
-            <p className="text-sm text-white/60 mb-3">
-              Watch how we bring your ideas to life
-            </p>
-            
-            {/* Simple animated dots */}
-            <div className="flex items-center justify-center gap-1">
-              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-[bounce_1s_ease-in-out_infinite]" />
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-[bounce_1s_ease-in-out_0.2s_infinite]" />
-              <div className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-[bounce_1s_ease-in-out_0.4s_infinite]" />
-            </div>
-          </div>
-        </div>
-
-        {/* Keyframe animations */}
-        <style>{`
-          @keyframes bounce {
-            0%, 100% { transform: translateY(0); opacity: 1; }
-            50% { transform: translateY(-8px); opacity: 0.7; }
-          }
-        `}</style>
       </div>
     );
   }

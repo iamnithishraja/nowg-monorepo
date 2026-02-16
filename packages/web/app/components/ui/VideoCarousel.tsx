@@ -1,7 +1,5 @@
 import * as React from "react";
-import useEmblaCarousel from "embla-carousel-react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { classNames } from "../../lib/classNames";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 interface VideoItem {
   id: string;
@@ -15,146 +13,137 @@ interface VideoCarouselProps {
   className?: string;
 }
 
-export function VideoCarousel({ videos, className }: VideoCarouselProps) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false);
-  const [canScrollNext, setCanScrollNext] = React.useState(false);
-  const [currentIndex, setCurrentIndex] = React.useState(0);
+export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
+  const [current, setCurrent] = React.useState(0);
 
-  const onSelect = React.useCallback(() => {
-    if (!emblaApi) return;
-    setCanScrollPrev(emblaApi.canScrollPrev());
-    setCanScrollNext(emblaApi.canScrollNext());
-    setCurrentIndex(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
-
-  React.useEffect(() => {
-    if (!emblaApi) return;
-    onSelect();
-    emblaApi.on("select", onSelect);
-    emblaApi.on("reInit", onSelect);
-    return () => {
-      emblaApi.off("select", onSelect);
-    };
-  }, [emblaApi, onSelect]);
-
-  const scrollPrev = React.useCallback(() => {
-    emblaApi?.scrollPrev();
-  }, [emblaApi]);
-
-  const scrollNext = React.useCallback(() => {
-    emblaApi?.scrollNext();
-  }, [emblaApi]);
+  const prev = () => setCurrent((c) => (c === 0 ? videos.length - 1 : c - 1));
+  const next = () => setCurrent((c) => (c === videos.length - 1 ? 0 : c + 1));
 
   return (
-    <div
-      className={classNames(
-        "relative h-full w-full flex items-center justify-center bg-[#0a0a0f]",
-        className
-      )}
-    >
-      {/* Left Arrow */}
-      <button
-        onClick={scrollPrev}
-        disabled={!canScrollPrev && videos.length <= 1}
-        className={classNames(
-          "absolute left-4 md:left-8 z-20 w-10 h-10 md:w-12 md:h-12 rounded-full",
-          "bg-white/10 backdrop-blur-sm border border-white/20",
-          "flex items-center justify-center",
-          "transition-all duration-200 hover:bg-white/20 hover:scale-105",
-          "disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100",
-          "focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-        )}
-        aria-label="Previous video"
-      >
-        <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 text-white" />
-      </button>
+    <div className={`relative h-full w-full flex items-center justify-center ${className}`} style={{ background: "#2c2c33" }}>
 
-      {/* Carousel Container */}
-      <div className="w-full h-full flex items-center justify-center px-16 md:px-24 lg:px-32">
-        <div
-          ref={emblaRef}
-          className="overflow-hidden w-full max-w-4xl h-full max-h-[80vh]"
-        >
-          <div className="flex h-full">
-            {videos.map((video, index) => (
-              <div
-                key={video.id}
-                className="flex-[0_0_100%] min-w-0 h-full flex items-center justify-center px-2"
-              >
-                <div className="relative w-full h-full max-h-[70vh] rounded-2xl overflow-hidden shadow-2xl shadow-purple-500/20 bg-black">
-                  {/* Video Container with Laptop-style frame */}
-                  <div className="relative w-full h-full">
-                    {/* Top bar (browser-like) */}
-                    <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-gray-800 to-gray-900 flex items-center px-3 z-10 rounded-t-2xl">
-                      <div className="flex gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
-                        <div className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
-                      </div>
-                      <div className="flex-1 flex justify-center">
-                        <div className="bg-gray-700/50 rounded-md px-4 py-0.5 text-[10px] text-gray-400">
-                          {video.title || `Preview ${index + 1}`}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Video */}
-                    <video
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
-                      className="w-full h-full object-cover pt-8"
-                    >
-                      <source src={video.url} type="video/mp4" />
-                    </video>
-
-                    {/* Subtle gradient overlay at bottom */}
-                    <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* ---- left dots ---- */}
+      <div className="absolute left-5 top-1/2 -translate-y-1/2 flex flex-col items-center gap-[6px] z-10">
+        {videos.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrent(i)}
+            style={{
+              width: 5,
+              height: i === current ? 20 : 5,
+              borderRadius: 99,
+              background: i === current ? "rgba(255,255,255,.85)" : "rgba(255,255,255,.2)",
+              transition: "all .3s ease",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+            }}
+          />
+        ))}
       </div>
 
-      {/* Right Arrow */}
-      <button
-        onClick={scrollNext}
-        disabled={!canScrollNext && videos.length <= 1}
-        className={classNames(
-          "absolute right-4 md:right-8 z-20 w-10 h-10 md:w-12 md:h-12 rounded-full",
-          "bg-white/10 backdrop-blur-sm border border-white/20",
-          "flex items-center justify-center",
-          "transition-all duration-200 hover:bg-white/20 hover:scale-105",
-          "disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100",
-          "focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-        )}
-        aria-label="Next video"
-      >
-        <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-white" />
-      </button>
+      {/* ---- centre column ---- */}
+      <div style={{ width: "62%", maxWidth: 480, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
 
-      {/* Dot Indicators */}
-      {videos.length > 1 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-          {videos.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => emblaApi?.scrollTo(index)}
-              className={classNames(
-                "w-2 h-2 rounded-full transition-all duration-200",
-                index === currentIndex
-                  ? "bg-white w-6"
-                  : "bg-white/40 hover:bg-white/60"
-              )}
-              aria-label={`Go to slide ${index + 1}`}
-            />
-          ))}
+        {/* stacked-card wrapper */}
+        <div style={{ position: "relative", width: "100%", paddingBottom: "82%" }}>
+
+          {/* card behind-2 */}
+          <div style={{
+            position: "absolute", left: "5%", right: "5%", top: 0, bottom: "4%",
+            borderRadius: 16, background: "rgba(255,255,255,.03)",
+          }} />
+
+          {/* card behind-1 */}
+          <div style={{
+            position: "absolute", left: "2.5%", right: "2.5%", top: "2%", bottom: "2%",
+            borderRadius: 16, background: "rgba(255,255,255,.06)",
+          }} />
+
+          {/* front card */}
+          <div style={{
+            position: "absolute", inset: "4% 0 0 0",
+            borderRadius: 16,
+            background: "rgba(255,255,255,.10)",
+            padding: 8,
+            overflow: "hidden",
+          }}>
+            <div style={{ width: "100%", height: "100%", borderRadius: 10, overflow: "hidden", position: "relative" }}>
+              {videos.map((v, i) => (
+                <video
+                  key={v.id}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  style={{
+                    position: i === 0 ? "relative" : "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    opacity: i === current ? 1 : 0,
+                    transition: "opacity .4s ease",
+                    display: "block",
+                  }}
+                >
+                  <source src={v.url} type="video/mp4" />
+                </video>
+              ))}
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* text */}
+        <h3 style={{ color: "#fff", fontSize: 17, fontWeight: 600, marginTop: 20, lineHeight: 1.3 }}>
+          {videos[current].title}
+        </h3>
+        <p style={{ color: "#9a9aa3", fontSize: 13, lineHeight: 1.55, marginTop: 4 }}>
+          {videos[current].description}
+        </p>
+      </div>
+
+      {/* ---- right arrows ---- */}
+      <div className="absolute right-5 top-1/2 -translate-y-1/2 flex flex-col items-center gap-[6px] z-10">
+        <NavBtn onClick={prev}><ChevronUp size={16} /></NavBtn>
+        <GridIcon />
+        <NavBtn onClick={next}><ChevronDown size={16} /></NavBtn>
+      </div>
+    </div>
+  );
+}
+
+function NavBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: 32, height: 32, borderRadius: "50%",
+        background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.10)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#8a8a94", cursor: "pointer", transition: "background .15s",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,.12)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,.06)"; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function GridIcon() {
+  return (
+    <div style={{
+      width: 32, height: 32, borderRadius: 8,
+      background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.10)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="#8a8a94">
+        <rect x="1" y="1" width="6" height="6" rx="1.5" />
+        <rect x="9" y="1" width="6" height="6" rx="1.5" />
+        <rect x="1" y="9" width="6" height="6" rx="1.5" />
+        <rect x="9" y="9" width="6" height="6" rx="1.5" />
+      </svg>
     </div>
   );
 }
