@@ -13,6 +13,7 @@ on:
       - "tsconfig.json"
       - ".github/workflows/deploy-admin-all.yml"
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   build-and-deploy:

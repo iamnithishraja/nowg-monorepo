@@ -1,0 +1,63 @@
+name: Deploy All to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_web:
+        description: 'Deploy Web'
+        type: boolean
+        default: true
+      deploy_datadock_api:
+        description: 'Deploy DataDock API'
+        type: boolean
+        default: true
+      deploy_neon_billing_cron:
+        description: 'Deploy Neon Billing Cron'
+        type: boolean
+        default: true
+      deploy_admin:
+        description: 'Deploy Admin Stack'
+        type: boolean
+        default: true
+
+jobs:
+  deploy-web:
+    if: ${{ inputs.deploy_web }}
+    name: Deploy Web
+    uses: ./.github/workflows/deploy-web-ecs-production.yml
+    secrets: inherit
+
+  deploy-datadock-api:
+    if: ${{ inputs.deploy_datadock_api }}
+    name: Deploy DataDock API
+    uses: ./.github/workflows/deploy-datadock-api-ecs-production.yml
+    secrets: inherit
+
+  deploy-neon-billing-cron:
+    if: ${{ inputs.deploy_neon_billing_cron }}
+    name: Deploy Neon Billing Cron
+    uses: ./.github/workflows/deploy-neon-billing-cron-ecs-production.yml
+    secrets: inherit
+
+  deploy-admin:
+    if: ${{ inputs.deploy_admin }}
+    name: Deploy Admin Stack
+    uses: ./.github/workflows/deploy-admin-all.yml
+    secrets: inherit
+
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-web, deploy-datadock-api, deploy-neon-billing-cron, deploy-admin]
+    if: always()
+    steps:
+      - name: Print Summary
+        run: |
+          echo "## 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Web | ${{ needs.deploy-web.result == 'success' && '✅ Success' || needs.deploy-web.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| DataDock API | ${{ needs.deploy-datadock-api.result == 'success' && '✅ Success' || needs.deploy-datadock-api.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Neon Billing Cron | ${{ needs.deploy-neon-billing-cron.result == 'success' && '✅ Success' || needs.deploy-neon-billing-cron.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin Stack | ${{ needs.deploy-admin.result == 'success' && '✅ Success' || needs.deploy-admin.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY

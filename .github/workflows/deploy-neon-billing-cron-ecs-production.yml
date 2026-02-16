@@ -2,6 +2,7 @@ name: Deploy Neon Billing Cron to ECS (Production)
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 env:
   AWS_REGION: ap-south-1
