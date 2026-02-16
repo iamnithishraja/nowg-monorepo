@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Globe } from "lucide-react";
 import { classNames } from "../lib/classNames";
+import { VideoCarousel } from "./ui/VideoCarousel";
 
 interface PreviewPanelProps {
   previewUrl: string | null | undefined;
@@ -324,54 +325,53 @@ export default function PreviewPanel({
     return "#1a1a1a";
   }, []);
 
-  // TODO: Replace this placeholder with your video URL
+  // Preview videos for the carousel - using the same video 3 times as requested
   const PREVIEW_VIDEO_URL = "https://res.cloudinary.com/drqyjtqgu/video/upload/v1770994514/329209_small_dzydp1.mp4";
+  
+  const previewVideos = [
+    { id: "1", url: PREVIEW_VIDEO_URL, title: "Building Your App" },
+    { id: "2", url: PREVIEW_VIDEO_URL, title: "Creating Components" },
+    { id: "3", url: PREVIEW_VIDEO_URL, title: "Deploying to Production" },
+  ];
 
   if (isLoading && !previewUrl) {
     return (
       <div className="h-full flex flex-col bg-[#0a0a0f] overflow-hidden relative">
-        {/* Video Background */}
-        <div className="absolute inset-0">
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="w-full h-full object-cover"
-          >
-            <source src={PREVIEW_VIDEO_URL} type="video/mp4" />
-          </video>
-          {/* Gradient overlay for better text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-transparent to-[#0a0a0f]/50" />
-        </div>
-
-        {/* Main Content */}
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-8">
-          {/* Animated Logo/Icon */}
-          <div className="mb-6">
-            <div className="relative">
-              {/* Glow effect */}
-              <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/40 via-cyan-500/40 to-pink-500/40 rounded-2xl blur-xl animate-pulse" />
-              
-              {/* Icon container */}
-              <div className="relative w-16 h-16 bg-gradient-to-br from-purple-600 via-cyan-500 to-pink-500 rounded-xl flex items-center justify-center shadow-2xl shadow-purple-500/40">
-                <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+        {/* Video Carousel - Lovable Style */}
+        <VideoCarousel videos={previewVideos} className="flex-1" />
+        
+        {/* Bottom Content Overlay */}
+        <div className="absolute bottom-0 left-0 right-0 z-30 pb-16 pt-8 px-8 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/90 to-transparent">
+          <div className="max-w-md mx-auto text-center">
+            {/* Animated Logo/Icon */}
+            <div className="mb-4 flex justify-center">
+              <div className="relative">
+                {/* Glow effect */}
+                <div className="absolute -inset-3 bg-gradient-to-r from-purple-500/40 via-cyan-500/40 to-pink-500/40 rounded-xl blur-lg animate-pulse" />
+                
+                {/* Icon container */}
+                <div className="relative w-12 h-12 bg-gradient-to-br from-purple-600 via-cyan-500 to-pink-500 rounded-lg flex items-center justify-center shadow-xl shadow-purple-500/40">
+                  <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Title */}
-          <h2 className="text-xl font-semibold text-white mb-2 text-center">
-            Building Your App
-          </h2>
-          
-          {/* Simple animated dots */}
-          <div className="flex items-center gap-1 mt-4">
-            <div className="w-2 h-2 bg-purple-500 rounded-full animate-[bounce_1s_ease-in-out_infinite]" />
-            <div className="w-2 h-2 bg-cyan-500 rounded-full animate-[bounce_1s_ease-in-out_0.2s_infinite]" />
-            <div className="w-2 h-2 bg-pink-500 rounded-full animate-[bounce_1s_ease-in-out_0.4s_infinite]" />
+            {/* Title */}
+            <h2 className="text-lg font-semibold text-white mb-1">
+              Building Your App
+            </h2>
+            <p className="text-sm text-white/60 mb-3">
+              Watch how we bring your ideas to life
+            </p>
+            
+            {/* Simple animated dots */}
+            <div className="flex items-center justify-center gap-1">
+              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-[bounce_1s_ease-in-out_infinite]" />
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-[bounce_1s_ease-in-out_0.2s_infinite]" />
+              <div className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-[bounce_1s_ease-in-out_0.4s_infinite]" />
+            </div>
           </div>
         </div>
 

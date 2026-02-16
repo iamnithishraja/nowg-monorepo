@@ -169,6 +169,22 @@
         "typescript": "^5.9.3",
       },
     },
+    "packages/neon-billing-cron": {
+      "name": "@nowgai/neon-billing-cron",
+      "version": "1.0.0",
+      "dependencies": {
+        "@hono/node-server": "^1.19.7",
+        "@nowgai/shared": "workspace:*",
+        "hono": "^4.11.1",
+        "mongoose": "^8.18.2",
+        "node-cron": "^3.0.3",
+      },
+      "devDependencies": {
+        "@types/node": "^25.0.3",
+        "@types/node-cron": "^3.0.11",
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/shared": {
       "name": "@nowgai/shared",
       "version": "1.0.0",
@@ -240,6 +256,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "diff": "^8.0.2",
+        "embla-carousel-react": "^8.6.0",
         "ignore": "^7.0.5",
         "isbot": "^5.1.27",
         "jszip": "^3.10.1",
@@ -565,6 +582,8 @@
     "@nowgai/admin-server": ["@nowgai/admin-server@workspace:packages/admin-server"],
 
     "@nowgai/datadock-api": ["@nowgai/datadock-api@workspace:packages/datadock-api"],
+
+    "@nowgai/neon-billing-cron": ["@nowgai/neon-billing-cron@workspace:packages/neon-billing-cron"],
 
     "@nowgai/shared": ["@nowgai/shared@workspace:packages/shared"],
 
@@ -2052,6 +2071,8 @@
 
     "@nowgai/datadock-api/@types/node": ["@types/node@25.0.3", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-W609buLVRVmeW693xKfzHeIV6nJGGz98uCPfeXI1ELMLXVeKYZ9m15fAMSaUPBHYLGFsVRcMmSCksQOrZV9BYA=="],
 
+    "@nowgai/neon-billing-cron/@types/node": ["@types/node@25.0.3", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-W609buLVRVmeW693xKfzHeIV6nJGGz98uCPfeXI1ELMLXVeKYZ9m15fAMSaUPBHYLGFsVRcMmSCksQOrZV9BYA=="],
+
     "@nowgai/shared/@types/node": ["@types/node@22.19.3", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-1N9SBnWYOJTrNZCdh/yJE+t910Y128BoyY+zBLWhL3r0TYzlTmFdXrPwHL9DyFZmlEXNQQolTZh3KHV31QDhyA=="],
 
     "@openrouter/sdk/zod": ["zod@4.3.5", "", {}, "sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g=="],
@@ -2385,6 +2406,8 @@
     "@nowgai/datadock-api/@neondatabase/serverless/@types/node": ["@types/node@22.19.3", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-1N9SBnWYOJTrNZCdh/yJE+t910Y128BoyY+zBLWhL3r0TYzlTmFdXrPwHL9DyFZmlEXNQQolTZh3KHV31QDhyA=="],
 
     "@nowgai/datadock-api/@types/node/undici-types": ["undici-types@7.16.0", "", {}, "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="],
+
+    "@nowgai/neon-billing-cron/@types/node/undici-types": ["undici-types@7.16.0", "", {}, "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="],
 
     "@nowgai/shared/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
