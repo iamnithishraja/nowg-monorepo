@@ -59,7 +59,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
           gap: 10,
         }}
       >
-        <LoadingSpinner />
+        <GettingReadyIcon />
         <span
           style={{
             color: "rgba(255,255,255,.65)",
@@ -121,12 +121,12 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
           <div
             style={{
               position: "absolute",
-              left: "6%",
-              right: "6%",
+              left: "8%",
+              right: "8%",
               top: 0,
-              bottom: "6%",
+              bottom: "10%",
               borderRadius: 16,
-              background: "rgba(255,255,255,.025)",
+              background: "#3d3d45",
             }}
           />
 
@@ -134,22 +134,22 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
           <div
             style={{
               position: "absolute",
-              left: "3%",
-              right: "3%",
-              top: "3%",
-              bottom: "3%",
+              left: "4%",
+              right: "4%",
+              top: "5%",
+              bottom: "5%",
               borderRadius: 16,
-              background: "rgba(255,255,255,.05)",
+              background: "#424249",
             }}
           />
 
-          {/* Front card — gradient border wrapper */}
+          {/* Front card — border wrapper */}
           <div
             style={{
               position: "absolute",
               left: 0,
               right: 0,
-              top: "6%",
+              top: "10%",
               bottom: 0,
               borderRadius: 16,
               padding: 2,
@@ -207,7 +207,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
               </div>
 
               {/* Text section — inside the card */}
-              <div style={{ padding: "16px 18px 20px" }}>
+              <div style={{ padding: "18px 20px 22px" }}>
                 <h3
                   style={{
                     color: "#fff",
@@ -261,7 +261,8 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
 
       <style>{`
         @keyframes carousel-spin {
-          to { transform: rotate(360deg); }
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
       `}</style>
     </div>
@@ -270,28 +271,20 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
 
 /* ---- Sub-components ---- */
 
-function LoadingSpinner() {
+function GettingReadyIcon() {
   return (
     <svg
       width="18"
       height="18"
       viewBox="0 0 24 24"
       fill="none"
-      style={{ animation: "carousel-spin 1s linear infinite" }}
+      stroke="rgba(255,255,255,.55)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="rgba(255,255,255,.1)"
-        strokeWidth="2.5"
-      />
-      <path
-        d="M12 2a10 10 0 0 1 10 10"
-        stroke="rgba(255,255,255,.5)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
     </svg>
   );
 }
