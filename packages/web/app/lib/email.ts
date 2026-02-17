@@ -97,11 +97,15 @@ export async function sendPasswordResetEmail({
   userName,
 }: SendPasswordResetEmailProps) {
   const apiKey = getEnv("RESEND_API_KEY");
-  const fromEmail = getResendFrom();
-
   if (!apiKey) {
     console.error("❌ RESEND_API_KEY is not set!");
     throw new Error("RESEND_API_KEY environment variable is required");
+  }
+
+  const fromEmail = getResendFrom();
+  if (!fromEmail) {
+    console.error("❌ RESEND_FROM is not set!");
+    throw new Error("RESEND_FROM environment variable is required");
   }
 
   try {
@@ -112,7 +116,13 @@ export async function sendPasswordResetEmail({
       html: createPasswordResetEmailTemplate({ resetUrl, userName }),
     };
 
+    console.log("📧 Sending password reset email to:", to);
     const result = await getResendClient().emails.send(emailData);
+    console.log("✅ Password reset email sent successfully:", result);
+
+    if (!result || !result.data || !result.data.id) {
+      throw new Error("Email service returned invalid response");
+    }
 
     return result;
   } catch (error) {

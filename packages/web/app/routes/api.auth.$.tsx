@@ -85,17 +85,35 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
+    const url = new URL(request.url);
+    console.log("🔍 Auth action - URL:", url.pathname, "Method:", request.method);
+    
     const authInstance = await auth;
 
     const response = await authInstance.handler(request);
 
     // If Better Auth returns 404, it means the route isn't recognized
     if (response.status === 404) {
+      console.error("❌ Better Auth returned 404 for:", url.pathname);
+      console.error("Full URL:", request.url);
+      console.error("Method:", request.method);
+      
+      // Log response body for debugging
+      const responseClone = response.clone();
+      try {
+        const responseText = await responseClone.text();
+        console.error("Response body:", responseText);
+      } catch (e) {
+        console.log("Could not read response body");
+      }
+      
       // Return a proper 404 response
       return new Response(
         JSON.stringify({
           error: "Auth endpoint not found",
           requestedUrl: request.url,
+          requestedPath: url.pathname,
+          method: request.method,
           message: "The requested auth endpoint is not available",
         }),
         {
@@ -105,11 +123,13 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-
     // Log response body for debugging
     const responseClone = response.clone();
     try {
       const responseText = await responseClone.text();
+      if (url.pathname.includes("forget") || url.pathname.includes("reset")) {
+        console.log("✅ Password reset response:", responseText.substring(0, 200));
+      }
     } catch (e) {
       console.log("Could not read response body");
     }

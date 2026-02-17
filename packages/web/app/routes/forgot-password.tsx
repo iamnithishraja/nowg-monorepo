@@ -24,20 +24,33 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     setError("");
+    setSuccess(false);
 
     try {
-      await authClient.forgetPassword({
+      console.log("📧 Requesting password reset for:", email);
+      const result = await authClient.requestPasswordReset({
         email,
         redirectTo: "/reset-password",
       });
+      
+      console.log("Password reset request result:", result);
+      
+      // Check if there's an error in the result
+      if (result?.error) {
+        throw new Error(result.error.message || "Failed to send reset email");
+      }
+      
       setSuccess(true);
     } catch (err) {
-      console.error("Forgot password error:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to send reset email. Please try again."
-      );
+      console.error("❌ Forgot password error:", err);
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : typeof err === 'object' && err !== null && 'message' in err
+        ? String(err.message)
+        : "Failed to send reset email. Please try again.";
+      
+      setError(errorMessage);
+      setSuccess(false);
     } finally {
       setIsLoading(false);
     }

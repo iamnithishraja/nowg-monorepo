@@ -8,6 +8,6 @@ export const authClient = createAuthClient({
       : getEnvWithDefault("BETTER_AUTH_URL", "http://localhost:5173"),
 });
 
-export const { signIn, signOut, signUp, forgetPassword, resetPassword } =
+export const { signIn, signOut, signUp, requestPasswordReset, resetPassword } =
   authClient;
 

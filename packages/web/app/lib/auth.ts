@@ -45,12 +45,20 @@ async function createAuth() {
       enabled: true,
       requireEmailVerification: true,
       sendResetPassword: async ({ user, url }: { user: any; url: string }) => {
-        await sendPasswordResetEmail({
-          to: user.email,
-          subject: "Reset your password - Nowgai",
-          resetUrl: url,
-          userName: user.name || user.email,
-        });
+        try {
+          console.log("🔄 Sending password reset email for user:", user.email);
+          await sendPasswordResetEmail({
+            to: user.email,
+            subject: "Reset your password - Nowgai",
+            resetUrl: url,
+            userName: user.name || user.email,
+          });
+          console.log("✅ Password reset email callback completed successfully");
+        } catch (error) {
+          console.error("❌ Error in sendResetPassword callback:", error);
+          // Re-throw the error so Better Auth knows the email failed
+          throw error;
+        }
       },
     },
     emailVerification: {

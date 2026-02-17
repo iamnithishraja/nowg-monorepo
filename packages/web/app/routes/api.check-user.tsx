@@ -1,5 +1,26 @@
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getUsersCollection } from "~/lib/adminHelpers";
+
+/**
+ * GET /api/check-user
+ * Handle OPTIONS and other non-POST requests
+ */
+export async function loader({ request }: LoaderFunctionArgs) {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }
+  return new Response("Method not allowed. Use POST.", {
+    status: 405,
+    headers: { "Content-Type": "text/plain" },
+  });
+}
 
 /**
  * POST /api/check-user

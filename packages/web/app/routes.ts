@@ -99,6 +99,7 @@ export default [
     "routes/api.admin.fund-requests.$requestId.reject.tsx"
   ),
   route("/api/admin/upload-image", "routes/api.admin.upload-image.tsx"),
+  route("/api/check-user", "routes/api.check-user.tsx"),
   route("/api/auth/user", "routes/api.auth.user.tsx"),
   route("/api/auth/*", "routes/api.auth.$.tsx"),
   route("/api/llm/chat", "routes/api.llm.chat.tsx"),
