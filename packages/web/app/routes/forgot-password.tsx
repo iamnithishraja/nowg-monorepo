@@ -17,6 +17,29 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [userNotFound, setUserNotFound] = useState(false);
+
+  // Helper function to check if user exists
+  const checkUserExists = async (email: string): Promise<boolean> => {
+    try {
+      const checkUserResponse = await fetch("/api/check-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (checkUserResponse.ok) {
+        const checkResult = await checkUserResponse.json();
+        return checkResult.exists === true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking user existence:", error);
+      return false;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,8 +48,20 @@ export default function ForgotPassword() {
     setIsLoading(true);
     setError("");
     setSuccess(false);
+    setUserNotFound(false);
 
     try {
+      // First, check if the user exists
+      const userExists = await checkUserExists(email);
+      
+      if (!userExists) {
+        setUserNotFound(true);
+        setError("No account found with this email address.");
+        setIsLoading(false);
+        return;
+      }
+
+      // User exists, proceed with password reset
       console.log("📧 Requesting password reset for:", email);
       const result = await authClient.requestPasswordReset({
         email,
@@ -51,6 +86,7 @@ export default function ForgotPassword() {
       
       setError(errorMessage);
       setSuccess(false);
+      setUserNotFound(false);
     } finally {
       setIsLoading(false);
     }
@@ -115,14 +151,41 @@ export default function ForgotPassword() {
               </div>
 
               {error && (
-                <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 backdrop-blur-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center">
-                      <X className="w-3 h-3 text-red-400" weight="bold" />
+                <div className={`p-4 rounded-xl backdrop-blur-sm ${
+                  userNotFound 
+                    ? "bg-yellow-500/5 border border-yellow-500/20" 
+                    : "bg-red-500/5 border border-red-500/10"
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      userNotFound 
+                        ? "bg-yellow-500/20" 
+                        : "bg-red-500/20"
+                    }`}>
+                      <X className={`w-3 h-3 ${
+                        userNotFound ? "text-yellow-400" : "text-red-400"
+                      }`} weight="bold" />
                     </div>
-                    <p className="text-sm text-red-400 font-medium flex-1" role="alert">
-                      {error}
-                    </p>
+                    <div className="flex-1 space-y-2">
+                      <p className={`text-sm font-medium ${
+                        userNotFound ? "text-yellow-400" : "text-red-400"
+                      }`} role="alert">
+                        {error}
+                      </p>
+                      {userNotFound && (
+                        <div className="pt-2 space-y-2">
+                          <p className="text-sm text-white/60">
+                            Don't have an account yet? Create one to get started.
+                          </p>
+                          <Link
+                            to="/?tab=signup"
+                            className="inline-flex items-center justify-center w-full h-10 rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white font-medium text-sm hover:from-purple-400 hover:to-purple-500 hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300"
+                          >
+                            Create Account
+                          </Link>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
