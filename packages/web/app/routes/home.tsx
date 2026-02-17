@@ -1110,7 +1110,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 placeholder={`What shall we build today? (${shortcutLabel} to start)`}
                 disabled={isEnhancing}
                 rows={3}
-                className="w-full bg-transparent text-white placeholder:text-white/30 px-5 py-5 resize-none focus:outline-none text-base min-h-[120px] max-h-[200px]"
+                className="w-full bg-transparent text-white placeholder:text-white/30 px-5 py-5 resize-none focus:outline-none text-base min-h-[120px] max-h-[200px] overflow-y-scroll"
                 style={{ height: "120px" }}
               />
 

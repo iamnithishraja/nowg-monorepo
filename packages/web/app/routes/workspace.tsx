@@ -732,7 +732,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     controller.chatIsLoading || controller.isProcessingTemplate
                   }
                   rows={1}
-                  className="w-full bg-transparent text-white placeholder:text-white/30 px-5 py-4 pr-28 resize-none focus:outline-none text-base min-h-[56px] max-h-[200px]"
+                  className="w-full bg-transparent text-white placeholder:text-white/30 px-5 py-4 pr-28 resize-none focus:outline-none text-base min-h-[56px] max-h-[200px] overflow-y-scroll"
                   style={{ height: "96px" }}
                 />
 
