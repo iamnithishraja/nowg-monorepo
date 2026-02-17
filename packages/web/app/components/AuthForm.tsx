@@ -25,6 +25,7 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
   // shared
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<AuthInitialTab>(initialTab);
 
   // sign in state
   const [signinEmail, setSigninEmail] = useState("");
@@ -83,23 +84,71 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
     setError("");
     setShowResendVerification(false);
 
+    // Helper function to check if user exists
+    const checkUserExists = async (email: string): Promise<boolean> => {
+      try {
+        const checkUserResponse = await fetch("/api/check-user", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email }),
+        });
+
+        if (checkUserResponse.ok) {
+          const checkResult = await checkUserResponse.json();
+          return checkResult.exists === true;
+        }
+        return false;
+      } catch (error) {
+        console.error("Error checking user existence:", error);
+        return false;
+      }
+    };
+
     try {
+      // First, check if the user exists
+      const userExists = await checkUserExists(signinEmail);
+      
+      if (!userExists) {
+        setError("No account found with this email. Please create an account first.");
+        setIsLoading(false);
+        return;
+      }
+
+      // User exists, proceed with sign-in
       const result = await signIn.email(
         { email: signinEmail, password: signinPassword },
         {
-          onError: (ctx) => {
+          onError: async (ctx) => {
             if (ctx.error.status === 403) {
               setError("Please verify your email before signing in.");
               setShowResendVerification(true);
             } else {
-              setError(ctx.error.message || "Sign in failed");
+              // Better Auth might return "Invalid password" even if user doesn't exist (for security)
+              // Double-check user existence to provide helpful message
+              const errorMessage = ctx.error.message || "";
+              if (
+                errorMessage.toLowerCase().includes("invalid") ||
+                errorMessage.toLowerCase().includes("password")
+              ) {
+                const stillExists = await checkUserExists(signinEmail);
+                if (!stillExists) {
+                  setError("No account found with this email. Please create an account first.");
+                  setIsLoading(false);
+                  return;
+                }
+              }
+              setError(ctx.error.message || "Invalid email or password");
             }
           },
         }
       );
 
-      if (result?.error)
-        throw new Error(result.error.message || "Sign in failed");
+      if (result?.error) {
+        // If we get here, user exists but password is wrong (we already checked existence)
+        throw new Error(result.error.message || "Invalid email or password");
+      }
       
       // If there's an inviteToken, redirect to accept invitation
       if (inviteToken) {
@@ -108,6 +157,20 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
         window.location.href = "/home";
       }
     } catch (err) {
+      // If error occurs, check one more time if user exists
+      // This handles edge cases where Better Auth might throw before onError
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (
+        errorMessage.toLowerCase().includes("invalid") &&
+        (errorMessage.toLowerCase().includes("password") || errorMessage.toLowerCase().includes("email"))
+      ) {
+        const userExists = await checkUserExists(signinEmail);
+        if (!userExists) {
+          setError("No account found with this email. Please create an account first.");
+          setIsLoading(false);
+          return;
+        }
+      }
       setError(err instanceof Error ? err.message : "Failed to sign in");
     } finally {
       setIsLoading(false);
@@ -222,7 +285,7 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue={initialTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AuthInitialTab)} className="w-full">
         <TabsList className="grid grid-cols-2 w-full h-12 p-1.5 bg-white/[0.02] border border-white/[0.04] rounded-xl backdrop-blur-sm">
           <TabsTrigger
             value="signin"

@@ -142,11 +142,11 @@ export default function AuthLayout({
       </aside>
 
       {/* Right Panel - Auth Form */}
-      <main className="flex-1 flex items-center justify-center px-6 py-8 relative bg-[#111111]/60 backdrop-blur-sm">
+      <main className="flex-1 flex items-start justify-center px-6 py-8 relative bg-[#111111]/60 backdrop-blur-sm overflow-y-auto">
         {/* Simple divider */}
         <div className="hidden lg:block absolute left-0 top-0 bottom-0 w-px bg-white/10" />
 
-        <div className="w-full max-w-md relative">
+        <div className="w-full max-w-md relative flex flex-col min-h-[calc(100vh-4rem)] justify-center">
           {/* Simple Header */}
           <div className="mb-10 text-center">
             {/* Mobile logo */}
