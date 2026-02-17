@@ -21,6 +21,7 @@ export default [
   route("/recharge", "routes/recharge.tsx"),
   route("/api/stripe/checkout", "routes/api.stripe.checkout.tsx"),
   route("/api/profile/balance", "routes/api.profile.balance.tsx"),
+  route("/api/profile", "routes/api.profile.tsx"),
   route("/api/stripe/verify", "routes/api.stripe.verify.tsx"),
   route("/payment-success", "routes/payment-success.tsx"),
   route("/deployments", "routes/deployments.tsx"),

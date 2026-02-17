@@ -1,4 +1,4 @@
-import { ArrowLeft, DollarSign, User as UserIcon, Zap, Pencil, Check, X, Loader2, Link2, Link2Off } from "lucide-react";
+import { ArrowLeft, DollarSign, Zap, Loader2, Link2, Link2Off } from "lucide-react";
 import { Link, redirect, useRevalidator } from "react-router";
 import { useState, useEffect } from "react";
 import GradientGlow from "../components/GradientGlow";
@@ -6,7 +6,6 @@ import { ProjectSidebar } from "../components/ProjectSidebar";
 import { ContributionGraph } from "../components/ContributionGraph";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Input } from "../components/ui/input";
 import { auth } from "../lib/auth";
 import { authClient } from "../lib/authClient";
 import { connectToDatabase } from "../lib/mongo";
@@ -14,6 +13,10 @@ import { isWhitelistedEmail } from "../lib/stripe";
 import { getMessageModel } from "../models/messageModel";
 import { useSupabaseAuth } from "../hooks/useSupabaseAuth";
 import { useGitHubAuth } from "../hooks/useGitHubAuth";
+import { ProfileAvatar } from "../components/profile/ProfileAvatar";
+import { ProfileBasicInfo } from "../components/profile/ProfileBasicInfo";
+import { ProfileSocialMediaForm } from "../components/profile/ProfileSocialMediaForm";
+import { ProfileLegalSection } from "../components/profile/ProfileLegalSection";
 import type { Route } from "./+types/profile";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -104,6 +107,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     editData = [];
   }
 
+  // Log loaded profile data for debugging
+  console.log("[Profile Loader] Loading profile for user:", user.id);
+  console.log("[Profile Loader] Profile social data:", {
+    linkedin: profile.linkedin,
+    instagram: profile.instagram,
+    x: profile.x,
+    discord: profile.discord,
+    portfolio: profile.portfolio,
+    bio: profile.bio,
+    customUrls: profile.customUrls,
+  });
+
   return {
     user: {
       id: user.id,
@@ -119,7 +134,88 @@ export async function loader({ request }: Route.LoaderArgs) {
     balance: profile.balance || 0,
     isWhitelisted: whitelisted,
     edits: editData,
+    profile: {
+      linkedin: profile.linkedin || "",
+      instagram: profile.instagram || "",
+      x: profile.x || "",
+      discord: profile.discord || "",
+      portfolio: profile.portfolio || "",
+      bio: profile.bio || "",
+      customUrls: profile.customUrls || [],
+    },
   };
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  const { Profile: ProfileModel } = await import("@nowgai/shared/models");
+  
+  const authInstance = await auth;
+  const session = await authInstance.api.getSession({
+    headers: request.headers,
+  });
+
+  if (!session) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Only handle POST requests
+  if (request.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const user = session.user;
+
+  try {
+    await connectToDatabase();
+    
+    // Parse FormData (React Router sends FormData by default)
+    const fd = await request.formData();
+    const linkedin = fd.get("linkedin")?.toString() || "";
+    const instagram = fd.get("instagram")?.toString() || "";
+    const x = fd.get("x")?.toString() || "";
+    const discord = fd.get("discord")?.toString() || "";
+    const portfolio = fd.get("portfolio")?.toString() || "";
+    const bio = fd.get("bio")?.toString() || "";
+    const customUrls = fd.getAll("customUrls")
+      .map(url => url.toString())
+      .filter((url) => url.trim());
+
+    // Find or create profile
+    let profile = await ProfileModel.findOne({ userId: user.id });
+    if (!profile) {
+      profile = new ProfileModel({ userId: user.id });
+    }
+
+    // Update fields
+    profile.linkedin = linkedin || "";
+    profile.instagram = instagram || "";
+    profile.x = x || "";
+    profile.discord = discord || "";
+    profile.portfolio = portfolio || "";
+    profile.bio = bio || "";
+    profile.customUrls = Array.isArray(customUrls) ? customUrls.filter((url: string) => url.trim()) : [];
+    profile.lastUpdated = new Date();
+
+    await profile.save();
+
+    // Return redirect to revalidate the page
+    return redirect("/profile");
+  } catch (error: any) {
+    console.error("Error updating profile:", error);
+    return new Response(
+      JSON.stringify({ error: error.message || "Failed to update profile" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -164,11 +260,20 @@ const SupabaseIcon = ({ className }: { className?: string }) => (
 );
 
 export default function Profile({ loaderData }: Route.ComponentProps) {
-  const { user, balance, isWhitelisted, edits } = loaderData as {
+  const { user, balance, isWhitelisted, edits, profile } = loaderData as {
     user: { id: string; name?: string; email?: string; image?: string | null };
     balance: number;
     isWhitelisted: boolean;
     edits: Array<{ date: string; count: number }>;
+    profile: {
+      linkedin: string;
+      instagram: string;
+      x: string;
+      discord: string;
+      portfolio: string;
+      bio: string;
+      customUrls: string[];
+    };
   };
 
   const revalidator = useRevalidator();
@@ -237,81 +342,17 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
     return linkedAccounts.some((acc) => acc.providerId === providerId);
   };
 
-  // Editing states
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editedName, setEditedName] = useState(user?.name || "");
-  const [nameLoading, setNameLoading] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
-
   const displayName = user?.name || user?.email || "User";
 
-  const initials = (() => {
-    const source = displayName || "";
-    const parts = source
-      .split(" ")
-      .map((p) => p.trim())
-      .filter(Boolean);
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    const handle = source.includes("@") ? source.split("@")[0] : source;
-    return handle.slice(0, 2).toUpperCase();
-  })();
-
-  const handleSaveName = async () => {
-    if (!editedName.trim()) {
-      setNameError("Name cannot be empty");
-      return;
+  // Handle name update
+  const handleNameUpdate = async (name: string) => {
+    const result = await authClient.updateUser({ name });
+    if (result.error) {
+      throw new Error(result.error.message || "Failed to update name");
     }
-    
-    setNameLoading(true);
-    setNameError(null);
-    
-    try {
-      const result = await authClient.updateUser({
-        name: editedName.trim(),
-      });
-      
-      if (result.error) {
-        setNameError(result.error.message || "Failed to update name");
-        return;
-      }
-      
-      setIsEditingName(false);
-      revalidator.revalidate();
-    } catch (err: any) {
-      setNameError(err.message || "Failed to update name");
-    } finally {
-      setNameLoading(false);
-    }
+    revalidator.revalidate();
   };
 
-  const handleCancelName = () => {
-    setIsEditingName(false);
-    setEditedName(user?.name || "");
-    setNameError(null);
-  };
-
-  const Avatar = ({ size = "lg" }: { size?: "sm" | "lg" }) => {
-    const imageUrl = user?.image || undefined;
-    const sizeClass = size === "lg" ? "w-16 h-16" : "w-10 h-10";
-    const textSize = size === "lg" ? "text-xl" : "text-sm";
-    
-    if (imageUrl) {
-      return (
-        <img
-          src={imageUrl}
-          alt=""
-          referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
-          className={`${sizeClass} rounded-full object-cover border border-white/10`}
-        />
-      );
-    }
-    return (
-      <div className={`${sizeClass} rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white ${textSize} font-semibold`}>
-        {initials || <UserIcon className="w-6 h-6" />}
-      </div>
-    );
-  };
 
   return (
     <div className="h-screen w-screen bg-canvas text-white flex overflow-hidden">
@@ -341,7 +382,11 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                   <div className="relative group">
                     <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent-primary)]/20 to-[var(--gradient-mid)]/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500"></div>
                     <div className="relative">
-                      <Avatar size="lg" />
+                      <ProfileAvatar
+                        imageUrl={user?.image}
+                        displayName={displayName}
+                        size="lg"
+                      />
                     </div>
                   </div>
                   <div>
@@ -367,118 +412,17 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Name Field */}
-                      <div>
-                        <label className="text-sm text-tertiary">Name</label>
-                        {isEditingName ? (
-                          <div className="mt-1 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Input
-                                value={editedName}
-                                onChange={(e) => setEditedName(e.target.value)}
-                                className="flex-1 bg-surface-2/50 border-subtle text-secondary"
-                                placeholder="Enter your name"
-                                disabled={nameLoading}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSaveName();
-                                  if (e.key === "Escape") handleCancelName();
-                                }}
-                                autoFocus
-                              />
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={handleSaveName}
-                                disabled={nameLoading}
-                                className="h-9 w-9 text-green-500 hover:text-green-400 hover:bg-green-500/10"
-                              >
-                                {nameLoading ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Check className="w-4 h-4" />
-                                )}
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={handleCancelName}
-                                disabled={nameLoading}
-                                className="h-9 w-9 text-red-500 hover:text-red-400 hover:bg-red-500/10"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                            {nameError && (
-                              <p className="text-xs text-red-500">{nameError}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="mt-1 flex items-center gap-2">
-                            <div className="flex-1 px-3 py-2 rounded-lg border border-subtle bg-surface-2/50 text-secondary">
-                              {user?.name || "—"}
-                            </div>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => {
-                                setEditedName(user?.name || "");
-                                setIsEditingName(true);
-                              }}
-                              className="h-9 w-9 text-tertiary hover:text-primary"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                    <ProfileBasicInfo
+                      name={user?.name || ""}
+                      email={user?.email || ""}
+                      onNameUpdate={handleNameUpdate}
+                    />
 
-                      {/* Email Field */}
-                      <div>
-                        <label className="text-sm text-tertiary">Email</label>
-                        <div className="mt-1">
-                          <div className="px-3 py-2 rounded-lg border border-subtle bg-surface-2/50 text-secondary">
-                            {user?.email || "—"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t border-subtle">
-                      <p className="text-xs text-tertiary mb-3 font-medium">Legal & Policies</p>
-                      <div className="flex flex-col gap-2">
-                        <Link
-                          to="/privacy-policy"
-                          className="text-sm text-tertiary hover:text-primary transition-colors underline underline-offset-2"
-                        >
-                          Privacy Policy
-                        </Link>
-                        <Link
-                          to="/EULA"
-                          className="text-sm text-tertiary hover:text-primary transition-colors underline underline-offset-2"
-                        >
-                          End User License Agreement (EULA)
-                        </Link>
-                        <Link
-                          to="/support"
-                          className="text-sm text-tertiary hover:text-primary transition-colors underline underline-offset-2"
-                        >
-                          Support & Contact
-                        </Link>
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-subtle">
-                        <p className="text-xs text-tertiary mb-2">Compliance</p>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          We comply with India's DPDP Act, IT Act, and applicable global standards including GDPR for EU users. For privacy queries or to exercise your rights, contact{" "}
-                          <a 
-                            href="mailto:support@nowg.ai" 
-                            className="text-tertiary hover:text-primary underline underline-offset-2"
-                          >
-                            support@nowg.ai
-                          </a>
-                          .
-                        </p>
-                      </div>
-                    </div>
+                    <ProfileSocialMediaForm
+                      initialData={profile}
+                    />
+
+                    <ProfileLegalSection />
                   </CardContent>
                 </Card>
               </div>

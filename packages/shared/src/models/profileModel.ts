@@ -104,10 +104,21 @@ export const profileSchemaDefinition = {
     },
   ],
 
+  // Social media and profile information
+  linkedin: { type: String, default: "" },
+  instagram: { type: String, default: "" },
+  x: { type: String, default: "" }, // X (formerly Twitter)
+  discord: { type: String, default: "" }, // Discord username
+  portfolio: { type: String, default: "" }, // Portfolio website URL
+  bio: { type: String, default: "" }, // User bio
+  customUrls: [{ type: String }], // Array of custom URLs
+
   lastUpdated: { type: Date, default: Date.now },
 };
 
-export const profileSchema = new mongoose.Schema(profileSchemaDefinition);
+export const profileSchema = new mongoose.Schema(profileSchemaDefinition, {
+  strict: false, // Allow fields not in schema (for flexibility)
+});
 
 // Model getter function for consistent access
 export function getProfileModel(): mongoose.Model<any> {
