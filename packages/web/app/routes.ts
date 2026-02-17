@@ -145,6 +145,7 @@ export default [
   route("/api/deploy/vercel", "routes/api.deploy.vercel.tsx"),
   route("/api/deploy/netlify", "routes/api.deploy.netlify.tsx"),
   route("/api/deployments", "routes/api.deployments.tsx"),
+  route("/api/deployments/promote", "routes/api.deployments.promote.tsx"),
   route("/api/supabase/projects", "routes/api.supabase.projects.tsx"),
   route("/api/analytics", "routes/api.analytics.tsx"),
   route(
