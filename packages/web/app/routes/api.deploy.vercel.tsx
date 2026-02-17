@@ -37,20 +37,9 @@ async function disableDeploymentProtection(
     });
 
     if (!updateRes.ok) {
-      const errorText = await updateRes.text();
-      console.warn(
-        `Failed to disable deployment protection for project ${projectId}:`,
-        errorText,
-      );
       // Don't throw - this is not critical for deployment
-    } else {
-      console.log(`✅ Disabled deployment protection (password + Vercel Auth) for project ${projectId}`);
     }
   } catch (error) {
-    console.warn(
-      `Error disabling deployment protection for project ${projectId}:`,
-      error,
-    );
     // Don't throw - this is not critical for deployment
   }
 }
