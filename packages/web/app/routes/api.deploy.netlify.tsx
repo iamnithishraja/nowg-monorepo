@@ -220,6 +220,8 @@ export async function action({ request }: ActionFunctionArgs) {
         const deploy = await deployRes.json();
         const deployId = deploy.id as string;
         const productionUrl = `https://${siteName}.netlify.app`;
+        // Netlify provides a unique deploy URL (e.g., deploy-id--sitename.netlify.app)
+        const uniqueDeploymentUrl = deploy.deploy_ssl_url || deploy.ssl_url || null;
 
         // Store deployment record in database
         let dbDeploymentId: string | null = null;
@@ -237,6 +239,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 branch: "main",
                 netlifySiteId: netlifySiteId,
                 versionId: versionId,
+                uniqueDeploymentUrl: uniqueDeploymentUrl || undefined,
                 snapshotData: {
                   files: files.map((f) => ({
                     path: f.path,
@@ -285,6 +288,8 @@ export async function action({ request }: ActionFunctionArgs) {
           if (state === "ready") {
             if (dbDeploymentId) {
               try {
+                // Get the unique deployment URL from Netlify's response
+                const uniqueUrl = statusJson.deploy_ssl_url || statusJson.ssl_url || null;
                 await deploymentService.updateDeploymentStatus(
                   dbDeploymentId,
                   "success",
@@ -292,6 +297,7 @@ export async function action({ request }: ActionFunctionArgs) {
                     environment: "production",
                     branch: "main",
                     deploymentUrl: productionUrl,
+                    uniqueDeploymentUrl: uniqueUrl || undefined,
                     netlifySiteId: netlifySiteId,
                   }
                 );

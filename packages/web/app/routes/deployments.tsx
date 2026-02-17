@@ -64,6 +64,7 @@ export default function Deployments() {
   const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRestoring, setIsRestoring] = useState<string | null>(null);
+  const [isPromoting, setIsPromoting] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -238,7 +239,8 @@ export default function Deployments() {
 
     setIsRestoring(deployment.id);
     try {
-      const res = await fetch("/api/deployments", {
+      // Step 1: Get snapshot data from archived deployment
+      const restoreRes = await fetch("/api/deployments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -250,22 +252,143 @@ export default function Deployments() {
         }),
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      if (!restoreRes.ok) {
+        throw new Error(`HTTP ${restoreRes.status}: ${restoreRes.statusText}`);
       }
 
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || "Failed to restore deployment");
+      const restoreData = await restoreRes.json();
+      if (!restoreData.success) {
+        throw new Error(restoreData.error || "Failed to prepare restore");
       }
 
-      // Refresh deployments to reflect the change
+      // Step 2: Redeploy using snapshot data
+      const platform = restoreData.platform || deployment.platform;
+      const endpoint = platform === "vercel" ? "/api/deploy/vercel" : "/api/deploy/netlify";
+      
+      const deployRes = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          files: restoreData.snapshotData.files || [],
+          projectName: restoreData.projectName || restoreData.snapshotData.projectName,
+          siteName: restoreData.projectName || restoreData.snapshotData.projectName,
+          conversationId: deployment.conversationId,
+          framework: restoreData.framework || restoreData.snapshotData.framework || "vite",
+        }),
+      });
+
+      if (!deployRes.ok) {
+        throw new Error(`Deployment failed: HTTP ${deployRes.status}`);
+      }
+
+      // Step 3: Monitor deployment progress via SSE stream
+      const reader = deployRes.body?.getReader();
+      if (!reader) {
+        throw new Error("No response stream from deployment server");
+      }
+
+      const decoder = new TextDecoder();
+      let deploymentComplete = false;
+      let deploymentUrl: string | null = null;
+      let errorMessage: string | null = null;
+
+      while (!deploymentComplete) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === "error") {
+                errorMessage = data.message || "Deployment failed";
+                deploymentComplete = true;
+                break;
+              }
+              
+              if (data.type === "success") {
+                deploymentUrl = data.url || data.deploymentUrl;
+                deploymentComplete = true;
+                break;
+              }
+              
+              if (data.type === "progress" && data.state === "ready") {
+                deploymentUrl = data.url || deploymentUrl;
+                deploymentComplete = true;
+                break;
+              }
+            } catch (e) {
+              // Ignore JSON parse errors for non-JSON lines
+            }
+          }
+        }
+      }
+
+      if (errorMessage) {
+        throw new Error(errorMessage);
+      }
+
+      // Step 4: Refresh deployments to show the new live deployment
       await fetchDeployments(true);
+      
+      // Show success message
+      setError(null);
+      
+      // Optionally show success notification
+      if (deploymentUrl) {
+        console.log(`Deployment restored successfully: ${deploymentUrl}`);
+      }
     } catch (err: any) {
       console.error("Error restoring deployment:", err);
-      setError(err.message);
+      setError(err.message || "Failed to restore deployment");
     } finally {
       setIsRestoring(null);
+    }
+  };
+
+  // Promote an archived deployment to live (instant, no redeploy - uses Vercel/Netlify alias API)
+  const handlePromoteDeployment = async (deployment: any) => {
+    if (!deployment.conversationId) {
+      setError("Conversation ID not found for this deployment");
+      return;
+    }
+
+    setIsPromoting(deployment.id);
+    setError(null);
+    
+    try {
+      const res = await fetch("/api/deployments/promote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          deploymentId: deployment.id,
+          conversationId: deployment.conversationId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to promote deployment");
+      }
+
+      // Refresh deployments to show the updated state
+      await fetchDeployments(true);
+      
+      console.log(`Deployment promoted successfully: ${data.deploymentUrl}`);
+    } catch (err: any) {
+      console.error("Error promoting deployment:", err);
+      setError(err.message || "Failed to promote deployment");
+    } finally {
+      setIsPromoting(null);
     }
   };
 
@@ -525,7 +648,7 @@ export default function Deployments() {
                             <CardTitle className="text-xl font-bold text-primary mb-3 line-clamp-2">
                               {d.conversationTitle || "Untitled Project"}
                             </CardTitle>
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
                               <span
                                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${getPlatformColor(
                                   d.platform
@@ -534,6 +657,12 @@ export default function Deployments() {
                                 <Globe className="w-3 h-3" />
                                 {d.platform}
                               </span>
+                              {d.versionNumber && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-[var(--info-500)]/10 text-info-500 border-[var(--info-500)]/20">
+                                  v{d.versionNumber}
+                                  {d.totalVersions && ` of ${d.totalVersions}`}
+                                </span>
+                              )}
                               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-surface-2 text-tertiary border-subtle">
                                 <Archive className="w-3 h-3" />
                                 Archived
@@ -553,18 +682,34 @@ export default function Deployments() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
+                                  onClick={() => handlePromoteDeployment(d)}
+                                  disabled={isPromoting === d.id || isRestoring === d.id}
+                                >
+                                  {isPromoting === d.id ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      Promoting...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Zap className="w-4 h-4 mr-2" />
+                                      Promote to Live (Instant)
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                   onClick={() => handleRestoreDeployment(d)}
-                                  disabled={isRestoring === d.id}
+                                  disabled={isRestoring === d.id || isPromoting === d.id}
                                 >
                                   {isRestoring === d.id ? (
                                     <>
                                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                      Restoring...
+                                      Redeploying...
                                     </>
                                   ) : (
                                     <>
                                       <RotateCcw className="w-4 h-4 mr-2" />
-                                      Restore & Make Live
+                                      Restore & Redeploy
                                     </>
                                   )}
                                 </DropdownMenuItem>
@@ -640,37 +785,62 @@ export default function Deployments() {
                               </code>
                             </div>
                           )}
+
+                          {(d.uniqueDeploymentUrl || d.deploymentUrl) && (
+                            <div className="flex items-center gap-2 text-sm text-tertiary">
+                              <Globe className="w-4 h-4" />
+                              <span className="font-medium">
+                                {d.uniqueDeploymentUrl ? "Unique URL:" : "URL:"}
+                              </span>
+                              <code className="bg-surface-2 px-2 py-0.5 rounded text-xs text-secondary border border-subtle truncate max-w-[200px]">
+                                {(d.uniqueDeploymentUrl || d.deploymentUrl).replace(/^https?:\/\//, '')}
+                              </code>
+                            </div>
+                          )}
                         </div>
 
-                        {/* Action Button */}
-                        {d.deploymentUrl && d.status === "success" && (
+                        {/* Action Buttons */}
+                        {(d.uniqueDeploymentUrl || d.deploymentUrl) && d.status === "success" && (
                           <div className="space-y-2">
+                            {d.uniqueDeploymentUrl ? (
+                              <div className="text-xs text-success-500 text-center mb-2">
+                                This URL shows the exact archived version
+                              </div>
+                            ) : (
+                              <div className="text-xs text-tertiary text-center mb-2">
+                                Note: This URL may show the latest version
+                              </div>
+                            )}
                             <a
-                              href={d.deploymentUrl}
+                              href={d.uniqueDeploymentUrl || d.deploymentUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center justify-center gap-2 w-full bg-surface-2 hover:bg-surface-3 text-secondary px-4 py-3 rounded-xl font-semibold transition-all border border-subtle"
                             >
-                              View Archived Deployment
+                              View Archived Version
                               <ExternalLink className="w-4 h-4" />
                             </a>
+                            {/* Primary action: Promote to Live (instant alias switch) */}
                             <button
-                              onClick={() => handleRestoreDeployment(d)}
-                              disabled={isRestoring === d.id}
+                              onClick={() => handlePromoteDeployment(d)}
+                              disabled={isPromoting === d.id || isRestoring === d.id}
                               className="flex items-center justify-center gap-2 w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white px-4 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {isRestoring === d.id ? (
+                              {isPromoting === d.id ? (
                                 <>
                                   <Loader2 className="w-4 h-4 animate-spin" />
-                                  Restoring...
+                                  Promoting...
                                 </>
                               ) : (
                                 <>
-                                  <RotateCcw className="w-4 h-4" />
-                                  Restore & Make Live
+                                  <Zap className="w-4 h-4" />
+                                  Promote to Live
                                 </>
                               )}
                             </button>
+                            <div className="text-xs text-tertiary text-center">
+                              Instant switch - no rebuild required
+                            </div>
                           </div>
                         )}
                       </CardContent>
@@ -717,6 +887,12 @@ export default function Deployments() {
                               <Globe className="w-3 h-3" />
                               {d.platform}
                             </span>
+                            {d.versionNumber && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-[var(--info-500)]/10 text-info-500 border-[var(--info-500)]/20">
+                                v{d.versionNumber}
+                                {d.totalVersions && d.totalVersions > 1 && ` of ${d.totalVersions}`}
+                              </span>
+                            )}
                             {d.isLive && (
                               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-[var(--success-500)]/10 text-success-500 border-[var(--success-500)]/20">
                                 <Zap className="w-3 h-3" />

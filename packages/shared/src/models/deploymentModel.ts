@@ -14,6 +14,10 @@ export const deploymentSchemaDefinition = {
     required: true,
   },
   deploymentUrl: { type: String, required: true },
+  // Unique deployment URL that points to this specific deployment (not the production alias)
+  // For Vercel: projectname-abc123.vercel.app
+  // For Netlify: deploy-preview-123--sitename.netlify.app
+  uniqueDeploymentUrl: { type: String },
   deploymentId: { type: String, required: true },
   // Store Vercel project ID for reuse
   vercelProjectId: { type: String },

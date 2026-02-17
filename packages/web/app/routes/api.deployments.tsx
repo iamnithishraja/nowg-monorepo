@@ -40,6 +40,34 @@ export async function loader({ request }: Route.LoaderArgs) {
       deployments = await deploymentService.getUserDeployments(session.user.id);
     }
 
+    // Get all successful deployments for this user to calculate version numbers
+    const allUserDeployments = await deploymentService.getUserDeployments(session.user.id);
+    const allArchivedDeployments = await deploymentService.getUserArchivedDeployments(session.user.id);
+    const allDeployments = [...allUserDeployments, ...allArchivedDeployments];
+    
+    // Group deployments by conversation and sort by date to assign version numbers
+    const deploymentsByConversation: Record<string, any[]> = {};
+    for (const d of allDeployments) {
+      const convId = d.conversationId?._id?.toString() || d.conversationId?.toString();
+      if (!convId) continue;
+      if (!deploymentsByConversation[convId]) {
+        deploymentsByConversation[convId] = [];
+      }
+      deploymentsByConversation[convId].push(d);
+    }
+    
+    // Sort each conversation's deployments by date (oldest first) and assign version numbers
+    const versionMap: Record<string, number> = {};
+    for (const convId of Object.keys(deploymentsByConversation)) {
+      const convDeployments = deploymentsByConversation[convId]
+        .filter((d: any) => d.status === "success")
+        .sort((a: any, b: any) => new Date(a.deployedAt).getTime() - new Date(b.deployedAt).getTime());
+      
+      convDeployments.forEach((d: any, index: number) => {
+        versionMap[d._id.toString()] = index + 1;
+      });
+    }
+
     // For each deployment, check if update is needed by comparing with latest version in database
     const deploymentsWithUpdateStatus = await Promise.all(
       deployments.map(async (deployment: any) => {
@@ -75,6 +103,25 @@ export async function loader({ request }: Route.LoaderArgs) {
           }
         }
 
+        // Get version number from our calculated map
+        const versionNumber = versionMap[deployment._id.toString()] || null;
+        
+        // Get total versions for this conversation
+        const convId = deployment.conversationId?._id?.toString() || deployment.conversationId?.toString();
+        const totalVersions = convId && deploymentsByConversation[convId] 
+          ? deploymentsByConversation[convId].filter((d: any) => d.status === "success").length 
+          : 0;
+
+        // For archived deployments without uniqueDeploymentUrl, try to fetch it from platform API
+        let uniqueDeploymentUrl = deployment.uniqueDeploymentUrl || null;
+        if (!uniqueDeploymentUrl && deployment.isArchived && deployment.status === "success") {
+          try {
+            uniqueDeploymentUrl = await deploymentService.ensureUniqueDeploymentUrl(deployment._id.toString());
+          } catch (error) {
+            console.error("Error fetching unique deployment URL:", error);
+          }
+        }
+
         return {
           id: deployment._id.toString(),
           conversationId:
@@ -86,6 +133,8 @@ export async function loader({ request }: Route.LoaderArgs) {
           conversationUpdatedAt: deployment.conversationId?.updatedAt,
           platform: deployment.platform,
           deploymentUrl: deployment.deploymentUrl,
+          // Unique URL for this specific deployment (for viewing archived versions)
+          uniqueDeploymentUrl: uniqueDeploymentUrl,
           deploymentId: deployment.deploymentId,
           status: deployment.status,
           deployedAt: deployment.deployedAt,
@@ -96,6 +145,9 @@ export async function loader({ request }: Route.LoaderArgs) {
           archivedAt: deployment.archivedAt,
           snapshotData: deployment.snapshotData || {},
           metadata: deployment.metadata || {},
+          // Version history info
+          versionNumber: versionNumber,
+          totalVersions: totalVersions,
         };
       })
     );
@@ -145,7 +197,7 @@ export async function action({ request }: Route.ActionArgs) {
     const deploymentService = new DeploymentService();
 
     if (restore) {
-      // Restore an archived deployment
+      // Restore an archived deployment by redeploying it
       if (!deploymentId || !conversationId) {
         return new Response(
           JSON.stringify({
@@ -158,16 +210,38 @@ export async function action({ request }: Route.ActionArgs) {
         );
       }
 
-      await deploymentService.restoreDeployment(
+      // Get archived deployment with snapshot data
+      const archivedDeployment = await deploymentService.getArchivedDeploymentForRestore(
         deploymentId,
         session.user.id,
         conversationId
       );
 
+      if (!archivedDeployment.snapshotData || !archivedDeployment.snapshotData.files) {
+        return new Response(
+          JSON.stringify({
+            error: "Snapshot data not found for this deployment",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Note: We don't archive the current live deployment here because
+      // the new deployment creation will handle that automatically.
+      // This ensures proper sequencing and avoids double-archiving.
+
+      // Return the snapshot data so the frontend can trigger a redeploy
       return new Response(
         JSON.stringify({
           success: true,
-          message: "Deployment restored successfully",
+          message: "Ready to redeploy",
+          snapshotData: archivedDeployment.snapshotData,
+          platform: archivedDeployment.platform,
+          projectName: archivedDeployment.snapshotData.projectName,
+          framework: archivedDeployment.snapshotData.framework || "vite",
         }),
         {
           status: 200,

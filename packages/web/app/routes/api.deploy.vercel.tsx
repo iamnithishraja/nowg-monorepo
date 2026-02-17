@@ -237,6 +237,8 @@ export async function action({ request }: ActionFunctionArgs) {
         const created = await createRes.json();
         const deploymentId = created.id as string;
         const productionUrl = `https://${projectName}.vercel.app`;
+        // Vercel provides a unique URL for each deployment (e.g., projectname-abc123.vercel.app)
+        const uniqueDeploymentUrl = created.url ? `https://${created.url}` : null;
 
         // Store deployment record in database
         let dbDeploymentId: string | null = null;
@@ -254,6 +256,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 branch: "main",
                 vercelProjectId: vercelProjectId,
                 versionId: versionId,
+                uniqueDeploymentUrl: uniqueDeploymentUrl || undefined,
                 snapshotData: {
                   files: files.map((f) => ({
                     path: f.path,
@@ -334,6 +337,23 @@ export async function action({ request }: ActionFunctionArgs) {
                 const urlWithProtocol = actualProductionUrl.startsWith("http")
                   ? actualProductionUrl
                   : `https://${actualProductionUrl}`;
+                // Get the unique deployment URL (specific to this deployment)
+                // Vercel returns this in the 'url' field - it's the deployment-specific URL
+                // Format: projectname-hash-teamname.vercel.app or similar
+                let uniqueUrl: string | null = null;
+                if (statusJson.url) {
+                  uniqueUrl = statusJson.url.startsWith("http") 
+                    ? statusJson.url 
+                    : `https://${statusJson.url}`;
+                }
+                // Log for debugging
+                console.log("Vercel deployment ready:", {
+                  deploymentId,
+                  productionUrl: urlWithProtocol,
+                  uniqueUrl,
+                  rawUrl: statusJson.url,
+                  aliases: statusJson.alias,
+                });
                 await deploymentService.updateDeploymentStatus(
                   dbDeploymentId,
                   "success",
@@ -341,6 +361,7 @@ export async function action({ request }: ActionFunctionArgs) {
                     environment: "production",
                     branch: "main",
                     deploymentUrl: urlWithProtocol,
+                    uniqueDeploymentUrl: uniqueUrl || undefined,
                     vercelProjectId: vercelProjectId,
                   }
                 );
