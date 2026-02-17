@@ -1,7 +1,7 @@
 import type { Route } from "./+types/forgot-password";
 import { useState } from "react";
 import { Link } from "react-router";
-import { Button } from "../components/ui/button";
+import { Check, SpinnerGap, X } from "@phosphor-icons/react";
 import { Input } from "../components/ui/input";
 import { authClient } from "../lib/authClient";
 
@@ -57,47 +57,56 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-6">
+    <div className="min-h-screen bg-[#0c0c0c] text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">Forgot your password?</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-white">Forgot your password?</h1>
+          <p className="text-white/60">
             Enter your email and we'll send you a reset link
           </p>
         </div>
 
-        <div className="bg-card/60 border border-border rounded-2xl p-6 space-y-4">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4 backdrop-blur-sm">
           {success ? (
-            <div className="text-center space-y-4">
-              <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
-                <h3 className="text-lg font-semibold text-primary mb-2">
+            <div className="text-center space-y-6 py-4">
+              <div className="relative">
+                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-purple-400/20 to-purple-600/20 border border-purple-500/30 flex items-center justify-center backdrop-blur-sm">
+                  <Check className="w-10 h-10 text-purple-400" weight="bold" />
+                </div>
+                <div className="absolute inset-0 w-20 h-20 mx-auto rounded-full bg-purple-500/5 animate-ping" />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-xl font-bold text-white">
                   Reset link sent!
                 </h3>
-                <p className="text-primary text-sm">
-                  We've sent a password reset link to <strong>{email}</strong>.
+                <p className="text-sm text-white/60 leading-relaxed">
+                  We've sent a password reset link to{" "}
+                  <span className="text-white font-semibold break-all">{email}</span>.
                   Please check your inbox and follow the instructions.
                 </p>
               </div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-white/40">
                 <p>
                   Didn't receive the email? Check your spam folder or try again.
                 </p>
               </div>
               <Link
                 to="/"
-                className="inline-block w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium py-2 px-4 rounded-lg transition-colors"
+                className="inline-block w-full h-12 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold text-sm hover:from-purple-400 hover:to-purple-500 hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 flex items-center justify-center"
               >
                 Back to Sign In
               </Link>
             </div>
           ) : (
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <div className="space-y-2">
-                <label className="text-sm text-foreground">Email address</label>
+            <form className="space-y-5" onSubmit={handleSubmit}>
+              <div className="space-y-2.5">
+                <label className="text-sm font-semibold text-white/80 tracking-wide">
+                  Email address
+                </label>
                 <Input
                   type="email"
                   placeholder="you@example.com"
-                  className="bg-transparent border-border"
+                  className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -106,27 +115,39 @@ export default function ForgotPassword() {
               </div>
 
               {error && (
-                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <p className="text-destructive text-sm" role="alert">
-                    {error}
-                  </p>
+                <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 backdrop-blur-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <X className="w-3 h-3 text-red-400" weight="bold" />
+                    </div>
+                    <p className="text-sm text-red-400 font-medium flex-1" role="alert">
+                      {error}
+                    </p>
+                  </div>
                 </div>
               )}
 
-              <Button
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                disabled={!email || isLoading}
+              <button
                 type="submit"
+                disabled={!email || isLoading}
+                className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold text-sm hover:from-purple-400 hover:to-purple-500 hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center justify-center gap-2 overflow-hidden"
               >
-                {isLoading ? "Sending..." : "Send reset link"}
-              </Button>
+                {isLoading && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/90 to-purple-600/90 flex items-center justify-center">
+                    <SpinnerGap className="w-5 h-5 animate-spin text-white" weight="bold" />
+                  </div>
+                )}
+                <span className={isLoading ? "opacity-0" : "opacity-100"}>
+                  Send reset link
+                </span>
+              </button>
             </form>
           )}
         </div>
 
-        <p className="text-center text-sm text-gray-400">
+        <p className="text-center text-sm text-white/40">
           Remember your password?{" "}
-          <Link to="/" className="text-gray-200 underline">
+          <Link to="/" className="text-purple-400 hover:text-purple-300 font-medium hover:underline transition-all duration-200">
             Sign in
           </Link>
         </p>
