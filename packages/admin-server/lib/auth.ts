@@ -11,7 +11,8 @@ export function initAuth() {
     const { getMongoClient } = require("../config/db");
 
     // Get the database instance from the client
-    const db = getMongoClient().db("nowgai");
+    const dbName = process.env.MONGODB_DB_NAME || "nowgai";
+    const db = getMongoClient().db(dbName);
 
     // Debug: Log OAuth configuration
     console.log("🔑 OAuth Configuration:");

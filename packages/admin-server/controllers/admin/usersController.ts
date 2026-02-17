@@ -11,6 +11,9 @@ import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
 import { getUserOrganizations } from "../../lib/organizationRoles";
 import { getUserProjects } from "../../lib/projectRoles";
+import { sendVerificationEmail } from "../../lib/email";
+import { getMongoClient } from "../../config/db";
+import crypto from "crypto";
 
 export async function getUsers(req: Request, res: Response) {
   try {
@@ -150,6 +153,7 @@ export async function getUsers(req: Request, res: Response) {
         lastName: user.name?.split(" ").slice(1).join(" ") || "",
         role: user.role || "customer",
         isActive: !user.banned,
+        emailVerified: user.emailVerified || false,
         balance: profile?.balance ? parseFloat(profile.balance.toFixed(2)) : 0,
         tokenBalance: profile?.totalTokens || 0,
         createdAt: user.createdAt,
@@ -243,6 +247,194 @@ export async function updateUserRole(req: Request, res: Response) {
     console.error("Error in admin users action:", error);
     return res.status(500).json({
       error: "Internal server error",
+      details: error.message || String(error),
+    });
+  }
+}
+
+/**
+ * Send verification email to a specific user
+ */
+export async function sendVerificationEmailToUser(req: Request, res: Response) {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const usersCollection = getUsersCollection();
+    let objectId: ObjectId;
+    try {
+      objectId = new ObjectId(userId);
+    } catch (err) {
+      return res.status(400).json({ error: "Invalid user ID format" });
+    }
+
+    const user = await usersCollection.findOne({ _id: objectId });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if email is already verified
+    if (user.emailVerified) {
+      return res.status(400).json({
+        error: "User email is already verified",
+        alreadyVerified: true,
+      });
+    }
+
+    // Generate verification token using Better Auth format
+    const baseURL = process.env.BETTER_AUTH_URL || process.env.BASE_URL || "http://localhost:5173";
+    const basePath = "/api/auth";
+
+    // Generate a verification token (Better Auth uses base64url encoded tokens)
+    const tokenBytes = crypto.randomBytes(32);
+    // Convert base64 to base64url (replace + with -, / with _, remove padding)
+    const token = tokenBytes
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, "");
+    const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
+
+    // Store verification token in Better Auth's verification table
+    const mongoClient = getMongoClient();
+    const dbName = process.env.MONGODB_DB_NAME || "nowgai";
+    const db = mongoClient.db(dbName);
+    const verificationCollection = db.collection("verification");
+
+    // Delete any existing verification tokens for this user
+    await verificationCollection.deleteMany({ userId: user._id.toString() });
+
+    // Insert new verification token (Better Auth format)
+    await verificationCollection.insertOne({
+      userId: user._id.toString(),
+      token,
+      expiresAt,
+      createdAt: new Date(),
+    });
+
+    // Create verification URL (Better Auth format)
+    const verificationUrl = `${baseURL}${basePath}/verify-email?token=${token}`;
+
+    // Send verification email
+    await sendVerificationEmail({
+      to: user.email,
+      subject: "Verify your email address - Nowgai",
+      verificationUrl,
+      userName: user.name || user.email,
+    });
+
+    return res.json({
+      success: true,
+      message: "Verification email sent successfully",
+    });
+  } catch (error: any) {
+    console.error("Error sending verification email:", error);
+    return res.status(500).json({
+      error: "Failed to send verification email",
+      details: error.message || String(error),
+    });
+  }
+}
+
+/**
+ * Send verification emails to all unverified users
+ */
+export async function sendVerificationEmailsToAllUnverified(
+  req: Request,
+  res: Response
+) {
+  try {
+    const usersCollection = getUsersCollection();
+
+    // Find all unverified users
+    const unverifiedUsers = await usersCollection
+      .find({
+        emailVerified: { $ne: true },
+        email: { $exists: true, $ne: null },
+      })
+      .toArray();
+
+    if (unverifiedUsers.length === 0) {
+      return res.json({
+        success: true,
+        message: "No unverified users found",
+        sent: 0,
+        failed: 0,
+      });
+    }
+
+    const baseURL = process.env.BETTER_AUTH_URL || process.env.BASE_URL || "http://localhost:5173";
+    const basePath = "/api/auth";
+    const mongoClient = getMongoClient();
+    const dbName = process.env.MONGODB_DB_NAME || "nowgai";
+    const db = mongoClient.db(dbName);
+    const verificationCollection = db.collection("verification");
+
+    let sent = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    // Send emails to all unverified users
+    for (const user of unverifiedUsers) {
+      try {
+        // Generate verification token (Better Auth format)
+        const tokenBytes = crypto.randomBytes(32);
+        // Convert base64 to base64url (replace + with -, / with _, remove padding)
+        const token = tokenBytes
+          .toString("base64")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=/g, "");
+        const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
+
+        // Delete any existing verification tokens for this user
+        await verificationCollection.deleteMany({
+          userId: user._id.toString(),
+        });
+
+        // Insert new verification token (Better Auth format)
+        await verificationCollection.insertOne({
+          userId: user._id.toString(),
+          token,
+          expiresAt,
+          createdAt: new Date(),
+        });
+
+        // Create verification URL (Better Auth format)
+        const verificationUrl = `${baseURL}${basePath}/verify-email?token=${token}`;
+
+        // Send verification email
+        await sendVerificationEmail({
+          to: user.email,
+          subject: "Verify your email address - Nowgai",
+          verificationUrl,
+          userName: user.name || user.email,
+        });
+
+        sent++;
+      } catch (error: any) {
+        failed++;
+        errors.push(`${user.email}: ${error.message || String(error)}`);
+        console.error(`Failed to send verification email to ${user.email}:`, error);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Verification emails sent to ${sent} users${failed > 0 ? `, ${failed} failed` : ""}`,
+      sent,
+      failed,
+      total: unverifiedUsers.length,
+      ...(errors.length > 0 && { errors }),
+    });
+  } catch (error: any) {
+    console.error("Error sending verification emails:", error);
+    return res.status(500).json({
+      error: "Failed to send verification emails",
       details: error.message || String(error),
     });
   }

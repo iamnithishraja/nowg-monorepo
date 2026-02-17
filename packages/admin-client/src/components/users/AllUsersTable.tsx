@@ -14,6 +14,7 @@ import { getRoleBadgeVariant, UserRole } from "@nowgai/shared/types";
 import {
     BarChart3,
     Eye,
+    Mail,
     Search,
     Shield,
     ShieldOff,
@@ -35,6 +36,10 @@ interface AllUsersTableProps {
   onViewDetail: (user: UserType) => void;
   onToggleRole: (user: UserType) => void;
   onInviteAdmin: () => void;
+  onSendVerificationEmail?: (userId: string) => void;
+  onSendVerificationEmailsToAll?: () => void;
+  isSendingVerificationEmail?: boolean;
+  isSendingVerificationEmailsToAll?: boolean;
 }
 
 export function AllUsersTable({
@@ -48,10 +53,16 @@ export function AllUsersTable({
   onViewDetail,
   onToggleRole,
   onInviteAdmin,
+  onSendVerificationEmail,
+  onSendVerificationEmailsToAll,
+  isSendingVerificationEmail = false,
+  isSendingVerificationEmailsToAll = false,
 }: AllUsersTableProps) {
   const [, setLocation] = useLocation();
   const users = data?.users || [];
   const pagination = data?.pagination;
+  
+  const unverifiedCount = users.filter((u) => !u.emailVerified).length;
 
   return (
     <Card className="shadow-sm">
@@ -71,6 +82,20 @@ export function AllUsersTable({
                 className="pl-9 w-64"
               />
             </div>
+            {onSendVerificationEmailsToAll && unverifiedCount > 0 && (
+              <Button
+                onClick={onSendVerificationEmailsToAll}
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-2"
+                disabled={isSendingVerificationEmailsToAll}
+              >
+                <Mail className="h-4 w-4" />
+                {isSendingVerificationEmailsToAll
+                  ? "Sending..."
+                  : `Send Verification Emails (${unverifiedCount})`}
+              </Button>
+            )}
             <Button
               onClick={onInviteAdmin}
               size="sm"
@@ -138,6 +163,17 @@ export function AllUsersTable({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {!user.emailVerified && onSendVerificationEmail && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onSendVerificationEmail(user.id)}
+                            title="Send verification email"
+                            disabled={isSendingVerificationEmail}
+                          >
+                            <Mail className="h-4 w-4 text-blue-500" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"

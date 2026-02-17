@@ -1199,3 +1199,153 @@ function createProjectMemberInvitationEmailTemplate({
     </html>
   `;
 }
+
+interface SendVerificationEmailProps {
+  to: string;
+  subject: string;
+  verificationUrl: string;
+  userName: string;
+}
+
+export async function sendVerificationEmail({
+  to,
+  subject,
+  verificationUrl,
+  userName,
+}: SendVerificationEmailProps) {
+  const resendClient = await getResendClient();
+  const fromEmail = await getResendFrom();
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject,
+      html: createVerificationEmailTemplate({ verificationUrl, userName }),
+    };
+
+    const result = await resendClient.emails.send(emailData);
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending verification email:", error);
+    throw new Error(
+      `Failed to send verification email: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+function createVerificationEmailTemplate({
+  verificationUrl,
+  userName,
+}: {
+  verificationUrl: string;
+  userName: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Verify Your Email - Nowgai</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #f8f9fa;
+        }
+        .container {
+          background: white;
+          border-radius: 12px;
+          padding: 40px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .logo {
+          font-size: 28px;
+          font-weight: bold;
+          color: #000;
+          margin-bottom: 10px;
+        }
+        .title {
+          font-size: 24px;
+          font-weight: 600;
+          color: #1a1a1a;
+          margin-bottom: 20px;
+        }
+        .message {
+          font-size: 16px;
+          color: #666;
+          margin-bottom: 30px;
+          line-height: 1.6;
+        }
+        .button {
+          display: inline-block;
+          background-color: #000;
+          color: white;
+          text-decoration: none;
+          padding: 14px 32px;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 16px;
+          margin: 20px 0;
+          transition: background-color 0.2s;
+        }
+        .button:hover {
+          background-color: #333;
+        }
+        .footer {
+          margin-top: 40px;
+          padding-top: 20px;
+          border-top: 1px solid #eee;
+          font-size: 14px;
+          color: #888;
+        }
+        .link {
+          word-break: break-all;
+          color: #666;
+          font-size: 14px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai</div>
+        </div>
+        
+        <h1 class="title">Verify your email address</h1>
+        
+        <div class="message">
+          <p>Hi ${userName},</p>
+          <p>Thanks for signing up for Nowgai! To complete your registration and start building fullstack web apps, please verify your email address by clicking the button below.</p>
+        </div>
+        
+        <div style="text-align: center;">
+          <a href="${verificationUrl}" class="button">Verify Email Address</a>
+        </div>
+        
+        <div class="message">
+          <p>If the button doesn't work, you can also copy and paste this link into your browser:</p>
+          <p class="link">${verificationUrl}</p>
+        </div>
+        
+        <div class="footer">
+          <p>This verification link will expire in 1 hour for security reasons.</p>
+          <p>If you didn't create an account with Nowgai, you can safely ignore this email.</p>
+          <p>Best regards,<br>The Nowgai Team</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}

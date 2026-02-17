@@ -251,3 +251,69 @@ export function useAddToProject(projectId: string | undefined) {
     },
   });
 }
+
+export function useSendVerificationEmail() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      return client.post<{ message?: string; alreadyVerified?: boolean }>(
+        "/api/admin/users/send-verification-email",
+        { userId }
+      );
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "Success",
+        description: data?.message || "Verification email sent successfully",
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.error || error.message || "Failed to send verification email";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useSendVerificationEmailsToAll() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async () => {
+      return client.post<{
+        message?: string;
+        sent?: number;
+        failed?: number;
+        total?: number;
+      }>("/api/admin/users/send-verification-emails-all");
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "Success",
+        description:
+          data?.message ||
+          `Verification emails sent to ${data?.sent || 0} users`,
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.error ||
+        error.message ||
+        "Failed to send verification emails";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+}

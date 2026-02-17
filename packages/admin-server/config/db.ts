@@ -56,6 +56,11 @@ async function fixOrgUserInvitationIndex() {
   }
 }
 
+// Get database name from environment variable with fallback
+function getDatabaseName(): string {
+  return process.env.MONGODB_DB_NAME || "nowgai";
+}
+
 export async function connectToDatabase() {
   if (mongooseConnected) {
     return;
@@ -66,10 +71,12 @@ export async function connectToDatabase() {
     throw new Error("MONGODB_URI or DB_URL environment variable is not set");
   }
 
+  const dbName = getDatabaseName();
+
   try {
     // Connect Mongoose for models
     await mongoose.connect(uri, {
-      dbName: "nowgai",
+      dbName,
     });
 
     mongooseConnected = true;
@@ -103,6 +110,6 @@ export function getMongoClient(): MongoClient {
 
 export function getUsersCollection() {
   const client = getMongoClient();
-  const db = client.db("nowgai");
+  const db = client.db(getDatabaseName());
   return db.collection("user");
 }

@@ -29,6 +29,8 @@ import {
     useUpdateRole,
     useUserDetail,
     useUsers,
+    useSendVerificationEmail,
+    useSendVerificationEmailsToAll,
 } from "@/components/users/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -121,6 +123,8 @@ export default function Users() {
   const searchUserMutation = useSearchUser();
   const inviteOrgUserMutation = useInviteOrgUser();
   const addToProjectMutation = useAddToProject(userProjectId);
+  const sendVerificationEmailMutation = useSendVerificationEmail();
+  const sendVerificationEmailsToAllMutation = useSendVerificationEmailsToAll();
 
   // Fetch user detail
   const { data: userDetail, isLoading: isLoadingDetail } = useUserDetail(
@@ -291,6 +295,14 @@ export default function Users() {
                 onViewDetail={handleViewDetail}
                 onToggleRole={handleToggleRole}
                 onInviteAdmin={() => setInviteDialogOpen(true)}
+                onSendVerificationEmail={(userId) => {
+                  sendVerificationEmailMutation.mutate(userId);
+                }}
+                onSendVerificationEmailsToAll={() => {
+                  sendVerificationEmailsToAllMutation.mutate();
+                }}
+                isSendingVerificationEmail={sendVerificationEmailMutation.isPending}
+                isSendingVerificationEmailsToAll={sendVerificationEmailsToAllMutation.isPending}
               />
             </TabsContent>
           )}
