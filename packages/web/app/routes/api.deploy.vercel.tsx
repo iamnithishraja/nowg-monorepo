@@ -11,11 +11,55 @@ interface DeployFile {
 
 const versionService = new VersionSnapshotService();
 
+// Helper to disable password protection and Vercel Authentication (SSO Protection) on a Vercel project
+async function disableDeploymentProtection(
+  projectId: string,
+  token: string,
+  teamId?: string,
+): Promise<void> {
+  try {
+    const updateUrl = new URL(
+      `https://api.vercel.com/v9/projects/${projectId}`,
+    );
+    if (teamId) updateUrl.searchParams.set("teamId", teamId);
+
+    const updateRes = await fetch(updateUrl, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        passwordProtection: null, // Disable password protection
+        ssoProtection: null, // Disable Vercel Authentication (SSO Protection)
+        // This makes preview deployments publicly accessible without requiring Vercel account login
+      }),
+    });
+
+    if (!updateRes.ok) {
+      const errorText = await updateRes.text();
+      console.warn(
+        `Failed to disable deployment protection for project ${projectId}:`,
+        errorText,
+      );
+      // Don't throw - this is not critical for deployment
+    } else {
+      console.log(`✅ Disabled deployment protection (password + Vercel Auth) for project ${projectId}`);
+    }
+  } catch (error) {
+    console.warn(
+      `Error disabling deployment protection for project ${projectId}:`,
+      error,
+    );
+    // Don't throw - this is not critical for deployment
+  }
+}
+
 // Helper to get or create Vercel project
 async function getOrCreateVercelProject(
   projectName: string,
   token: string,
-  teamId?: string
+  teamId?: string,
 ): Promise<string | null> {
   try {
     // Try to get existing project
@@ -28,7 +72,10 @@ async function getOrCreateVercelProject(
 
     if (getRes.ok) {
       const project = await getRes.json();
-      return project.id;
+      const projectId = project.id;
+      // Disable deployment protection (password + Vercel Auth) on existing project
+      await disableDeploymentProtection(projectId, token, teamId);
+      return projectId;
     }
 
     // Project doesn't exist, create it
@@ -52,7 +99,10 @@ async function getOrCreateVercelProject(
 
     if (createRes.ok) {
       const project = await createRes.json();
-      return project.id;
+      const projectId = project.id;
+      // Disable deployment protection (password + Vercel Auth) on newly created project
+      await disableDeploymentProtection(projectId, token, teamId);
+      return projectId;
     }
 
     return null;
@@ -101,7 +151,7 @@ export async function action({ request }: ActionFunctionArgs) {
             const isAlreadyDeployed = await deploymentService.isVersionDeployed(
               conversationId,
               versionId,
-              "vercel"
+              "vercel",
             );
             if (isAlreadyDeployed) {
               send({
@@ -158,15 +208,14 @@ export async function action({ request }: ActionFunctionArgs) {
         }
 
         // NEW: Check if we have an existing deployment for this conversation
-        const existingDeployments = await deploymentService.getDeployments(
-          conversationId
-        );
+        const existingDeployments =
+          await deploymentService.getDeployments(conversationId);
         const latestDeployment = existingDeployments
           .filter((d: any) => d.platform === "vercel")
           .sort(
             (a: any, b: any) =>
               new Date(b.deployedAt).getTime() -
-              new Date(a.deployedAt).getTime()
+              new Date(a.deployedAt).getTime(),
           )[0];
 
         send({
@@ -181,7 +230,7 @@ export async function action({ request }: ActionFunctionArgs) {
           vercelProjectId = await getOrCreateVercelProject(
             projectName,
             token,
-            teamId
+            teamId,
           );
           if (!vercelProjectId) {
             send({
@@ -191,6 +240,9 @@ export async function action({ request }: ActionFunctionArgs) {
             controller.close();
             return;
           }
+        } else {
+          // Ensure deployment protection is disabled on existing project
+          await disableDeploymentProtection(vercelProjectId, token, teamId);
         }
 
         const vercelFiles = files.map((f) => ({
@@ -238,7 +290,9 @@ export async function action({ request }: ActionFunctionArgs) {
         const deploymentId = created.id as string;
         const productionUrl = `https://${projectName}.vercel.app`;
         // Vercel provides a unique URL for each deployment (e.g., projectname-abc123.vercel.app)
-        const uniqueDeploymentUrl = created.url ? `https://${created.url}` : null;
+        const uniqueDeploymentUrl = created.url
+          ? `https://${created.url}`
+          : null;
 
         // Store deployment record in database
         let dbDeploymentId: string | null = null;
@@ -268,7 +322,7 @@ export async function action({ request }: ActionFunctionArgs) {
                   installCommand: "npm install",
                   outputDirectory: "dist",
                 },
-              }
+              },
             );
           } catch (error) {
             console.error("Failed to store deployment record:", error);
@@ -342,8 +396,8 @@ export async function action({ request }: ActionFunctionArgs) {
                 // Format: projectname-hash-teamname.vercel.app or similar
                 let uniqueUrl: string | null = null;
                 if (statusJson.url) {
-                  uniqueUrl = statusJson.url.startsWith("http") 
-                    ? statusJson.url 
+                  uniqueUrl = statusJson.url.startsWith("http")
+                    ? statusJson.url
                     : `https://${statusJson.url}`;
                 }
                 // Log for debugging
@@ -363,7 +417,7 @@ export async function action({ request }: ActionFunctionArgs) {
                     deploymentUrl: urlWithProtocol,
                     uniqueDeploymentUrl: uniqueUrl || undefined,
                     vercelProjectId: vercelProjectId,
-                  }
+                  },
                 );
               } catch (error) {
                 console.error("Failed to update deployment status:", error);
@@ -378,7 +432,7 @@ export async function action({ request }: ActionFunctionArgs) {
               try {
                 await deploymentService.updateDeploymentStatus(
                   dbDeploymentId,
-                  "failed"
+                  "failed",
                 );
               } catch (error) {
                 console.error("Failed to update deployment status:", error);
@@ -412,7 +466,7 @@ export async function action({ request }: ActionFunctionArgs) {
             try {
               await deploymentService.updateDeploymentStatus(
                 dbDeploymentId,
-                "failed"
+                "failed",
               );
             } catch (error) {
               console.error("Failed to update deployment status:", error);
