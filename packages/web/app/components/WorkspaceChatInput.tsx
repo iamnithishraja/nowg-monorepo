@@ -46,6 +46,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "./ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 interface WorkspaceChatInputProps {
   input: string;
@@ -97,6 +105,7 @@ export function WorkspaceChatInput({
   const isDisabled = isLoading || isProcessingTemplate || isStreaming;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const shortcutLabel = getShortcutLabel();
 
   // Workspace state for switching tabs and edit mode
@@ -175,10 +184,24 @@ export function WorkspaceChatInput({
   // Handle Escape key to interrupt
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape" && (isLoading || isStreaming) && onInterrupt) {
-      onInterrupt();
+      setShowStopConfirmation(true);
       return;
     }
     onKeyDown(e);
+  };
+
+  // Handle stop confirmation
+  const handleStopClick = () => {
+    if (onInterrupt) {
+      setShowStopConfirmation(true);
+    }
+  };
+
+  const handleConfirmStop = () => {
+    setShowStopConfirmation(false);
+    if (onInterrupt) {
+      onInterrupt();
+    }
   };
 
   const handleSend = () => {
@@ -844,7 +867,7 @@ export function WorkspaceChatInput({
               {/* Stop button */}
               {(isLoading || isStreaming) && onInterrupt && (
                 <Button
-                  onClick={onInterrupt}
+                  onClick={handleStopClick}
                   size="sm"
                   className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full"
                   title="Stop generation"
@@ -859,6 +882,32 @@ export function WorkspaceChatInput({
       <div className="mt-1.5 px-1 text-[10px] text-tertiary text-right">
         Ctrl+Enter to Run • Esc to Stop
       </div>
+
+      {/* Stop Confirmation Dialog */}
+      <Dialog open={showStopConfirmation} onOpenChange={setShowStopConfirmation}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Stop Generation?</DialogTitle>
+            <DialogDescription className="pt-2">
+              Credits will be deducted based on tokens processed so far. Are you sure you want to stop?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowStopConfirmation(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmStop}
+            >
+              Stop
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
