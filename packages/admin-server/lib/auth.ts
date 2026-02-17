@@ -16,10 +16,22 @@ export function initAuth() {
 
     // Debug: Log OAuth configuration
     console.log("🔑 OAuth Configuration:");
-    console.log("  Google Client ID:", process.env.GOOGLE_CLIENT_ID ? "✅ Set" : "❌ Not set");
-    console.log("  Google Client Secret:", process.env.GOOGLE_CLIENT_SECRET ? "✅ Set" : "❌ Not set");
-    console.log("  GitHub Client ID:", process.env.GITHUB_CLIENT_ID ? "✅ Set" : "❌ Not set");
-    console.log("  GitHub Client Secret:", process.env.GITHUB_CLIENT_SECRET ? "✅ Set" : "❌ Not set");
+    console.log(
+      "  Google Client ID:",
+      process.env.GOOGLE_CLIENT_ID ? "✅ Set" : "❌ Not set",
+    );
+    console.log(
+      "  Google Client Secret:",
+      process.env.GOOGLE_CLIENT_SECRET ? "✅ Set" : "❌ Not set",
+    );
+    console.log(
+      "  GitHub Client ID:",
+      process.env.GITHUB_CLIENT_ID ? "✅ Set" : "❌ Not set",
+    );
+    console.log(
+      "  GitHub Client Secret:",
+      process.env.GITHUB_CLIENT_SECRET ? "✅ Set" : "❌ Not set",
+    );
 
     authInstance = betterAuth({
       database: mongodbAdapter(db),
@@ -51,7 +63,7 @@ export function initAuth() {
               google: {
                 clientId: process.env.GOOGLE_CLIENT_ID,
                 clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-redirectURI: `${process.env.BASE_URL || "http://localhost:3000"}/api/auth/callback/google`,
+                redirectURI: `${process.env.BASE_URL || "http://localhost:3000"}/api/auth/callback/google`,
               },
             }
           : {}),
@@ -60,7 +72,7 @@ redirectURI: `${process.env.BASE_URL || "http://localhost:3000"}/api/auth/callba
               github: {
                 clientId: process.env.GITHUB_CLIENT_ID,
                 clientSecret: process.env.GITHUB_CLIENT_SECRET,
-redirectURI: `${process.env.BASE_URL || "http://localhost:3000"}/api/auth/callback/github`,
+                redirectURI: `${process.env.BASE_URL || "http://localhost:3000"}/api/auth/callback/github`,
               },
             }
           : {}),
@@ -106,4 +118,7 @@ export const auth = {
   },
 };
 
-export type Session = ReturnType<typeof getAuth> extends { $Infer: { Session: infer S } } ? S : never;
+export type Session =
+  ReturnType<typeof getAuth> extends { $Infer: { Session: infer S } }
+    ? S
+    : never;

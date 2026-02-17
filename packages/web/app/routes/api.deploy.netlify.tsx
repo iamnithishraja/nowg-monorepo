@@ -237,6 +237,17 @@ export async function action({ request }: ActionFunctionArgs) {
                 branch: "main",
                 netlifySiteId: netlifySiteId,
                 versionId: versionId,
+                snapshotData: {
+                  files: files.map((f) => ({
+                    path: f.path,
+                    content: f.content,
+                  })),
+                  projectName: siteName,
+                  framework: "vite",
+                  buildCommand: "npm run build",
+                  installCommand: "npm install",
+                  outputDirectory: "dist",
+                },
               }
             );
           } catch (error) {

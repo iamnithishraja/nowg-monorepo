@@ -16,6 +16,9 @@ import {
   AlertTriangle,
   RefreshCw,
   ArrowLeft,
+  Archive,
+  RotateCcw,
+  Zap,
 } from "lucide-react";
 import { Link } from "react-router";
 import {
@@ -46,9 +49,11 @@ import {
 
 export default function Deployments() {
   const [deployments, setDeployments] = useState<any[]>([]);
+  const [archivedDeployments, setArchivedDeployments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
+  const [showArchived, setShowArchived] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deploymentToDelete, setDeploymentToDelete] = useState<{
     id: string;
@@ -58,6 +63,8 @@ export default function Deployments() {
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDeployments();
@@ -71,6 +78,7 @@ export default function Deployments() {
         setLoading(true);
       }
 
+      // Fetch active deployments
       const res = await fetch("/api/deployments", {
         headers: {
           Accept: "application/json",
@@ -84,7 +92,27 @@ export default function Deployments() {
       if (!data.success) {
         throw new Error(data.error || "Failed to fetch deployments");
       }
-      setDeployments(data.deployments || []);
+      const activeDeployments = data.deployments || [];
+      setDeployments(activeDeployments);
+      
+      // Extract conversationId from first deployment if available (for restore functionality)
+      if (activeDeployments.length > 0 && activeDeployments[0].conversationId) {
+        setConversationId(activeDeployments[0].conversationId);
+      }
+
+      // Fetch all archived deployments for the user
+      const archivedRes = await fetch("/api/deployments?archived=true", {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+      if (archivedRes.ok) {
+        const archivedData = await archivedRes.json();
+        if (archivedData.success) {
+          setArchivedDeployments(archivedData.deployments || []);
+        }
+      }
     } catch (err: any) {
       console.error("Error fetching deployments:", err);
       setError(err.message);
@@ -200,6 +228,45 @@ export default function Deployments() {
       title: deployment.conversationTitle || "Untitled Project",
     });
     setDeleteDialogOpen(true);
+  };
+
+  const handleRestoreDeployment = async (deployment: any) => {
+    if (!deployment.conversationId) {
+      setError("Conversation ID not found for this deployment");
+      return;
+    }
+
+    setIsRestoring(deployment.id);
+    try {
+      const res = await fetch("/api/deployments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          restore: true,
+          deploymentId: deployment.id,
+          conversationId: deployment.conversationId,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Failed to restore deployment");
+      }
+
+      // Refresh deployments to reflect the change
+      await fetchDeployments(true);
+    } catch (err: any) {
+      console.error("Error restoring deployment:", err);
+      setError(err.message);
+    } finally {
+      setIsRestoring(null);
+    }
   };
 
   const filteredDeployments =
@@ -404,20 +471,214 @@ export default function Deployments() {
 
             {/* Filter Tabs */}
             <Tabs
-              value={filter}
-              onValueChange={(v) => setFilter(v)}
+              value={showArchived ? "archived" : filter}
+              onValueChange={(v) => {
+                if (v === "archived") {
+                  setShowArchived(true);
+                } else {
+                  setShowArchived(false);
+                  setFilter(v);
+                }
+              }}
               className="mb-6"
             >
               <TabsList className="bg-surface-2/50 border border-subtle">
-                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="all">Active</TabsTrigger>
                 <TabsTrigger value="success">Successful</TabsTrigger>
                 <TabsTrigger value="failed">Failed</TabsTrigger>
                 <TabsTrigger value="pending">Pending</TabsTrigger>
+                <TabsTrigger value="archived">
+                  <Archive className="w-4 h-4 mr-2" />
+                  Archived ({archivedDeployments.length})
+                </TabsTrigger>
               </TabsList>
             </Tabs>
 
             {/* Deployments Grid */}
-            {filteredDeployments.length === 0 ? (
+            {showArchived ? (
+              archivedDeployments.length === 0 ? (
+                <Card className="bg-surface-1 border border-subtle rounded-[12px]">
+                  <CardContent className="p-12 text-center">
+                    <div className="bg-surface-2 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Archive className="w-10 h-10 text-tertiary" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-primary mb-2">
+                      No Archived Deployments
+                    </h3>
+                    <p className="text-tertiary">
+                      Archived deployments will appear here when you create new
+                      deployments
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {archivedDeployments.map((d) => (
+                    <Card
+                      key={d.id}
+                      className="bg-surface-1 border border-subtle rounded-[12px] hover:border-[var(--accent-primary)]/30 transition-all duration-300 h-full opacity-75"
+                    >
+                      <CardHeader className="pb-4">
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <CardTitle className="text-xl font-bold text-primary mb-3 line-clamp-2">
+                              {d.conversationTitle || "Untitled Project"}
+                            </CardTitle>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${getPlatformColor(
+                                  d.platform
+                                )}`}
+                              >
+                                <Globe className="w-3 h-3" />
+                                {d.platform}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-surface-2 text-tertiary border-subtle">
+                                <Archive className="w-3 h-3" />
+                                Archived
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(d.status)}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  className="p-1.5 rounded-lg hover:bg-surface-3/50 transition-colors duration-200"
+                                  title="More options"
+                                >
+                                  <MoreHorizontal className="w-4 h-4 text-tertiary" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleRestoreDeployment(d)}
+                                  disabled={isRestoring === d.id}
+                                >
+                                  {isRestoring === d.id ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      Restoring...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RotateCcw className="w-4 h-4 mr-2" />
+                                      Restore & Make Live
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => openDeleteDialog(d)}
+                                  variant="destructive"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete Deployment
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border ${getStatusBadge(
+                            d.status
+                          )}`}
+                        >
+                          {d.status.charAt(0).toUpperCase() + d.status.slice(1)}
+                        </div>
+                      </CardHeader>
+
+                      <CardContent>
+                        {/* Details */}
+                        <div className="space-y-3 mb-4">
+                          <div className="flex items-center gap-2 text-sm text-tertiary">
+                            <Calendar className="w-4 h-4" />
+                            <span className="font-medium">Archived:</span>
+                            <span className="text-secondary">
+                              {d.archivedAt
+                                ? new Date(d.archivedAt).toLocaleDateString(
+                                    "en-US",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    }
+                                  )
+                                : "N/A"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-sm text-tertiary">
+                            <Calendar className="w-4 h-4" />
+                            <span className="font-medium">Deployed:</span>
+                            <span className="text-secondary">
+                              {d.deployedAt
+                                ? new Date(d.deployedAt).toLocaleDateString(
+                                    "en-US",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    }
+                                  )
+                                : "N/A"}
+                            </span>
+                          </div>
+
+                          {d.deploymentId && (
+                            <div className="flex items-center gap-2 text-sm text-tertiary">
+                              <Package className="w-4 h-4" />
+                              <span className="font-medium">ID:</span>
+                              <code className="bg-surface-2 px-2 py-0.5 rounded text-xs text-secondary border border-subtle">
+                                {d.deploymentId.substring(0, 12)}...
+                              </code>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Button */}
+                        {d.deploymentUrl && d.status === "success" && (
+                          <div className="space-y-2">
+                            <a
+                              href={d.deploymentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-center gap-2 w-full bg-surface-2 hover:bg-surface-3 text-secondary px-4 py-3 rounded-xl font-semibold transition-all border border-subtle"
+                            >
+                              View Archived Deployment
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                            <button
+                              onClick={() => handleRestoreDeployment(d)}
+                              disabled={isRestoring === d.id}
+                              className="flex items-center justify-center gap-2 w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white px-4 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isRestoring === d.id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Restoring...
+                                </>
+                              ) : (
+                                <>
+                                  <RotateCcw className="w-4 h-4" />
+                                  Restore & Make Live
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )
+            ) : filteredDeployments.length === 0 ? (
               <Card className="bg-surface-1 border border-subtle rounded-[12px]">
                 <CardContent className="p-12 text-center">
                   <div className="bg-surface-2 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -447,14 +708,22 @@ export default function Deployments() {
                           <CardTitle className="text-xl font-bold text-primary mb-3 line-clamp-2">
                             {d.conversationTitle || "Untitled Project"}
                           </CardTitle>
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${getPlatformColor(
-                              d.platform
-                            )}`}
-                          >
-                            <Globe className="w-3 h-3" />
-                            {d.platform}
-                          </span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${getPlatformColor(
+                                d.platform
+                              )}`}
+                            >
+                              <Globe className="w-3 h-3" />
+                              {d.platform}
+                            </span>
+                            {d.isLive && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-[var(--success-500)]/10 text-success-500 border-[var(--success-500)]/20">
+                                <Zap className="w-3 h-3" />
+                                Live
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusIcon(d.status)}

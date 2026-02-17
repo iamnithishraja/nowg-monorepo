@@ -9,6 +9,42 @@ export class DeploymentService {
     await connectToDatabase();
   }
 
+  // Archive existing live deployment before creating a new one
+  async archiveLiveDeployment(
+    conversationId: string,
+    snapshotData?: {
+      files?: Array<{ path: string; content: string }>;
+      projectName?: string;
+      framework?: string;
+      buildCommand?: string;
+      installCommand?: string;
+      outputDirectory?: string;
+    }
+  ): Promise<void> {
+    try {
+      await this.ensureConnection();
+      // Find and archive the current live deployment for this conversation
+      const liveDeployment = await Deployment.findOne({
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+        isLive: true,
+        status: "success",
+      });
+
+      if (liveDeployment) {
+        liveDeployment.isLive = false;
+        liveDeployment.isArchived = true;
+        liveDeployment.archivedAt = new Date();
+        if (snapshotData) {
+          liveDeployment.snapshotData = snapshotData as any;
+        }
+        await liveDeployment.save();
+      }
+    } catch (error) {
+      console.error("Error archiving live deployment:", error);
+      // Don't throw - we don't want to fail deployment creation if archiving fails
+    }
+  }
+
   // Create a new deployment record
   async createDeployment(
     conversationId: string,
@@ -25,10 +61,22 @@ export class DeploymentService {
       vercelProjectId?: string; // NEW: Added vercelProjectId
       netlifySiteId?: string; // NEW: Added netlifySiteId
       versionId?: string; // NEW: Added versionId
+      snapshotData?: {
+        files?: Array<{ path: string; content: string }>;
+        projectName?: string;
+        framework?: string;
+        buildCommand?: string;
+        installCommand?: string;
+        outputDirectory?: string;
+      };
     }
   ): Promise<string> {
     try {
       await this.ensureConnection();
+      
+      // Archive existing live deployment before creating new one
+      await this.archiveLiveDeployment(conversationId, metadata?.snapshotData);
+
       const deployment = new Deployment({
         conversationId,
         userId,
@@ -38,6 +86,9 @@ export class DeploymentService {
         vercelProjectId: metadata?.vercelProjectId, // NEW: Store Vercel project ID
         versionId: metadata?.versionId, // NEW: Store version ID
         status: "pending",
+        isLive: false, // Will be set to true when status becomes "success"
+        isArchived: false,
+        snapshotData: metadata?.snapshotData || {},
         metadata: metadata || {},
       });
       const result = await deployment.save();
@@ -92,7 +143,21 @@ export class DeploymentService {
         updateData.vercelProjectId = metadata.vercelProjectId;
       }
 
-      const deployment = await Deployment.findByIdAndUpdate(deploymentId, {
+      const deployment = await Deployment.findById(deploymentId);
+      
+      if (!deployment) {
+        throw new Error("Deployment not found");
+      }
+
+      // If deployment is successful, make it live and archive previous live deployment
+      if (status === "success" && deployment.status !== "success") {
+        // Archive existing live deployment for this conversation
+        await this.archiveLiveDeployment(deployment.conversationId.toString());
+        // Mark this deployment as live
+        updateData.isLive = true;
+      }
+
+      await Deployment.findByIdAndUpdate(deploymentId, {
         $set: updateData,
       });
 
@@ -125,6 +190,93 @@ export class DeploymentService {
       return deployments;
     } catch (error) {
       console.error("Error getting deployments:", error);
+      throw error;
+    }
+  }
+
+  // Get archived deployments for a conversation
+  async getArchivedDeployments(conversationId?: string): Promise<any[]> {
+    try {
+      await this.ensureConnection();
+      const query: any = { isArchived: true };
+      if (conversationId) {
+        query.conversationId = new mongoose.Types.ObjectId(conversationId);
+      }
+      const deployments = await Deployment.find(query)
+        .populate("conversationId", "title updatedAt")
+        .sort({ archivedAt: -1 });
+      return deployments;
+    } catch (error) {
+      console.error("Error getting archived deployments:", error);
+      throw error;
+    }
+  }
+
+  // Get archived deployments for a user
+  async getUserArchivedDeployments(userId: string): Promise<any[]> {
+    try {
+      await this.ensureConnection();
+      const deployments = await Deployment.find({
+        userId,
+        isArchived: true,
+      })
+        .populate("conversationId", "title updatedAt")
+        .sort({ archivedAt: -1 });
+      return deployments;
+    } catch (error) {
+      console.error("Error getting user archived deployments:", error);
+      throw error;
+    }
+  }
+
+  // Get live deployment for a conversation
+  async getLiveDeployment(conversationId: string): Promise<any | null> {
+    try {
+      await this.ensureConnection();
+      const deployment = await Deployment.findOne({
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+        isLive: true,
+        status: "success",
+      })
+        .populate("conversationId", "title updatedAt");
+      return deployment;
+    } catch (error) {
+      console.error("Error getting live deployment:", error);
+      throw error;
+    }
+  }
+
+  // Restore an archived deployment (make it live and archive current live one)
+  async restoreDeployment(
+    deploymentId: string,
+    userId: string,
+    conversationId: string
+  ): Promise<void> {
+    try {
+      await this.ensureConnection();
+
+      // Verify deployment belongs to user
+      const deployment = await Deployment.findOne({
+        _id: deploymentId,
+        userId,
+        conversationId: new mongoose.Types.ObjectId(conversationId),
+        isArchived: true,
+      });
+
+      if (!deployment) {
+        throw new Error("Deployment not found or access denied");
+      }
+
+      // Archive current live deployment
+      await this.archiveLiveDeployment(conversationId);
+
+      // Restore the archived deployment
+      deployment.isLive = true;
+      deployment.isArchived = false;
+      deployment.archivedAt = undefined;
+      await deployment.save();
+    } catch (error) {
+      console.error("Error restoring deployment:", error);
       throw error;
     }
   }

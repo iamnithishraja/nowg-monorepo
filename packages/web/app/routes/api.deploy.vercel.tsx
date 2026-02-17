@@ -254,6 +254,17 @@ export async function action({ request }: ActionFunctionArgs) {
                 branch: "main",
                 vercelProjectId: vercelProjectId,
                 versionId: versionId,
+                snapshotData: {
+                  files: files.map((f) => ({
+                    path: f.path,
+                    content: f.content,
+                  })),
+                  projectName: projectName,
+                  framework: framework,
+                  buildCommand: "npm run build",
+                  installCommand: "npm install",
+                  outputDirectory: "dist",
+                },
               }
             );
           } catch (error) {

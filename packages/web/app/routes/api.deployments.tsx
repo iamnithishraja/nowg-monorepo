@@ -19,11 +19,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     const url = new URL(request.url);
     const conversationId = url.searchParams.get("conversationId");
+    const archived = url.searchParams.get("archived") === "true";
     const deploymentService = new DeploymentService();
     const versionService = new VersionSnapshotService();
     let deployments;
 
-    if (conversationId) {
+    if (archived) {
+      if (conversationId) {
+        // Get archived deployments for a specific conversation
+        deployments = await deploymentService.getArchivedDeployments(conversationId);
+      } else {
+        // Get all archived deployments for the user
+        deployments = await deploymentService.getUserArchivedDeployments(session.user.id);
+      }
+    } else if (conversationId) {
       // Get deployments for a specific conversation
       deployments = await deploymentService.getDeployments(conversationId);
     } else {
@@ -82,6 +91,10 @@ export async function loader({ request }: Route.LoaderArgs) {
           deployedAt: deployment.deployedAt,
           versionId: deployedVersionId, // Include versionId
           needsUpdate: needsUpdate, // Include needsUpdate flag determined by backend
+          isLive: deployment.isLive || false,
+          isArchived: deployment.isArchived || false,
+          archivedAt: deployment.archivedAt,
+          snapshotData: deployment.snapshotData || {},
           metadata: deployment.metadata || {},
         };
       })
@@ -127,11 +140,41 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     const body = await request.json();
-    const { deploymentId, deleteAll } = body;
+    const { deploymentId, deleteAll, restore, conversationId } = body;
 
     const deploymentService = new DeploymentService();
 
-    if (deleteAll) {
+    if (restore) {
+      // Restore an archived deployment
+      if (!deploymentId || !conversationId) {
+        return new Response(
+          JSON.stringify({
+            error: "Deployment ID and conversation ID are required",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      await deploymentService.restoreDeployment(
+        deploymentId,
+        session.user.id,
+        conversationId
+      );
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Deployment restored successfully",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    } else if (deleteAll) {
       // Delete all user deployments
       await deploymentService.deleteAllDeployments(session.user.id);
 
@@ -171,14 +214,14 @@ export async function action({ request }: Route.ActionArgs) {
       );
     }
   } catch (error) {
-    console.error("Error deleting deployment(s):", error);
+    console.error("Error processing deployment action:", error);
     return new Response(
       JSON.stringify({
         success: false,
         error:
           error instanceof Error
             ? error.message
-            : "Failed to delete deployment(s)",
+            : "Failed to process deployment action",
       }),
       {
         status: 500,
