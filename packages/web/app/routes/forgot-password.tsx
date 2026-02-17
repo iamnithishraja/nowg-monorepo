@@ -144,7 +144,14 @@ export default function ForgotPassword() {
                   placeholder="you@example.com"
                   className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    // Clear error and warning when user starts typing
+                    if (error || userNotFound) {
+                      setError("");
+                      setUserNotFound(false);
+                    }
+                  }}
                   disabled={isLoading}
                   required
                 />
@@ -190,20 +197,22 @@ export default function ForgotPassword() {
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={!email || isLoading}
-                className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold text-sm hover:from-purple-400 hover:to-purple-500 hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center justify-center gap-2 overflow-hidden"
-              >
-                {isLoading && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/90 to-purple-600/90 flex items-center justify-center">
-                    <SpinnerGap className="w-5 h-5 animate-spin text-white" weight="bold" />
-                  </div>
-                )}
-                <span className={isLoading ? "opacity-0" : "opacity-100"}>
-                  Send reset link
-                </span>
-              </button>
+              {!userNotFound && (
+                <button
+                  type="submit"
+                  disabled={!email || isLoading}
+                  className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold text-sm hover:from-purple-400 hover:to-purple-500 hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center justify-center gap-2 overflow-hidden"
+                >
+                  {isLoading && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/90 to-purple-600/90 flex items-center justify-center">
+                      <SpinnerGap className="w-5 h-5 animate-spin text-white" weight="bold" />
+                    </div>
+                  )}
+                  <span className={isLoading ? "opacity-0" : "opacity-100"}>
+                    Send reset link
+                  </span>
+                </button>
+              )}
             </form>
           )}
         </div>
