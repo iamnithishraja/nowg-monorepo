@@ -21,22 +21,75 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
   const [isMuted, setIsMuted] = React.useState(true);
   const videoRefs = React.useRef<(HTMLVideoElement | null)[]>([]);
   const isPlayingRef = React.useRef(isPlaying);
+  const videoReadyRefs = React.useRef<boolean[]>(videos.map(() => false));
+  const previousCurrentRef = React.useRef<number>(current);
+  const isPlayingVideoRef = React.useRef<number | null>(null);
   isPlayingRef.current = isPlaying;
 
   const advance = React.useCallback(() => {
     setCurrent((c) => (c === videos.length - 1 ? 0 : c + 1));
   }, [videos.length]);
 
+  // Reset tracking when videos array length changes (e.g., opening different project)
+  React.useEffect(() => {
+    videoReadyRefs.current = videos.map(() => false);
+    isPlayingVideoRef.current = null;
+    previousCurrentRef.current = current;
+  }, [videos.length, current]);
+
   const prev = () => setCurrent((c) => (c === 0 ? videos.length - 1 : c - 1));
   const next = () => setCurrent((c) => (c === videos.length - 1 ? 0 : c + 1));
+
+  const playVideo = React.useCallback((video: HTMLVideoElement, videoIndex: number) => {
+    if (!video) return;
+    
+    // Prevent multiple play attempts for the same video
+    if (isPlayingVideoRef.current === videoIndex && !video.paused) {
+      return;
+    }
+    
+    isPlayingVideoRef.current = videoIndex;
+    
+    // Check if video is ready to play
+    if (video.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+      const p = video.play();
+      if (p) {
+        p.catch(() => {
+          // If play fails, try muting and playing again
+          video.muted = true;
+          video.play().catch(() => {});
+        });
+      }
+    } else {
+      // Wait for video to be ready
+      const handleCanPlay = () => {
+        if (isPlayingRef.current && videoIndex === current) {
+          const p = video.play();
+          if (p) {
+            p.catch(() => {
+              video.muted = true;
+              video.play().catch(() => {});
+            });
+          }
+        }
+        video.removeEventListener('canplay', handleCanPlay);
+      };
+      video.addEventListener('canplay', handleCanPlay);
+    }
+  }, [current]);
 
   const togglePlayPause = () => {
     setIsPlaying((p) => {
       const newState = !p;
       const v = videoRefs.current[current];
       if (v) {
-        if (newState) v.play().catch(() => {});
-        else v.pause();
+        if (newState) {
+          isPlayingVideoRef.current = null; // Reset to allow play
+          playVideo(v, current);
+        } else {
+          v.pause();
+          isPlayingVideoRef.current = null;
+        }
       }
       return newState;
     });
@@ -54,24 +107,37 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
 
   // Play current video, pause others, advance after duration via setTimeout
   React.useEffect(() => {
+    const previousCurrent = previousCurrentRef.current;
+    const videoSwitched = previousCurrent !== current;
+    previousCurrentRef.current = current;
+
     videoRefs.current.forEach((v, i) => {
       if (!v) return;
       if (i === current) {
-        v.currentTime = 0;
+        // Only reset currentTime if we actually switched videos
+        if (videoSwitched) {
+          v.currentTime = 0;
+          isPlayingVideoRef.current = null; // Reset play tracking when switching
+        }
         if (isPlayingRef.current) {
-          const p = v.play();
-          if (p) p.catch(() => { v.muted = true; v.play().catch(() => {}); });
+          playVideo(v, i);
         }
       } else {
         v.pause();
+        // Clear play tracking for paused videos
+        if (isPlayingVideoRef.current === i) {
+          isPlayingVideoRef.current = null;
+        }
       }
     });
 
-    const ms = videos[current].duration * 1000;
-    const timer = setTimeout(advance, ms);
+    const ms = videos[current]?.duration * 1000 || 0;
+    const timer = ms > 0 ? setTimeout(advance, ms) : null;
 
-    return () => clearTimeout(timer);
-  }, [current, advance, videos]);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [current, advance, playVideo]);
 
   const currentHasAudio = videos[current]?.hasAudio;
 
@@ -225,6 +291,22 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
                     muted
                     playsInline
                     preload="auto"
+                    onLoadedData={(e) => {
+                      const video = e.currentTarget;
+                      videoReadyRefs.current[i] = true;
+                      // If this is the current video and we should be playing, play it
+                      if (i === current && isPlayingRef.current) {
+                        playVideo(video, i);
+                      }
+                    }}
+                    onCanPlay={(e) => {
+                      const video = e.currentTarget;
+                      videoReadyRefs.current[i] = true;
+                      // If this is the current video and we should be playing, play it
+                      if (i === current && isPlayingRef.current) {
+                        playVideo(video, i);
+                      }
+                    }}
                     style={{
                       position: i === 0 ? "relative" : "absolute",
                       inset: 0,
