@@ -39,6 +39,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "../components/ui/tabs";
+import { PlanSwitcher } from "../components/PlanSwitcher";
 
 interface Conversation {
   id: string;
@@ -104,6 +105,16 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   const [isLoadingWallet, setIsLoadingWallet] = useState(false);
   const [addCreditsAmount, setAddCreditsAmount] = useState("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Plan selection state - show plan switcher only once when user has no org
+  const [selectedPlan, setSelectedPlan] = useState<"core" | "enterprise">("core");
+  const [hasDismissedPlanSwitcher, setHasDismissedPlanSwitcher] = useState(() => {
+    // Check localStorage to see if user has already seen the plan switcher
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("hasDismissedPlanSwitcher") === "true";
+    }
+    return false;
+  });
 
   useEffect(() => {
     fetchConversations();
@@ -569,7 +580,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                   </div>
                 </div>
 
-                <Tabs defaultValue="projects" className="w-full">
+                <Tabs defaultValue={!hasAnyMembership ? "create-org" : "projects"} className="w-full">
                   <TabsList className="mb-6 bg-surface-1 border border-subtle gap-1">
                     <TabsTrigger 
                       value="projects"
@@ -710,8 +721,26 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
 
                   {!hasAnyMembership && (
                     <TabsContent value="create-org" className="mt-0">
-                    {/* Show organization details if user already has one */}
-                    {createdOrg ? (
+                    {/* Show plan switcher first if user hasn't dismissed it */}
+                    {!createdOrg && !hasDismissedPlanSwitcher ? (
+                      <div className="space-y-6">
+                        <PlanSwitcher
+                          selectedPlan={selectedPlan}
+                          onPlanSelect={(plan) => setSelectedPlan(plan)}
+                        />
+                        <div className="flex justify-center">
+                          <Button
+                            onClick={() => {
+                              setHasDismissedPlanSwitcher(true);
+                              localStorage.setItem("hasDismissedPlanSwitcher", "true");
+                            }}
+                            className="bg-gradient-to-r from-[#7b4cff] to-[#a855f7] hover:from-[#8c63f2] hover:to-[#b566f8] text-white font-medium shadow-lg shadow-[#7b4cff]/25 transition-all duration-200 px-8 py-3"
+                          >
+                            Continue with {selectedPlan === "core" ? "Core" : "Enterprise"} Plan
+                          </Button>
+                        </div>
+                      </div>
+                    ) : createdOrg ? (
                       <div className="rounded-[12px] bg-surface-1 border border-[#7b4cff]/30 w-full">
                         <Card className="bg-transparent border-0 shadow-none">
                           <CardHeader className="px-5 py-4">
