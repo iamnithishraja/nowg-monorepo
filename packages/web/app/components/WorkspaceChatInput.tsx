@@ -183,7 +183,7 @@ export function WorkspaceChatInput({
 
   // Handle Escape key to interrupt
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape" && (isLoading || isStreaming) && onInterrupt) {
+    if (e.key === "Escape" && (isLoading || isStreaming || isProcessingTemplate) && onInterrupt) {
       setShowStopConfirmation(true);
       return;
     }
@@ -449,6 +449,18 @@ export function WorkspaceChatInput({
                   >
                     <PaperPlaneRight className="w-4 h-4" />
                   </Button>
+
+                  {/* Stop button */}
+                  {(isLoading || isStreaming || isProcessingTemplate) && onInterrupt && (
+                    <Button
+                      onClick={handleStopClick}
+                      size="sm"
+                      className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full"
+                      title="Stop generation"
+                    >
+                      <Square className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -865,7 +877,7 @@ export function WorkspaceChatInput({
               )}
 
               {/* Stop button */}
-              {(isLoading || isStreaming) && onInterrupt && (
+              {(isLoading || isStreaming || isProcessingTemplate) && onInterrupt && (
                 <Button
                   onClick={handleStopClick}
                   size="sm"
