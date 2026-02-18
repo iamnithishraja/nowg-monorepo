@@ -214,6 +214,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         lastName: user.name?.split(" ").slice(1).join(" ") || "",
         role: user.role || "customer",
         isActive: !user.banned,
+        emailVerified: user.emailVerified || false,
         balance: profile?.balance ? parseFloat(profile.balance.toFixed(2)) : 0,
         tokenBalance: profile?.totalTokens || 0,
         createdAt: user.createdAt,
