@@ -13,6 +13,7 @@ export function meta({}: Route.MetaArgs) {
 export default function SignUp() {
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get("inviteToken");
+  const needAccount = searchParams.get("needAccount") === "true";
 
   return (
     <AuthLayout
@@ -35,7 +36,11 @@ export default function SignUp() {
         </p>
       }
     >
-      <AuthForm initialTab="signup" inviteToken={inviteToken || undefined} />
+      <AuthForm 
+        initialTab="signup" 
+        inviteToken={inviteToken || undefined} 
+        showCreateAccountMessage={needAccount}
+      />
     </AuthLayout>
   );
 }

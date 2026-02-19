@@ -19,9 +19,10 @@ type AuthInitialTab = "signin" | "signup";
 interface AuthFormProps {
   initialTab?: AuthInitialTab;
   inviteToken?: string;
+  showCreateAccountMessage?: boolean;
 }
 
-export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFormProps) {
+export default function AuthForm({ initialTab = "signin", inviteToken, showCreateAccountMessage }: AuthFormProps) {
   // shared
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -111,8 +112,10 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
       const userExists = await checkUserExists(signinEmail);
       
       if (!userExists) {
-        setError("No account found with this email. Please create an account first.");
-        setIsLoading(false);
+        const redirectUrl = inviteToken 
+          ? `/signup?needAccount=true&inviteToken=${inviteToken}`
+          : `/signup?needAccount=true`;
+        window.location.href = redirectUrl;
         return;
       }
 
@@ -134,8 +137,10 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
               ) {
                 const stillExists = await checkUserExists(signinEmail);
                 if (!stillExists) {
-                  setError("No account found with this email. Please create an account first.");
-                  setIsLoading(false);
+                  const redirectUrl = inviteToken 
+                    ? `/signup?needAccount=true&inviteToken=${inviteToken}`
+                    : `/signup?needAccount=true`;
+                  window.location.href = redirectUrl;
                   return;
                 }
               }
@@ -166,8 +171,10 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
       ) {
         const userExists = await checkUserExists(signinEmail);
         if (!userExists) {
-          setError("No account found with this email. Please create an account first.");
-          setIsLoading(false);
+          const redirectUrl = inviteToken 
+            ? `/signup?needAccount=true&inviteToken=${inviteToken}`
+            : `/signup?needAccount=true`;
+          window.location.href = redirectUrl;
           return;
         }
       }
@@ -423,7 +430,19 @@ export default function AuthForm({ initialTab = "signin", inviteToken }: AuthFor
         </TabsContent>
 
         {/* Sign Up Tab */}
-        <TabsContent value="signup" className="mt-8">
+        <TabsContent value="signup" className="mt-8 space-y-6">
+          {showCreateAccountMessage && !signupSuccess && (
+            <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/10 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <Check className="w-3 h-3 text-green-400" weight="bold" />
+                </div>
+                <p className="text-sm text-green-400 font-medium">
+                  Please create an account first, then you can sign in.
+                </p>
+              </div>
+            </div>
+          )}
           {signupSuccess ? (
             <div className="text-center space-y-8 py-6">
               <div className="relative">

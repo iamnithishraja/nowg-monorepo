@@ -45,7 +45,7 @@ export async function downloadCodebaseAsZip(
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${projectName}-${Date.now()}.zip`;
+    link.download = `${projectName}.zip`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

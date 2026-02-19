@@ -385,7 +385,7 @@ export function downloadMessagesAsHTML(
     .replace(/^-+|-+$/g, "")
     .slice(0, 50);
   link.href = url;
-  link.download = `${sanitizedTitle}-${Date.now()}.html`;
+  link.download = `${sanitizedTitle}.html`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
