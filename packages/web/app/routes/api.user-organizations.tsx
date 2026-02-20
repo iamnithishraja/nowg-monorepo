@@ -26,9 +26,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     await connectToDatabase();
 
     // Get user's organization memberships (org_admin or org_user)
+    // Include both active and pending memberships (pending for enterprise requests)
     const orgMemberships = await OrganizationMember.find({
       userId: userId,
-      status: "active",
+      status: { $in: ["active", "pending"] },
     })
       .sort({ joinedAt: -1 }) // Most recent first
       .lean();
@@ -75,6 +76,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
         orgAdminId: org.orgAdminId,
         role: membership?.role || "org_user",
         walletBalance: 0, // Wallet is created on-demand, default is 0
+        planType: org.planType || "core",
+        approvalStatus: org.approvalStatus || null,
       };
     });
 

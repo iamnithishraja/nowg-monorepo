@@ -1087,3 +1087,880 @@ function createOrgUserInvitationEmailForNewUserTemplate({
     </html>
   `;
 }
+
+// ============================================
+// Enterprise Organization Request Emails
+// ============================================
+
+interface SendEnterpriseRequestSubmittedEmailProps {
+  to: string;
+  userName: string;
+  organizationName: string;
+}
+
+export async function sendEnterpriseRequestSubmittedEmail({
+  to,
+  userName,
+  organizationName,
+}: SendEnterpriseRequestSubmittedEmailProps) {
+  const resendClient = getResendClient();
+  const fromEmail = getResendFrom();
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject: `Enterprise Request Received - ${organizationName}`,
+      html: createEnterpriseRequestSubmittedTemplate({ userName, organizationName }),
+    };
+
+    const result = await resendClient.emails.send(emailData);
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending enterprise request submitted email:", error);
+    throw new Error(
+      `Failed to send enterprise request submitted email: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+function createEnterpriseRequestSubmittedTemplate({
+  userName,
+  organizationName,
+}: {
+  userName: string;
+  organizationName: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Enterprise Request Received - Nowgai</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #0f0f1a;
+        }
+        .container {
+          background: linear-gradient(135deg, #1a1a2e 0%, #16162a 100%);
+          border-radius: 16px;
+          padding: 40px;
+          border: 1px solid rgba(123, 76, 255, 0.2);
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .logo {
+          font-size: 28px;
+          font-weight: bold;
+          background: linear-gradient(135deg, #7b4cff 0%, #a855f7 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin-bottom: 10px;
+        }
+        .icon-container {
+          width: 80px;
+          height: 80px;
+          background: rgba(251, 191, 36, 0.1);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 20px;
+        }
+        .title {
+          font-size: 24px;
+          font-weight: 600;
+          color: #fbbf24;
+          margin-bottom: 10px;
+          text-align: center;
+        }
+        .subtitle {
+          font-size: 16px;
+          color: #9ca3af;
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .message {
+          font-size: 16px;
+          color: #d1d5db;
+          margin-bottom: 30px;
+          line-height: 1.8;
+        }
+        .info-box {
+          background: rgba(123, 76, 255, 0.1);
+          border: 1px solid rgba(123, 76, 255, 0.2);
+          border-radius: 12px;
+          padding: 20px;
+          margin: 20px 0;
+        }
+        .info-box h4 {
+          color: #a78bfa;
+          margin: 0 0 15px 0;
+          font-size: 14px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        .info-box ul {
+          margin: 0;
+          padding-left: 20px;
+          color: #9ca3af;
+        }
+        .info-box li {
+          margin-bottom: 10px;
+        }
+        .detail-box {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 8px;
+          padding: 15px;
+          margin: 15px 0;
+        }
+        .detail-label {
+          font-size: 12px;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .detail-value {
+          font-size: 16px;
+          color: #f3f4f6;
+          font-weight: 500;
+        }
+        .footer {
+          margin-top: 40px;
+          padding-top: 20px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          font-size: 14px;
+          color: #6b7280;
+          text-align: center;
+        }
+        .footer a {
+          color: #7b4cff;
+          text-decoration: none;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai</div>
+        </div>
+        
+        <div class="icon-container">
+          <span style="font-size: 36px;">⏳</span>
+        </div>
+        
+        <h1 class="title">Request Under Review</h1>
+        <p class="subtitle">Thank you for your interest in Nowgai Enterprise!</p>
+        
+        <div class="message">
+          <p>Hi ${userName},</p>
+          <p>We've received your Enterprise organization request for <strong style="color: #f3f4f6;">"${organizationName}"</strong>. Our team is now reviewing your application.</p>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">Organization Name</div>
+          <div class="detail-value">${organizationName}</div>
+        </div>
+
+        <div class="info-box">
+          <h4>What happens next?</h4>
+          <ul>
+            <li>Our team will review your request within 1-2 business days</li>
+            <li>You'll receive an email notification once a decision is made</li>
+            <li>If approved, you'll get immediate access to Enterprise features</li>
+            <li>We may reach out if we need additional information</li>
+          </ul>
+        </div>
+        
+        <div class="footer">
+          <p>Have questions? Contact us at <a href="mailto:support@nowgai.com">support@nowgai.com</a></p>
+          <p>Best regards,<br>The Nowgai Team</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+interface SendEnterpriseRequestNotificationToAdminProps {
+  organizationName: string;
+  organizationId: string;
+  requesterEmail: string;
+  requesterName: string;
+  companySize: string;
+  industry: string;
+  website: string;
+  useCase: string;
+}
+
+export async function sendEnterpriseRequestNotificationToAdmin({
+  organizationName,
+  organizationId,
+  requesterEmail,
+  requesterName,
+  companySize,
+  industry,
+  website,
+  useCase,
+}: SendEnterpriseRequestNotificationToAdminProps) {
+  const resendClient = getResendClient();
+  const fromEmail = getResendFrom();
+  const adminEmail = getEnvWithDefault("ADMIN_NOTIFICATION_EMAIL", "admin@nowgai.com");
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to: adminEmail,
+      subject: `🏢 New Enterprise Request: ${organizationName}`,
+      html: createEnterpriseRequestNotificationToAdminTemplate({
+        organizationName,
+        organizationId,
+        requesterEmail,
+        requesterName,
+        companySize,
+        industry,
+        website,
+        useCase,
+      }),
+    };
+
+    const result = await resendClient.emails.send(emailData);
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending enterprise request notification to admin:", error);
+    throw new Error(
+      `Failed to send enterprise request notification: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+function createEnterpriseRequestNotificationToAdminTemplate({
+  organizationName,
+  organizationId,
+  requesterEmail,
+  requesterName,
+  companySize,
+  industry,
+  website,
+  useCase,
+}: {
+  organizationName: string;
+  organizationId: string;
+  requesterEmail: string;
+  requesterName: string;
+  companySize: string;
+  industry: string;
+  website: string;
+  useCase: string;
+}) {
+  const adminUrl = getEnvWithDefault("ADMIN_PANEL_URL", "http://localhost:3000");
+  const reviewUrl = `${adminUrl}/admin/organizations/pending`;
+  
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>New Enterprise Request - Nowgai Admin</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #f8f9fa;
+        }
+        .container {
+          background: white;
+          border-radius: 12px;
+          padding: 40px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+          padding-bottom: 20px;
+          border-bottom: 2px solid #7b4cff;
+        }
+        .logo {
+          font-size: 28px;
+          font-weight: bold;
+          color: #7b4cff;
+          margin-bottom: 5px;
+        }
+        .badge {
+          display: inline-block;
+          background: linear-gradient(135deg, #7b4cff 0%, #a855f7 100%);
+          color: white;
+          padding: 4px 12px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+        .title {
+          font-size: 22px;
+          font-weight: 600;
+          color: #1a1a1a;
+          margin: 20px 0 10px;
+        }
+        .org-name {
+          font-size: 28px;
+          font-weight: 700;
+          color: #7b4cff;
+          margin-bottom: 20px;
+        }
+        .details-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+          margin: 25px 0;
+        }
+        .detail-item {
+          background: #f8f9fa;
+          padding: 15px;
+          border-radius: 8px;
+        }
+        .detail-item.full-width {
+          grid-column: span 2;
+        }
+        .detail-label {
+          font-size: 11px;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 5px;
+        }
+        .detail-value {
+          font-size: 15px;
+          color: #1a1a1a;
+          font-weight: 500;
+        }
+        .use-case-box {
+          background: #f0f9ff;
+          border: 1px solid #bae6fd;
+          border-radius: 8px;
+          padding: 20px;
+          margin: 20px 0;
+        }
+        .use-case-box h4 {
+          color: #0c4a6e;
+          margin: 0 0 10px 0;
+          font-size: 14px;
+        }
+        .use-case-box p {
+          color: #0369a1;
+          margin: 0;
+          font-style: italic;
+        }
+        .button-container {
+          text-align: center;
+          margin: 30px 0;
+        }
+        .button {
+          display: inline-block;
+          padding: 14px 40px;
+          background: linear-gradient(135deg, #7b4cff 0%, #a855f7 100%);
+          color: white;
+          text-decoration: none;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 16px;
+        }
+        .footer {
+          margin-top: 30px;
+          padding-top: 20px;
+          border-top: 1px solid #eee;
+          font-size: 13px;
+          color: #888;
+          text-align: center;
+        }
+        .org-id {
+          font-family: monospace;
+          font-size: 12px;
+          color: #9ca3af;
+          background: #f3f4f6;
+          padding: 2px 6px;
+          border-radius: 4px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai Admin</div>
+          <span class="badge">New Enterprise Request</span>
+        </div>
+        
+        <h1 class="title">New Organization Request</h1>
+        <div class="org-name">${organizationName}</div>
+        <span class="org-id">ID: ${organizationId}</span>
+        
+        <div class="details-grid">
+          <div class="detail-item">
+            <div class="detail-label">Requester Name</div>
+            <div class="detail-value">${requesterName}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Email</div>
+            <div class="detail-value">${requesterEmail}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Company Size</div>
+            <div class="detail-value">${companySize}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Industry</div>
+            <div class="detail-value">${industry}</div>
+          </div>
+          <div class="detail-item full-width">
+            <div class="detail-label">Website</div>
+            <div class="detail-value">${website}</div>
+          </div>
+        </div>
+
+        <div class="use-case-box">
+          <h4>📋 Use Case Description</h4>
+          <p>"${useCase}"</p>
+        </div>
+        
+        <div class="button-container">
+          <a href="${reviewUrl}" class="button">Review Request</a>
+        </div>
+        
+        <div class="footer">
+          <p>This is an automated notification from Nowgai Admin.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+interface SendEnterpriseRequestApprovedEmailProps {
+  to: string;
+  userName: string;
+  organizationName: string;
+}
+
+export async function sendEnterpriseRequestApprovedEmail({
+  to,
+  userName,
+  organizationName,
+}: SendEnterpriseRequestApprovedEmailProps) {
+  const resendClient = getResendClient();
+  const fromEmail = getResendFrom();
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject: `🎉 Enterprise Request Approved - ${organizationName}`,
+      html: createEnterpriseRequestApprovedTemplate({ userName, organizationName }),
+    };
+
+    const result = await resendClient.emails.send(emailData);
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending enterprise request approved email:", error);
+    throw new Error(
+      `Failed to send enterprise request approved email: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+function createEnterpriseRequestApprovedTemplate({
+  userName,
+  organizationName,
+}: {
+  userName: string;
+  organizationName: string;
+}) {
+  const appUrl = getEnvWithDefault("APP_URL", "http://localhost:3000");
+  
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Enterprise Request Approved - Nowgai</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #0f0f1a;
+        }
+        .container {
+          background: linear-gradient(135deg, #1a1a2e 0%, #16162a 100%);
+          border-radius: 16px;
+          padding: 40px;
+          border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .logo {
+          font-size: 28px;
+          font-weight: bold;
+          background: linear-gradient(135deg, #7b4cff 0%, #a855f7 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin-bottom: 10px;
+        }
+        .icon-container {
+          width: 80px;
+          height: 80px;
+          background: rgba(16, 185, 129, 0.1);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 20px;
+        }
+        .title {
+          font-size: 28px;
+          font-weight: 600;
+          color: #10b981;
+          margin-bottom: 10px;
+          text-align: center;
+        }
+        .subtitle {
+          font-size: 16px;
+          color: #9ca3af;
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .message {
+          font-size: 16px;
+          color: #d1d5db;
+          margin-bottom: 30px;
+          line-height: 1.8;
+        }
+        .highlight {
+          color: #f3f4f6;
+          font-weight: 600;
+        }
+        .info-box {
+          background: rgba(16, 185, 129, 0.1);
+          border: 1px solid rgba(16, 185, 129, 0.2);
+          border-radius: 12px;
+          padding: 20px;
+          margin: 20px 0;
+        }
+        .info-box h4 {
+          color: #10b981;
+          margin: 0 0 15px 0;
+          font-size: 14px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        .info-box ul {
+          margin: 0;
+          padding-left: 20px;
+          color: #9ca3af;
+        }
+        .info-box li {
+          margin-bottom: 10px;
+        }
+        .button-container {
+          text-align: center;
+          margin: 30px 0;
+        }
+        .button {
+          display: inline-block;
+          padding: 14px 40px;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: white;
+          text-decoration: none;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 16px;
+        }
+        .footer {
+          margin-top: 40px;
+          padding-top: 20px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          font-size: 14px;
+          color: #6b7280;
+          text-align: center;
+        }
+        .footer a {
+          color: #7b4cff;
+          text-decoration: none;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai</div>
+        </div>
+        
+        <div class="icon-container">
+          <span style="font-size: 36px;">🎉</span>
+        </div>
+        
+        <h1 class="title">Request Approved!</h1>
+        <p class="subtitle">Welcome to Nowgai Enterprise</p>
+        
+        <div class="message">
+          <p>Hi ${userName},</p>
+          <p>Great news! Your Enterprise organization request for <span class="highlight">"${organizationName}"</span> has been approved.</p>
+          <p>You now have full access to all Enterprise features and can start building with your team.</p>
+        </div>
+
+        <div class="info-box">
+          <h4>What you can do now</h4>
+          <ul>
+            <li>Invite team members to your organization</li>
+            <li>Create projects and assign project admins</li>
+            <li>Access Enterprise-tier AI models and features</li>
+            <li>Manage billing and credits for your organization</li>
+          </ul>
+        </div>
+        
+        <div class="button-container">
+          <a href="${appUrl}/manage-org/convo" class="button">Go to Dashboard</a>
+        </div>
+        
+        <div class="footer">
+          <p>Need help getting started? Contact us at <a href="mailto:support@nowgai.com">support@nowgai.com</a></p>
+          <p>Best regards,<br>The Nowgai Team</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+interface SendEnterpriseRequestRejectedEmailProps {
+  to: string;
+  userName: string;
+  organizationName: string;
+  reason?: string;
+}
+
+export async function sendEnterpriseRequestRejectedEmail({
+  to,
+  userName,
+  organizationName,
+  reason,
+}: SendEnterpriseRequestRejectedEmailProps) {
+  const resendClient = getResendClient();
+  const fromEmail = getResendFrom();
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject: `Enterprise Request Update - ${organizationName}`,
+      html: createEnterpriseRequestRejectedTemplate({ userName, organizationName, reason }),
+    };
+
+    const result = await resendClient.emails.send(emailData);
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending enterprise request rejected email:", error);
+    throw new Error(
+      `Failed to send enterprise request rejected email: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+function createEnterpriseRequestRejectedTemplate({
+  userName,
+  organizationName,
+  reason,
+}: {
+  userName: string;
+  organizationName: string;
+  reason?: string;
+}) {
+  const appUrl = getEnvWithDefault("APP_URL", "http://localhost:3000");
+  
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Enterprise Request Update - Nowgai</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #0f0f1a;
+        }
+        .container {
+          background: linear-gradient(135deg, #1a1a2e 0%, #16162a 100%);
+          border-radius: 16px;
+          padding: 40px;
+          border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .logo {
+          font-size: 28px;
+          font-weight: bold;
+          background: linear-gradient(135deg, #7b4cff 0%, #a855f7 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin-bottom: 10px;
+        }
+        .title {
+          font-size: 24px;
+          font-weight: 600;
+          color: #f87171;
+          margin-bottom: 10px;
+          text-align: center;
+        }
+        .subtitle {
+          font-size: 16px;
+          color: #9ca3af;
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .message {
+          font-size: 16px;
+          color: #d1d5db;
+          margin-bottom: 30px;
+          line-height: 1.8;
+        }
+        .highlight {
+          color: #f3f4f6;
+          font-weight: 600;
+        }
+        .reason-box {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          border-radius: 12px;
+          padding: 20px;
+          margin: 20px 0;
+        }
+        .reason-box h4 {
+          color: #f87171;
+          margin: 0 0 10px 0;
+          font-size: 14px;
+        }
+        .reason-box p {
+          color: #fca5a5;
+          margin: 0;
+        }
+        .info-box {
+          background: rgba(123, 76, 255, 0.1);
+          border: 1px solid rgba(123, 76, 255, 0.2);
+          border-radius: 12px;
+          padding: 20px;
+          margin: 20px 0;
+        }
+        .info-box h4 {
+          color: #a78bfa;
+          margin: 0 0 15px 0;
+          font-size: 14px;
+        }
+        .info-box p {
+          color: #9ca3af;
+          margin: 0;
+        }
+        .button-container {
+          text-align: center;
+          margin: 30px 0;
+        }
+        .button {
+          display: inline-block;
+          padding: 14px 40px;
+          background: linear-gradient(135deg, #7b4cff 0%, #a855f7 100%);
+          color: white;
+          text-decoration: none;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 16px;
+        }
+        .footer {
+          margin-top: 40px;
+          padding-top: 20px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          font-size: 14px;
+          color: #6b7280;
+          text-align: center;
+        }
+        .footer a {
+          color: #7b4cff;
+          text-decoration: none;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai</div>
+        </div>
+        
+        <h1 class="title">Request Not Approved</h1>
+        <p class="subtitle">We appreciate your interest in Nowgai Enterprise</p>
+        
+        <div class="message">
+          <p>Hi ${userName},</p>
+          <p>Thank you for your interest in Nowgai Enterprise. After reviewing your request for <span class="highlight">"${organizationName}"</span>, we're unable to approve it at this time.</p>
+        </div>
+
+        ${reason ? `
+        <div class="reason-box">
+          <h4>Reason</h4>
+          <p>${reason}</p>
+        </div>
+        ` : ''}
+
+        <div class="info-box">
+          <h4>What you can do</h4>
+          <p>You can still use Nowgai with our Core plan, which includes many powerful features. If you believe this decision was made in error or would like to discuss your use case further, please don't hesitate to reach out to us.</p>
+        </div>
+        
+        <div class="button-container">
+          <a href="${appUrl}/manage-org/convo" class="button">Try Core Plan</a>
+        </div>
+        
+        <div class="footer">
+          <p>Questions? Contact us at <a href="mailto:support@nowgai.com">support@nowgai.com</a></p>
+          <p>Best regards,<br>The Nowgai Team</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}

@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   BarChart3,
   Building2,
+  Clock,
   Database,
   DollarSign,
   GitBranch,
@@ -86,6 +87,12 @@ const getMenuGroups = (
                 title: "Organizations",
                 url: "/admin/organizations",
                 icon: Building2,
+                iconType: "lucide" as const,
+              },
+              {
+                title: "Pending Requests",
+                url: "/admin/organizations/pending",
+                icon: Clock,
                 iconType: "lucide" as const,
               },
             ]

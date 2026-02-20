@@ -70,6 +70,54 @@ export const organizationSchemaDefinition = {
     enum: ["active", "suspended"],
     default: "active",
   },
+  // Plan type (core or enterprise)
+  planType: {
+    type: String,
+    enum: ["core", "enterprise"],
+    default: "core",
+  },
+  // Approval status for enterprise organizations
+  approvalStatus: {
+    type: String,
+    enum: ["pending", "approved", "rejected", null],
+    default: null, // null for core plans, pending for enterprise requests
+  },
+  // Approval/rejection details
+  approvalReviewedBy: {
+    type: String,
+    ref: "User",
+    default: null,
+  },
+  approvalReviewedAt: {
+    type: Date,
+    default: null,
+  },
+  approvalNotes: {
+    type: String,
+    default: null,
+  },
+  // Additional enterprise fields
+  companySize: {
+    type: String,
+    enum: ["1-10", "11-50", "51-200", "201-500", "500+", null],
+    default: null,
+  },
+  industry: {
+    type: String,
+    default: null,
+  },
+  website: {
+    type: String,
+    default: null,
+  },
+  useCase: {
+    type: String,
+    default: null,
+  },
+  contactPhone: {
+    type: String,
+    default: null,
+  },
   // Payment provider for this organization (optional)
   // If set, this provider will be used for all payments for this organization
   // If null, falls back to country-specific or default provider
@@ -94,6 +142,8 @@ export const organizationSchema = new mongoose.Schema(organizationSchemaDefiniti
 organizationSchema.index({ orgAdminId: 1 });
 organizationSchema.index({ name: 1 });
 organizationSchema.index({ createdAt: -1 });
+organizationSchema.index({ approvalStatus: 1 });
+organizationSchema.index({ planType: 1 });
 
 // Model getter function for consistent access
 export function getOrganizationModel(): mongoose.Model<any> {
