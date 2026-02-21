@@ -22,6 +22,8 @@ RUN bun run build
 
 # Build admin-client
 WORKDIR /app/packages/admin-client
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN bun run build
 
 # Stage 2: Production
