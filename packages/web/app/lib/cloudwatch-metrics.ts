@@ -43,6 +43,13 @@ export async function publishActiveConnections(count: number): Promise<void> {
     "CLOUDWATCH_METRIC_NAMESPACE",
     DEFAULT_NAMESPACE
   );
+  const serviceName = getEnvWithDefault("WEB_ECS_SERVICE_NAME", "web");
+  const clusterName = getEnvWithDefault("WEB_ECS_CLUSTER_NAME", "default");
+  const dimensions = [
+    { Name: "Service", Value: serviceName },
+    { Name: "Cluster", Value: clusterName },
+  ].filter((d) => d.Value);
+  const timestamp = new Date();
 
   try {
     await cw.send(
@@ -53,19 +60,22 @@ export async function publishActiveConnections(count: number): Promise<void> {
             MetricName: DEFAULT_METRIC_NAME,
             Value: count,
             Unit: "Count",
-            Timestamp: new Date(),
-            Dimensions: [
-              {
-                Name: "Service",
-                Value: getEnvWithDefault("WEB_ECS_SERVICE_NAME", "web"),
-              },
-              {
-                Name: "Cluster",
-                Value: getEnvWithDefault("WEB_ECS_CLUSTER_NAME", "default"),
-              },
-            ].filter((d) => d.Value),
+            Timestamp: timestamp,
+            Dimensions: dimensions,
           },
         ],
+      })
+    );
+    console.log(
+      "[CloudWatch] Pushed metric:",
+      JSON.stringify({
+        metric: DEFAULT_METRIC_NAME,
+        connections: count,
+        namespace,
+        dimensions: Object.fromEntries(
+          dimensions.map((d) => [d.Name, d.Value])
+        ),
+        timestamp: timestamp.toISOString(),
       })
     );
   } catch (err) {
