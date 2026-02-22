@@ -3,7 +3,10 @@
  * Used to report active streaming connection count per ECS task (sum in CloudWatch = total).
  */
 
-import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwatch";
+import {
+  CloudWatchClient,
+  PutMetricDataCommand,
+} from "@aws-sdk/client-cloudwatch";
 import { getEnvWithDefault } from "./env";
 
 let client: CloudWatchClient | null = null;
@@ -25,7 +28,7 @@ function getClient(): CloudWatchClient | null {
   }
 }
 
-const DEFAULT_NAMESPACE = "NowGai/Web";
+const DEFAULT_NAMESPACE = "Nowgai/Web";
 const DEFAULT_METRIC_NAME = "ActiveStreamConnections";
 
 /**
@@ -36,7 +39,10 @@ export async function publishActiveConnections(count: number): Promise<void> {
   const cw = getClient();
   if (!cw) return;
 
-  const namespace = getEnvWithDefault("CLOUDWATCH_METRIC_NAMESPACE", DEFAULT_NAMESPACE);
+  const namespace = getEnvWithDefault(
+    "CLOUDWATCH_METRIC_NAMESPACE",
+    DEFAULT_NAMESPACE
+  );
 
   try {
     await cw.send(
@@ -49,8 +55,14 @@ export async function publishActiveConnections(count: number): Promise<void> {
             Unit: "Count",
             Timestamp: new Date(),
             Dimensions: [
-              { Name: "Service", Value: getEnvWithDefault("ECS_SERVICE_NAME", "web") },
-              { Name: "Cluster", Value: getEnvWithDefault("ECS_CLUSTER_NAME", "default") },
+              {
+                Name: "Service",
+                Value: getEnvWithDefault("WEB_ECS_SERVICE_NAME", "web"),
+              },
+              {
+                Name: "Cluster",
+                Value: getEnvWithDefault("WEB_ECS_CLUSTER_NAME", "default"),
+              },
             ].filter((d) => d.Value),
           },
         ],
