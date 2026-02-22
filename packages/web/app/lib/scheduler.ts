@@ -1,10 +1,13 @@
 import * as cron from "node-cron";
+import { publishActiveConnections } from "./cloudwatch-metrics";
 import { getEnvWithDefault, loadEnvFromDatabase, waitForEnvLoad } from "./env";
 import { runHourlyBillingJob } from "./neonBillingService";
 import { connectToDatabase } from "./mongo";
+import { getActiveStreamCount } from "./streamConnectionTracker";
 
 let isSchedulerInitialized = false;
 let neonBillingTask: cron.ScheduledTask | null = null;
+let cloudWatchIntervalId: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Initialize all scheduled jobs
@@ -74,6 +77,23 @@ export async function initializeScheduler(): Promise<void> {
     
   }
 
+  // CloudWatch: push active stream connection count every 1 minute (when an AWS region is set)
+  const awsRegion =
+    getEnvWithDefault("AWS_REGION", "") ||
+    process.env.AWS_REGION ||
+    process.env.AWS_DEFAULT_REGION ||
+    "";
+  if (awsRegion) {
+    cloudWatchIntervalId = setInterval(async () => {
+      try {
+        const count = getActiveStreamCount();
+        await publishActiveConnections(count);
+      } catch (error) {
+        console.error("[Scheduler] CloudWatch metric publish failed:", error);
+      }
+    }, 60_000); // 1 minute
+  }
+
   isSchedulerInitialized = true;
 }
 
@@ -82,7 +102,10 @@ export async function initializeScheduler(): Promise<void> {
  * Call this on graceful shutdown
  */
 export function stopScheduler(): void {
-  
+  if (cloudWatchIntervalId) {
+    clearInterval(cloudWatchIntervalId);
+    cloudWatchIntervalId = null;
+  }
 
   if (neonBillingTask) {
     neonBillingTask.stop();

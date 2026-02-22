@@ -15,6 +15,7 @@ import mongoose from "mongoose";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { getEnv } from "~/lib/env";
+import { trackStreamConnection } from "~/lib/streamConnectionTracker";
 import { Agent, AgentTools, SystemPrompt } from "~/agent";
 import type { FileMap, FileNode } from "~/utils/constants";
 import { ChatService } from "~/lib/chatService";
@@ -455,6 +456,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        const done = trackStreamConnection(controller as { signal?: AbortSignal });
         const sendChunk = (data: any) => {
           const chunk = `data: ${JSON.stringify(data)}\n\n`;
           controller.enqueue(encoder.encode(chunk));
@@ -1351,6 +1353,7 @@ export async function action({ request }: ActionFunctionArgs) {
             error: error instanceof Error ? error.message : String(error),
           });
         } finally {
+          done();
           controller.close();
         }
       },

@@ -21,6 +21,7 @@ import { connectToDatabase } from "~/lib/mongo";
 import { CONTINUE_PROMPT, getSystemPrompt } from "~/lib/prompt";
 import { createFilesContext, selectContext } from "~/lib/select-context";
 import { isWhitelistedEmail } from "~/lib/stripe";
+import { trackStreamConnection } from "~/lib/streamConnectionTracker";
 import { executeSQL } from "~/lib/supabaseManager";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -785,6 +786,7 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
     >();
     const stream = new ReadableStream({
       async start(controller) {
+        const done = trackStreamConnection(controller as { signal?: AbortSignal });
         const encoder = new TextEncoder();
 
         const sendChunk = (data: any) => {
@@ -1815,6 +1817,7 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             figmaMCPPool.releaseConnection(userId);
           }
         } finally {
+          done();
           controller.close();
         }
       },
