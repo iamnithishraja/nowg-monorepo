@@ -91,7 +91,7 @@ export async function initializeScheduler(): Promise<void> {
       } catch (error) {
         console.error("[Scheduler] CloudWatch metric publish failed:", error);
       }
-    }, 60_000); // 1 minute
+    }, 15_000); // 15 seconds
   }
 
   isSchedulerInitialized = true;
