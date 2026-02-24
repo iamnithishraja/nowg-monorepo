@@ -82,8 +82,70 @@ export async function loader({ request }: LoaderFunctionArgs) {
       // Use R2 messages if available, and merge in any DB-only messages (e.g. partial save when tab closed before R2 sync)
       let messages: any[] = [];
       const dbMessageList = conversation.messages || [];
+      
+      // Debug: Log raw DB and R2 messages to check incomplete flag and content
+      console.log(`[API Conversations] Loading conversation ${conversationId}:`, {
+        r2MessagesCount: r2Messages?.length || 0,
+        dbMessagesCount: dbMessageList.length,
+        r2Messages: r2Messages?.map((m: any) => ({
+          id: m.id || m._id?.toString?.(),
+          role: m.role,
+          incomplete: m.incomplete,
+          contentLength: (m.content || "").length,
+        })) || [],
+        dbMessages: dbMessageList.map((m: any) => ({
+          id: (m as any)._id?.toString?.(),
+          role: (m as any).role,
+          incomplete: (m as any).incomplete,
+          incompleteType: typeof (m as any).incomplete,
+          contentLength: ((m as any).content || "").length,
+        })),
+      });
+      
       if (r2Messages && r2Messages.length > 0) {
-        messages = [...r2Messages];
+        // Create a map of DB messages by ID for quick lookup
+        const dbMessageMap = new Map<string, any>();
+        for (const m of dbMessageList) {
+          const id = (m as any)._id?.toString?.() || (m as any).id;
+          if (id) {
+            dbMessageMap.set(id, m);
+          }
+        }
+        
+        // Start with R2 messages but prefer DB content when DB has more content
+        // This handles the case where R2 sync happened before stream completed
+        messages = r2Messages.map((r2Msg: any) => {
+          const r2Id = r2Msg.id || r2Msg._id?.toString();
+          const dbMsg = dbMessageMap.get(r2Id);
+          
+          if (dbMsg) {
+            const r2ContentLength = (r2Msg.content || "").length;
+            const dbContentLength = ((dbMsg as any).content || "").length;
+            
+            // If DB has more content, use DB version (stream completed after R2 sync)
+            if (dbContentLength > r2ContentLength) {
+              console.log(`[API Conversations] Using DB content for message ${r2Id} (DB: ${dbContentLength} chars > R2: ${r2ContentLength} chars)`);
+              return {
+                id: r2Id,
+                _id: (dbMsg as any)._id,
+                role: (dbMsg as any).role,
+                content: (dbMsg as any).content || "",
+                timestamp: (dbMsg as any).timestamp || (dbMsg as any).createdAt,
+                createdAt: (dbMsg as any).createdAt || (dbMsg as any).timestamp,
+                model: (dbMsg as any).model,
+                toolCalls: (dbMsg as any).toolCalls || [],
+                r2Files: r2Msg.r2Files || (dbMsg as any).r2Files || [], // Prefer R2 files
+                files: (dbMsg as any).files,
+                incomplete: (dbMsg as any).incomplete === true,
+              };
+            }
+          }
+          
+          // Otherwise use R2 version
+          return r2Msg;
+        });
+        
+        // Add any DB-only messages (not in R2)
         const r2Ids = new Set(messages.map((m: any) => m.id || m._id?.toString()));
         for (const m of dbMessageList) {
           const id = (m as any)._id?.toString?.() || (m as any).id;

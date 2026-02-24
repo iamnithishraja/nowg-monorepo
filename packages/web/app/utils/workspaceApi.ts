@@ -56,7 +56,13 @@ export const loadConversation = async (
   }
 
   // Otherwise, load all conversation messages
-  const response = await fetch(url);
+  // Add cache-busting to ensure we always get fresh data (important for resume flow)
+  const response = await fetch(url, {
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache',
+    },
+  });
 
   if (!response.ok) {
     throw new Error(`Failed to load conversation: ${response.status}`);
