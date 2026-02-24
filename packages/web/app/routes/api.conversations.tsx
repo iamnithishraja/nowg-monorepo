@@ -61,13 +61,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
         : undefined;
 
       // Try to fetch entire conversation (messages + files) from R2 first
+      // Add timeout to prevent hanging if R2 is slow
       let r2Messages: any[] | null = null;
       try {
-        const r2Result = await getConversationFromR2(
+        const r2Promise = getConversationFromR2(
           userId,
           conversationId,
           projectId,
         );
+        
+        // 5 second timeout for R2 fetch
+        const timeoutPromise = new Promise<{ success: false }>((_, reject) => 
+          setTimeout(() => reject(new Error("R2 fetch timeout")), 5000)
+        );
+        
+        const r2Result = await Promise.race([r2Promise, timeoutPromise]);
 
         if (r2Result.success && r2Result.data && r2Result.data.messages) {
           r2Messages = r2Result.data.messages;

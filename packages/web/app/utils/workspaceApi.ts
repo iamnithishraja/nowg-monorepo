@@ -57,19 +57,34 @@ export const loadConversation = async (
 
   // Otherwise, load all conversation messages
   // Add cache-busting to ensure we always get fresh data (important for resume flow)
-  const response = await fetch(url, {
-    cache: 'no-store',
-    headers: {
-      'Cache-Control': 'no-cache',
-    },
-  });
+  // Add timeout to prevent hanging on slow responses
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+  
+  try {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
 
-  if (!response.ok) {
-    throw new Error(`Failed to load conversation: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Failed to load conversation: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Conversation load timed out. Please try again.');
+    }
+    throw error;
   }
-
-  const data = await response.json();
-  return data;
 };
 
 export const selectTemplate = async (
