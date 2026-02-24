@@ -68,6 +68,10 @@ export interface LLMChatResponse {
   usage?: any;
 }
 
+/** Shown when OpenRouter is unavailable (401/402/429). User credits are not deducted. */
+export const PROVIDER_MAINTENANCE_MESSAGE =
+  "NowGAI is under maintenance. Your credits won't be deducted — you're safe.";
+
 /**
  * Makes a request to OpenRouter API for LLM chat completion
  * @param request - The chat request parameters
@@ -123,8 +127,12 @@ export async function callLLMChat(
   );
 
   if (!response.ok) {
+    const status = response.status;
+    if (status === 401 || status === 402 || status === 429) {
+      throw new Error(PROVIDER_MAINTENANCE_MESSAGE);
+    }
     const errorText = await response.text();
-    throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
+    throw new Error(`OpenRouter API error: ${status} - ${errorText}`);
   }
 
   const data = await response.json();

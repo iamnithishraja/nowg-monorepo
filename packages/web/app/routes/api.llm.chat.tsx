@@ -39,6 +39,7 @@ function isOpenRouterExhausted(error: unknown): boolean {
       : String(error);
   const s = msg.toLowerCase();
   return (
+    s.includes("401") ||
     s.includes("402") ||
     s.includes("429") ||
     s.includes("payment required") ||

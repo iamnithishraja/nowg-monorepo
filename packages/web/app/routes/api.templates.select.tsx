@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { TemplateSelector } from "../lib/templateSelector";
 import { getEnv, getEnvWithDefault } from "~/lib/env";
+import { PROVIDER_MAINTENANCE_MESSAGE } from "~/lib/utils.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   return new Response("Template Selection API - GET not supported", {
@@ -58,6 +59,21 @@ export async function action({ request }: ActionFunctionArgs) {
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (error) {
+    const isMaintenance =
+      error instanceof Error &&
+      error.message.includes("under maintenance");
+    if (isMaintenance) {
+      return new Response(
+        JSON.stringify({
+          error: PROVIDER_MAINTENANCE_MESSAGE,
+          errorType: "provider_maintenance",
+        }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
     console.error("Template selection API error:", error);
     return new Response(
       JSON.stringify({ error: "Internal Server Error" }),

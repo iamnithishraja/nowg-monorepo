@@ -78,7 +78,15 @@ export const selectTemplate = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Template selection failed: ${response.status}`);
+    const data = await response.json().catch(() => ({}));
+    const errorMessage = (data as any).error;
+    const errorType = (data as any).errorType;
+    if (response.status === 503 && errorType === "provider_maintenance" && errorMessage) {
+      const err = new Error(errorMessage) as Error & { errorType?: string };
+      err.errorType = "provider_maintenance";
+      throw err;
+    }
+    throw new Error(errorMessage || `Template selection failed: ${response.status}`);
   }
 
   return await response.json();

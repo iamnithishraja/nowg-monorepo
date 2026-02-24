@@ -1381,7 +1381,12 @@ export class ChatService {
 
       return this.fallbackTitle(message);
     } catch (error) {
-      console.error("Error generating title with OpenRouter:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("under maintenance")) {
+        console.warn("OpenRouter unavailable (maintenance), using fallback title");
+      } else {
+        console.error("Error generating title with OpenRouter:", error);
+      }
       return this.fallbackTitle(message);
     }
   }

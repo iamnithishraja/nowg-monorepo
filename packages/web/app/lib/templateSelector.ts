@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { GitHubRepoImporter } from './githubRepo';
 import { getEnv, getEnvWithDefault } from './env';
+import { PROVIDER_MAINTENANCE_MESSAGE } from './utils.server';
 
 // Template definitions
 interface Template {
@@ -195,7 +196,11 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
       );
 
       if (!response.ok) {
-        throw new Error(`OpenRouter API error: ${response.status}`);
+        const status = response.status;
+        if (status === 401 || status === 402 || status === 429) {
+          throw new Error(PROVIDER_MAINTENANCE_MESSAGE);
+        }
+        throw new Error(`OpenRouter API error: ${status}`);
       }
 
       const data = await response.json();
@@ -211,6 +216,9 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
         };
       }
     } catch (error) {
+      if (error instanceof Error && error.message === PROVIDER_MAINTENANCE_MESSAGE) {
+        throw error;
+      }
       console.error("Error calling OpenRouter:", error);
       return {
         template: "blank",
