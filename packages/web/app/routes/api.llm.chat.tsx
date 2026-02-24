@@ -795,6 +795,9 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           );
         };
 
+        let accumulatedText = "";
+        let messageSaved = false;
+
         try {
           // Send conversation ID
           sendChunk({
@@ -1216,8 +1219,6 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           // Removed auto-creation of uploaded images
 
           // 🔥 NEW STREAMING LOGIC - Properly handles text before, during, and after artifacts
-          let accumulatedText = "";
-
           for await (const delta of result.textStream) {
             accumulatedText += delta;
 
@@ -1463,6 +1464,7 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             inputTokens,
             outputTokens,
           });
+          messageSaved = true;
 
           // Always track analytics for org/project conversations, even if whitelisted
           // Whitelisting only affects balance deduction, not analytics tracking
@@ -1807,10 +1809,41 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             figmaMCPPool.releaseConnection(userId);
           }
         } catch (error) {
-          sendChunk({
-            type: "error",
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+          // Save partially generated content first (before sendChunk which may fail if client disconnected)
+          if (
+            !messageSaved &&
+            currentConversationId &&
+            accumulatedText &&
+            accumulatedText.trim().length > 0
+          ) {
+            try {
+              await chatService.addMessage(currentConversationId, {
+                role: "assistant",
+                content: accumulatedText.trim(),
+                model: model,
+              });
+              messageSaved = true;
+              console.log(
+                "[API] Saved partial assistant message after stream error:",
+                accumulatedText.trim().length,
+                "chars"
+              );
+            } catch (saveError) {
+              console.error(
+                "[API] Failed to save partial message on stream error:",
+                saveError
+              );
+            }
+          }
+
+          try {
+            sendChunk({
+              type: "error",
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          } catch (_) {
+            // Client may have closed the connection
+          }
 
           // Release Figma MCP connection on error
           if (figmaMCPClient) {
