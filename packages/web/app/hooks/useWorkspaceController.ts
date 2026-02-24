@@ -1299,6 +1299,13 @@ conversationId
           // Otherwise it's cleanup/unmount - don't show error
           return;
         } else if (
+          errorAny.errorType === "provider_maintenance" ||
+          error.message.includes("under maintenance") ||
+          error.message.includes("won't be deducted")
+        ) {
+          // Our OpenRouter credits exhausted — show maintenance message; do not deduct user credits
+          chat.setError(error.message);
+        } else if (
           error.message.includes("Insufficient balance") ||
           error.message.includes("Payment Required") ||
           error.message.includes("spending limit") ||

@@ -494,18 +494,27 @@ export function useWorkspaceChat() {
     });
 
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = (errorData as any).error;
+      const errorType = (errorData as any).errorType;
+
       if (response.status === 402) {
-        const errorData = await response.json().catch(() => ({}));
         const error = new Error(
-          (errorData as any).error ||
+          errorMessage ||
             "Insufficient balance. Please recharge your account to continue."
         ) as any;
-        // Attach error data to the error object for detailed handling
         error.errorData = errorData;
-        error.errorType = (errorData as any).errorType || "insufficient_balance";
+        error.errorType = errorType || "insufficient_balance";
         throw error;
       }
-      throw new Error(`Chat API request failed: ${response.status}`);
+      if (response.status === 503 && errorType === "provider_maintenance") {
+        const error = new Error(
+          errorMessage || "NowGAI is under maintenance. Your credits won't be deducted — you're safe."
+        ) as any;
+        error.errorType = "provider_maintenance";
+        throw error;
+      }
+      throw new Error(errorMessage || `Chat API request failed: ${response.status}`);
     }
 
     return response;

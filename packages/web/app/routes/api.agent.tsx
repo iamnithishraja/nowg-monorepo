@@ -62,6 +62,31 @@ import { generateMessageId, generatePartId } from "~/models/agentMessageModel";
  * - done: Stream ended
  */
 
+/** Message shown when our OpenRouter credits are exhausted (provider-side). User credits are not deducted. */
+const PROVIDER_MAINTENANCE_MESSAGE =
+  "NowGAI is under maintenance. Your credits won't be deducted — you're safe.";
+
+function isOpenRouterExhausted(error: unknown): boolean {
+  const msg =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message?: unknown }).message)
+      : String(error);
+  const s = msg.toLowerCase();
+  return (
+    s.includes("402") ||
+    s.includes("429") ||
+    s.includes("payment required") ||
+    s.includes("insufficient credits") ||
+    s.includes("quota exceeded") ||
+    (s.includes("quota") && (s.includes("exceeded") || s.includes("limit"))) ||
+    s.includes("rate limit") ||
+    s.includes("usage limit") ||
+    s.includes("credits exhausted") ||
+    s.includes("out of credits") ||
+    (s.includes("billing") && s.includes("limit"))
+  );
+}
+
 /**
  * Tool categories for execution flow control
  * NOTE: Server-side tools (websearch, codesearch) are NOT included here
@@ -1348,9 +1373,15 @@ export async function action({ request }: ActionFunctionArgs) {
             console.error("[Agent API] Error name:", error.name);
             console.error("[Agent API] Error message:", error.message);
           }
+          const isProviderExhausted = isOpenRouterExhausted(error);
           sendChunk({
             type: "error",
-            error: error instanceof Error ? error.message : String(error),
+            error: isProviderExhausted
+              ? PROVIDER_MAINTENANCE_MESSAGE
+              : error instanceof Error
+                ? error.message
+                : String(error),
+            ...(isProviderExhausted && { errorType: "provider_maintenance" }),
           });
         } finally {
           done();
@@ -1372,6 +1403,16 @@ export async function action({ request }: ActionFunctionArgs) {
     if (error instanceof Error) {
       console.error("[Agent API] Fatal error stack:", error.stack);
       console.error("[Agent API] Fatal error name:", error.name);
+    }
+    const isProviderExhausted = isOpenRouterExhausted(error);
+    if (isProviderExhausted) {
+      return new Response(
+        JSON.stringify({
+          error: PROVIDER_MAINTENANCE_MESSAGE,
+          errorType: "provider_maintenance",
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } }
+      );
     }
     return new Response(
       JSON.stringify({

@@ -178,30 +178,35 @@ export function useChatHandlers({
           });
 
           if (!response.ok) {
-            // Handle 402 Payment Required (insufficient balance) errors
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = (errorData as any).error;
+            const errorType = (errorData as any).errorType;
+
             if (response.status === 402) {
-              const errorData = await response.json().catch(() => ({}));
               const error = new Error(
-                (errorData as any).error ||
+                errorMessage ||
                   "Insufficient balance. Please recharge your account to continue."
               ) as any;
-              // Attach error data to the error object for detailed handling
               error.errorData = errorData;
-              error.errorType =
-                (errorData as any).errorType || "insufficient_balance";
+              error.errorType = errorType || "insufficient_balance";
+              throw error;
+            }
+            if (response.status === 503 && errorType === "provider_maintenance") {
+              const error = new Error(
+                errorMessage ||
+                  "NowGAI is under maintenance. Your credits won't be deducted — you're safe."
+              ) as any;
+              error.errorType = "provider_maintenance";
               throw error;
             }
 
-            const errorText = await response
-              .text()
-              .catch(() => "Unknown error");
             console.error(
               "[ChatHandler] Agent API error:",
               response.status,
-              errorText
+              errorMessage
             );
             throw new Error(
-              `Agent API error: ${response.status} - ${errorText}`
+              errorMessage || `Agent API error: ${response.status}`
             );
           }
 
@@ -887,6 +892,10 @@ export function useChatHandlers({
                     // Agent finished
                     assistantText = assistantText || data.text || "";
                     return { text: assistantText, toolCalls: allToolCalls };
+                  } else if (data.type === "error") {
+                    const err = new Error(data.error ?? "Agent error") as any;
+                    if (data.errorType) err.errorType = data.errorType;
+                    throw err;
                   } else if (data.type === "sync_started") {
                     // Server-side DB sync started (conversation.json) - ignore, client handles file upload loader
                   } else if (data.type === "sync_completed") {
@@ -1128,6 +1137,13 @@ export function useChatHandlers({
               }
               // Otherwise it's cleanup/unmount - don't show error
             } else if (
+              errorAny.errorType === "provider_maintenance" ||
+              error.message.includes("under maintenance") ||
+              error.message.includes("won't be deducted")
+            ) {
+              // Our OpenRouter credits exhausted — show maintenance message; do not deduct user credits
+              chat.setError(error.message);
+            } else if (
               error.message.includes("Insufficient balance") ||
               error.message.includes("Payment Required") ||
               error.message.includes("spending limit") ||
@@ -1209,6 +1225,13 @@ export function useChatHandlers({
             }
             // Otherwise it's cleanup/unmount - don't show error
             return;
+          } else if (
+            errorAny.errorType === "provider_maintenance" ||
+            error.message.includes("under maintenance") ||
+            error.message.includes("won't be deducted")
+          ) {
+            // Our OpenRouter credits exhausted — show maintenance message; do not deduct user credits
+            chat.setError(error.message);
           } else if (
             error.message.includes("Insufficient balance") ||
             error.message.includes("Payment Required") ||

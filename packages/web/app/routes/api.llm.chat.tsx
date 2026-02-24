@@ -28,6 +28,31 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return new Response("LLM Chat API - GET not supported", { status: 405 });
 }
 
+/** Message shown when our OpenRouter credits are exhausted (provider-side). User credits are not deducted. */
+const PROVIDER_MAINTENANCE_MESSAGE =
+  "NowGAI is under maintenance. Your credits won't be deducted — you're safe.";
+
+function isOpenRouterExhausted(error: unknown): boolean {
+  const msg =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message?: unknown }).message)
+      : String(error);
+  const s = msg.toLowerCase();
+  return (
+    s.includes("402") ||
+    s.includes("429") ||
+    s.includes("payment required") ||
+    s.includes("insufficient credits") ||
+    s.includes("quota exceeded") ||
+    (s.includes("quota") && (s.includes("exceeded") || s.includes("limit"))) ||
+    s.includes("rate limit") ||
+    s.includes("usage limit") ||
+    s.includes("credits exhausted") ||
+    s.includes("out of credits") ||
+    s.includes("billing") && s.includes("limit")
+  );
+}
+
 export async function action({ request }: ActionFunctionArgs) {
   try {
     // Ensure database connection and environment variables are loaded first
@@ -1837,9 +1862,15 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           }
 
           try {
+            const isProviderExhausted = isOpenRouterExhausted(error);
             sendChunk({
               type: "error",
-              error: error instanceof Error ? error.message : "Unknown error",
+              error: isProviderExhausted
+                ? PROVIDER_MAINTENANCE_MESSAGE
+                : error instanceof Error
+                  ? error.message
+                  : "Unknown error",
+              ...(isProviderExhausted && { errorType: "provider_maintenance" }),
             });
           } catch (_) {
             // Client may have closed the connection
@@ -1865,20 +1896,33 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
     });
   } catch (error) {
     console.error("LLM API error:", error);
-    // Include more details in error response for debugging (but don't expose sensitive info)
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const isEnvError = errorMessage.includes("OPENROUTER_API_KEY") || 
-                       errorMessage.includes("environment") ||
-                       errorMessage.includes("MongoDB");
-    
+    const isEnvError =
+      errorMessage.includes("OPENROUTER_API_KEY") ||
+      errorMessage.includes("environment") ||
+      errorMessage.includes("MongoDB");
+    const isProviderExhausted = isOpenRouterExhausted(error);
+
+    if (isProviderExhausted) {
+      return new Response(
+        JSON.stringify({
+          error: PROVIDER_MAINTENANCE_MESSAGE,
+          errorType: "provider_maintenance",
+        }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ 
-        error: isEnvError 
-          ? "Server configuration error. Please try again in a moment." 
+      JSON.stringify({
+        error: isEnvError
+          ? "Server configuration error. Please try again in a moment."
           : "Internal Server Error",
-        // Include error type for debugging (safe to expose)
-        errorType: isEnvError ? "config_error" : "internal_error"
-      }), 
+        errorType: isEnvError ? "config_error" : "internal_error",
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
