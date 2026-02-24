@@ -79,15 +79,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
         );
       }
 
-      // Use R2 messages if available, otherwise fall back to database messages
+      // Use R2 messages if available, and merge in any DB-only messages (e.g. partial save when tab closed before R2 sync)
       let messages: any[] = [];
+      const dbMessageList = conversation.messages || [];
       if (r2Messages && r2Messages.length > 0) {
-        // Use R2 messages (they already have r2Files included)
-        messages = r2Messages;
+        messages = [...r2Messages];
+        const r2Ids = new Set(messages.map((m: any) => m.id || m._id?.toString()));
+        for (const m of dbMessageList) {
+          const id = (m as any)._id?.toString?.() || (m as any).id;
+          if (id && !r2Ids.has(id)) {
+            r2Ids.add(id);
+            messages.push({
+              id,
+              _id: (m as any)._id,
+              role: (m as any).role,
+              content: (m as any).content || "",
+              timestamp: (m as any).timestamp || (m as any).createdAt,
+              createdAt: (m as any).createdAt || (m as any).timestamp,
+              model: (m as any).model,
+              toolCalls: (m as any).toolCalls || [],
+              r2Files: (m as any).r2Files || [],
+              files: (m as any).files,
+            });
+          }
+        }
       } else {
-        // Fallback to database messages
-        const dbMessages = conversation.messages || [];
-        messages = dbMessages;
+        messages = dbMessageList;
       }
 
       // Sort messages by timestamp to ensure proper order
