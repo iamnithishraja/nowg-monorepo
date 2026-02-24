@@ -151,6 +151,8 @@ export const convertToUIMessages = (messages: any[]): Message[] => {
         ...(msg.outputTokens ? { outputTokens: msg.outputTokens } : {}),
         // Preserve timestamps
         ...(msg.timestamp || msg.createdAt ? { timestamp: msg.timestamp || msg.createdAt } : {}),
+        // Preserve incomplete flag (for resume when tab was closed mid-stream)
+        ...(msg.incomplete === true ? { incomplete: true } : {}),
       };
     });
 };

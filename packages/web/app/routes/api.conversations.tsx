@@ -100,6 +100,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
               toolCalls: (m as any).toolCalls || [],
               r2Files: (m as any).r2Files || [],
               files: (m as any).files,
+              incomplete: (m as any).incomplete === true,
             });
           }
         }
@@ -269,6 +270,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             // Tool calls - extracted from either legacy or parts format
             toolCalls,
             files,
+            incomplete: msg.incomplete === true,
           };
         }),
       };

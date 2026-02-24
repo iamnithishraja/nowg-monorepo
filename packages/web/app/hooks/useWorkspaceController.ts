@@ -1546,6 +1546,7 @@ conversationId
     updateConversationUrl,
     convertToUIMessages,
     chat,
+    handleStreamingResponseWrapper: stream,
     searchParams,
     location,
     selectedModel,

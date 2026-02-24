@@ -74,6 +74,8 @@ export interface Message {
   // Ordered segments preserving interleaved text and tool calls
   segments?: MessageSegment[];
   timestamp?: string | Date;
+  /** True when stream was interrupted (e.g. tab closed); used to resume and stream continuation */
+  incomplete?: boolean;
 }
 
 export interface DesignScheme {

@@ -78,24 +78,33 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const userId = session.user.id;
     const userEmail = session.user.email;
+    const body = await request.json();
     const {
-      messages,
+      messages: bodyMessages,
       model,
-      files,
+      files: bodyFiles,
       conversationId,
       designScheme,
       uploadedFiles,
       figmaUrl,
       enableFigmaMCP,
-    } = await request.json();
+      resume,
+    } = body;
 
-    if (!messages || !model || !files) {
+    const isResume = resume === true;
+    if (!isResume && (!bodyMessages || !model || !bodyFiles)) {
       return new Response(
         JSON.stringify({ error: "Missing messages or model" }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
         }
+      );
+    }
+    if (isResume && !conversationId) {
+      return new Response(
+        JSON.stringify({ error: "Conversation ID required for resume" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -363,6 +372,43 @@ export async function action({ request }: ActionFunctionArgs) {
         // If DB check fails, proceed without blocking to avoid hard outages
         console.warn("Balance check failed, proceeding:", e);
       }
+    }
+
+    // When resume=true, load messages from DB and set for streaming continuation
+    let messages: any[];
+    let files: Record<string, any>;
+    let resumeMessageId: string | null = null;
+    let resumePreviousContent = "";
+
+    if (isResume) {
+      const dbMessages = await chatService.getMessages(currentConversationId);
+      if (!dbMessages?.length) {
+        return new Response(JSON.stringify({ error: "No messages to resume" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const last = dbMessages[dbMessages.length - 1];
+      if (last.role !== "assistant" || !(last as any).incomplete) {
+        return new Response(JSON.stringify({ error: "Nothing to resume" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      resumeMessageId = last._id.toString();
+      resumePreviousContent = (last.content || "").trim();
+      messages = dbMessages.map((m: any) => ({
+        role: m.role,
+        content: m.content || "",
+      }));
+      files =
+        conversationDoc?.filesMap &&
+        Object.keys(conversationDoc.filesMap).length > 0
+          ? { ...conversationDoc.filesMap }
+          : {};
+    } else {
+      messages = bodyMessages;
+      files = bodyFiles;
     }
 
     // Integrate uploaded files into files map for LLM context (images removed)
@@ -710,9 +756,9 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
       return base;
     };
 
-    // Save user message to database (only once) and upload files in parallel
+    // Save user message to database (only once) and upload files in parallel (skip when resuming)
     let userMessageId: string | undefined;
-    if (lastUserMessage?.role === "user") {
+    if (!isResume && lastUserMessage?.role === "user") {
       userMessageId = await chatService.addMessage(currentConversationId, {
         role: "user",
         content: lastUserMessage.content,
@@ -801,6 +847,19 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
       return { role: m.role, content } as any;
     });
 
+    // For resume, append a user message instructing the model to continue from where it stopped
+    if (isResume && resumeMessageId) {
+      (modelMessages as any[]).push({
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `The previous assistant response was cut off. Continue from the exact point where it stopped. Output ONLY the continuation in the same format (nowgaiAction for file/shell changes). Do not repeat anything already said.\n\n${CONTINUE_PROMPT}`,
+          },
+        ],
+      });
+    }
+
     // 4) True streaming with real-time parsing
     const startTime = Date.now();
     // Track file processing state
@@ -823,6 +882,10 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
 
         let accumulatedText = "";
         let messageSaved = false;
+        /** When we save partial during stream, we update this message on completion/error (so reopen sees it immediately). */
+        let currentStreamMessageId: string | null = null;
+        let lastPartialSaveTime = 0;
+        const PARTIAL_SAVE_INTERVAL_MS = 2500; // Save partial every 2.5s so reopening tab sees latest
 
         try {
           // Send conversation ID
@@ -1430,6 +1493,37 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
                 }
               }
             }
+            // Periodic partial save so reopening the tab immediately shows progress and can resume
+            if (!isResume && accumulatedText.trim().length > 80) {
+              const now = Date.now();
+              if (!currentStreamMessageId) {
+                try {
+                  currentStreamMessageId = await chatService.addMessage(
+                    currentConversationId,
+                    {
+                      role: "assistant",
+                      content: accumulatedText.trim(),
+                      model: model,
+                      incomplete: true,
+                    }
+                  );
+                  lastPartialSaveTime = now;
+                } catch (e) {
+                  console.warn("[API] Partial save create failed:", e);
+                }
+              } else if (now - lastPartialSaveTime >= PARTIAL_SAVE_INTERVAL_MS) {
+                try {
+                  await chatService.updateMessage(
+                    currentStreamMessageId,
+                    userId,
+                    { content: accumulatedText.trim(), incomplete: true }
+                  );
+                  lastPartialSaveTime = now;
+                } catch (e) {
+                  console.warn("[API] Partial save update failed:", e);
+                }
+              }
+            }
           }
 
           const processingTime = Date.now() - startTime;
@@ -1437,8 +1531,14 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             `[API] Text streaming complete, processed ${fileCount} files and ${shellCount} shell commands total`
           );
 
+          // On resume, full content = previous partial + this continuation (so client gets one final update)
+          const fullRaw =
+            isResume && resumeMessageId
+              ? resumePreviousContent + accumulatedText.trim()
+              : accumulatedText.trim();
+
           // Send message complete event with cleaned content
-          let cleanContent = accumulatedText
+          let cleanContent = fullRaw
             .replace(/<nowgaiAction[^>]*>[\s\S]*?<\/nowgaiAction>/g, "")
             .replace(/<nowgaiArtifact[^>]*>[\s\S]*?<\/nowgaiArtifact>/g, "")
             .trim();
@@ -1453,7 +1553,7 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             const messageParser = new EnhancedMessageParser();
             const ops = messageParser.parseMessage(
               Math.random().toString(36).slice(2),
-              accumulatedText.trim()
+              fullRaw
             );
             if (ops && ops.length > 0) {
               sendChunk({ type: "file_operations", operations: ops });
@@ -1469,7 +1569,7 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           sendChunk({
             type: "message_complete",
             content: cleanContent,
-            raw: accumulatedText.trim(),
+            raw: fullRaw,
             processingTime,
             tokensUsed,
           });
@@ -1480,17 +1580,32 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           // No placeholder replacement needed
           const contentToSave = accumulatedText.trim();
 
-          // Save to database with token usage
-          // Note: R2 file sync is now handled by the frontend using pre-signed URLs
-          await chatService.addMessage(currentConversationId, {
-            role: "assistant",
-            content: contentToSave,
-            model: model,
-            tokensUsed,
-            inputTokens,
-            outputTokens,
-          });
-          messageSaved = true;
+          // Save to database: on resume or when we had a partial save, update; otherwise add new
+          if (isResume && resumeMessageId) {
+            await chatService.updateMessage(resumeMessageId, userId, {
+              content: resumePreviousContent + contentToSave,
+              incomplete: false,
+            });
+            messageSaved = true;
+          } else if (currentStreamMessageId) {
+            // We saved partial during stream; update to full content and mark complete
+            await chatService.updateMessage(currentStreamMessageId, userId, {
+              content: contentToSave,
+              incomplete: false,
+            });
+            messageSaved = true;
+          } else {
+            // Note: R2 file sync is now handled by the frontend using pre-signed URLs
+            await chatService.addMessage(currentConversationId, {
+              role: "assistant",
+              content: contentToSave,
+              model: model,
+              tokensUsed,
+              inputTokens,
+              outputTokens,
+            });
+            messageSaved = true;
+          }
 
           // Always track analytics for org/project conversations, even if whitelisted
           // Whitelisting only affects balance deduction, not analytics tracking
@@ -1835,22 +1950,35 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             figmaMCPPool.releaseConnection(userId);
           }
         } catch (error) {
-          // Save partially generated content first (before sendChunk which may fail if client disconnected)
+          // Save partially generated content when stream is interrupted (e.g. tab closed); skip when already resuming
           if (
+            !isResume &&
             !messageSaved &&
             currentConversationId &&
             accumulatedText &&
             accumulatedText.trim().length > 0
           ) {
             try {
-              await chatService.addMessage(currentConversationId, {
-                role: "assistant",
-                content: accumulatedText.trim(),
-                model: model,
-              });
+              if (currentStreamMessageId) {
+                await chatService.updateMessage(
+                  currentStreamMessageId,
+                  userId,
+                  {
+                    content: accumulatedText.trim(),
+                    incomplete: true,
+                  }
+                );
+              } else {
+                await chatService.addMessage(currentConversationId, {
+                  role: "assistant",
+                  content: accumulatedText.trim(),
+                  model: model,
+                  incomplete: true,
+                });
+              }
               messageSaved = true;
               console.log(
-                "[API] Saved partial assistant message after stream error:",
+                "[API] Saved partial assistant message (incomplete) after stream error:",
                 accumulatedText.trim().length,
                 "chars"
               );

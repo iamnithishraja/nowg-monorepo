@@ -353,6 +353,12 @@ export class ChatService {
         messageData.clientRequestId = clientRequestId;
       }
 
+      // Mark assistant message as incomplete when stream was interrupted (for resume)
+      const incomplete = (message as any).incomplete;
+      if (message.role === "assistant" && incomplete === true) {
+        messageData.incomplete = true;
+      }
+
       // Only add toolCalls if present
       if (toolCalls) {
         messageData.toolCalls = toolCalls.map((tc: any) => ({
@@ -1139,6 +1145,45 @@ export class ChatService {
       }
     } catch (error) {
       console.error("Error updating message model:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update an existing message (e.g. append content and set incomplete: false on resume complete).
+   */
+  async updateMessage(
+    messageId: string,
+    userId: string,
+    updates: { content?: string; incomplete?: boolean }
+  ): Promise<void> {
+    try {
+      await this.ensureConnection();
+
+      const message = await Messages.findById(messageId);
+      if (!message) {
+        throw new Error("Message not found");
+      }
+
+      const conversation = await Conversation.findById(message.conversationId);
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+      const convUserId = (conversation as any).userId?.toString?.() ?? conversation.userId;
+      if (convUserId !== userId) {
+        throw new Error("Unauthorized: You don't own this conversation");
+      }
+
+      const set: Record<string, any> = {};
+      if (updates.content !== undefined) set.content = updates.content;
+      if (updates.incomplete !== undefined) set.incomplete = updates.incomplete;
+
+      await Messages.findByIdAndUpdate(messageId, { $set: set });
+      await Conversation.findByIdAndUpdate(message.conversationId, {
+        $set: { updatedAt: new Date() },
+      });
+    } catch (error) {
+      console.error("Error updating message:", error);
       throw error;
     }
   }

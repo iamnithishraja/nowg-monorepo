@@ -67,6 +67,8 @@ export const messageSchemaDefinition = {
       },
     },
   ],
+  // True when stream was interrupted (e.g. tab closed); used to resume and stream continuation
+  incomplete: { type: Boolean, default: false },
   // File references stored in R2 (replaces files array)
   r2Files: [
     {

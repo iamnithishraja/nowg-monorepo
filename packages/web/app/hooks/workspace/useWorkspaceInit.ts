@@ -65,7 +65,16 @@ interface InitDeps {
     location: { pathname: string }
   ) => void;
   convertToUIMessages: (messages: any[]) => any[];
-  chat: { setMessages: (u: any) => void; setError: (s: string) => void };
+  chat: {
+    setMessages: (u: any) => void;
+    setError: (s: string) => void;
+    resumeGeneration?: (
+      conversationId: string,
+      selectedModel: string,
+      files: any
+    ) => Promise<Response | null>;
+  };
+  handleStreamingResponseWrapper?: (response: Response) => Promise<void>;
   searchParams: URLSearchParams;
   location: { pathname: string };
   selectedModel: string;
@@ -717,6 +726,7 @@ export function useWorkspaceInit({
   runLinear,
   designScheme,
   beforeInitialPrompt,
+  handleStreamingResponseWrapper,
 }: InitDeps) {
   const initialSendRef = useRef(false);
   const isInitializingRef = useRef(false);
@@ -950,6 +960,29 @@ export function useWorkspaceInit({
               
               // Always set messages, even if empty (this ensures empty chats show empty, not cached messages)
               chat.setMessages(uiMessages);
+
+              // Main conversation only: if last message is incomplete assistant, resume and stream continuation
+              if (
+                !chatId &&
+                uiMessages.length > 0 &&
+                chat.resumeGeneration &&
+                handleStreamingResponseWrapper
+              ) {
+                const last = uiMessages[uiMessages.length - 1];
+                if (
+                  last?.role === "assistant" &&
+                  (last as any).incomplete === true
+                ) {
+                  const response = await chat.resumeGeneration(
+                    urlConversationId,
+                    selectedModel,
+                    files.filesMap || {}
+                  );
+                  if (response) {
+                    await handleStreamingResponseWrapper(response);
+                  }
+                }
+              }
 
               // Debug: log which branch we're taking
               fetch("/api/conversations", {

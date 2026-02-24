@@ -154,6 +154,11 @@ export function useWorkspaceChat() {
     return id;
   };
 
+  /** Target an existing assistant message for streaming (e.g. when resuming so deltas append to it). */
+  const setStreamingTargetMessageId = (id: string | null) => {
+    currentAssistantMessageId.current = id;
+  };
+
   const updateLastAssistantMessage = (
     contentOrFn: string | ((prev: string) => string),
     mountedRef?: React.RefObject<boolean>
@@ -518,6 +523,44 @@ export function useWorkspaceChat() {
     }
 
     return response;
+  };
+
+  /** Resume generation: stream continuation for an incomplete assistant message (same stream format as normal). */
+  const resumeGeneration = async (
+    conversationId: string,
+    selectedModel: string,
+    files: FileMap
+  ): Promise<Response | null> => {
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.role !== "assistant") return null;
+    setStreamingTargetMessageId(lastMsg.id || null);
+    abortControllerRef.current = new AbortController();
+    setIsLoading(true);
+    setIsStreaming(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/llm/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resume: true,
+          conversationId,
+          model: selectedModel,
+          files: files || {},
+        }),
+        signal: abortControllerRef.current.signal,
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error((errData as any).error || `Resume failed: ${response.status}`);
+      }
+      return response;
+    } catch (e) {
+      setIsLoading(false);
+      setIsStreaming(false);
+      setError(e instanceof Error ? e.message : "Resume failed");
+      return null;
+    }
   };
 
   const cleanup = () => {
@@ -1010,7 +1053,9 @@ export function useWorkspaceChat() {
     updateToolCallInSegments,
     addMessage,
     beginAssistantMessage,
+    setStreamingTargetMessageId,
     updateLastAssistantMessage,
+    resumeGeneration,
     addFileCreationIndicator,
     markFileCompleted,
     markAllFilesCompleted,
