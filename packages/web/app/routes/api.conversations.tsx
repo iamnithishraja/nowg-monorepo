@@ -83,25 +83,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       let messages: any[] = [];
       const dbMessageList = conversation.messages || [];
       
-      // Debug: Log raw DB and R2 messages to check incomplete flag and content
-      console.log(`[API Conversations] Loading conversation ${conversationId}:`, {
-        r2MessagesCount: r2Messages?.length || 0,
-        dbMessagesCount: dbMessageList.length,
-        r2Messages: r2Messages?.map((m: any) => ({
-          id: m.id || m._id?.toString?.(),
-          role: m.role,
-          incomplete: m.incomplete,
-          contentLength: (m.content || "").length,
-        })) || [],
-        dbMessages: dbMessageList.map((m: any) => ({
-          id: (m as any)._id?.toString?.(),
-          role: (m as any).role,
-          incomplete: (m as any).incomplete,
-          incompleteType: typeof (m as any).incomplete,
-          contentLength: ((m as any).content || "").length,
-        })),
-      });
-      
       if (r2Messages && r2Messages.length > 0) {
         // Create a map of DB messages by ID for quick lookup
         const dbMessageMap = new Map<string, any>();
@@ -124,7 +105,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
             
             // If DB has more content, use DB version (stream completed after R2 sync)
             if (dbContentLength > r2ContentLength) {
-              console.log(`[API Conversations] Using DB content for message ${r2Id} (DB: ${dbContentLength} chars > R2: ${r2ContentLength} chars)`);
               return {
                 id: r2Id,
                 _id: (dbMsg as any)._id,

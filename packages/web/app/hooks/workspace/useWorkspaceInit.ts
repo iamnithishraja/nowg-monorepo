@@ -488,17 +488,15 @@ export async function reconstructFilesFromMessages(
   files: any,
   saveFile: any,
   runLinear: any,
-  conversationId?: string
+  conversationId?: string,
+  options?: { skipCommands?: boolean }
 ) {
-  console.log(`%c[reconstructFilesFromMessages] Called with:`, 'color: #f97316; font-weight: bold', {
-    messagesCount: messages?.length || 0,
-    conversationId,
-  });
+  const { skipCommands = false } = options || {};
+  
   
   try {
     // Early return if no messages
     if (!messages || messages.length === 0) {
-      console.log(`%c[reconstructFilesFromMessages] ⚠️ No messages, returning early`, 'color: #f59e0b; font-weight: bold');
       return;
     }
 
@@ -528,14 +526,8 @@ export async function reconstructFilesFromMessages(
           }
         }
       } catch (e) {
-        console.error(`%c[reconstructFilesFromMessages] Regex error:`, 'color: #ef4444; font-weight: bold', e);
+        console.error(`[reconstructFilesFromMessages] Regex error:`, e);
       }
-
-      console.log(`%c[reconstructFilesFromMessages] Message ${message.id}:`, 'color: #f97316; font-weight: bold', {
-        contentLength: message.content.length,
-        fileActionsFound: fileActions.length,
-        files: fileActions.map(f => f.filePath),
-      });
 
       // Add files to the map (last write wins)
       for (const fa of fileActions) {
@@ -544,16 +536,10 @@ export async function reconstructFilesFromMessages(
       }
     }
 
-    console.log(`%c[reconstructFilesFromMessages] Total files extracted:`, 'color: #f97316; font-weight: bold', {
-      count: latestFiles.size,
-      files: Array.from(latestFiles.keys()),
-    });
-
     if (latestFiles.size === 0) {
-      console.log(`%c[reconstructFilesFromMessages] ⚠️ No files found, returning early`, 'color: #f59e0b; font-weight: bold');
       return;
     }
-
+    
     // Convert to array format
     const wcFiles = Array.from(latestFiles.entries()).map(
       ([path, content]) => ({
@@ -565,7 +551,7 @@ export async function reconstructFilesFromMessages(
 
     // Update UI file state first to prevent layout shift
     files.setTemplateFilesState(wcFiles);
-
+    
     // Rebuild filesMap with absolute paths
     const newMap: any = {};
     for (const f of wcFiles) {
@@ -576,6 +562,7 @@ export async function reconstructFilesFromMessages(
         isBinary: false,
       };
     }
+    
     files.setFilesMap(newMap);
 
     // Add a small delay to let the UI update before WebContainer operations
@@ -586,6 +573,18 @@ export async function reconstructFilesFromMessages(
       await runLinear(
         wcFiles.map((f) => ({ path: f.path, content: f.content }))
       );
+    }
+    
+    // Skip command detection and execution if requested (e.g., during resume)
+    if (skipCommands) {
+      // Save snapshot to IndexedDB for fast future restore
+      if (conversationId && wcFiles.length > 0) {
+        const snapshot = filesToSnapshot(
+          wcFiles.map((f) => ({ path: f.path, content: f.content }))
+        );
+        await saveSnapshot(conversationId, snapshot);
+      }
+      return;
     }
 
     // Detect project commands using bolt.diy's approach (npm install, dev server, etc.)
@@ -714,8 +713,9 @@ ${commandActionsString}
       );
       await saveSnapshot(conversationId, snapshot);
     }
+    
   } catch (error) {
-    console.error("Failed to reconstruct files from conversation:", error);
+    console.error("[reconstructFilesFromMessages] Error:", error);
     // Don't throw the error to prevent breaking the initialization
   }
 }
@@ -973,18 +973,6 @@ export function useWorkspaceInit({
               const chatId = searchParams?.get("chatId") || null;
               const data = await loadConversation(urlConversationId, chatId);
               
-              // Debug: Log raw API response
-              console.log(`%c[Resume Debug] Raw API response:`, 'color: #3b82f6; font-weight: bold', {
-                conversationId: urlConversationId,
-                messagesCount: data.messages?.length || 0,
-                messages: data.messages?.map((m: any) => ({
-                  id: m.id,
-                  role: m.role,
-                  incomplete: m.incomplete,
-                  contentLength: m.content?.length || 0,
-                })),
-              });
-              
               setSelectedModel(data.conversation?.model || selectedModel);
               setConversationTitle(data.conversation?.title || null);
               
@@ -996,13 +984,6 @@ export function useWorkspaceInit({
               chat.setMessages(uiMessages);
 
               // Main conversation only: if last message is incomplete assistant, resume and stream continuation
-              console.log(`%c[Resume Debug] Checking resume conditions:`, 'color: #ff6b6b; font-weight: bold', {
-                chatId,
-                uiMessagesLength: uiMessages.length,
-                hasResumeGeneration: !!chat.resumeGeneration,
-                hasStreamingWrapper: !!handleStreamingResponseWrapper,
-              });
-              
               if (
                 !chatId &&
                 uiMessages.length > 0 &&
@@ -1010,19 +991,10 @@ export function useWorkspaceInit({
                 handleStreamingResponseWrapper
               ) {
                 const last = uiMessages[uiMessages.length - 1];
-                console.log(`%c[Resume Debug] Last message:`, 'color: #ff6b6b; font-weight: bold', {
-                  role: last?.role,
-                  incomplete: (last as any)?.incomplete,
-                  contentLength: last?.content?.length || 0,
-                  contentPreview: last?.content?.substring(0, 200),
-                });
-                
                 if (
                   last?.role === "assistant" &&
                   (last as any).incomplete === true
                 ) {
-                  console.log(`%c[Resume Debug] ✅ Found incomplete assistant message, starting resume flow`, 'color: #22c55e; font-weight: bold');
-                  
                   // IMPORTANT: Before resuming, restore ALL files from the conversation
                   // This includes files from previous messages AND the incomplete message
                   // Files in the incomplete message were generated but not yet processed by the frontend
@@ -1033,21 +1005,10 @@ export function useWorkspaceInit({
                     m.content.includes("<nowgaiAction")
                   );
                   
-                  console.log(`%c[Resume Debug] File actions check:`, 'color: #ff6b6b; font-weight: bold', {
-                    hasAnyFileActions,
-                    messagesWithActions: uiMessages.filter((m: any) => 
-                      m.role === "assistant" && 
-                      typeof m.content === "string" && 
-                      m.content.includes("<nowgaiAction")
-                    ).length,
-                  });
-                  
                   if (hasAnyFileActions) {
                     try {
                       const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
                       setIsReconstructingFiles(true);
-                      
-                      console.log(`%c[Resume Debug] Attempting R2 restore...`, 'color: #ff6b6b; font-weight: bold');
                       
                       // Try R2 restore first (fastest and most reliable)
                       let restored = await restoreFilesFromR2(
@@ -1057,25 +1018,24 @@ export function useWorkspaceInit({
                         runLinear
                       );
                       
-                      console.log(`%c[Resume Debug] R2 restore result:`, 'color: #ff6b6b; font-weight: bold', { restored });
-                      
                       // If R2 doesn't have files, fall back to message reconstruction
                       // This handles the case where user navigated away before R2 sync completed
                       if (!restored) {
-                        console.log(`%c[Resume Debug] R2 failed, falling back to message reconstruction...`, 'color: #f59e0b; font-weight: bold');
+                        // Skip commands during resume - we just need files restored
+                        // Commands will be handled by the continuing stream
                         await reconstructFilesFromMessages(
                           uiMessages,
                           files,
                           saveFile,
                           runLinear,
-                          urlConversationId
+                          urlConversationId,
+                          { skipCommands: true }
                         );
-                        console.log(`%c[Resume Debug] Message reconstruction complete`, 'color: #22c55e; font-weight: bold');
                       }
                       
                       setIsReconstructingFiles(false);
                     } catch (restoreError) {
-                      console.error("[Resume Debug] ❌ Error restoring files before resume:", restoreError);
+                      console.error("[Resume] Error restoring files:", restoreError);
                       const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
                       setIsReconstructingFiles(false);
                     }
@@ -1084,13 +1044,6 @@ export function useWorkspaceInit({
                   // Small delay to ensure React has processed the setMessages call above
                   // This prevents race conditions where streaming starts before messages are in state
                   await new Promise((resolve) => setTimeout(resolve, 50));
-                  
-                  console.log(`%c[Resume Debug] Calling resumeGeneration...`, 'color: #ff6b6b; font-weight: bold', {
-                    conversationId: urlConversationId,
-                    model: selectedModel,
-                    filesMapKeys: Object.keys(files.filesMap || {}).length,
-                    lastMessageId: last.id,
-                  });
                   
                   // Pass the incomplete message directly to avoid React state timing issues
                   // (chat.setMessages is async, so messages state may not be updated yet)
@@ -1101,27 +1054,10 @@ export function useWorkspaceInit({
                     last // Pass the incomplete message directly
                   );
                   
-                  console.log(`%c[Resume Debug] resumeGeneration response:`, 'color: #ff6b6b; font-weight: bold', {
-                    hasResponse: !!response,
-                    responseOk: response?.ok,
-                    responseStatus: response?.status,
-                  });
-                  
                   if (response) {
-                    console.log(`%c[Resume Debug] Starting stream processing...`, 'color: #22c55e; font-weight: bold');
                     await handleStreamingResponseWrapper(response);
-                    console.log(`%c[Resume Debug] Stream processing complete`, 'color: #22c55e; font-weight: bold');
-                  } else {
-                    console.log(`%c[Resume Debug] ⚠️ No response from resumeGeneration`, 'color: #f59e0b; font-weight: bold');
                   }
-                } else {
-                  console.log(`%c[Resume Debug] ℹ️ Last message is not incomplete assistant`, 'color: #6b7280; font-weight: bold', {
-                    role: last?.role,
-                    incomplete: (last as any)?.incomplete,
-                  });
                 }
-              } else {
-                console.log(`%c[Resume Debug] ℹ️ Resume conditions not met`, 'color: #6b7280; font-weight: bold');
               }
 
               // Debug: log which branch we're taking

@@ -537,31 +537,13 @@ export function useWorkspaceChat() {
     files: FileMap,
     incompleteMessage?: Message
   ): Promise<Response | null> => {
-    console.log(`%c[resumeGeneration] Called with:`, 'color: #8b5cf6; font-weight: bold', {
-      conversationId,
-      selectedModel,
-      filesCount: Object.keys(files || {}).length,
-      hasIncompleteMessage: !!incompleteMessage,
-      incompleteMessageId: incompleteMessage?.id,
-      messagesInState: messages.length,
-    });
-    
     // Use provided message or fall back to last message in state
     const lastMsg = incompleteMessage || messages[messages.length - 1];
     
-    console.log(`%c[resumeGeneration] Last message:`, 'color: #8b5cf6; font-weight: bold', {
-      hasLastMsg: !!lastMsg,
-      role: lastMsg?.role,
-      id: lastMsg?.id,
-      contentLength: lastMsg?.content?.length || 0,
-    });
-    
     if (!lastMsg || lastMsg.role !== "assistant") {
-      console.log(`%c[resumeGeneration] ❌ Invalid last message, returning null`, 'color: #ef4444; font-weight: bold');
       return null;
     }
     
-    console.log(`%c[resumeGeneration] Setting streaming target to:`, 'color: #8b5cf6; font-weight: bold', lastMsg.id);
     setStreamingTargetMessageId(lastMsg.id || null);
     abortControllerRef.current = new AbortController();
     setIsLoading(true);
@@ -569,7 +551,6 @@ export function useWorkspaceChat() {
     setError(null);
     
     try {
-      console.log(`%c[resumeGeneration] Fetching /api/llm/chat with resume=true...`, 'color: #8b5cf6; font-weight: bold');
       const response = await fetch("/api/llm/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -582,22 +563,13 @@ export function useWorkspaceChat() {
         signal: abortControllerRef.current.signal,
       });
       
-      console.log(`%c[resumeGeneration] Response:`, 'color: #8b5cf6; font-weight: bold', {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-      });
-      
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        console.log(`%c[resumeGeneration] ❌ Error response:`, 'color: #ef4444; font-weight: bold', errData);
         throw new Error((errData as any).error || `Resume failed: ${response.status}`);
       }
       
-      console.log(`%c[resumeGeneration] ✅ Returning response for streaming`, 'color: #22c55e; font-weight: bold');
       return response;
     } catch (e) {
-      console.log(`%c[resumeGeneration] ❌ Exception:`, 'color: #ef4444; font-weight: bold', e);
       setIsLoading(false);
       setIsStreaming(false);
       setError(e instanceof Error ? e.message : "Resume failed");

@@ -479,13 +479,27 @@ function ChatPanelComponent({
 
     let content = message.content;
 
-    // Remove artifact tags and their content
+    // Remove complete artifact tags and their content
     content = content.replace(
       /<nowgaiArtifact[^>]*>[\s\S]*?<\/nowgaiArtifact>/g,
       ""
     );
+    // Remove complete action tags and their content
     content = content.replace(
       /<nowgaiAction[^>]*>[\s\S]*?<\/nowgaiAction>/g,
+      ""
+    );
+    
+    // During streaming, also remove incomplete/partial tags that haven't closed yet
+    // This handles the case where we're mid-stream and the closing tag hasn't arrived
+    // Remove incomplete artifact tags (opened but not closed)
+    content = content.replace(
+      /<nowgaiArtifact[^>]*>[\s\S]*$/,
+      ""
+    );
+    // Remove incomplete action tags (opened but not closed)
+    content = content.replace(
+      /<nowgaiAction[^>]*>[\s\S]*$/,
       ""
     );
 
@@ -947,6 +961,9 @@ function ChatPanelComponent({
           let cleanText = textBefore
             .replace(/<nowgaiArtifact[^>]*>[\s\S]*?<\/nowgaiArtifact>/g, "")
             .replace(/<nowgaiAction[^>]*>[\s\S]*?<\/nowgaiAction>/g, "")
+            // Also remove incomplete/partial tags during streaming
+            .replace(/<nowgaiArtifact[^>]*>[\s\S]*$/, "")
+            .replace(/<nowgaiAction[^>]*>[\s\S]*$/, "")
             .replace(/\n\n\n+/g, "\n\n")
             .trim();
 
@@ -1025,6 +1042,9 @@ function ChatPanelComponent({
         let cleanText = textAfter
           .replace(/<nowgaiArtifact[^>]*>[\s\S]*?<\/nowgaiArtifact>/g, "")
           .replace(/<nowgaiAction[^>]*>[\s\S]*?<\/nowgaiAction>/g, "")
+          // Also remove incomplete/partial tags during streaming
+          .replace(/<nowgaiArtifact[^>]*>[\s\S]*$/, "")
+          .replace(/<nowgaiAction[^>]*>[\s\S]*$/, "")
           .replace(/\n\n\n+/g, "\n\n")
           .trim();
 
@@ -1040,6 +1060,9 @@ function ChatPanelComponent({
         .replace(/<div class="__nowgai_file_checklist__">[\s\S]*?<\/div>/g, "")
         .replace(/<nowgaiArtifact[^>]*>[\s\S]*?<\/nowgaiArtifact>/g, "")
         .replace(/<nowgaiAction[^>]*>[\s\S]*?<\/nowgaiAction>/g, "")
+        // Also remove incomplete/partial tags during streaming
+        .replace(/<nowgaiArtifact[^>]*>[\s\S]*$/, "")
+        .replace(/<nowgaiAction[^>]*>[\s\S]*$/, "")
         .replace(/\n\n\n+/g, "\n\n")
         .trim();
 

@@ -106,31 +106,21 @@ export function useStreamingHandler() {
               }
 
               switch (data.type) {
-                case "conversation_id":
-                  console.log(`%c[StreamingHandler] conversation_id:`, 'color: #06b6d4; font-weight: bold', data.conversationId);
-                  options.onConversationId(data.conversationId);
-                  break;
+        case "conversation_id":
+          options.onConversationId(data.conversationId);
+          break;
 
                 case "text_delta":
-                  // Log first few deltas to avoid spam
-                  if (assistantContent.length < 200) {
-                    console.log(`%c[StreamingHandler] text_delta:`, 'color: #06b6d4;', data.delta?.substring(0, 50));
-                  }
                   if (options.onTextDelta) {
                     options.onTextDelta(data.delta);
                   }
                   break;
 
                 case "file_action_start":
-                  console.log(`%c[StreamingHandler] file_action_start:`, 'color: #06b6d4; font-weight: bold', data.action?.filePath);
                   await options.onFileActionStart(data.action);
                   break;
 
                 case "file_action":
-                  console.log(`%c[StreamingHandler] file_action:`, 'color: #22c55e; font-weight: bold', {
-                    filePath: data.action?.filePath,
-                    contentLength: data.action?.content?.length || 0,
-                  });
                   await options.onFileAction(data.action);
                   break;
 
@@ -208,10 +198,6 @@ export function useStreamingHandler() {
                   break;
 
                 case "message_complete":
-                  console.log(`%c[StreamingHandler] message_complete:`, 'color: #22c55e; font-weight: bold', {
-                    contentLength: (data.content || "").length,
-                    rawLength: (data.raw || "").length,
-                  });
                   // Prefer raw content if provided (includes artifacts/actions)
                   assistantContent = data.raw || data.content || "";
                   options.onMessageComplete(assistantContent);
@@ -232,14 +218,13 @@ export function useStreamingHandler() {
                   break;
 
                 case "done":
-                  console.log(`%c[StreamingHandler] done`, 'color: #22c55e; font-weight: bold');
                   if (mountedRef.current) {
                     options.onDone();
                   }
                   break;
 
                 case "error":
-                  console.log(`%c[StreamingHandler] error:`, 'color: #ef4444; font-weight: bold', data.error);
+                  console.error(`[StreamingHandler] Error:`, data.error);
                   options.onError(data.error);
                   break;
               }

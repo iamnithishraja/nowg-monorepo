@@ -381,27 +381,17 @@ export async function action({ request }: ActionFunctionArgs) {
     let resumePreviousContent = "";
 
     if (isResume) {
-      console.log(`[API Resume] Starting resume for conversation: ${currentConversationId}`);
       const dbMessages = await chatService.getMessages(currentConversationId);
-      console.log(`[API Resume] Found ${dbMessages?.length || 0} messages in DB`);
       
       if (!dbMessages?.length) {
-        console.log(`[API Resume] ❌ No messages found`);
         return new Response(JSON.stringify({ error: "No messages to resume" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
       }
       const last = dbMessages[dbMessages.length - 1];
-      console.log(`[API Resume] Last message:`, {
-        role: last.role,
-        incomplete: (last as any).incomplete,
-        contentLength: (last.content || "").length,
-        contentPreview: (last.content || "").substring(0, 200),
-      });
       
       if (last.role !== "assistant" || !(last as any).incomplete) {
-        console.log(`[API Resume] ❌ Last message is not incomplete assistant`);
         return new Response(JSON.stringify({ error: "Nothing to resume" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -409,7 +399,6 @@ export async function action({ request }: ActionFunctionArgs) {
       }
       resumeMessageId = last._id.toString();
       resumePreviousContent = (last.content || "").trim();
-      console.log(`[API Resume] ✅ Will resume from message ${resumeMessageId}, previous content: ${resumePreviousContent.length} chars`);
       
       messages = dbMessages.map((m: any) => ({
         role: m.role,
@@ -420,7 +409,6 @@ export async function action({ request }: ActionFunctionArgs) {
         Object.keys(conversationDoc.filesMap).length > 0
           ? { ...conversationDoc.filesMap }
           : {};
-      console.log(`[API Resume] Loaded ${messages.length} messages and ${Object.keys(files).length} files for context`);
     } else {
       messages = bodyMessages;
       files = bodyFiles;
