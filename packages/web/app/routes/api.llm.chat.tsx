@@ -872,6 +872,28 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
       string,
       { startTime: number; isCompleted: boolean }
     >();
+
+    // When resuming, pre-populate pendingFiles with files already processed in the previous partial
+    // so we don't re-send file_action_start or file_action for them
+    if (isResume && resumeMessageId && resumePreviousContent) {
+      // Find all file starts in previous content
+      const fileStartRegex = /<nowgaiAction type="file" filePath="([^"]+)">/g;
+      let startMatch;
+      while ((startMatch = fileStartRegex.exec(resumePreviousContent)) !== null) {
+        const filePath = startMatch[1].trim();
+        pendingFiles.set(filePath, { startTime: Date.now(), isCompleted: false });
+      }
+      // Find all complete file actions in previous content and mark as completed
+      const completeFileRegex = /<nowgaiAction type="file" filePath="([^"]+)">([\s\S]*?)<\/nowgaiAction>/g;
+      let completeMatch;
+      while ((completeMatch = completeFileRegex.exec(resumePreviousContent)) !== null) {
+        const filePath = completeMatch[1].trim();
+        pendingFiles.set(filePath, { startTime: Date.now(), isCompleted: true });
+        fileCount++;
+      }
+      console.log(`[API] Resume: pre-populated ${pendingFiles.size} files from previous partial (${fileCount} completed)`);
+    }
+
     const stream = new ReadableStream({
       async start(controller) {
         const done = trackStreamConnection(controller as { signal?: AbortSignal });
@@ -883,7 +905,8 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           );
         };
 
-        let accumulatedText = "";
+        // When resuming, start with previous partial so tag detection (file actions) works on the full content
+        let accumulatedText = isResume && resumeMessageId ? resumePreviousContent : "";
         let messageSaved = false;
         /** When we save partial during stream, we update this message on completion/error (so reopen sees it immediately). */
         let currentStreamMessageId: string | null = null;
@@ -1534,11 +1557,8 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             `[API] Text streaming complete, processed ${fileCount} files and ${shellCount} shell commands total`
           );
 
-          // On resume, full content = previous partial + this continuation (so client gets one final update)
-          const fullRaw =
-            isResume && resumeMessageId
-              ? resumePreviousContent + accumulatedText.trim()
-              : accumulatedText.trim();
+          // accumulatedText already contains full content (including resumePreviousContent when resuming)
+          const fullRaw = accumulatedText.trim();
 
           // Send message complete event with cleaned content
           let cleanContent = fullRaw
@@ -1585,8 +1605,9 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
 
           // Save to database: on resume or when we had a partial save, update; otherwise add new
           if (isResume && resumeMessageId) {
+            // accumulatedText already contains resumePreviousContent + continuation
             await chatService.updateMessage(resumeMessageId, userId, {
-              content: resumePreviousContent + contentToSave,
+              content: contentToSave,
               incomplete: false,
             });
             messageSaved = true;
