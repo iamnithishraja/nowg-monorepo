@@ -33,6 +33,17 @@ const PROVIDER_MAINTENANCE_MESSAGE =
   "NowGAI is under maintenance. Your credits won't be deducted — you're safe.";
 
 function isOpenRouterExhausted(error: unknown): boolean {
+  // Check statusCode for API errors (e.g. AI_APICallError has statusCode 402)
+  if (typeof error === "object" && error !== null && "statusCode" in error) {
+    const code = (error as { statusCode?: unknown }).statusCode;
+    if (code === 401 || code === 402 || code === 429) return true;
+  }
+  if (typeof error === "object" && error !== null && "data" in error) {
+    const data = (error as { data?: { error?: { code?: number } } }).data;
+    const code = data?.error?.code;
+    if (code === 401 || code === 402 || code === 429) return true;
+  }
+
   const msg =
     typeof error === "object" && error !== null && "message" in error
       ? String((error as { message?: unknown }).message)
@@ -44,13 +55,17 @@ function isOpenRouterExhausted(error: unknown): boolean {
     s.includes("429") ||
     s.includes("payment required") ||
     s.includes("insufficient credits") ||
+    s.includes("requires more credits") ||
+    s.includes("can only afford") ||
+    s.includes("add more credits") ||
+    s.includes("openrouter.ai/settings/credits") ||
     s.includes("quota exceeded") ||
     (s.includes("quota") && (s.includes("exceeded") || s.includes("limit"))) ||
     s.includes("rate limit") ||
     s.includes("usage limit") ||
     s.includes("credits exhausted") ||
     s.includes("out of credits") ||
-    s.includes("billing") && s.includes("limit")
+    (s.includes("billing") && s.includes("limit"))
   );
 }
 
