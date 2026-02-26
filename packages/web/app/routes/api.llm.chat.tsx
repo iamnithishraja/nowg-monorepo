@@ -873,25 +873,28 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
       { startTime: number; isCompleted: boolean }
     >();
 
-    // When resuming, pre-populate pendingFiles with files already processed in the previous partial
-    // so we don't re-send file_action_start or file_action for them
+    // When resuming, extract files already processed in the previous partial
+    // We'll send file_action events for completed files so frontend can add them to file tree
+    const resumeCompletedFiles: Array<{ filePath: string; content: string }> = [];
     if (isResume && resumeMessageId && resumePreviousContent) {
-      // Find all file starts in previous content
+      // Find all file starts in previous content (incomplete files)
       const fileStartRegex = /<nowgaiAction type="file" filePath="([^"]+)">/g;
       let startMatch;
       while ((startMatch = fileStartRegex.exec(resumePreviousContent)) !== null) {
         const filePath = startMatch[1].trim();
         pendingFiles.set(filePath, { startTime: Date.now(), isCompleted: false });
       }
-      // Find all complete file actions in previous content and mark as completed
+      // Find all complete file actions in previous content
       const completeFileRegex = /<nowgaiAction type="file" filePath="([^"]+)">([\s\S]*?)<\/nowgaiAction>/g;
       let completeMatch;
       while ((completeMatch = completeFileRegex.exec(resumePreviousContent)) !== null) {
         const filePath = completeMatch[1].trim();
+        const content = completeMatch[2].trim();
         pendingFiles.set(filePath, { startTime: Date.now(), isCompleted: true });
+        resumeCompletedFiles.push({ filePath, content });
         fileCount++;
       }
-      console.log(`[API] Resume: pre-populated ${pendingFiles.size} files from previous partial (${fileCount} completed)`);
+      console.log(`[API] Resume: found ${pendingFiles.size} files from previous partial (${fileCount} completed)`);
     }
 
     const stream = new ReadableStream({
@@ -919,6 +922,31 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             type: "conversation_id",
             conversationId: currentConversationId,
           });
+
+          // When resuming, re-send file_action events for files completed in previous partial
+          // so frontend can add them to file tree (they might not be in R2 snapshot yet)
+          if (isResume && resumeCompletedFiles.length > 0) {
+            console.log(`[API] Resume: re-sending ${resumeCompletedFiles.length} completed files to frontend`);
+            for (const file of resumeCompletedFiles) {
+              // Send file_action_start first
+              sendChunk({
+                type: "file_action_start",
+                action: {
+                  type: "file",
+                  filePath: file.filePath,
+                },
+              });
+              // Then send the complete file_action
+              sendChunk({
+                type: "file_action",
+                action: {
+                  type: "file",
+                  filePath: file.filePath,
+                  content: file.content,
+                },
+              });
+            }
+          }
 
           // Surface Supabase endpoint to the frontend if available
           if (
