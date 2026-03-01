@@ -1,18 +1,15 @@
 import { useMemo, useRef, useState } from "react";
-import type {
-    Attachment,
-    Message
-} from "../types/chat";
+import type { Attachment, Message } from "../types/chat";
 import type { FileMap } from "../utils/constants";
 
 // Streaming segment types for ordered rendering
 export interface StreamingTextSegment {
-  type: 'text';
+  type: "text";
   content: string;
 }
 
 export interface StreamingToolCallSegment {
-  type: 'toolCall';
+  type: "toolCall";
   toolCall: any;
 }
 
@@ -25,16 +22,21 @@ export function useWorkspaceChat() {
   const [error, setError] = useState<string | null>(null);
   const [currentToolCalls, setCurrentToolCalls] = useState<any[]>([]); // Tool calls for current assistant message
   // Track streaming segments in order (text and tool calls interleaved)
-  const [streamingSegments, setStreamingSegments] = useState<StreamingSegment[]>([]);
+  const [streamingSegments, setStreamingSegments] = useState<
+    StreamingSegment[]
+  >([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const userCancelledRef = useRef(false);
   const processedFiles = useRef(new Set<string>());
 
   // Track which assistant message is currently being streamed to
   const currentAssistantMessageId = useRef<string | null>(null);
-  
+
   // Track last processed text delta to prevent duplicates (React 18 StrictMode can cause double processing)
-  const lastProcessedTextRef = useRef<{ text: string; timestamp: number } | null>(null);
+  const lastProcessedTextRef = useRef<{
+    text: string;
+    timestamp: number;
+  } | null>(null);
 
   // Track file creation for appending to message content
   const fileCreationState = useRef({
@@ -84,16 +86,16 @@ export function useWorkspaceChat() {
 
     // Clear processed files when starting a new assistant message
     processedFiles.current.clear();
-    
+
     // Capture current state from refs before clearing (avoids nested callback issues)
     const prevToolCalls = [...currentToolCallsRef.current];
     const prevSegments = [...streamingSegmentsRef.current];
-    
+
     // IMPORTANT: Update messages in a single atomic operation
     // This prevents race conditions and ensures all previous message data is preserved
     setMessages((prevMessages) => {
       let updatedMessages = [...prevMessages];
-      
+
       // Save tool calls and segments to the previous assistant message if they exist
       if ((prevToolCalls.length > 0 || prevSegments.length > 0) && prevMsgId) {
         updatedMessages = prevMessages.map((msg) => {
@@ -101,37 +103,52 @@ export function useWorkspaceChat() {
             const existingToolCalls = (msg as any).toolCalls;
             const existingSegments = (msg as any).segments;
             // Only save if the message doesn't already have them persisted
-            if ((!existingToolCalls || existingToolCalls.length === 0) || 
-                (!existingSegments || existingSegments.length === 0)) {
+            if (
+              !existingToolCalls ||
+              existingToolCalls.length === 0 ||
+              !existingSegments ||
+              existingSegments.length === 0
+            ) {
               // Finalize tool calls with completed status
               const finalizedToolCalls = prevToolCalls.map((tc) => ({
                 ...tc,
                 status: tc.status === "error" ? "error" : "completed",
               }));
-              
+
               // Finalize segments with updated tool call statuses
               const finalizedSegments = prevSegments.map((segment) => {
-                if (segment.type === 'toolCall') {
-                  const finalizedTc = finalizedToolCalls.find((tc) => tc.id === segment.toolCall.id);
+                if (segment.type === "toolCall") {
+                  const finalizedTc = finalizedToolCalls.find(
+                    (tc) => tc.id === segment.toolCall.id
+                  );
                   return {
-                    type: 'toolCall' as const,
-                    toolCall: finalizedTc || { ...segment.toolCall, status: 'completed' as const },
+                    type: "toolCall" as const,
+                    toolCall: finalizedTc || {
+                      ...segment.toolCall,
+                      status: "completed" as const,
+                    },
                   };
                 }
                 return segment;
               });
-              
+
               return {
                 ...msg,
-                toolCalls: existingToolCalls?.length > 0 ? existingToolCalls : finalizedToolCalls,
-                segments: existingSegments?.length > 0 ? existingSegments : finalizedSegments,
+                toolCalls:
+                  existingToolCalls?.length > 0
+                    ? existingToolCalls
+                    : finalizedToolCalls,
+                segments:
+                  existingSegments?.length > 0
+                    ? existingSegments
+                    : finalizedSegments,
               };
             }
           }
           return msg;
         });
       }
-      
+
       // Add the new assistant message
       return [
         ...updatedMessages,
@@ -142,14 +159,14 @@ export function useWorkspaceChat() {
         },
       ];
     });
-    
+
     // Clear streaming state for the new message (after messages are updated)
     setCurrentToolCalls([]);
     setStreamingSegments([]);
     currentToolCallsRef.current = [];
     streamingSegmentsRef.current = [];
     lastProcessedTextRef.current = null; // Reset text deduplication tracker
-    
+
     currentAssistantMessageId.current = id;
     return id;
   };
@@ -514,12 +531,15 @@ export function useWorkspaceChat() {
       }
       if (response.status === 503 && errorType === "provider_maintenance") {
         const error = new Error(
-          errorMessage || "NowGAI is under maintenance. Your credits won't be deducted — you're safe."
+          errorMessage ||
+            "NowGAI is under maintenance. Your credits won't be deducted — you're safe."
         ) as any;
         error.errorType = "provider_maintenance";
         throw error;
       }
-      throw new Error(errorMessage || `Chat API request failed: ${response.status}`);
+      throw new Error(
+        errorMessage || `Chat API request failed: ${response.status}`
+      );
     }
 
     return response;
@@ -539,17 +559,17 @@ export function useWorkspaceChat() {
   ): Promise<Response | null> => {
     // Use provided message or fall back to last message in state
     const lastMsg = incompleteMessage || messages[messages.length - 1];
-    
+
     if (!lastMsg || lastMsg.role !== "assistant") {
       return null;
     }
-    
+
     setStreamingTargetMessageId(lastMsg.id || null);
     abortControllerRef.current = new AbortController();
     setIsLoading(true);
     setIsStreaming(true);
     setError(null);
-    
+
     try {
       const response = await fetch("/api/llm/chat", {
         method: "POST",
@@ -562,12 +582,24 @@ export function useWorkspaceChat() {
         }),
         signal: abortControllerRef.current.signal,
       });
-      
+
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error((errData as any).error || `Resume failed: ${response.status}`);
+        const errorMessage =
+          (errData as any).error || `Resume failed: ${response.status}`;
+
+        // "Nothing to resume" means the stream already completed - not a real error
+        // Just return null so the caller can reload the conversation
+        if (errorMessage === "Nothing to resume") {
+          setIsLoading(false);
+          setIsStreaming(false);
+          // Don't set error - this is expected when stream completed while user was away
+          return null;
+        }
+
+        throw new Error(errorMessage);
       }
-      
+
       return response;
     } catch (e) {
       setIsLoading(false);
@@ -896,13 +928,15 @@ export function useWorkspaceChat() {
   };
 
   // Wrapper function to prevent duplicate messages when setting the entire array
-  const setMessagesWithDeduplication = (newMessages: Message[] | ((prev: Message[]) => Message[])) => {
+  const setMessagesWithDeduplication = (
+    newMessages: Message[] | ((prev: Message[]) => Message[])
+  ) => {
     // Use functional update to ensure we always have the latest state
     setMessages((prevMessages) => {
       // Handle both direct array and function updater
       let messagesArray: Message[];
-      
-      if (typeof newMessages === 'function') {
+
+      if (typeof newMessages === "function") {
         // Function updater - call it with the LATEST state from React
         messagesArray = newMessages(prevMessages);
       } else if (Array.isArray(newMessages)) {
@@ -910,13 +944,21 @@ export function useWorkspaceChat() {
         messagesArray = newMessages;
       } else {
         // Invalid input - log error and return previous state
-        console.error("[useWorkspaceChat] setMessages received non-array:", typeof newMessages, newMessages);
+        console.error(
+          "[useWorkspaceChat] setMessages received non-array:",
+          typeof newMessages,
+          newMessages
+        );
         return prevMessages;
       }
-      
+
       // Ensure it's still an array after function call
       if (!Array.isArray(messagesArray)) {
-        console.error("[useWorkspaceChat] setMessages function returned non-array:", typeof messagesArray, messagesArray);
+        console.error(
+          "[useWorkspaceChat] setMessages function returned non-array:",
+          typeof messagesArray,
+          messagesArray
+        );
         return prevMessages;
       }
 
@@ -946,11 +988,14 @@ export function useWorkspaceChat() {
   // double-invocation issues. React can call the updater function multiple times, so we must
   // not have side effects (like mutating refs) inside it.
   // Also includes deduplication to prevent the same tool call from appearing twice.
-  const setCurrentToolCallsWithSync = (updater: any[] | ((prev: any[]) => any[])) => {
+  const setCurrentToolCallsWithSync = (
+    updater: any[] | ((prev: any[]) => any[])
+  ) => {
     // 1. Read current value from ref (source of truth)
     const currentValue = currentToolCallsRef.current;
     // 2. Compute new value
-    let newValue = typeof updater === 'function' ? updater(currentValue) : updater;
+    let newValue =
+      typeof updater === "function" ? updater(currentValue) : updater;
     // 3. Deduplicate by tool call ID (prevents duplicates from rapid state updates)
     const seenIds = new Set<string>();
     newValue = newValue.filter((tc: any) => {
@@ -967,11 +1012,16 @@ export function useWorkspaceChat() {
 
   // Wrapper for setStreamingSegments that also syncs the ref
   // IMPORTANT: Same pattern as setCurrentToolCallsWithSync to avoid duplication
-  const setStreamingSegmentsWithSync = (updater: StreamingSegment[] | ((prev: StreamingSegment[]) => StreamingSegment[])) => {
+  const setStreamingSegmentsWithSync = (
+    updater:
+      | StreamingSegment[]
+      | ((prev: StreamingSegment[]) => StreamingSegment[])
+  ) => {
     // 1. Read current value from ref (source of truth)
     const currentValue = streamingSegmentsRef.current;
     // 2. Compute new value
-    const newValue = typeof updater === 'function' ? updater(currentValue) : updater;
+    const newValue =
+      typeof updater === "function" ? updater(currentValue) : updater;
     // 3. Update ref synchronously
     streamingSegmentsRef.current = newValue;
     // 4. Set React state directly
@@ -980,9 +1030,12 @@ export function useWorkspaceChat() {
 
   // Append text to streaming segments (updates last text segment or creates new one)
   // Includes deduplication to prevent the same text from being added twice in rapid succession
-  const appendTextSegment = (text: string, mountedRef?: React.RefObject<boolean>) => {
+  const appendTextSegment = (
+    text: string,
+    mountedRef?: React.RefObject<boolean>
+  ) => {
     if (mountedRef?.current === false) return;
-    
+
     // Deduplicate: if the same text was processed very recently (within 50ms), skip it
     // This prevents React 18 StrictMode double-processing from causing duplicate text
     const now = Date.now();
@@ -991,55 +1044,59 @@ export function useWorkspaceChat() {
       return; // Skip duplicate
     }
     lastProcessedTextRef.current = { text, timestamp: now };
-    
+
     setStreamingSegmentsWithSync((prev) => {
       const lastSegment = prev[prev.length - 1];
-      
+
       // If last segment is text, append to it
-      if (lastSegment && lastSegment.type === 'text') {
+      if (lastSegment && lastSegment.type === "text") {
         return [
           ...prev.slice(0, -1),
-          { type: 'text' as const, content: lastSegment.content + text }
+          { type: "text" as const, content: lastSegment.content + text },
         ];
       }
-      
+
       // Otherwise create new text segment
-      return [...prev, { type: 'text' as const, content: text }];
+      return [...prev, { type: "text" as const, content: text }];
     });
   };
 
   // Append a tool call segment
   // Includes deduplication to prevent the same tool call from appearing twice
-  const appendToolCallSegment = (toolCall: any, mountedRef?: React.RefObject<boolean>) => {
+  const appendToolCallSegment = (
+    toolCall: any,
+    mountedRef?: React.RefObject<boolean>
+  ) => {
     if (mountedRef?.current === false) return;
-    
+
     setStreamingSegmentsWithSync((prev) => {
       // Check if this tool call already exists in segments
       const existsInSegments = prev.some(
-        (segment) => segment.type === 'toolCall' && segment.toolCall.id === toolCall.id
+        (segment) =>
+          segment.type === "toolCall" && segment.toolCall.id === toolCall.id
       );
       if (existsInSegments) {
         // Already exists, don't add duplicate
         return prev;
       }
-      return [...prev, { type: 'toolCall' as const, toolCall }];
+      return [...prev, { type: "toolCall" as const, toolCall }];
     });
   };
 
   // Update a tool call in streaming segments
   const updateToolCallInSegments = (
-    toolCallId: string, 
+    toolCallId: string,
     updates: Partial<any>,
     mountedRef?: React.RefObject<boolean>
   ) => {
     if (mountedRef?.current === false) return;
-    
-    setStreamingSegmentsWithSync((prev) => 
+
+    setStreamingSegmentsWithSync((prev) =>
       prev.map((segment) => {
-        if (segment.type === 'toolCall' && segment.toolCall.id === toolCallId) {
+        if (segment.type === "toolCall" && segment.toolCall.id === toolCallId) {
           return {
             ...segment,
-            toolCall: { ...segment.toolCall, ...updates }
+            toolCall: { ...segment.toolCall, ...updates },
           };
         }
         return segment;
@@ -1049,44 +1106,47 @@ export function useWorkspaceChat() {
 
   // Memoize the return object to prevent unnecessary re-renders in consumers
   // The object reference only changes when state values change
-  return useMemo(() => ({
-    messages,
-    setMessages: setMessagesWithDeduplication,
-    isLoading,
-    setIsLoading,
-    isStreaming,
-    setIsStreaming,
-    error,
-    setError,
-    currentToolCalls,
-    setCurrentToolCalls: setCurrentToolCallsWithSync,
-    streamingSegments,
-    setStreamingSegments: setStreamingSegmentsWithSync,
-    appendTextSegment,
-    appendToolCallSegment,
-    updateToolCallInSegments,
-    addMessage,
-    beginAssistantMessage,
-    setStreamingTargetMessageId,
-    updateLastAssistantMessage,
-    resumeGeneration,
-    addFileCreationIndicator,
-    markFileCompleted,
-    markAllFilesCompleted,
-    setProjectTitle,
-    addApplicationStarted,
-    sendChatMessage,
-    cleanup,
-    interruptGeneration,
-    resetFileIndicators,
-    userCancelledRef,
-  }), [
-    messages,
-    isLoading,
-    isStreaming,
-    error,
-    currentToolCalls,
-    streamingSegments, // CRITICAL: Must be included for tool call status updates to show in UI
-    // Functions are stable references, but include for completeness
-  ]);
+  return useMemo(
+    () => ({
+      messages,
+      setMessages: setMessagesWithDeduplication,
+      isLoading,
+      setIsLoading,
+      isStreaming,
+      setIsStreaming,
+      error,
+      setError,
+      currentToolCalls,
+      setCurrentToolCalls: setCurrentToolCallsWithSync,
+      streamingSegments,
+      setStreamingSegments: setStreamingSegmentsWithSync,
+      appendTextSegment,
+      appendToolCallSegment,
+      updateToolCallInSegments,
+      addMessage,
+      beginAssistantMessage,
+      setStreamingTargetMessageId,
+      updateLastAssistantMessage,
+      resumeGeneration,
+      addFileCreationIndicator,
+      markFileCompleted,
+      markAllFilesCompleted,
+      setProjectTitle,
+      addApplicationStarted,
+      sendChatMessage,
+      cleanup,
+      interruptGeneration,
+      resetFileIndicators,
+      userCancelledRef,
+    }),
+    [
+      messages,
+      isLoading,
+      isStreaming,
+      error,
+      currentToolCalls,
+      streamingSegments, // CRITICAL: Must be included for tool call status updates to show in UI
+      // Functions are stable references, but include for completeness
+    ]
+  );
 }

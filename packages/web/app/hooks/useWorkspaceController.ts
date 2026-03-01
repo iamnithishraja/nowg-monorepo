@@ -241,14 +241,14 @@ export function useWorkspaceController(
       if (!force && versionCapturedInSessionRef.current) {
         return;
       }
-      
+
       if (!versionsHydrated || !conversationId) return;
 
       const filesSnapshot = cloneTemplateFiles(latestFilesRef.current);
       if (filesSnapshot.length === 0) {
         return;
       }
-      
+
       // Mark as captured for this session
       versionCapturedInSessionRef.current = true;
 
@@ -265,7 +265,7 @@ export function useWorkspaceController(
         const messagesSnapshot = latestMessagesRef.current;
         anchorMessageId =
           messagesSnapshot.length > 0
-            ? messagesSnapshot[messagesSnapshot.length - 1]?.id ?? null
+            ? (messagesSnapshot[messagesSnapshot.length - 1]?.id ?? null)
             : null;
       }
 
@@ -390,9 +390,8 @@ export function useWorkspaceController(
   ): Promise<File[]> => {
     try {
       const fileStorageService = createClientFileStorageService();
-      const files = await fileStorageService.getFilesForConversation(
-conversationId
-);
+      const files =
+        await fileStorageService.getFilesForConversation(conversationId);
 
       if (files && files.length > 0) {
         const restoredFiles: File[] = [];
@@ -703,7 +702,8 @@ conversationId
         setCommandProgress({
           phase: "preparing",
           message: "Running command",
-          details: command.substring(0, 50) + (command.length > 50 ? "..." : ""),
+          details:
+            command.substring(0, 50) + (command.length > 50 ? "..." : ""),
           progress: 10,
           startTime: Date.now(),
           error: null,
@@ -749,7 +749,7 @@ conversationId
       // Stream terminal output to store and detect preview URL lines
       const detach = onTerminalOutput((line: string) => {
         const { setCommandProgress } = useWorkspaceStore.getState() as any;
-        
+
         // Detect Vite/WebContainer URL lines
         const urlMatch = line.match(/https?:\/\/[^\s]+/);
         if (urlMatch && !previewUrl) {
@@ -768,31 +768,45 @@ conversationId
             })
           );
         }
-        
+
         // Detect server ready patterns and update progress
         const lowerLine = line.toLowerCase();
-        if (/ready in|local:|localhost:|compiled successfully|listening on|running at|➜\s+local:/i.test(line)) {
+        if (
+          /ready in|local:|localhost:|compiled successfully|listening on|running at|➜\s+local:/i.test(
+            line
+          )
+        ) {
           setCommandProgress({
             phase: "ready",
             message: "Server is ready",
             details: "Waiting for preview URL...",
             progress: 95,
           });
-        } else if (/starting.*dev|vite|next dev|webpack|dev server/i.test(lowerLine)) {
+        } else if (
+          /starting.*dev|vite|next dev|webpack|dev server/i.test(lowerLine)
+        ) {
           setCommandProgress({
             phase: "starting",
             message: "Starting development server",
             details: "Booting up the dev server...",
             progress: 75,
           });
-        } else if (/added\s+\d+\s+packages?|audited\s+\d+\s+packages?|up to date|done in\s+\d/i.test(lowerLine)) {
+        } else if (
+          /added\s+\d+\s+packages?|audited\s+\d+\s+packages?|up to date|done in\s+\d/i.test(
+            lowerLine
+          )
+        ) {
           setCommandProgress({
             phase: "building",
             message: "Dependencies installed",
             details: "Preparing to start server...",
             progress: 55,
           });
-        } else if (/resolving|fetching|linking|installing|preinstall|postinstall/i.test(lowerLine)) {
+        } else if (
+          /resolving|fetching|linking|installing|preinstall|postinstall/i.test(
+            lowerLine
+          )
+        ) {
           setCommandProgress({
             phase: "installing",
             message: "Installing dependencies",
@@ -800,7 +814,7 @@ conversationId
             progress: 35,
           });
         }
-        
+
         // Filter noisy extension warnings
         const noisy = /origins don't match|preloaded using link preload/i.test(
           line
@@ -835,8 +849,9 @@ conversationId
         true
       )
         .then(async () => {
-          const { setCommandProgress, resetCommandProgress } = useWorkspaceStore.getState() as any;
-          
+          const { setCommandProgress, resetCommandProgress } =
+            useWorkspaceStore.getState() as any;
+
           // Refresh preview after npm install completes to pick up new dependencies
           if (isNpmInstall) {
             setCommandProgress({
@@ -851,7 +866,7 @@ conversationId
               })
             );
           }
-          
+
           // If dev server command completed successfully, check for preview URL
           if (isDevServer) {
             // Give the server a moment to output the URL
@@ -971,9 +986,10 @@ conversationId
           if (result.success) {
             appendTerminalLine(`✅ Tool ${result.name} completed`);
           } else {
-            const errorMsg = !result.success && 'error' in result.result 
-              ? (result.result as { error: string }).error 
-              : 'Unknown error';
+            const errorMsg =
+              !result.success && "error" in result.result
+                ? (result.result as { error: string }).error
+                : "Unknown error";
             appendTerminalLine(`❌ Tool ${result.name} failed: ${errorMsg}`);
           }
         } catch {}
@@ -1012,7 +1028,10 @@ conversationId
       },
       onDone: () => {
         (async () => {
-          console.log(`%c[R2 Sync] 🎯 onDone callback triggered - streaming complete`, 'color: #8b5cf6; font-weight: bold; font-size: 14px');
+          console.log(
+            `%c[R2 Sync] 🎯 onDone callback triggered - streaming complete`,
+            "color: #8b5cf6; font-weight: bold; font-size: 14px"
+          );
           if (isMountedRef.current) {
             chat.setIsStreaming(false);
             // Mark all remaining file indicators as completed (removes spinners)
@@ -1028,27 +1047,37 @@ conversationId
               streamingConversationIdRef.current || conversationId;
             // Use latestFilesRef to get current files (closure has stale state)
             const currentFiles = latestFilesRef.current;
-            
-            console.log(`%c[R2 Sync] 🔍 onDone check: conversationId=${currentConvId}, filesCount=${currentFiles?.length || 0}`, 'color: #8b5cf6; font-weight: bold');
-            
+
+            console.log(
+              `%c[R2 Sync] 🔍 onDone check: conversationId=${currentConvId}, filesCount=${currentFiles?.length || 0}`,
+              "color: #8b5cf6; font-weight: bold"
+            );
+
             if (currentConvId && currentFiles.length > 0) {
               // Sync files to R2 from frontend (client-side upload)
               const { setIsSyncingToR2 } = useWorkspaceStore.getState();
               try {
-                console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = true`, 'color: #8b5cf6; font-weight: bold');
-                setIsSyncingToR2(true);
-                
-                const { uploadFilesToR2WithPresignedUrls, syncConversationJsonToR2 } = await import(
-                  "../lib/r2UploadClient"
+                console.log(
+                  `%c[R2 Sync] 🔄 Setting isSyncingToR2 = true`,
+                  "color: #8b5cf6; font-weight: bold"
                 );
-                
+                setIsSyncingToR2(true);
+
+                const {
+                  uploadFilesToR2WithPresignedUrls,
+                  syncConversationJsonToR2,
+                } = await import("../lib/r2UploadClient");
+
                 const filesToSync = currentFiles.map((f: any) => ({
                   path: f.path,
                   content: f.content,
                 }));
-                
-                console.log(`%c[R2 Sync] 📤 Starting client-side upload of ${filesToSync.length} files...`, 'color: #8b5cf6; font-weight: bold');
-                
+
+                console.log(
+                  `%c[R2 Sync] 📤 Starting client-side upload of ${filesToSync.length} files...`,
+                  "color: #8b5cf6; font-weight: bold"
+                );
+
                 const uploadResult = await uploadFilesToR2WithPresignedUrls(
                   currentConvId,
                   undefined, // No chatId for main conversation
@@ -1057,11 +1086,13 @@ conversationId
 
                 if (uploadResult.success) {
                   console.log(
-                    `%c[R2 Sync] ✅ Successfully uploaded ${uploadResult.uploadedFiles.length} files`, 'color: #22c55e; font-weight: bold'
+                    `%c[R2 Sync] ✅ Successfully uploaded ${uploadResult.uploadedFiles.length} files`,
+                    "color: #22c55e; font-weight: bold"
                   );
                 } else {
                   console.warn(
-                    `%c[R2 Sync] ⚠️ Some files failed to upload:`, 'color: #f59e0b; font-weight: bold',
+                    `%c[R2 Sync] ⚠️ Some files failed to upload:`,
+                    "color: #f59e0b; font-weight: bold",
                     uploadResult.failedFiles
                   );
                 }
@@ -1069,9 +1100,16 @@ conversationId
                 // Also sync conversation.json (metadata) to R2
                 await syncConversationJsonToR2(currentConvId);
               } catch (syncError) {
-                console.error(`%c[R2 Sync] ❌ Error syncing files to R2:`, 'color: #ef4444; font-weight: bold', syncError);
+                console.error(
+                  `%c[R2 Sync] ❌ Error syncing files to R2:`,
+                  "color: #ef4444; font-weight: bold",
+                  syncError
+                );
               } finally {
-                console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = false`, 'color: #8b5cf6; font-weight: bold');
+                console.log(
+                  `%c[R2 Sync] 🔄 Setting isSyncingToR2 = false`,
+                  "color: #8b5cf6; font-weight: bold"
+                );
                 setIsSyncingToR2(false);
               }
 
@@ -1267,7 +1305,7 @@ conversationId
     try {
       // Reset version captured flag for this new streaming session
       versionCapturedInSessionRef.current = false;
-      
+
       const response = await baseHandleSend(messageContent, fileMetadata);
 
       // Clear uploaded files state immediately after message is sent
@@ -1275,7 +1313,7 @@ conversationId
 
       if (response) {
         await stream(response);
-        
+
         // Ensure version snapshot is captured after streaming completes
         // This is a fallback in case onDone doesn't fire properly
         await captureVersionSnapshot();
@@ -1416,10 +1454,10 @@ conversationId
     await ensureLatestVersionBeforeSend();
 
     const messageContent = input.trim();
-    
+
     // Reset version captured flag for this new message
     versionCapturedInSessionRef.current = false;
-    
+
     if (!hasHandledInitialPrompt) {
       // For empty conversations, use initial prompt handler which includes template selection/cloning
       await handleInitialPrompt(messageContent, conversationId || undefined);
@@ -1627,7 +1665,13 @@ conversationId
   // Revert to a specific version - restores files, creates a new version, and syncs to R2
   const handleRevertToVersion = useCallback(
     async (versionId: string) => {
-      if (!versionId || isRestoringVersion || !versionsHydrated || !conversationId) return;
+      if (
+        !versionId ||
+        isRestoringVersion ||
+        !versionsHydrated ||
+        !conversationId
+      )
+        return;
 
       const targetVersion = versions.find((v) => v.id === versionId);
       if (!targetVersion) return;
@@ -1689,12 +1733,11 @@ conversationId
           const { setIsSyncingToR2 } = useWorkspaceStore.getState();
           try {
             setIsSyncingToR2(true);
-            
+
             // Use client-side upload with pre-signed URLs
-            const { uploadFilesToR2WithPresignedUrls } = await import(
-              "../lib/r2UploadClient"
-            );
-            
+            const { uploadFilesToR2WithPresignedUrls } =
+              await import("../lib/r2UploadClient");
+
             const uploadResult = await uploadFilesToR2WithPresignedUrls(
               conversationId,
               undefined, // No chatId for revert
@@ -1718,7 +1761,10 @@ conversationId
             const snapshot = filesToSnapshot(filesToSync);
             await saveSnapshot(conversationId, snapshot);
           } catch (snapshotError) {
-            console.error("[Revert] Error saving IndexedDB snapshot:", snapshotError);
+            console.error(
+              "[Revert] Error saving IndexedDB snapshot:",
+              snapshotError
+            );
           }
         }
       } catch (error) {
@@ -1749,10 +1795,13 @@ conversationId
   }, [isOnLatestVersion, latestVersionIdInList, handleVersionSelect]);
 
   // Memoize saveFile to prevent recreation
-  const memoizedSaveFile = useCallback((path: string, content: string) => {
-    files.updateFileContent(path, content);
-    return saveFile(path, content);
-  }, [files.updateFileContent, saveFile]);
+  const memoizedSaveFile = useCallback(
+    (path: string, content: string) => {
+      files.updateFileContent(path, content);
+      return saveFile(path, content);
+    },
+    [files.updateFileContent, saveFile]
+  );
 
   // Memoize terminal state to prevent unnecessary re-renders
   const terminalLines = useWorkspaceStore((s) => s.terminalLines);
@@ -1800,6 +1849,11 @@ conversationId
     chatError: chat.error,
     currentToolCalls: chat.currentToolCalls || [],
     streamingSegments: chat.streamingSegments || [],
+    // Expose setters for safety timeout reset
+    chat: {
+      setIsLoading: chat.setIsLoading,
+      setIsStreaming: chat.setIsStreaming,
+    },
 
     // files state
     templateFilesState: files.templateFilesState,

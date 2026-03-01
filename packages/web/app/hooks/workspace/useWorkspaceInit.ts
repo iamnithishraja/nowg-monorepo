@@ -68,6 +68,19 @@ interface InitDeps {
   chat: {
     setMessages: (u: any) => void;
     setError: (s: string) => void;
+    setIsLoading?: (v: boolean) => void;
+    setIsStreaming?: (v: boolean) => void;
+    beginAssistantMessage?: (ref: { current: boolean }) => string | null;
+    sendChatMessage?: (
+      messages: any[],
+      filesMap: any,
+      conversationId: string | null,
+      model: string,
+      uploadedFiles?: File[],
+      designScheme?: any,
+      figmaUrl?: string,
+      enableFigmaMCP?: boolean
+    ) => Promise<Response>;
     resumeGeneration?: (
       conversationId: string,
       selectedModel: string,
@@ -209,7 +222,7 @@ export async function restoreFilesFromR2(
     }
 
     const result = await response.json();
-    
+
     if (!result.success) {
       console.warn("[R2 Restore] Failed to fetch files from R2:", result.error);
       return false;
@@ -381,7 +394,9 @@ async function runProjectSetupFromFiles(
           // Wait for preload to complete if it's in progress
           // This prevents running npm install while GitHub clone is happening
           if (isPreloadInProgress()) {
-            appendTerminalLine("⏳ Waiting for node_modules cache to be ready...");
+            appendTerminalLine(
+              "⏳ Waiting for node_modules cache to be ready..."
+            );
             await waitForPreloadComplete();
             appendTerminalLine("✅ Cache ready!");
           }
@@ -389,12 +404,16 @@ async function runProjectSetupFromFiles(
           // Check if we have cached node_modules using BASE_TEMPLATE_CACHE_KEY
           // This key is populated by the preloader on the home page
           let restoredFromCache = false;
-          const hasCache = await hasNodeModulesSnapshotByHash(BASE_TEMPLATE_CACHE_KEY);
+          const hasCache = await hasNodeModulesSnapshotByHash(
+            BASE_TEMPLATE_CACHE_KEY
+          );
 
           if (hasCache) {
             appendTerminalLine("📦 Restoring node_modules from cache...");
 
-            const cachedFiles = await loadNodeModulesSnapshotByHash(BASE_TEMPLATE_CACHE_KEY);
+            const cachedFiles = await loadNodeModulesSnapshotByHash(
+              BASE_TEMPLATE_CACHE_KEY
+            );
 
             if (cachedFiles && cachedFiles.length > 0) {
               const restored = await restoreNodeModulesToContainer(
@@ -419,9 +438,11 @@ async function runProjectSetupFromFiles(
             ? "--prefer-offline --legacy-peer-deps --no-audit --no-fund"
             : "--legacy-peer-deps --no-audit --no-fund";
 
-          appendTerminalLine(restoredFromCache
+          appendTerminalLine(
+            restoredFromCache
               ? "📦 Installing any additional dependencies..."
-              : "📦 Installing dependencies...");
+              : "📦 Installing dependencies..."
+          );
 
           setIsTerminalRunning(true);
           await runShellCommand(
@@ -437,11 +458,7 @@ async function runProjectSetupFromFiles(
           appendTerminalLine("✅ Dependencies installed!");
 
           // Now run the dev server
-          await runDevServer(
-wcFiles,
-appendTerminalLine,
-setIsTerminalRunning
-);
+          await runDevServer(wcFiles, appendTerminalLine, setIsTerminalRunning);
         } catch (error) {
           console.error("[ProjectSetup] Error:", error);
         }
@@ -492,8 +509,7 @@ export async function reconstructFilesFromMessages(
   options?: { skipCommands?: boolean }
 ) {
   const { skipCommands = false } = options || {};
-  
-  
+
   try {
     // Early return if no messages
     if (!messages || messages.length === 0) {
@@ -539,7 +555,7 @@ export async function reconstructFilesFromMessages(
     if (latestFiles.size === 0) {
       return;
     }
-    
+
     // Convert to array format
     const wcFiles = Array.from(latestFiles.entries()).map(
       ([path, content]) => ({
@@ -551,7 +567,7 @@ export async function reconstructFilesFromMessages(
 
     // Update UI file state first to prevent layout shift
     files.setTemplateFilesState(wcFiles);
-    
+
     // Rebuild filesMap with absolute paths
     const newMap: any = {};
     for (const f of wcFiles) {
@@ -562,7 +578,7 @@ export async function reconstructFilesFromMessages(
         isBinary: false,
       };
     }
-    
+
     files.setFilesMap(newMap);
 
     // Add a small delay to let the UI update before WebContainer operations
@@ -574,7 +590,7 @@ export async function reconstructFilesFromMessages(
         wcFiles.map((f) => ({ path: f.path, content: f.content }))
       );
     }
-    
+
     // Skip command detection and execution if requested (e.g., during resume)
     if (skipCommands) {
       // Save snapshot to IndexedDB for fast future restore
@@ -611,20 +627,29 @@ export async function reconstructFilesFromMessages(
           // Wait for preload to complete if it's in progress
           // This prevents running npm install while GitHub clone is happening
           if (isPreloadInProgress()) {
-            appendTerminalLine("⏳ Waiting for node_modules cache to be ready...");
+            appendTerminalLine(
+              "⏳ Waiting for node_modules cache to be ready..."
+            );
             await waitForPreloadComplete();
             appendTerminalLine("✅ Cache ready!");
           }
 
           // Check for cached node_modules using BASE_TEMPLATE_CACHE_KEY
-          const hasCache = await hasNodeModulesSnapshotByHash(BASE_TEMPLATE_CACHE_KEY);
+          const hasCache = await hasNodeModulesSnapshotByHash(
+            BASE_TEMPLATE_CACHE_KEY
+          );
 
           if (hasCache) {
             appendTerminalLine("📦 Restoring node_modules from cache...");
-            const cachedFiles = await loadNodeModulesSnapshotByHash(BASE_TEMPLATE_CACHE_KEY);
+            const cachedFiles = await loadNodeModulesSnapshotByHash(
+              BASE_TEMPLATE_CACHE_KEY
+            );
 
             if (cachedFiles && cachedFiles.length > 0) {
-              const restored = await restoreNodeModulesToContainer(wc, cachedFiles);
+              const restored = await restoreNodeModulesToContainer(
+                wc,
+                cachedFiles
+              );
               if (restored) {
                 appendTerminalLine("✅ Restored node_modules from cache!");
                 restoredFromCache = true;
@@ -671,11 +696,15 @@ ${commandActionsString}
           if (isNpmInstall) {
             if (restoredFromCache) {
               // Use --prefer-offline since most deps are already restored from cache
-              finalCommand = "npm install --prefer-offline --legacy-peer-deps --no-audit --no-fund";
-              appendTerminalLine("📦 Installing any additional dependencies...");
+              finalCommand =
+                "npm install --prefer-offline --legacy-peer-deps --no-audit --no-fund";
+              appendTerminalLine(
+                "📦 Installing any additional dependencies..."
+              );
             } else if (nodeModulesExisted) {
               // node_modules existed, run quick update
-              finalCommand = "npm install --legacy-peer-deps --no-audit --no-fund";
+              finalCommand =
+                "npm install --legacy-peer-deps --no-audit --no-fund";
               appendTerminalLine("📦 Updating dependencies...");
             } else {
               appendTerminalLine("📦 Installing dependencies...");
@@ -713,7 +742,6 @@ ${commandActionsString}
       );
       await saveSnapshot(conversationId, snapshot);
     }
-    
   } catch (error) {
     console.error("[reconstructFilesFromMessages] Error:", error);
     // Don't throw the error to prevent breaking the initialization
@@ -766,7 +794,7 @@ export function useWorkspaceInit({
           debug: `initializeWorkspace START: urlConversationId=${urlConversationId}, initialPrompt=${!!initialPrompt}, isInitializingRef=${isInitializingRef.current}`,
         }),
       }).catch(() => {});
-      
+
       if (model) setSelectedModel(model || OPENROUTER_MODELS[0].id);
 
       try {
@@ -780,7 +808,8 @@ export function useWorkspaceInit({
 
         // Get current chatId
         const currentChatId = searchParams?.get("chatId") || null;
-        const isChatChange = lastChatIdRef.current !== currentChatId && isSameConversation;
+        const isChatChange =
+          lastChatIdRef.current !== currentChatId && isSameConversation;
 
         // Reset initialization flag if conversation changed
         if (previousConversationId !== urlConversationId) {
@@ -838,8 +867,13 @@ export function useWorkspaceInit({
           let conversationData: any = null;
           try {
             const chatId = searchParams?.get("chatId") || null;
-            conversationData = await loadConversation(urlConversationId, chatId);
-            setSelectedModel(conversationData.conversation?.model || selectedModel);
+            conversationData = await loadConversation(
+              urlConversationId,
+              chatId
+            );
+            setSelectedModel(
+              conversationData.conversation?.model || selectedModel
+            );
             setConversationTitle(conversationData.conversation?.title || null);
           } catch (error) {
             // Failed to load existing conversation, will create new one
@@ -859,16 +893,45 @@ export function useWorkspaceInit({
           if (initialPrompt && !initialSendRef.current) {
             initialSendRef.current = true;
 
-            // Check if the conversation already has an AI response (assistant message)
-            // If it only has user message, we still need to get AI response
-            const hasAssistantMessage =
-              conversationData &&
-              conversationData.messages &&
-              conversationData.messages.some(
+            // Check if the conversation already has a REAL AI response (not just template init message)
+            const assistantMessages =
+              conversationData?.messages?.filter(
                 (m: any) => m.role === "assistant"
-              );
+              ) || [];
 
-            if (hasAssistantMessage) {
+            // The template init message is saved to DB before LLM streaming starts.
+            // We need to check if we have MORE than just that, or if the last message
+            // is incomplete (streaming was interrupted).
+            const lastAssistant =
+              assistantMessages[assistantMessages.length - 1];
+
+            // Check if the ONLY assistant message is the template init message
+            // Template messages contain specific phrases and are usually short
+            const isOnlyTemplateMessage =
+              assistantMessages.length === 1 &&
+              lastAssistant &&
+              (lastAssistant.content?.includes("Project set up successfully") ||
+                lastAssistant.content?.includes("Nowgai is initializing") ||
+                lastAssistant.content?.includes(
+                  "Now processing your request"
+                ) ||
+                lastAssistant.content?.includes(
+                  "Starting with a blank project"
+                ));
+
+            // Check if last message is incomplete (streaming interrupted)
+            const isIncomplete = lastAssistant?.incomplete === true;
+
+            // Has a real response if:
+            // - Has assistant messages AND
+            // - Not just a template message AND
+            // - Not incomplete
+            const hasRealAssistantResponse =
+              assistantMessages.length > 0 &&
+              !isOnlyTemplateMessage &&
+              !isIncomplete;
+
+            if (hasRealAssistantResponse) {
               // Conversation already has AI response, just load it
               const uiMessages = convertToUIMessages(conversationData.messages);
               chat.setMessages(uiMessages);
@@ -883,14 +946,15 @@ export function useWorkspaceInit({
               } catch (error) {
                 console.error("Error cleaning up IndexedDB files:", error);
               }
-              
+
               // IMPORTANT: Also restore files when reloading a conversation that was initially created with initialPrompt
               // This ensures files appear in the file tree on page reload
               if (uiMessages && uiMessages.length > 0) {
                 try {
-                  const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
+                  const { setIsReconstructingFiles } =
+                    useWorkspaceStore.getState() as any;
                   setIsReconstructingFiles(true);
-                  
+
                   // Try R2 restore first - it has the authoritative latest state
                   const r2Restored = await restoreFilesFromR2(
                     urlConversationId,
@@ -898,7 +962,7 @@ export function useWorkspaceInit({
                     saveFile,
                     runLinear
                   );
-                  
+
                   if (!r2Restored) {
                     // Fall back to snapshot
                     const snapshotRestored = await restoreFilesFromSnapshot(
@@ -908,7 +972,7 @@ export function useWorkspaceInit({
                       saveFile,
                       runLinear
                     );
-                    
+
                     if (!snapshotRestored) {
                       // Fall back to message reconstruction
                       await reconstructFilesFromMessages(
@@ -920,16 +984,107 @@ export function useWorkspaceInit({
                       );
                     }
                   }
-                  
+
                   setIsReconstructingFiles(false);
                 } catch (restoreError) {
-                  console.error("[File Restore] Error restoring files:", restoreError);
-                  const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
+                  console.error(
+                    "[File Restore] Error restoring files:",
+                    restoreError
+                  );
+                  const { setIsReconstructingFiles } =
+                    useWorkspaceStore.getState() as any;
                   setIsReconstructingFiles(false);
                 }
               }
+            } else if (
+              isIncomplete &&
+              chat.resumeGeneration &&
+              handleStreamingResponseWrapper
+            ) {
+              const uiMessages = convertToUIMessages(conversationData.messages);
+              chat.setMessages(uiMessages);
+              setHasHandledInitialPrompt(true);
+
+              try {
+                const response = await chat.resumeGeneration(
+                  urlConversationId,
+                  selectedModel,
+                  files.filesMap || {},
+                  lastAssistant
+                );
+
+                if (response) {
+                  await handleStreamingResponseWrapper(response);
+                }
+              } catch (e) {
+                console.error("[WorkspaceInit] Error resuming:", e);
+                if (chat.setIsLoading) chat.setIsLoading(false);
+                if (chat.setIsStreaming) chat.setIsStreaming(false);
+              }
+            } else if (isOnlyTemplateMessage) {
+              // Template message exists but no LLM response yet
+              // Don't call handleInitialPrompt (would create duplicate template)
+              // Just send the chat message directly
+              const uiMessages = convertToUIMessages(conversationData.messages);
+              chat.setMessages(uiMessages);
+              setHasHandledInitialPrompt(true);
+
+              const effectiveModel =
+                conversationData.conversation?.model || selectedModel;
+
+              if (
+                chat.sendChatMessage &&
+                chat.beginAssistantMessage &&
+                handleStreamingResponseWrapper
+              ) {
+                try {
+                  // Restore template files to WebContainer first
+                  const hasFileActions = uiMessages.some(
+                    (m: any) =>
+                      m.role === "assistant" &&
+                      typeof m.content === "string" &&
+                      m.content.includes("<nowgaiAction")
+                  );
+
+                  if (hasFileActions) {
+                    let restored = await restoreFilesFromR2(
+                      urlConversationId,
+                      files,
+                      saveFile,
+                      runLinear
+                    );
+
+                    if (!restored) {
+                      await reconstructFilesFromMessages(
+                        uiMessages,
+                        files,
+                        saveFile,
+                        runLinear,
+                        urlConversationId,
+                        { skipCommands: true }
+                      );
+                    }
+                  }
+
+                  chat.beginAssistantMessage({ current: true });
+
+                  const response = await chat.sendChatMessage(
+                    uiMessages,
+                    files.filesMap || {},
+                    urlConversationId,
+                    effectiveModel
+                  );
+
+                  await handleStreamingResponseWrapper(response);
+                } catch (e) {
+                  console.error(
+                    "[WorkspaceInit] Error sending chat message:",
+                    e
+                  );
+                }
+              }
             } else {
-              // No AI response yet, send the initial prompt to get AI response
+              // No assistant message at all - run full initial prompt flow
               setHasHandledInitialPrompt(false);
 
               if (model) setSelectedModel(model);
@@ -972,57 +1127,100 @@ export function useWorkspaceInit({
               // Get chatId from searchParams if available
               const chatId = searchParams?.get("chatId") || null;
               const data = await loadConversation(urlConversationId, chatId);
-              
-              setSelectedModel(data.conversation?.model || selectedModel);
+
+              const effectiveModel = data.conversation?.model || selectedModel;
+              setSelectedModel(effectiveModel);
               setConversationTitle(data.conversation?.title || null);
-              
+
               // Ensure messages is always an array - empty chats should show empty, not conversation messages
-              const messages = Array.isArray(data.messages) ? data.messages : [];
+              const messages = Array.isArray(data.messages)
+                ? data.messages
+                : [];
               const uiMessages = convertToUIMessages(messages);
-              
+
               // Always set messages, even if empty (this ensures empty chats show empty, not cached messages)
               chat.setMessages(uiMessages);
 
-              // Main conversation only: if last message is incomplete assistant, resume and stream continuation
-              if (
+              // Check conversation state to determine what action to take
+              const assistantMsgs = uiMessages.filter(
+                (m: any) => m.role === "assistant"
+              );
+              const userMsgs = uiMessages.filter((m: any) => m.role === "user");
+              const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
+
+              // Case 1: Only user message, no assistant at all
+              // User left before template even loaded
+              const hasOnlyUserMessage =
+                userMsgs.length > 0 && assistantMsgs.length === 0;
+
+              // Case 2: Only template message (no real LLM response yet)
+              // User left after template but before streaming started/saved
+              const isOnlyTemplateMsg =
+                assistantMsgs.length === 1 &&
+                lastAssistant &&
+                typeof lastAssistant.content === "string" &&
+                (lastAssistant.content.includes(
+                  "Project set up successfully"
+                ) ||
+                  lastAssistant.content.includes("Nowgai is initializing") ||
+                  lastAssistant.content.includes(
+                    "Now processing your request"
+                  ) ||
+                  lastAssistant.content.includes(
+                    "Starting with a blank project"
+                  ));
+
+              // Case 3: Incomplete message (streaming was interrupted after partial save)
+              const hasIncompleteMsg =
+                lastAssistant && (lastAssistant as any).incomplete === true;
+
+              // Handle Case 1: Only user message - run full initial prompt flow
+              if (!chatId && hasOnlyUserMessage && handleInitialPrompt) {
+                const userMsg = userMsgs[0];
+                if (userMsg && typeof userMsg.content === "string") {
+                  try {
+                    await handleInitialPrompt(
+                      userMsg.content,
+                      urlConversationId
+                    );
+                  } catch (e) {
+                    console.error(
+                      "[WorkspaceInit] Error running initial prompt:",
+                      e
+                    );
+                  }
+                }
+              }
+              // Handle Case 2: Only template message - just send chat message (template already set up)
+              else if (
                 !chatId &&
-                uiMessages.length > 0 &&
-                chat.resumeGeneration &&
-                handleStreamingResponseWrapper
+                isOnlyTemplateMsg &&
+                handleStreamingResponseWrapper &&
+                chat.sendChatMessage &&
+                chat.beginAssistantMessage
               ) {
-                const last = uiMessages[uiMessages.length - 1];
-                if (
-                  last?.role === "assistant" &&
-                  (last as any).incomplete === true
-                ) {
-                  // IMPORTANT: Before resuming, restore ALL files from the conversation
-                  // This includes files from previous messages AND the incomplete message
-                  // Files in the incomplete message were generated but not yet processed by the frontend
-                  // (they're in the message content as <nowgaiAction> tags)
-                  const hasAnyFileActions = uiMessages.some(
-                    (m: any) => m.role === "assistant" && 
-                    typeof m.content === "string" && 
-                    m.content.includes("<nowgaiAction")
-                  );
-                  
-                  if (hasAnyFileActions) {
-                    try {
-                      const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
-                      setIsReconstructingFiles(true);
-                      
-                      // Try R2 restore first (fastest and most reliable)
+                const userMsg = userMsgs[0];
+                if (userMsg && typeof userMsg.content === "string") {
+                  try {
+                    // Restore template files to WebContainer first
+                    // The template message contains <nowgaiAction> tags with all template files
+                    const hasFileActions = uiMessages.some(
+                      (m: any) =>
+                        m.role === "assistant" &&
+                        typeof m.content === "string" &&
+                        m.content.includes("<nowgaiAction")
+                    );
+
+                    if (hasFileActions) {
+                      // Try R2 first (has authoritative state), fall back to message reconstruction
                       let restored = await restoreFilesFromR2(
                         urlConversationId,
                         files,
                         saveFile,
                         runLinear
                       );
-                      
-                      // If R2 doesn't have files, fall back to message reconstruction
-                      // This handles the case where user navigated away before R2 sync completed
+
                       if (!restored) {
-                        // Skip commands during resume - we just need files restored
-                        // Commands will be handled by the continuing stream
                         await reconstructFilesFromMessages(
                           uiMessages,
                           files,
@@ -1032,30 +1230,149 @@ export function useWorkspaceInit({
                           { skipCommands: true }
                         );
                       }
-                      
-                      setIsReconstructingFiles(false);
-                    } catch (restoreError) {
-                      console.error("[Resume] Error restoring files:", restoreError);
-                      const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
-                      setIsReconstructingFiles(false);
                     }
+
+                    chat.beginAssistantMessage({ current: true });
+
+                    const response = await chat.sendChatMessage(
+                      uiMessages,
+                      files.filesMap || {},
+                      urlConversationId,
+                      effectiveModel
+                    );
+
+                    await handleStreamingResponseWrapper(response);
+                  } catch (e) {
+                    console.error(
+                      "[WorkspaceInit] Error sending chat message:",
+                      e
+                    );
                   }
-                  
+                }
+              }
+              // Handle Case 3: Incomplete message - resume streaming
+              else if (
+                !chatId &&
+                hasIncompleteMsg &&
+                chat.resumeGeneration &&
+                handleStreamingResponseWrapper
+              ) {
+                // Track if we set isReconstructingFiles so we can reset it in finally
+                let didSetReconstructing = false;
+                const { setIsReconstructingFiles } =
+                  useWorkspaceStore.getState() as any;
+
+                try {
+                  // IMPORTANT: Before resuming, restore ALL files from the conversation
+                  // This includes files from previous messages AND the incomplete message
+                  // Files in the incomplete message were generated but not yet processed by the frontend
+                  // (they're in the message content as <nowgaiAction> tags)
+                  const hasAnyFileActions = uiMessages.some(
+                    (m: any) =>
+                      m.role === "assistant" &&
+                      typeof m.content === "string" &&
+                      m.content.includes("<nowgaiAction")
+                  );
+
+                  if (hasAnyFileActions) {
+                    setIsReconstructingFiles(true);
+                    didSetReconstructing = true;
+
+                    // Try R2 restore first (fastest and most reliable)
+                    let restored = await restoreFilesFromR2(
+                      urlConversationId,
+                      files,
+                      saveFile,
+                      runLinear
+                    );
+
+                    // If R2 doesn't have files, fall back to message reconstruction
+                    // This handles the case where user navigated away before R2 sync completed
+                    if (!restored) {
+                      // Skip commands during resume - we just need files restored
+                      // Commands will be handled by the continuing stream
+                      await reconstructFilesFromMessages(
+                        uiMessages,
+                        files,
+                        saveFile,
+                        runLinear,
+                        urlConversationId,
+                        { skipCommands: true }
+                      );
+                    }
+
+                    setIsReconstructingFiles(false);
+                    didSetReconstructing = false;
+                  }
+
                   // Small delay to ensure React has processed the setMessages call above
                   // This prevents race conditions where streaming starts before messages are in state
                   await new Promise((resolve) => setTimeout(resolve, 50));
-                  
+
                   // Pass the incomplete message directly to avoid React state timing issues
                   // (chat.setMessages is async, so messages state may not be updated yet)
                   const response = await chat.resumeGeneration(
                     urlConversationId,
-                    selectedModel,
+                    effectiveModel,
                     files.filesMap || {},
-                    last // Pass the incomplete message directly
+                    lastAssistant // Pass the incomplete message directly
                   );
-                  
+
                   if (response) {
                     await handleStreamingResponseWrapper(response);
+                  } else {
+                    // resumeGeneration returned null - this means either:
+                    // 1. The backend stream already completed (nothing to resume)
+                    // 2. There was an error (already handled in resumeGeneration)
+                    // In case 1, we need to reload the conversation to get the latest message
+                    try {
+                      const freshData = await loadConversation(
+                        urlConversationId,
+                        null
+                      );
+                      const freshMessages = Array.isArray(freshData.messages)
+                        ? freshData.messages
+                        : [];
+                      const freshUiMessages =
+                        convertToUIMessages(freshMessages);
+                      chat.setMessages(freshUiMessages);
+                    } catch (reloadError) {
+                      console.error(
+                        "[Resume] Error reloading conversation:",
+                        reloadError
+                      );
+                    }
+                  }
+                } catch (resumeError) {
+                  console.error(
+                    "[Resume] Error during resume flow:",
+                    resumeError
+                  );
+                  // Ensure all loading states are reset on error
+                  if (chat.setIsLoading) chat.setIsLoading(false);
+                  if (chat.setIsStreaming) chat.setIsStreaming(false);
+
+                  // Try to reload conversation to get latest state
+                  try {
+                    const freshData = await loadConversation(
+                      urlConversationId,
+                      null
+                    );
+                    const freshMessages = Array.isArray(freshData.messages)
+                      ? freshData.messages
+                      : [];
+                    const freshUiMessages = convertToUIMessages(freshMessages);
+                    chat.setMessages(freshUiMessages);
+                  } catch (reloadError) {
+                    console.error(
+                      "[Resume] Error reloading conversation after error:",
+                      reloadError
+                    );
+                  }
+                } finally {
+                  // Always ensure isReconstructingFiles is reset
+                  if (didSetReconstructing) {
+                    setIsReconstructingFiles(false);
                   }
                 }
               }
@@ -1067,7 +1384,7 @@ export function useWorkspaceInit({
                 credentials: "include",
                 body: JSON.stringify({
                   action: "debug",
-                  debug: `Branch check: chatId=${chatId || 'null'}, messages.length=${messages?.length || 0}`,
+                  debug: `Branch check: chatId=${chatId || "null"}, messages.length=${messages?.length || 0}`,
                 }),
               }).catch(() => {});
 
@@ -1082,14 +1399,17 @@ export function useWorkspaceInit({
                 // 3. Files are not in UI state (templateFilesState is empty)
                 const hasActivePreview = !!getPreviewUrl();
                 const hasFilesInState = files.templateFilesState.length > 0;
-                const shouldRestoreFiles = (!isSameConversation && !hasActivePreview) || !hasFilesInState;
-                
+                const shouldRestoreFiles =
+                  (!isSameConversation && !hasActivePreview) ||
+                  !hasFilesInState;
+
                 if (shouldRestoreFiles) {
                   // Direct navigation to chat URL (fresh page load) - restore files from main conversation so tools can work
                   // Prefer R2 restore first (has latest files from all chats), then snapshot, then message reconstruction
                   await new Promise((resolve) => setTimeout(resolve, 100));
                   try {
-                    const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
+                    const { setIsReconstructingFiles } =
+                      useWorkspaceStore.getState() as any;
                     setIsReconstructingFiles(true);
 
                     // Try R2 restore first - it has the authoritative latest state from all chats
@@ -1113,8 +1433,13 @@ export function useWorkspaceInit({
                       if (!snapshotRestored) {
                         // If snapshot also failed, fall back to message reconstruction (legacy)
                         // Get all messages from main conversation for reconstruction
-                        const mainData = await loadConversation(urlConversationId, null);
-                        const mainMessages = convertToUIMessages(mainData.messages || []);
+                        const mainData = await loadConversation(
+                          urlConversationId,
+                          null
+                        );
+                        const mainMessages = convertToUIMessages(
+                          mainData.messages || []
+                        );
                         await reconstructFilesFromMessages(
                           mainMessages,
                           files,
@@ -1127,8 +1452,12 @@ export function useWorkspaceInit({
 
                     setIsReconstructingFiles(false);
                   } catch (restoreError) {
-                    console.error("[R2 Restore] Error restoring files for chat:", restoreError);
-                    const { setIsReconstructingFiles } = useWorkspaceStore.getState() as any;
+                    console.error(
+                      "[R2 Restore] Error restoring files for chat:",
+                      restoreError
+                    );
+                    const { setIsReconstructingFiles } =
+                      useWorkspaceStore.getState() as any;
                     setIsReconstructingFiles(false);
                   }
                 }
@@ -1140,7 +1469,7 @@ export function useWorkspaceInit({
 
                 const hasActivePreview = !!getPreviewUrl();
                 const hasFilesInState = files.templateFilesState.length > 0;
-                
+
                 // Also log to server for debugging
                 fetch("/api/conversations", {
                   method: "POST",
@@ -1199,10 +1528,7 @@ export function useWorkspaceInit({
 
                     setIsReconstructingFiles(false);
                   } catch (reconstructError) {
-                    console.error(
-                      "Failed to restore files:",
-                      reconstructError
-                    );
+                    console.error("Failed to restore files:", reconstructError);
                     const { setIsReconstructingFiles } =
                       useWorkspaceStore.getState() as any;
                     setIsReconstructingFiles(false);
@@ -1283,30 +1609,30 @@ export function useWorkspaceInit({
   useEffect(() => {
     // Only reload if conversationId exists and we're not handling initial prompt
     if (!urlConversationId || initialPrompt) return;
-    
+
     const chatId = searchParams?.get("chatId") || null;
-    
+
     // Skip if this is the initial load (handled by main effect)
     // Only reload if chatId actually changed
     if (lastChatIdRef.current === chatId) return;
-    
+
     const reloadChatMessages = async () => {
       try {
         // Clear messages first to prevent showing old messages
         chat.setMessages([]);
-        
+
         const data = await loadConversation(urlConversationId, chatId);
-        
+
         // Ensure messages is always an array - empty chats should show empty
         const messages = Array.isArray(data.messages) ? data.messages : [];
         const uiMessages = convertToUIMessages(messages);
-        
+
         // Always set messages, even if empty (this ensures empty chats show empty)
         chat.setMessages(uiMessages);
-        
+
         // When switching chats, don't restore files - chats are conversation-only
         // The main conversation files remain in WebContainer
-        
+
         // Update the ref to track current chatId
         lastChatIdRef.current = chatId;
       } catch (error) {
@@ -1315,7 +1641,14 @@ export function useWorkspaceInit({
     };
 
     reloadChatMessages();
-  }, [searchParams?.get("chatId"), urlConversationId, initialPrompt, loadConversation, convertToUIMessages, chat]); // Watch chatId changes
+  }, [
+    searchParams?.get("chatId"),
+    urlConversationId,
+    initialPrompt,
+    loadConversation,
+    convertToUIMessages,
+    chat,
+  ]); // Watch chatId changes
 
   return null;
 }

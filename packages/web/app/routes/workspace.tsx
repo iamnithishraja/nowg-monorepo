@@ -6,11 +6,15 @@ import {
   GithubLogo,
   Palette,
   SpinnerGap,
-  Upload
+  Upload,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { redirect, useLocation, useSearchParams } from "react-router";
-import { AgentModal, InsufficientBalanceModal, ProjectSidebar } from "../components";
+import {
+  AgentModal,
+  InsufficientBalanceModal,
+  ProjectSidebar,
+} from "../components";
 import ChatPanel from "../components/ChatPanel";
 import {
   DatabaseConnectionDialog,
@@ -52,7 +56,10 @@ import { useSupabaseAuth } from "../hooks/useSupabaseAuth";
 import { useWorkspaceController } from "../hooks/useWorkspaceController";
 import { auth } from "../lib/auth";
 import { cn } from "../lib/utils";
-import { useIsReconstructingFiles } from "../stores/useWorkspaceStore";
+import {
+  useIsReconstructingFiles,
+  useWorkspaceStore,
+} from "../stores/useWorkspaceStore";
 import type { DesignScheme } from "../types/design-scheme";
 import { getShortcutLabel } from "../utils/platform";
 import type { Route } from "./+types/workspace";
@@ -260,6 +267,46 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     }
   }, [controller.conversationId, hadInitialPrompt]);
 
+  // Safety timeout: Force-clear loading states if stuck for too long
+  // This prevents the loading screen from getting stuck indefinitely
+  // (e.g., when returning to page during streaming and resume fails)
+  useEffect(() => {
+    if (!isHydratingConversation || !hasConversation) return;
+
+    const timeout = setTimeout(() => {
+      console.warn(
+        "[Workspace] Loading timeout (15s) - checking for stuck states"
+      );
+
+      // Check if we have messages loaded - if so, we shouldn't be showing loader
+      if (controller.messages.length > 0) {
+        console.warn(
+          "[Workspace] Messages exist but loader still showing - forcing reset"
+        );
+
+        // Force reset loading states via the store
+        const { setIsReconstructingFiles } = useWorkspaceStore.getState();
+        setIsReconstructingFiles(false);
+
+        // Force reset chat loading states if they're stuck
+        if (controller.chatIsLoading && !controller.chatIsStreaming) {
+          controller.chat?.setIsLoading?.(false);
+        }
+
+        // Force the loader off
+        setShouldShowLoader(false);
+      }
+    }, 15000); // 15 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [
+    isHydratingConversation,
+    hasConversation,
+    controller.messages.length,
+    controller.chatIsLoading,
+    controller.chatIsStreaming,
+  ]);
+
   // Only show empty state when we're absolutely certain:
   // 1. Initial loading is done
   // 2. Conversation data is loaded
@@ -462,12 +509,12 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
           const chat = data.chats?.find((c: any) => c.id === currentChatId);
           if (chat) {
             setCurrentChatTitle(chat.title);
-            
+
             // Check if title is still a default title (Chat X) and we have messages
             // If so, keep polling for the generated title
             const isDefaultTitle = /^Chat \d+$/.test(chat.title);
             const hasMessages = controller.messages.length > 0;
-            
+
             if (isDefaultTitle && hasMessages) {
               // Title is being generated, poll again in 2 seconds
               if (chatTitlePollIntervalRef.current) {
@@ -509,21 +556,21 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
         // Check if it's still a default title and we have messages (title is being generated)
         const isDefaultTitle = /^Chat \d+$/.test(currentChatTitle);
         const hasMessages = controller.messages.length > 0;
-        
+
         if (isDefaultTitle && hasMessages) {
           // Title is being generated, show loading
           return "Loading...";
         }
-        
+
         return currentChatTitle;
       }
-      
+
       // No title yet, check if we have messages
       if (controller.messages.length > 0) {
         // Title is being generated
         return "Loading...";
       }
-      
+
       // No messages yet, show loading
       return "Loading...";
     }
@@ -539,7 +586,13 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     }
 
     return undefined;
-  }, [currentChatId, currentChatTitle, controller.messages.length, controller.conversationTitle, controller.conversationId]);
+  }, [
+    currentChatId,
+    currentChatTitle,
+    controller.messages.length,
+    controller.conversationTitle,
+    controller.conversationId,
+  ]);
 
   usePreventBrowserDragDrop();
 
@@ -639,7 +692,10 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                   ) : (
                     // Database not enabled - show toggle
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                      <Database className="w-4 h-4 text-purple-400" weight="bold" />
+                      <Database
+                        className="w-4 h-4 text-purple-400"
+                        weight="bold"
+                      />
                       <Label
                         htmlFor="db-toggle"
                         className="text-xs text-white/60 cursor-pointer"
@@ -802,7 +858,10 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     >
                       {controller.chatIsLoading ||
                       controller.isProcessingTemplate ? (
-                        <SpinnerGap className="w-4 h-4 animate-spin" weight="bold" />
+                        <SpinnerGap
+                          className="w-4 h-4 animate-spin"
+                          weight="bold"
+                        />
                       ) : (
                         <ArrowUp className="w-4 h-4" weight="bold" />
                       )}
@@ -832,14 +891,15 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
               <ResizablePanel defaultSize={28} minSize={22} maxSize={40}>
                 <div className="flex flex-col h-full min-h-0 max-h-full bg-canvas py-2">
                   {/* Left Panel Header */}
-                  <WorkspaceLeftHeader 
-                    chatTitle={getChatTitle} 
+                  <WorkspaceLeftHeader
+                    chatTitle={getChatTitle}
                     conversationId={controller.conversationId || undefined}
                     isCreatingNewChat={isCreatingNewChat}
                     currentChatTitle={currentChatTitle}
                     onCreateNewChat={async () => {
-                      if (!controller.conversationId || isCreatingNewChat) return;
-                      
+                      if (!controller.conversationId || isCreatingNewChat)
+                        return;
+
                       setIsCreatingNewChat(true);
                       try {
                         const response = await fetch("/api/conversations", {
@@ -850,45 +910,67 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                             conversationId: controller.conversationId,
                           }),
                         });
-                        
+
                         let data;
                         try {
                           data = await response.json();
                         } catch (jsonError) {
-                          console.error("Error parsing JSON response:", jsonError);
+                          console.error(
+                            "Error parsing JSON response:",
+                            jsonError
+                          );
                           const text = await response.text();
                           console.error("Response text:", text);
-                          alert(`Failed to create chat: Invalid response from server (${response.status})`);
+                          alert(
+                            `Failed to create chat: Invalid response from server (${response.status})`
+                          );
                           return;
                         }
-                        
+
                         if (!response.ok) {
-                          console.error("Error creating chat:", data.error || data.message || "Unknown error");
-                          alert(`Failed to create chat: ${data.error || data.message || `Server error (${response.status})`}`);
+                          console.error(
+                            "Error creating chat:",
+                            data.error || data.message || "Unknown error"
+                          );
+                          alert(
+                            `Failed to create chat: ${data.error || data.message || `Server error (${response.status})`}`
+                          );
                           return;
                         }
-                        
+
                         if (data.success && data.chatId) {
                           // Navigate to the new chat with chatId query parameter
                           // Use setSearchParams instead of reload to preserve WebContainer state and preview
-                          const newSearchParams = new URLSearchParams(searchParams);
+                          const newSearchParams = new URLSearchParams(
+                            searchParams
+                          );
                           newSearchParams.set("chatId", data.chatId);
                           setSearchParams(newSearchParams);
                           // No reload needed - React Router will handle the navigation
                           // The useWorkspaceInit hook will detect the chatId change and load chat messages
                         } else {
                           console.error("Unexpected response format:", data);
-                          alert("Failed to create chat: Invalid response format");
+                          alert(
+                            "Failed to create chat: Invalid response format"
+                          );
                         }
                       } catch (error) {
                         console.error("Error creating new chat:", error);
-                        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                        const errorMessage =
+                          error instanceof Error
+                            ? error.message
+                            : "Unknown error";
                         // Only show error if it's not a network error (network errors might be transient)
-                        if (!errorMessage.includes("network") && !errorMessage.includes("Network")) {
+                        if (
+                          !errorMessage.includes("network") &&
+                          !errorMessage.includes("Network")
+                        ) {
                           alert(`Failed to create chat: ${errorMessage}`);
                         } else {
                           // For network errors, try to create chat again silently or just navigate
-                          console.warn("Network error during chat creation, but continuing...");
+                          console.warn(
+                            "Network error during chat creation, but continuing..."
+                          );
                         }
                       } finally {
                         setIsCreatingNewChat(false);
@@ -920,21 +1002,32 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       selectedElementInfo={selectedElementInfo}
                       onInspectorEnable={() => setSelectedElementInfo(null)}
                       conversationId={controller.conversationId || undefined}
-                      currentToolCalls={(controller as any).currentToolCalls || []}
-                      streamingSegments={(controller as any).streamingSegments || []}
-                      chatId={currentChatId}
-                      conversationTitle={currentChatId ? (currentChatTitle || controller.conversationTitle) : controller.conversationTitle || undefined}
+                      currentToolCalls={
+                        (controller as any).currentToolCalls || []
+                      }
+                      streamingSegments={
+                        (controller as any).streamingSegments || []
+                      }
+                      chatId={currentChatId || undefined}
+                      conversationTitle={
+                        currentChatId
+                          ? (currentChatTitle ?? controller.conversationTitle) || undefined
+                          : controller.conversationTitle || undefined
+                      }
                       onFileClick={(filePath) => {
                         // Normalize path for the file tree (relative path without leading slash)
                         let normalizedPath = filePath;
-                        if (normalizedPath.startsWith('/home/project/')) {
-                          normalizedPath = normalizedPath.replace('/home/project/', '');
-                        } else if (normalizedPath.startsWith('/')) {
+                        if (normalizedPath.startsWith("/home/project/")) {
+                          normalizedPath = normalizedPath.replace(
+                            "/home/project/",
+                            ""
+                          );
+                        } else if (normalizedPath.startsWith("/")) {
                           normalizedPath = normalizedPath.slice(1);
                         }
                         controller.setSelectedPath(normalizedPath);
                         // Switch to files tab to show the file in editor
-                        controller.setActiveTab('files');
+                        controller.setActiveTab("files");
                       }}
                     />
                   </div>
@@ -1016,7 +1109,9 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     onGoToLatest={controller.handleReturnToLatestVersion}
                     isRestoringVersion={controller.isRestoringVersion}
                     templateFilesState={controller.templateFilesState}
-                    conversationTitle={controller.conversationTitle || undefined}
+                    conversationTitle={
+                      controller.conversationTitle || undefined
+                    }
                     messages={controller.messages}
                     chatId={currentChatId || undefined}
                   />

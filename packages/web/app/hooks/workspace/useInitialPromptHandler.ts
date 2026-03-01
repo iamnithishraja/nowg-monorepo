@@ -80,19 +80,27 @@ export function useInitialPromptHandler({
         }
       };
       // Idempotency: prevent duplicate initial sends caused by double effects/navigation
+      let idempotencyKey = "";
       try {
         const safeConv = activeConversationId || "new";
         const hash = Array.from(messageContent)
           .reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0)
           .toString();
-        const key = `nowgai:init:${safeConv}:${hash}`;
-        const alreadySent =           typeof window !== "undefined"             ? window.sessionStorage.getItem(key)             : null;
-        if (alreadySent) {
-          // If we've already sent this exact initial prompt for this conversation in this session, skip entirely
+        idempotencyKey = `nowgai:init:${safeConv}:${hash}`;
+        const status =
+          typeof window !== "undefined"
+            ? window.sessionStorage.getItem(idempotencyKey)
+            : null;
+
+        // Only skip if streaming actually completed ("done"), not just started ("pending")
+        if (status === "done") {
+          // Streaming completed successfully in this session, skip
           return;
         }
+
+        // Mark as pending (will be changed to "done" after successful streaming)
         if (typeof window !== "undefined") {
-          window.sessionStorage.setItem(key, "1");
+          window.sessionStorage.setItem(idempotencyKey, "pending");
         }
       } catch {}
 
@@ -158,9 +166,7 @@ export function useInitialPromptHandler({
             if (files && typeof files.setupTemplateFiles === "function") {
               files.setupTemplateFiles(normalizedPrime);
             }
-          } catch (e) {
-
-}
+          } catch (e) {}
 
           // Kick off actual file writes and webcontainer sync in background
           (async () => {
@@ -220,6 +226,11 @@ export function useInitialPromptHandler({
 
           await handleStreamingResponseWrapper(response);
 
+          // Mark idempotency key as done after successful streaming
+          if (idempotencyKey && typeof window !== "undefined") {
+            window.sessionStorage.setItem(idempotencyKey, "done");
+          }
+
           // Clean up uploaded files from IndexedDB after successful send
           await cleanupUploadedFiles(activeConversationId);
           return;
@@ -227,7 +238,9 @@ export function useInitialPromptHandler({
 
         // If screenshots/images are present on first prompt, bias to React template
         const currentUploads = getUploadedFiles ? getUploadedFiles() : [];
-        const hasImages = Array.isArray(currentUploads) && currentUploads.some((f) => (f as File).type?.startsWith("image/"));
+        const hasImages =
+          Array.isArray(currentUploads) &&
+          currentUploads.some((f) => (f as File).type?.startsWith("image/"));
         const templateData = await (selectTemplate as any)(
           messageContent,
           effectiveModel,
@@ -240,17 +253,17 @@ export function useInitialPromptHandler({
         ) {
           // Prime files map immediately so server-side context selection has access
           try {
-            const normalizedPrime = templateData.templateFiles.map((f: any) => ({
+            const normalizedPrime = templateData.templateFiles.map(
+              (f: any) => ({
                 name: f.name ?? (f.path.split("/").pop() || f.path),
                 path: f.path,
                 content: f.content,
-              }));
+              })
+            );
             if (files && typeof files.setupTemplateFiles === "function") {
               files.setupTemplateFiles(normalizedPrime);
             }
-          } catch (e) {
-
-}
+          } catch (e) {}
 
           // Kick off actual file writes and webcontainer sync in background
           // to reduce latency before first streamed token
@@ -323,7 +336,8 @@ export function useInitialPromptHandler({
 
           // Build model message history ensuring the last message is the user message,
           // so uploaded images are attached correctly on first send
-          const historyExcludingPlaceholder = (chat as any).messages?.filter?.(
+          const historyExcludingPlaceholder =
+            (chat as any).messages?.filter?.(
               (m: any) => m.id !== placeholderId
             ) || [];
 
@@ -360,6 +374,11 @@ export function useInitialPromptHandler({
           }
 
           await handleStreamingResponseWrapper(response);
+
+          // Mark idempotency key as done after successful streaming
+          if (idempotencyKey && typeof window !== "undefined") {
+            window.sessionStorage.setItem(idempotencyKey, "done");
+          }
 
           // Clean up uploaded files from IndexedDB after successful send
           await cleanupUploadedFiles(activeConversationId);
