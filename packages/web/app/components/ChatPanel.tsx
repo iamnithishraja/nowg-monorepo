@@ -1,5 +1,5 @@
 import { ChatCircle } from "@phosphor-icons/react";
-import { Bot, Download, FileText, Loader2, RotateCcw, X } from "lucide-react";
+import { Bot, Download, FileText, Loader2, RotateCcw, ShieldCheck, X } from "lucide-react";
 import type React from "react";
 import {
   Fragment,
@@ -1506,20 +1506,45 @@ function ChatPanelComponent({
               </div>
             )}
 
-          {error && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-destructive flex items-center justify-center">
-                <Bot className="w-4 h-4 text-foreground" />
-              </div>
-              <div className="flex-1">
-                <div className="bg-destructive/20 border border-destructive/20 p-3 rounded-lg">
-                  <div className="text-sm text-destructive">
-                    {error === "Chat aborted." ? error : `Error: ${error}`}
+          {error && (() => {
+            const isMaintenance =
+              error.includes("under maintenance") ||
+              error.includes("won't be deducted") ||
+              error.includes("credits won't be");
+            if (isMaintenance) {
+              return (
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-lg space-y-1">
+                      <p className="text-sm font-semibold text-amber-400">
+                        NowGAI is under maintenance
+                      </p>
+                      <p className="text-sm text-amber-300/80">
+                        Your credits are safe — nothing will be deducted. We'll be back shortly.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-destructive flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-foreground" />
+                </div>
+                <div className="flex-1">
+                  <div className="bg-destructive/20 border border-destructive/20 p-3 rounded-lg">
+                    <div className="text-sm text-destructive">
+                      {error === "Chat aborted." ? error : `Error: ${error}`}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div ref={messagesEndRef} />
         </div>

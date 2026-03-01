@@ -10,6 +10,42 @@ import { executeSQL } from "~/lib/supabaseManager";
 import { getEnv, getEnvWithDefault } from "~/lib/env";
 import { createClientFileStorageService } from "~/lib/clientFileStorage";
 
+/** Message shown when our OpenRouter credits are exhausted (provider-side). User credits are not deducted. */
+const PROVIDER_MAINTENANCE_MESSAGE =
+  "NowGAI is under maintenance. Your credits won't be deducted — you're safe.";
+
+function isOpenRouterExhausted(error: unknown): boolean {
+  if (typeof error === "object" && error !== null && "statusCode" in error) {
+    const code = (error as { statusCode?: unknown }).statusCode;
+    if (code === 401 || code === 402 || code === 429) return true;
+  }
+  if (typeof error === "object" && error !== null && "data" in error) {
+    const data = (error as { data?: { error?: { code?: number } } }).data;
+    const code = data?.error?.code;
+    if (code === 401 || code === 402 || code === 429) return true;
+  }
+  const msg =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message?: unknown }).message)
+      : String(error);
+  const s = msg.toLowerCase();
+  return (
+    s.includes("402") ||
+    s.includes("429") ||
+    s.includes("payment required") ||
+    s.includes("insufficient credits") ||
+    s.includes("requires more credits") ||
+    s.includes("can only afford") ||
+    s.includes("add more credits") ||
+    s.includes("openrouter.ai/settings/credits") ||
+    s.includes("quota exceeded") ||
+    s.includes("rate limit") ||
+    s.includes("usage limit") ||
+    s.includes("credits exhausted") ||
+    s.includes("out of credits")
+  );
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   return new Response(
     "Enhanced LLM Chat API with File Upload - GET not supported",
@@ -480,9 +516,15 @@ ${summary}
           });
 
         } catch (error) {
+          const isProviderExhausted = isOpenRouterExhausted(error);
           sendChunk({
             type: "error",
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: isProviderExhausted
+              ? PROVIDER_MAINTENANCE_MESSAGE
+              : error instanceof Error
+                ? error.message
+                : "Unknown error",
+            ...(isProviderExhausted && { errorType: "provider_maintenance" }),
           });
         } finally {
           controller.close();
@@ -499,6 +541,18 @@ ${summary}
     });
   } catch (error) {
     console.error("Enhanced LLM API error:", error);
+    if (isOpenRouterExhausted(error)) {
+      return new Response(
+        JSON.stringify({
+          error: PROVIDER_MAINTENANCE_MESSAGE,
+          errorType: "provider_maintenance",
+        }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
     return new Response(JSON.stringify({ error: "Internal Server Error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
