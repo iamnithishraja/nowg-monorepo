@@ -24,7 +24,7 @@ import {
   Users,
 } from "@phosphor-icons/react";
 import { memo, useEffect, useRef, useState } from "react";
-import { Link, redirect, useNavigate } from "react-router";
+import { redirect, useNavigate } from "react-router";
 import {
   DatabaseConnectionDialog,
   type DbProvider,
@@ -182,12 +182,19 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
   const [isCapacitor, setIsCapacitor] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   useEffect(() => {
     setIsCapacitor(
       typeof window !== "undefined" &&
         !!(window as any).Capacitor?.isNativePlatform?.()
     );
   }, []);
+
+  const closeProfileMenu = () => setProfileMenuOpen(false);
+  const navAndClose = (path: string) => {
+    navigate(path);
+    closeProfileMenu();
+  };
 
   const {
     hasSupabaseConnected,
@@ -831,15 +838,123 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               </div>
             )}
 
-            {/* On Capacitor: direct link so profile is reliably tappable; on web: dropdown */}
+            {/* On Capacitor: open touch-friendly modal with all menu links; on web: dropdown */}
             {isCapacitor ? (
-              <Link
-                to="/profile"
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-full hover:opacity-80 active:opacity-100 transition-opacity touch-manipulation cursor-pointer"
-                aria-label="Go to profile"
-              >
-                <HomeAvatar displayName={displayName} imageUrl={imageUrl} />
-              </Link>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen(true)}
+                  className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-full hover:opacity-80 active:opacity-100 transition-opacity touch-manipulation cursor-pointer"
+                  aria-label="Open account menu"
+                >
+                  <HomeAvatar displayName={displayName} imageUrl={imageUrl} />
+                </button>
+                <Dialog open={profileMenuOpen} onOpenChange={setProfileMenuOpen}>
+                  <DialogContent className="max-h-[85vh] overflow-y-auto bg-[#1a1a1a] border-white/10 text-white p-0 gap-0 max-w-[min(20rem,90vw)]">
+                    <DialogHeader className="px-4 pt-4 pb-2">
+                      <DialogTitle className="text-lg font-semibold text-white">
+                        Account
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="px-2 pb-4">
+                      <div className="rounded-lg overflow-hidden border border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => navAndClose("/profile")}
+                          className="w-full flex items-center gap-3 px-4 py-3 min-h-[48px] text-left hover:bg-white/5 active:bg-white/10 transition-colors touch-manipulation"
+                        >
+                          <HomeAvatar displayName={displayName} imageUrl={imageUrl} size={8} />
+                          <div className="min-w-0">
+                            <div className="font-medium truncate text-white">{user?.name || "User"}</div>
+                            {user?.email && (
+                              <div className="text-sm text-white/50 truncate">{user.email}</div>
+                            )}
+                          </div>
+                        </button>
+                        {balance !== null && (
+                          <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between gap-2">
+                            <span className="text-sm text-white/70">Balance</span>
+                            <span className="font-semibold text-purple-400">${balance.toFixed(2)}</span>
+                            {!isWhitelisted && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => navAndClose("/recharge")}
+                                className="h-8 text-xs text-purple-400 shrink-0"
+                              >
+                                Recharge
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <nav className="mt-2 rounded-lg overflow-hidden border border-white/10">
+                        {canAccessAdminPanel && (
+                          <button
+                            type="button"
+                            onClick={() => navAndClose("/admin")}
+                            className="w-full flex items-center gap-3 px-4 py-3 min-h-[48px] text-left text-white hover:bg-white/5 active:bg-white/10 transition-colors touch-manipulation"
+                          >
+                            <Shield className="w-5 h-5 shrink-0" weight="bold" />
+                            <span>Admin Panel</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => navAndClose("/analytics")}
+                          className="w-full flex items-center gap-3 px-4 py-3 min-h-[48px] text-left text-white hover:bg-white/5 active:bg-white/10 transition-colors touch-manipulation"
+                        >
+                          <ChartBar className="w-5 h-5 shrink-0" weight="bold" />
+                          <span>Analytics</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navAndClose("/deployments")}
+                          className="w-full flex items-center gap-3 px-4 py-3 min-h-[48px] text-left text-white hover:bg-white/5 active:bg-white/10 transition-colors touch-manipulation"
+                        >
+                          <GitBranch className="w-5 h-5 shrink-0" weight="bold" />
+                          <span>Deployments</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navAndClose("/supabase-projects")}
+                          className="w-full flex items-center gap-3 px-4 py-3 min-h-[48px] text-left text-white hover:bg-white/5 active:bg-white/10 transition-colors touch-manipulation"
+                        >
+                          <Database className="w-5 h-5 shrink-0" weight="bold" />
+                          <span>Supabase Projects</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navAndClose("/teams")}
+                          className="w-full flex items-center gap-3 px-4 py-3 min-h-[48px] text-left text-white hover:bg-white/5 active:bg-white/10 transition-colors touch-manipulation"
+                        >
+                          <Users className="w-5 h-5 shrink-0" weight="bold" />
+                          <span>Teams</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navAndClose("/manage-org/convo")}
+                          className="w-full flex items-center gap-3 px-4 py-3 min-h-[48px] text-left text-white hover:bg-white/5 active:bg-white/10 transition-colors touch-manipulation"
+                        >
+                          <ChatCircle className="w-5 h-5 shrink-0" weight="bold" />
+                          <span>Manage Organization</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSignOut();
+                            closeProfileMenu();
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 min-h-[48px] text-left text-red-400 hover:bg-red-500/10 active:bg-red-500/20 transition-colors touch-manipulation"
+                        >
+                          <SignOut className="w-5 h-5 shrink-0" weight="bold" />
+                          <span>Logout</span>
+                        </button>
+                      </nav>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </>
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
