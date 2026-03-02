@@ -232,20 +232,21 @@ export function ContributionGraph({ edits, projectName = "Nowgai" }: Contributio
   const canGoForward = selectedYear < currentYear;
 
   return (
-    <div className="bg-surface-1 border border-subtle rounded-[12px] p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-primary">
+    <div className="bg-surface-1 border border-subtle rounded-xl sm:rounded-[12px] p-3 sm:p-6 min-w-0 overflow-hidden">
+      {/* Header: title + year nav - stacks on small screens */}
+      <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h2 className="text-base sm:text-lg font-semibold text-primary truncate">
           {stats.totalEdits} contribution{stats.totalEdits !== 1 ? "s" : ""} in {selectedYear}
         </h2>
         
         {/* Year Navigation */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setSelectedYear(selectedYear - 1)}
             disabled={!canGoBack}
-            className="h-8 w-8 p-0 text-tertiary hover:text-primary disabled:opacity-30"
+            className="h-8 w-8 p-0 text-tertiary hover:text-primary disabled:opacity-30 touch-manipulation"
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -253,7 +254,7 @@ export function ContributionGraph({ edits, projectName = "Nowgai" }: Contributio
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="bg-surface-2 border border-subtle rounded-md px-3 py-1 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
+            className="bg-surface-2 border border-subtle rounded-md px-3 py-1.5 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/50 min-h-[32px]"
           >
             {availableYears.map((year) => (
               <option key={year} value={year}>
@@ -267,28 +268,29 @@ export function ContributionGraph({ edits, projectName = "Nowgai" }: Contributio
             size="sm"
             onClick={() => setSelectedYear(selectedYear + 1)}
             disabled={!canGoForward}
-            className="h-8 w-8 p-0 text-tertiary hover:text-primary disabled:opacity-30"
+            className="h-8 w-8 p-0 text-tertiary hover:text-primary disabled:opacity-30 touch-manipulation"
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      <div className="flex gap-4">
+      {/* Graph + Stats: column on small screens, row on large */}
+      <div className="flex flex-col lg:flex-row gap-4 min-w-0">
         {/* Calendar Grid */}
-        <div className="flex-1">
-          {/* Month labels row */}
-          <div className="flex gap-1 mb-2 pl-7">
+        <div className="flex-1 min-w-0">
+          {/* Month labels row - scrolls with grid on small screens */}
+          <div className="flex gap-1 mb-2 pl-5 sm:pl-7 overflow-x-auto overflow-y-hidden">
             {weeks.map((week, weekIndex) => {
               const firstDay = week[0]?.date;
-              if (!firstDay) return <div key={weekIndex} className="w-3" />;
+              if (!firstDay) return <div key={weekIndex} className="w-2.5 sm:w-3 shrink-0" />;
               
               // Get month name using explicit array (avoid locale issues)
               const month = monthNames[firstDay.getMonth()];
               
               // Skip if this is December from previous year (first partial week)
               if (firstDay.getFullYear() < selectedYear) {
-                return <div key={weekIndex} className="w-3" />;
+                return <div key={weekIndex} className="w-2.5 sm:w-3 shrink-0" />;
               }
               
               const prevWeek = weeks[weekIndex - 1];
@@ -298,13 +300,13 @@ export function ContributionGraph({ edits, projectName = "Nowgai" }: Contributio
               
               // Only show month label if it's the first week of the month or first week overall
               if (weekIndex > 0 && prevMonth === month) {
-                return <div key={weekIndex} className="w-3" />;
+                return <div key={weekIndex} className="w-2.5 sm:w-3 shrink-0" />;
               }
               
               return (
                 <div
                   key={weekIndex}
-                  className="text-xs text-tertiary whitespace-nowrap w-3 text-center"
+                  className="text-[10px] sm:text-xs text-tertiary whitespace-nowrap w-2.5 sm:w-3 text-center shrink-0"
                 >
                   {month}
                 </div>
@@ -313,20 +315,20 @@ export function ContributionGraph({ edits, projectName = "Nowgai" }: Contributio
           </div>
 
           {/* Week columns */}
-          <div className="flex gap-1 pb-2">
+          <div className="flex gap-1 pb-2 min-w-0">
             {/* Day labels column */}
-            <div className="flex flex-col gap-1 pr-2 flex-shrink-0">
+            <div className="flex flex-col gap-1 pr-1.5 sm:pr-2 shrink-0">
               {["", "Mon", "", "Wed", "", "Fri", ""].map((day, i) => (
-                <div key={i} className="text-xs text-tertiary h-3 flex items-center">
+                <div key={i} className="text-[10px] sm:text-xs text-tertiary h-3 flex items-center">
                   {day}
                 </div>
               ))}
             </div>
             
-            {/* Calendar grid - scrollable to show all weeks */}
-            <div className="flex gap-1 overflow-x-auto min-w-0 flex-1">
+            {/* Calendar grid - scrollable to show all weeks, touch-friendly on mobile */}
+            <div className="flex gap-0.5 sm:gap-1 overflow-x-auto overflow-y-hidden min-w-0 flex-1 pb-1 -mx-1 px-1">
               {weeks.map((week, weekIndex) => (
-                <div key={weekIndex} className="flex flex-col gap-1 flex-shrink-0">
+                <div key={weekIndex} className="flex flex-col gap-1 shrink-0">
                   {week.map((day, dayIndex) => {
                     const intensity = getIntensity(day.count);
                     const colorClass = getColorClass(intensity);
@@ -340,14 +342,14 @@ export function ContributionGraph({ edits, projectName = "Nowgai" }: Contributio
                     return (
                       <div
                         key={`${weekIndex}-${dayIndex}`}
-                        className={`w-3 h-3 rounded-sm ${colorClass} cursor-pointer hover:ring-2 hover:ring-white/20 transition-all ${isFuture ? 'opacity-50' : ''}`}
+                        className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded-sm shrink-0 ${colorClass} cursor-pointer hover:ring-2 hover:ring-white/20 transition-all touch-manipulation ${isFuture ? 'opacity-50' : ''}`}
                         title={`${dateStr}: ${day.count} contribution${day.count !== 1 ? "s" : ""}`}
                       />
                     );
                   })}
                   {/* Fill remaining days if week is incomplete (shouldn't happen with proper grouping) */}
                   {week.length < 7 && Array.from({ length: 7 - week.length }).map((_, i) => (
-                    <div key={`empty-${i}`} className="w-3 h-3" />
+                    <div key={`empty-${i}`} className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
                   ))}
                 </div>
               ))}
@@ -355,50 +357,50 @@ export function ContributionGraph({ edits, projectName = "Nowgai" }: Contributio
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-2 mt-4 text-xs text-tertiary">
+          <div className="flex items-center gap-2 mt-3 sm:mt-4 text-[10px] sm:text-xs text-tertiary flex-wrap">
             <span>Less</span>
-            <div className="flex gap-1">
-              <div className="w-3 h-3 rounded-sm bg-[#161b22] border border-[#30363d]" />
-              <div className="w-3 h-3 rounded-sm bg-[#0e4429] border border-[#0e4429]" />
-              <div className="w-3 h-3 rounded-sm bg-[#006d32] border border-[#006d32]" />
-              <div className="w-3 h-3 rounded-sm bg-[#26a641] border border-[#26a641]" />
-              <div className="w-3 h-3 rounded-sm bg-[#39d353] border border-[#39d353]" />
+            <div className="flex gap-0.5 sm:gap-1">
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded-sm bg-[#161b22] border border-[#30363d]" />
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded-sm bg-[#0e4429] border border-[#0e4429]" />
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded-sm bg-[#006d32] border border-[#006d32]" />
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded-sm bg-[#26a641] border border-[#26a641]" />
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded-sm bg-[#39d353] border border-[#39d353]" />
             </div>
             <span>More</span>
           </div>
         </div>
 
-        {/* Statistics Panel */}
-        <div className="flex flex-col gap-4 min-w-[180px]">
-          <div>
-            <div className="text-xs text-tertiary mb-1">Daily Average</div>
-            <div className="text-lg font-bold text-primary">
+        {/* Statistics Panel - 2-column grid on mobile, sidebar on lg */}
+        <div className="grid grid-cols-2 lg:flex lg:flex-col gap-4 lg:min-w-[180px] shrink-0">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-xs text-tertiary mb-0.5 sm:mb-1">Daily Average</div>
+            <div className="text-sm sm:text-lg font-bold text-primary truncate">
               {stats.dailyAverage.toFixed(1)} contribution{stats.dailyAverage !== 1 ? "s" : ""}
             </div>
           </div>
           
-          <div>
-            <div className="text-xs text-tertiary mb-1">Days Active</div>
-            <div className="text-lg font-bold text-primary">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-xs text-tertiary mb-0.5 sm:mb-1">Days Active</div>
+            <div className="text-sm sm:text-lg font-bold text-primary">
               {stats.daysActive} day{stats.daysActive !== 1 ? "s" : ""}
             </div>
-            <div className="text-xs text-tertiary mt-0.5">
+            <div className="text-[10px] sm:text-xs text-tertiary mt-0.5 truncate">
               {selectedYear === new Date().getFullYear() 
                 ? `${((stats.daysActive / (Math.floor((new Date().getTime() - new Date(selectedYear, 0, 1).getTime()) / (1000 * 60 * 60 * 24)) + 1)) * 100).toFixed(0)}% of year`
                 : `${((stats.daysActive / 365) * 100).toFixed(0)}% of year`}
             </div>
           </div>
           
-          <div>
-            <div className="text-xs text-tertiary mb-1">Current Streak</div>
-            <div className="text-lg font-bold text-primary">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-xs text-tertiary mb-0.5 sm:mb-1">Current Streak</div>
+            <div className="text-sm sm:text-lg font-bold text-primary">
               {stats.currentStreak} day{stats.currentStreak !== 1 ? "s" : ""}
             </div>
           </div>
           
-          <div>
-            <div className="text-xs text-tertiary mb-1">Total Contributions</div>
-            <div className="text-lg font-bold text-primary">{stats.totalEdits}</div>
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-xs text-tertiary mb-0.5 sm:mb-1">Total Contributions</div>
+            <div className="text-sm sm:text-lg font-bold text-primary">{stats.totalEdits}</div>
           </div>
         </div>
       </div>

@@ -22,8 +22,8 @@ import * as React from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData, useNavigate } from "react-router";
 import { Header } from "~/components";
+import GradientGlow from "~/components/GradientGlow";
 import { ProjectSidebar } from "~/components/ProjectSidebar";
-import Background from "~/components/Background";
 import { FilePreview } from "~/components/FileUpload";
 import GitHubImportModal from "~/components/GitHubImportModal";
 import { Button } from "~/components/ui/button";
@@ -544,167 +544,162 @@ export default function TeamDetailPage() {
   };
 
   return (
-    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <Background />
-      </div>
-
-      {/* Left Sidebar - ProjectSidebar */}
-      <ProjectSidebar user={user} className="flex-shrink-0" />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="h-screen w-screen max-w-full bg-canvas text-white flex overflow-hidden safe-area-padding">
+      <ProjectSidebar user={user} className="shrink-0" />
+      <div className="flex-1 flex flex-col relative overflow-hidden min-w-0">
+        <GradientGlow />
         <Header showAuthButtons={false} showSidebarToggle={false} />
+        <main className="relative z-20 flex flex-col h-full overflow-hidden">
+          <div className="flex-1 overflow-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="container mx-auto max-w-7xl">
+              {/* Back - touch-friendly */}
+              <Link to="/teams" className="inline-block mb-3 sm:mb-4">
+                <Button
+                  variant="ghost"
+                  className="-ml-2 min-h-[44px] min-w-[44px] sm:min-w-0 sm:px-0 touch-manipulation"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2 shrink-0" />
+                  <span className="hidden sm:inline">Back to Teams</span>
+                </Button>
+              </Link>
 
-          <main className="relative z-20 flex flex-col h-full overflow-hidden">
-            <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
-              <div className="container mx-auto max-w-7xl">
-                {/* Header */}
-                <div className="mb-8">
-                  <Link to="/teams">
-                    <Button variant="ghost" className="mb-4">
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back to Teams
-                    </Button>
-                  </Link>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">
-                        {localTeam.name}
-                      </h1>
-                      {localTeam.description && (
-                        <p className="text-muted-foreground">
-                          {localTeam.description}
-                        </p>
-                      )}
-                    </div>
-                    {isAdmin && (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowEditTeamDialog(true)}
-                        >
-                          <Settings className="w-4 h-4 mr-2" />
-                          Edit Team
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowDeleteDialog(true)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete Team
-                        </Button>
-                      </div>
+              {/* Header - stack on mobile */}
+              <div className="mb-4 sm:mb-6 lg:mb-8">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-1 sm:mb-2 truncate">
+                      {localTeam.name}
+                    </h1>
+                    {localTeam.description && (
+                      <p className="text-muted-foreground text-sm sm:text-base line-clamp-2 sm:line-clamp-none">
+                        {localTeam.description}
+                      </p>
                     )}
                   </div>
-                </div>
-
-                {error && (
-                  <div className="mb-6 p-4 rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
-                    {error}
-                  </div>
-                )}
-
-                {/* Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                  <div className="p-6 rounded-lg border border-border bg-card">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">
-                        Team Balance
-                      </span>
-                      <Wallet className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="text-2xl font-bold text-foreground">
-                        ${teamBalance.toFixed(2)}
-                      </p>
+                  {isAdmin && (
+                    <div className="flex flex-wrap gap-2 shrink-0">
                       <Button
-                        size="sm"
                         variant="outline"
-                        onClick={() => setShowRechargeDialog(true)}
-                        className="ml-2"
+                        size="sm"
+                        onClick={() => setShowEditTeamDialog(true)}
+                        className="min-h-[44px] sm:min-h-9 touch-manipulation"
                       >
-                        <CreditCard className="w-4 h-4 mr-1" />
-                        Add Funds
+                        <Settings className="w-4 h-4 mr-2 shrink-0" />
+                        Edit Team
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDeleteDialog(true)}
+                        className="min-h-[44px] sm:min-h-9 text-destructive hover:text-destructive hover:bg-destructive/10 touch-manipulation"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2 shrink-0" />
+                        Delete Team
                       </Button>
                     </div>
-                  </div>
-                  <div className="p-6 rounded-lg border border-border bg-card">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">
-                        Members
-                      </span>
-                      <Users className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <p className="text-2xl font-bold text-foreground">
-                      {localMembers.length}
-                    </p>
-                  </div>
-                  <div className="p-6 rounded-lg border border-border bg-card">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">
-                        Projects
-                      </span>
-                      <FolderKanban className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <p className="text-2xl font-bold text-foreground">
-                      {localProjects.length}
-                    </p>
-                  </div>
+                  )}
                 </div>
+              </div>
 
-                {/* Tabs */}
-                <div className="mb-6">
-                  <div className="flex gap-2 border-b border-border">
-                    {[
-                      { id: "overview", label: "Overview" },
-                      { id: "members", label: "Members" },
-                      { id: "projects", label: "Projects" },
-                    ].map((tab) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
-                        className={cn(
-                          "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-                          activeTab === tab.id
-                            ? "border-primary text-primary"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
+              {error && (
+                <div className="mb-4 sm:mb-6 p-3 sm:p-4 rounded-xl bg-destructive/10 text-destructive border border-destructive/20 text-sm sm:text-base">
+                  {error}
+                </div>
+              )}
+
+              {/* Stats - 1 col mobile, 3 cols desktop */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                <div className="p-4 sm:p-6 rounded-xl border border-border bg-card/80 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">Team Balance</span>
+                    <Wallet className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">
+                      ${teamBalance.toFixed(2)}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowRechargeDialog(true)}
+                      className="w-full sm:w-auto min-h-[44px] sm:min-h-9 touch-manipulation"
+                    >
+                      <CreditCard className="w-4 h-4 mr-1 shrink-0" />
+                      Add Funds
+                    </Button>
                   </div>
                 </div>
+                <div className="p-4 sm:p-6 rounded-xl border border-border bg-card/80 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">Members</span>
+                    <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-foreground">
+                    {localMembers.length}
+                  </p>
+                </div>
+                <div className="p-4 sm:p-6 rounded-xl border border-border bg-card/80 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">Projects</span>
+                    <FolderKanban className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-foreground">
+                    {localProjects.length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Tabs - scroll on narrow screens */}
+              <div className="mb-4 sm:mb-6">
+                <div className="flex gap-0 border-b border-border overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin">
+                  {[
+                    { id: "overview", label: "Overview" },
+                    { id: "members", label: "Members" },
+                    { id: "projects", label: "Projects" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={cn(
+                        "px-4 py-3 sm:py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap min-h-[44px] sm:min-h-0 flex items-center touch-manipulation",
+                        activeTab === tab.id
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
                 {/* Overview Tab */}
                 {activeTab === "overview" && (
-                  <div className="space-y-6">
-                    <div className="p-6 rounded-lg border border-border bg-card">
-                      <h2 className="text-lg font-semibold text-foreground mb-4">
+                  <div className="space-y-4 sm:space-y-6">
+                    <div className="p-4 sm:p-6 rounded-xl border border-border bg-card/80 backdrop-blur-sm">
+                      <h2 className="text-base sm:text-lg font-semibold text-foreground mb-3 sm:mb-4">
                         Quick Actions
                       </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <Button
                           variant="outline"
                           onClick={() => setShowInviteDialog(true)}
-                          className="h-auto py-4 flex flex-col items-start"
+                          className="h-auto py-4 sm:py-5 flex flex-col items-start min-h-[80px] sm:min-h-0 touch-manipulation"
                         >
-                          <UserPlus className="w-5 h-5 mb-2" />
+                          <UserPlus className="w-5 h-5 mb-2 shrink-0" />
                           <span className="font-medium">Invite Member</span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground text-left">
                             Add new team members
                           </span>
                         </Button>
                         <Button
                           variant="outline"
                           onClick={() => setShowCreateProjectDialog(true)}
-                          className="h-auto py-4 flex flex-col items-start"
+                          className="h-auto py-4 sm:py-5 flex flex-col items-start min-h-[80px] sm:min-h-0 touch-manipulation"
                         >
-                          <Plus className="w-5 h-5 mb-2" />
+                          <Plus className="w-5 h-5 mb-2 shrink-0" />
                           <span className="font-medium">Create Project</span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground text-left">
                             Start a new team project
                           </span>
                         </Button>
@@ -715,10 +710,13 @@ export default function TeamDetailPage() {
 
                 {/* Members Tab */}
                 {activeTab === "members" && (
-                  <div className="space-y-6">
+                  <div className="space-y-4 sm:space-y-6">
                     {isAdmin && (
                       <div className="flex justify-end">
-                        <Button onClick={() => setShowInviteDialog(true)}>
+                        <Button
+                          onClick={() => setShowInviteDialog(true)}
+                          className="min-h-[44px] sm:min-h-9 touch-manipulation"
+                        >
                           <UserPlus className="w-4 h-4 mr-2" />
                           Invite Member
                         </Button>
@@ -732,20 +730,20 @@ export default function TeamDetailPage() {
                       </h3>
                       <div className="space-y-2">
                         {localMembers.length === 0 ? (
-                          <p className="text-sm text-muted-foreground p-4 text-center">
+                          <p className="text-sm text-muted-foreground p-4 text-center rounded-xl border border-border bg-card/50">
                             No active members
                           </p>
                         ) : (
                           localMembers.map((member) => (
                             <div
                               key={member.userId}
-                              className="p-4 rounded-lg border border-border bg-card flex items-center justify-between"
+                              className="p-4 rounded-xl border border-border bg-card/80 backdrop-blur-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                             >
-                              <div>
-                                <p className="font-medium text-foreground">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-foreground truncate">
                                   {member.name || member.email || member.userId}
                                 </p>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-sm text-muted-foreground truncate">
                                   {member.email &&
                                     member.email !== member.name && (
                                       <span>{member.email} • </span>
@@ -759,7 +757,7 @@ export default function TeamDetailPage() {
                               {isAdmin &&
                                 member.userId !== team.adminId &&
                                 member.userId !== membership.userId && (
-                                  <div className="flex gap-1">
+                                  <div className="flex gap-2 shrink-0">
                                     <Button
                                       size="sm"
                                       variant="ghost"
@@ -772,6 +770,7 @@ export default function TeamDetailPage() {
                                         setShowEditMemberDialog(true);
                                       }}
                                       title="Edit member"
+                                      className="min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-8 p-0 touch-manipulation"
                                     >
                                       <Settings className="w-4 h-4" />
                                     </Button>
@@ -782,7 +781,7 @@ export default function TeamDetailPage() {
                                         setSelectedMember(member);
                                         setShowRemoveMemberDialog(true);
                                       }}
-                                      className="text-destructive hover:text-destructive"
+                                      className="text-destructive hover:text-destructive min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-8 p-0 touch-manipulation"
                                       title="Remove member"
                                     >
                                       <Trash2 className="w-4 h-4" />
@@ -823,7 +822,7 @@ export default function TeamDetailPage() {
                               return (
                                 <div
                                   key={invitation.id}
-                                  className="p-4 rounded-lg border border-border bg-card flex items-center justify-between"
+                                  className="p-4 rounded-xl border border-border bg-card/80 backdrop-blur-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
                                 >
                                   <div>
                                     <p className="font-medium text-foreground">
@@ -907,7 +906,7 @@ export default function TeamDetailPage() {
                                           setSelectedInvitation(invitation);
                                           setShowCancelInvitationDialog(true);
                                         }}
-                                        className="text-destructive hover:text-destructive"
+                                        className="text-destructive hover:text-destructive shrink-0 min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-8 p-0 touch-manipulation"
                                         title="Cancel invitation"
                                       >
                                         <XCircle className="w-4 h-4" />
@@ -926,55 +925,55 @@ export default function TeamDetailPage() {
                 {activeTab === "projects" && (
                   <div className="space-y-4">
                     <div className="flex justify-end">
-                      <Button onClick={() => setShowCreateProjectDialog(true)}>
+                      <Button
+                        onClick={() => setShowCreateProjectDialog(true)}
+                        className="min-h-[44px] sm:min-h-9 touch-manipulation"
+                      >
                         <Plus className="w-4 h-4 mr-2" />
                         Create Project
                       </Button>
                     </div>
                     {localProjects.length === 0 ? (
-                      <div className="text-center py-12 rounded-lg border border-border bg-card">
+                      <div className="text-center py-10 sm:py-12 px-4 rounded-xl border border-border bg-card/80 backdrop-blur-sm">
                         <FolderKanban className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                         <h3 className="text-lg font-medium text-foreground mb-2">
                           No projects yet
                         </h3>
-                        <p className="text-muted-foreground mb-4">
+                        <p className="text-muted-foreground mb-4 text-sm sm:text-base">
                           Create your first team project
                         </p>
                         <Button
                           onClick={() => setShowCreateProjectDialog(true)}
+                          className="min-h-[44px] touch-manipulation"
                         >
                           <Plus className="w-4 h-4 mr-2" />
                           Create Project
                         </Button>
                       </div>
                     ) : (
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {localProjects.map((project) => (
                           <div
                             key={project.id}
-                            className="p-4 rounded-lg border border-border bg-card hover:border-primary/50 transition-colors cursor-pointer"
+                            className="p-4 rounded-xl border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 active:border-primary/50 transition-colors cursor-pointer touch-manipulation"
                             onClick={() =>
                               navigate(
                                 `/workspace?conversationId=${project.id}`
                               )
                             }
                           >
-                            <h3 className="font-medium text-foreground mb-2">
+                            <h3 className="font-medium text-foreground mb-2 truncate">
                               {project.title}
                             </h3>
                             <div className="space-y-1 text-sm">
                               <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">
-                                  Balance
-                                </span>
-                                <span className="font-medium text-foreground">
+                                <span className="text-muted-foreground">Balance</span>
+                                <span className="font-medium text-foreground tabular-nums">
                                   ${project.balance.toFixed(2)}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">
-                                  Messages
-                                </span>
+                                <span className="text-muted-foreground">Messages</span>
                                 <span className="font-medium text-foreground">
                                   {project.messageCount}
                                 </span>
@@ -993,7 +992,7 @@ export default function TeamDetailPage() {
                 open={showInviteDialog}
                 onOpenChange={setShowInviteDialog}
               >
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
                     <DialogTitle>Invite Team Member</DialogTitle>
                     <DialogDescription>
@@ -1073,7 +1072,7 @@ export default function TeamDetailPage() {
                   }
                 }}
               >
-                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
                     <DialogTitle>Create Team Project</DialogTitle>
                     <DialogDescription>
@@ -1286,7 +1285,7 @@ export default function TeamDetailPage() {
                 open={showDeleteDialog}
                 onOpenChange={setShowDeleteDialog}
               >
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
                     <DialogTitle className="text-destructive">
                       Delete Team
@@ -1376,7 +1375,7 @@ export default function TeamDetailPage() {
                 open={showRechargeDialog}
                 onOpenChange={setShowRechargeDialog}
               >
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
                     <DialogTitle>Add Funds to Team Wallet</DialogTitle>
                     <DialogDescription>
@@ -1521,7 +1520,7 @@ export default function TeamDetailPage() {
                   }
                 }}
               >
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
                     <DialogTitle>Edit Team</DialogTitle>
                     <DialogDescription>
@@ -1640,7 +1639,7 @@ export default function TeamDetailPage() {
                   }
                 }}
               >
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
                     <DialogTitle>Edit Team Member</DialogTitle>
                     <DialogDescription>
@@ -1796,7 +1795,7 @@ export default function TeamDetailPage() {
                 open={showCancelInvitationDialog}
                 onOpenChange={setShowCancelInvitationDialog}
               >
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
                     <DialogTitle className="text-destructive">
                       Cancel Invitation
@@ -1883,7 +1882,7 @@ export default function TeamDetailPage() {
                 open={showRemoveMemberDialog}
                 onOpenChange={setShowRemoveMemberDialog}
               >
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
                     <DialogTitle className="text-destructive">
                       Remove Team Member

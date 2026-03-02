@@ -24,9 +24,11 @@ import {
   Trash,
   User,
   Warning,
+  X,
 } from "@phosphor-icons/react";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+import { useIsMobile } from "~/hooks/use-mobile";
 import crop from "~/assets/crop.png";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
@@ -140,10 +142,13 @@ function ProjectSidebarComponent({
 }: ProjectSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const isWorkspace = location.pathname === "/workspace";
   // Collapse sidebar by default on workspace pages to maximize editing space.
   // Keep it expanded on the home/dashboard so users can browse projects easily.
   const [isCollapsed, setIsCollapsed] = useState(() => isWorkspace);
+  // On mobile: drawer closed by default so header and main content are accessible.
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<
@@ -208,14 +213,25 @@ function ProjectSidebarComponent({
     }
   }, [openDropdownId]);
 
-  // Listen for toggle event from workspace header
+  // Listen for toggle event from workspace header (on mobile this opens the drawer)
   useEffect(() => {
     const handleToggle = () => {
-      setIsCollapsed((prev) => !prev);
+      if (isMobile) {
+        setMobileOpen(true);
+      } else {
+        setIsCollapsed((prev) => !prev);
+      }
     };
     window.addEventListener("toggleProjectSidebar", handleToggle);
     return () =>
       window.removeEventListener("toggleProjectSidebar", handleToggle);
+  }, [isMobile]);
+
+  // Listen for open event from mobile header menu (Capacitor / small screens)
+  useEffect(() => {
+    const handleOpen = () => setMobileOpen(true);
+    window.addEventListener("openProjectSidebar", handleOpen);
+    return () => window.removeEventListener("openProjectSidebar", handleOpen);
   }, []);
 
   // Focus search input when dialog opens and fetch projects
@@ -741,19 +757,26 @@ function ProjectSidebarComponent({
     [user?.name, user?.email, user?.image]
   );
 
-  return (
-    <>
-      <aside
-        className={cn(
-          "flex flex-col h-full bg-surface-1 border-r border-subtle transition-all duration-300 relative",
-          isWorkspace && isCollapsed
+  // On mobile drawer always show full (expanded) content
+  const effectiveCollapsed = isMobile ? false : isCollapsed;
+
+  const asideContent = (
+    <aside
+      className={cn(
+        "flex flex-col h-full bg-surface-1 border-r border-subtle transition-all duration-300 relative",
+        isMobile
+          ? "fixed left-0 top-0 z-40 h-full w-72 overflow-hidden shadow-xl"
+          : isWorkspace && isCollapsed
             ? "w-0 overflow-hidden border-r-0"
             : isCollapsed
               ? "w-16 overflow-hidden"
               : "w-60 overflow-hidden",
-          className
-        )}
-      >
+        isMobile && !mobileOpen && "-translate-x-full",
+        isMobile && mobileOpen && "translate-x-0",
+        className
+      )}
+      style={isMobile ? { transitionProperty: "transform" } : undefined}
+    >
         {/* Sidebar glow effect - bottom left */}
         <div
           className="pointer-events-none absolute"
@@ -772,10 +795,10 @@ function ProjectSidebarComponent({
         <div
           className={cn(
             "flex items-center py-4",
-            isCollapsed ? "justify-center px-2" : "justify-between px-4"
+            effectiveCollapsed ? "justify-center px-2" : "justify-between px-4"
           )}
         >
-          {!isWorkspace && !isCollapsed && (
+          {!isWorkspace && !effectiveCollapsed && (
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
                 <img
@@ -789,16 +812,26 @@ function ProjectSidebarComponent({
               </span>
             </div>
           )}
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 rounded-md hover:bg-white/5 text-white/50 hover:text-white transition-colors shrink-0"
-          >
-            <SidebarSimple className="w-4 h-4" />
-          </button>
+          {isMobile ? (
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="p-1.5 rounded-md hover:bg-white/5 text-white/50 hover:text-white transition-colors shrink-0"
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="p-1.5 rounded-md hover:bg-white/5 text-white/50 hover:text-white transition-colors shrink-0"
+            >
+              <SidebarSimple className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Workspace Selector */}
-        {!isCollapsed && (
+        {!effectiveCollapsed && (
           <div className="px-3 mb-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -856,10 +889,13 @@ function ProjectSidebarComponent({
                 ? "bg-white/[0.08] text-white"
                 : "text-white/60 hover:text-white hover:bg-white/[0.04]"
             )}
-            onClick={() => setOpenDropdownId(null)}
+            onClick={() => {
+              setOpenDropdownId(null);
+              if (isMobile) setMobileOpen(false);
+            }}
           >
             <House className="w-4 h-4" />
-            {!isCollapsed && "Home"}
+            {!effectiveCollapsed && "Home"}
           </Link>
 
           <button
@@ -873,11 +909,11 @@ function ProjectSidebarComponent({
             )}
           >
             <MagnifyingGlass className="w-4 h-4" />
-            {!isCollapsed && "Search"}
+            {!effectiveCollapsed && "Search"}
           </button>
 
               {/* Projects Section */}
-              {!isCollapsed && (
+              {!effectiveCollapsed && (
                 <>
                   <div className="pt-4 pb-2 flex items-center justify-between px-3">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">
@@ -1146,7 +1182,10 @@ function ProjectSidebarComponent({
                                   ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
                                   : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                               )}
-                              onClick={() => setOpenDropdownId(null)}
+                              onClick={() => {
+                                setOpenDropdownId(null);
+                                if (isMobile) setMobileOpen(false);
+                              }}
                             >
                               <ChatTeardropDots className="w-5 h-5 shrink-0" />
                               <div className="flex-1 min-w-0">
@@ -1308,7 +1347,10 @@ function ProjectSidebarComponent({
                                           ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
                                           : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                                       )}
-                                      onClick={() => setOpenDropdownId(null)}
+                                      onClick={() => {
+                                setOpenDropdownId(null);
+                                if (isMobile) setMobileOpen(false);
+                              }}
                                     >
                                       <ChatTeardropDots className="w-5 h-5 shrink-0" />
                                       <div className="flex-1 min-w-0">
@@ -1478,7 +1520,10 @@ function ProjectSidebarComponent({
                                           ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
                                           : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                                       )}
-                                      onClick={() => setOpenDropdownId(null)}
+                                      onClick={() => {
+                                setOpenDropdownId(null);
+                                if (isMobile) setMobileOpen(false);
+                              }}
                                     >
                                       <ChatTeardropDots className="w-5 h-5 shrink-0" />
                                       <div className="flex-1 min-w-0">
@@ -1619,20 +1664,23 @@ function ProjectSidebarComponent({
         <div className="px-3 py-4 border-t border-white/6">
           <div className="flex items-center justify-between">
             <button
-              onClick={() => navigate("/profile")}
+              onClick={() => {
+                navigate("/profile");
+                if (isMobile) setMobileOpen(false);
+              }}
               className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/4 transition-colors"
             >
               <UserAvatar
                 displayName={avatarProps.displayName}
                 imageUrl={avatarProps.imageUrl}
               />
-              {!isCollapsed && (
+              {!effectiveCollapsed && (
                 <span className="text-sm text-white/70 truncate max-w-30">
                   {user?.name || user?.email || "User"}
                 </span>
               )}
             </button>
-            {!isCollapsed && (
+            {!effectiveCollapsed && (
               <button className="p-2 rounded-lg hover:bg-white/4 text-white/40 hover:text-white transition-colors relative">
                 <Bell className="w-4 h-4" />
               </button>
@@ -1640,6 +1688,22 @@ function ProjectSidebarComponent({
           </div>
         </div>
       </aside>
+  );
+
+  return (
+    <>
+      {isMobile && mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+        />
+      )}
+      {isMobile ? (
+        <div className="w-0 flex-shrink-0 overflow-visible">{asideContent}</div>
+      ) : (
+        asideContent
+      )}
 
       {/* Edit Dialog */}
       <Dialog
@@ -1805,6 +1869,7 @@ function ProjectSidebarComponent({
                       key={project.id}
                       onClick={() => {
                         setShowSearchDialog(false);
+                        if (isMobile) setMobileOpen(false);
                         navigate(`/workspace?conversationId=${project.id}`);
                       }}
                       className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 active:bg-white/8 transition-all group border border-transparent hover:border-white/5"

@@ -1,4 +1,4 @@
-import { ArrowLeft, DollarSign, Zap, Loader2, Link2, Link2Off } from "lucide-react";
+import { ArrowLeft, DollarSign, Link2, Link2Off, Loader2, Menu, Zap } from "lucide-react";
 import { Link, redirect, useRevalidator } from "react-router";
 import { useState, useEffect } from "react";
 import GradientGlow from "../components/GradientGlow";
@@ -355,63 +355,81 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
 
 
   return (
-    <div className="h-screen w-screen bg-canvas text-white flex overflow-hidden">
+    <div className="h-screen w-screen max-w-full bg-canvas text-white flex overflow-hidden">
       {/* Sidebar */}
       <ProjectSidebar user={user ? { ...user, image: user.image ?? undefined } : undefined} />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
+      <div className="flex-1 flex flex-col relative overflow-hidden min-w-0">
         {/* Gradient Background */}
         <GradientGlow />
 
-        <main className="relative z-20 flex flex-col h-full overflow-hidden">
-          <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
-            {/* Back Button */}
+        <main className="relative z-20 flex flex-col min-h-0 flex-1">
+          {/* Mobile: top bar with menu so sidebar can be opened */}
+          <div className="md:hidden flex items-center justify-between px-3 py-2 border-b border-border/30 shrink-0">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("openProjectSidebar"))}
+              className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-white/5 text-tertiary hover:text-primary transition-colors touch-manipulation"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <Link
               to="/home"
-              className="inline-flex items-center gap-2 text-sm text-tertiary hover:text-primary transition-colors mb-6"
+              className="inline-flex items-center gap-2 text-sm text-tertiary hover:text-primary transition-colors py-2 touch-manipulation"
             >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Home
+              <ArrowLeft className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">Back to Home</span>
+            </Link>
+          </div>
+          <div className="flex-1 overflow-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {/* Back Button - desktop only (on mobile we have it in the top bar) */}
+            <Link
+              to="/home"
+              className="hidden md:inline-flex items-center gap-2 text-sm text-tertiary hover:text-primary transition-colors mb-4 sm:mb-6 touch-manipulation"
+            >
+              <ArrowLeft className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">Back to Home</span>
             </Link>
 
-            {/* Page Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent-primary)]/20 to-[var(--gradient-mid)]/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500"></div>
-                    <div className="relative">
-                      <ProfileAvatar
-                        imageUrl={user?.image}
-                        displayName={displayName}
-                        size="lg"
-                      />
-                    </div>
+            {/* Page Header - responsive stack on small screens */}
+            <div className="mb-6 sm:mb-8">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                <div className="relative group flex-shrink-0">
+                  <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent-primary)]/20 to-[var(--gradient-mid)]/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500" />
+                  <div className="relative">
+                    <ProfileAvatar
+                      imageUrl={user?.image}
+                      displayName={displayName}
+                      size="lg"
+                    />
                   </div>
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl font-bold text-primary">
-                      {displayName}
-                    </h1>
-                    {user?.email && (
-                      <p className="text-tertiary mt-1">{user.email}</p>
-                    )}
-                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary truncate">
+                    {displayName}
+                  </h1>
+                  {user?.email && (
+                    <p className="text-tertiary mt-0.5 sm:mt-1 text-sm sm:text-base truncate">
+                      {user.email}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Main grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main grid - single column on mobile, 3 cols on lg */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               {/* Account overview */}
-              <div className="lg:col-span-2">
-                <Card className="bg-surface-1 border border-subtle rounded-[12px]">
-                  <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary">
+              <div className="lg:col-span-2 min-w-0">
+                <Card className="bg-surface-1 border border-subtle rounded-xl sm:rounded-[12px] overflow-hidden">
+                  <CardHeader className="px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4">
+                    <CardTitle className="text-lg sm:text-xl font-semibold text-primary">
                       Profile Information
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 px-3 sm:px-6 pb-4 sm:pb-6">
                     <ProfileBasicInfo
                       name={user?.name || ""}
                       email={user?.email || ""}
@@ -427,26 +445,26 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                 </Card>
               </div>
 
-              {/* Balance */}
-              <div>
-                <Card className="bg-surface-1 border border-subtle rounded-[12px]">
-                  <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary">
+              {/* Balance - full width on mobile, stacks nicely */}
+              <div className="min-w-0 order-first lg:order-none">
+                <Card className="bg-surface-1 border border-subtle rounded-xl sm:rounded-[12px] overflow-hidden">
+                  <CardHeader className="px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4">
+                    <CardTitle className="text-lg sm:text-xl font-semibold text-primary">
                       Account Balance
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="px-4 py-4 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-[var(--accent-primary)]/20">
+                  <CardContent className="px-3 sm:px-6 pb-4 sm:pb-6">
+                    <div className="p-3 sm:p-4 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="p-2 rounded-lg bg-[var(--accent-primary)]/20 flex-shrink-0">
                             <DollarSign className="w-5 h-5 text-accent-primary" />
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-xs text-tertiary">
                               Available Balance
                             </p>
-                            <p className="text-2xl font-bold text-accent-primary">
+                            <p className="text-xl sm:text-2xl font-bold text-accent-primary tabular-nums">
                               ${Number(balance || 0).toFixed(2)}
                             </p>
                           </div>
@@ -456,7 +474,7 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                             size="sm"
                             variant="outline"
                             onClick={() => (window.location.href = "/recharge")}
-                            className="bg-[var(--accent-primary)]/10 hover:bg-[var(--accent-primary)]/20 border-[var(--accent-primary)]/30 text-accent-primary"
+                            className="bg-[var(--accent-primary)]/10 hover:bg-[var(--accent-primary)]/20 border-[var(--accent-primary)]/30 text-accent-primary flex-shrink-0 touch-manipulation"
                           >
                             Recharge
                           </Button>
@@ -464,7 +482,7 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                       </div>
                       {isWhitelisted && (
                         <div className="mt-3 flex items-center gap-1.5 text-xs text-accent-primary">
-                          <Zap className="w-3.5 h-3.5" />
+                          <Zap className="w-3.5 h-3.5 flex-shrink-0" />
                           <span>Unlimited Access</span>
                         </div>
                       )}
@@ -474,145 +492,151 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
               </div>
             </div>
 
-            {/* Connected Services */}
-            <div className="mt-6">
-              <Card className="bg-surface-1 border border-subtle rounded-[12px]">
-                <CardHeader>
-                  <CardTitle className="text-xl font-semibold text-primary">
+            {/* Connected Services - responsive rows */}
+            <div className="mt-4 sm:mt-6">
+              <Card className="bg-surface-1 border border-subtle rounded-xl sm:rounded-[12px] overflow-hidden">
+                <CardHeader className="px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4">
+                  <CardTitle className="text-lg sm:text-xl font-semibold text-primary">
                     Connected Services
                   </CardTitle>
                   <p className="text-sm text-tertiary mt-1">
                     Services linked to your account for authentication and integrations
                   </p>
                 </CardHeader>
-                <CardContent className="space-y-1">
+                <CardContent className="space-y-0 px-3 sm:px-6 pb-4 sm:pb-6">
                   {/* Google - Sign in provider */}
-                  <div className="flex items-center justify-between py-3 border-b border-subtle">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-subtle">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center flex-shrink-0">
                         <GoogleIcon className="w-5 h-5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-primary">Google</p>
-                        <p className="text-xs text-tertiary">Sign in with Google</p>
+                        <p className="text-xs text-tertiary truncate">Sign in with Google</p>
                       </div>
                     </div>
-                    {isLoadingAccounts ? (
-                      <div className="px-3 py-1.5">
-                        <Loader2 className="w-4 h-4 animate-spin text-tertiary" />
-                      </div>
-                    ) : isProviderLinked("google") ? (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20">
-                        <Link2 className="w-4 h-4 text-green-500" />
-                        <span className="text-sm text-green-500">Connected</span>
-                      </div>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleLinkProvider("google")}
-                        disabled={linkingProvider === "google"}
-                        className="bg-surface-2/50 hover:bg-surface-2 border-subtle text-secondary hover:text-primary"
-                      >
-                        {linkingProvider === "google" ? (
-                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        ) : (
-                          <Link2 className="w-4 h-4 mr-2" />
-                        )}
-                        Connect
-                      </Button>
-                    )}
+                    <div className="flex-shrink-0 sm:pl-2">
+                      {isLoadingAccounts ? (
+                        <div className="px-3 py-1.5">
+                          <Loader2 className="w-4 h-4 animate-spin text-tertiary" />
+                        </div>
+                      ) : isProviderLinked("google") ? (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 w-fit">
+                          <Link2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          <span className="text-sm text-green-500">Connected</span>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleLinkProvider("google")}
+                          disabled={linkingProvider === "google"}
+                          className="bg-surface-2/50 hover:bg-surface-2 border-subtle text-secondary hover:text-primary touch-manipulation"
+                        >
+                          {linkingProvider === "google" ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Link2 className="w-4 h-4 mr-2" />
+                          )}
+                          Connect
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* GitHub - Sign in provider + Repo integration */}
-                  <div className="flex items-center justify-between py-3 border-b border-subtle">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-subtle">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center flex-shrink-0">
                         <GitHubIcon className="w-5 h-5 text-primary" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-primary">GitHub</p>
-                        <p className="text-xs text-tertiary">
-                          {isProviderLinked("github") || hasGitHubConnected 
-                            ? "Sign in & repository access" 
+                        <p className="text-xs text-tertiary truncate">
+                          {isProviderLinked("github") || hasGitHubConnected
+                            ? "Sign in & repository access"
                             : "Sign in with GitHub"}
                         </p>
                       </div>
                     </div>
-                    {isLoadingAccounts || isCheckingGitHub ? (
-                      <div className="px-3 py-1.5">
-                        <Loader2 className="w-4 h-4 animate-spin text-tertiary" />
-                      </div>
-                    ) : isProviderLinked("github") || hasGitHubConnected ? (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20">
-                        <Link2 className="w-4 h-4 text-green-500" />
-                        <span className="text-sm text-green-500">Connected</span>
-                      </div>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleLinkProvider("github")}
-                        disabled={linkingProvider === "github"}
-                        className="bg-surface-2/50 hover:bg-surface-2 border-subtle text-secondary hover:text-primary"
-                      >
-                        {linkingProvider === "github" ? (
-                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        ) : (
-                          <Link2 className="w-4 h-4 mr-2" />
-                        )}
-                        Connect
-                      </Button>
-                    )}
+                    <div className="flex-shrink-0 sm:pl-2">
+                      {isLoadingAccounts || isCheckingGitHub ? (
+                        <div className="px-3 py-1.5">
+                          <Loader2 className="w-4 h-4 animate-spin text-tertiary" />
+                        </div>
+                      ) : isProviderLinked("github") || hasGitHubConnected ? (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 w-fit">
+                          <Link2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          <span className="text-sm text-green-500">Connected</span>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleLinkProvider("github")}
+                          disabled={linkingProvider === "github"}
+                          className="bg-surface-2/50 hover:bg-surface-2 border-subtle text-secondary hover:text-primary touch-manipulation"
+                        >
+                          {linkingProvider === "github" ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Link2 className="w-4 h-4 mr-2" />
+                          )}
+                          Connect
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Supabase - Database integration */}
-                  <div className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center flex-shrink-0">
                         <SupabaseIcon className="w-5 h-5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-primary">Supabase</p>
-                        <p className="text-xs text-tertiary">
-                          {hasSupabaseConnected && supabaseUser?.email 
-                            ? supabaseUser.email 
+                        <p className="text-xs text-tertiary truncate">
+                          {hasSupabaseConnected && supabaseUser?.email
+                            ? supabaseUser.email
                             : "Database & backend services"}
                         </p>
                       </div>
                     </div>
-                    {isCheckingSupabase ? (
-                      <div className="px-3 py-1.5">
-                        <Loader2 className="w-4 h-4 animate-spin text-tertiary" />
-                      </div>
-                    ) : hasSupabaseConnected ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleDisconnectSupabase}
-                        className="bg-surface-2/50 hover:bg-red-500/10 border-subtle hover:border-red-500/30 text-secondary hover:text-red-500"
-                      >
-                        <Link2Off className="w-4 h-4 mr-2" />
-                        Disconnect
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleConnectSupabase}
-                        className="bg-surface-2/50 hover:bg-surface-2 border-subtle text-secondary hover:text-primary"
-                      >
-                        <Link2 className="w-4 h-4 mr-2" />
-                        Connect
-                      </Button>
-                    )}
+                    <div className="flex-shrink-0 sm:pl-2">
+                      {isCheckingSupabase ? (
+                        <div className="px-3 py-1.5">
+                          <Loader2 className="w-4 h-4 animate-spin text-tertiary" />
+                        </div>
+                      ) : hasSupabaseConnected ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleDisconnectSupabase}
+                          className="bg-surface-2/50 hover:bg-red-500/10 border-subtle hover:border-red-500/30 text-secondary hover:text-red-500 touch-manipulation"
+                        >
+                          <Link2Off className="w-4 h-4 mr-2" />
+                          Disconnect
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleConnectSupabase}
+                          className="bg-surface-2/50 hover:bg-surface-2 border-subtle text-secondary hover:text-primary touch-manipulation"
+                        >
+                          <Link2 className="w-4 h-4 mr-2" />
+                          Connect
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
             {/* Contribution Graph */}
-            <div className="mt-6">
+            <div className="mt-4 sm:mt-6 min-w-0">
               <ContributionGraph edits={edits || []} projectName="Nowgai" />
             </div>
           </div>

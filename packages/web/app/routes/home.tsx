@@ -13,6 +13,7 @@ import {
   GitBranch,
   GithubLogo,
   Lightning,
+  List,
   MagnifyingGlass,
   Palette,
   PlusCircle,
@@ -802,9 +803,18 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {/* Gradient Background */}
         <GradientGlow />
 
-        {/* Header - Right side only */}
-        <header className="relative z-10 flex items-center justify-end px-6 py-4">
-          <div className="flex items-center gap-3">
+        {/* Header - Menu (mobile) + Balance + Profile */}
+        <header className="relative z-10 flex items-center justify-between px-4 sm:px-6 py-4">
+          {/* Mobile: hamburger to open sidebar so profile/analytics are reachable */}
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("openProjectSidebar"))}
+            className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg hover:bg-white/[0.06] text-white/80 hover:text-white transition-colors touch-manipulation"
+            aria-label="Open menu"
+          >
+            <List className="w-6 h-6" weight="bold" />
+          </button>
+          <div className="flex items-center gap-3 md:ml-0 ml-auto">
             {/* Balance Display */}
             {balance !== null && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">

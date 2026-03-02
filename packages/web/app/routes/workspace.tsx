@@ -4,6 +4,7 @@ import {
   Database,
   Gear,
   GithubLogo,
+  List,
   Palette,
   SpinnerGap,
   Upload,
@@ -623,13 +624,25 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
 
         {isEmptyConversation ? (
           // Empty state UI - new design
-          <main
-            {...dragHandlers}
-            className={cn(
-              "relative z-10 flex-1 flex flex-col items-center justify-center px-6 pb-24 overflow-y-auto",
-              isDragging && "bg-purple-500/5"
-            )}
-          >
+          <>
+            {/* Mobile: top bar to open sidebar */}
+            <div className="md:hidden relative z-10 flex items-center justify-end px-4 py-3">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("openProjectSidebar"))}
+                className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-white/[0.06] text-white/80 hover:text-white transition-colors touch-manipulation"
+                aria-label="Open menu"
+              >
+                <List className="w-6 h-6" weight="bold" />
+              </button>
+            </div>
+            <main
+              {...dragHandlers}
+              className={cn(
+                "relative z-10 flex-1 flex flex-col items-center justify-center px-6 pb-24 overflow-y-auto",
+                isDragging && "bg-purple-500/5"
+              )}
+            >
             {/* Hero */}
             <div className="text-center mb-8">
               <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mb-3">
@@ -871,6 +884,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
               </div>
             </div>
           </main>
+          </>
         ) : (
           // Regular workspace view (when conversation has messages)
           <div className="flex-1 z-10 min-h-0 h-screen transition-all duration-200 ease-out relative">
