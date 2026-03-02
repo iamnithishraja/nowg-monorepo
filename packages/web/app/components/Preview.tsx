@@ -3,12 +3,18 @@ import { Globe } from "lucide-react";
 import { classNames } from "../lib/classNames";
 import { VideoCarousel } from "./ui/VideoCarousel";
 
+export interface PreviewApiHandle {
+  getPreviewHtml: () => Promise<string>;
+}
+
 interface PreviewPanelProps {
   previewUrl: string | null | undefined;
   isLoading: boolean;
   terminalLines?: string[];
   onElementSelected?: (info: any) => void;
   onInspectorEnable?: () => void;
+  /** When set, Preview will assign getPreviewHtml so the parent can request current iframe HTML */
+  previewApiRef?: React.MutableRefObject<PreviewApiHandle | null>;
 }
 
 interface WindowSize {
@@ -124,6 +130,7 @@ export default function PreviewPanel({
   terminalLines = [],
   onElementSelected,
   onInspectorEnable,
+  previewApiRef,
 }: PreviewPanelProps) {
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
@@ -141,6 +148,8 @@ export default function PreviewPanel({
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const getPreviewHtmlResolveRef = useRef<((html: string) => void) | null>(null);
+  const getPreviewHtmlRejectRef = useRef<((err: Error) => void) | null>(null);
 
   useEffect(() => {
     if (previewUrl) {
@@ -263,11 +272,54 @@ export default function PreviewPanel({
             "*"
           );
         } catch {}
+      } else if (data && data.type === "PREVIEW_HTML") {
+        const resolve = getPreviewHtmlResolveRef.current;
+        getPreviewHtmlResolveRef.current = null;
+        getPreviewHtmlRejectRef.current = null;
+        if (resolve) resolve(typeof data.html === "string" ? data.html : "");
+      } else if (data && data.type === "PREVIEW_HTML_ERROR") {
+        const reject = getPreviewHtmlRejectRef.current;
+        getPreviewHtmlResolveRef.current = null;
+        getPreviewHtmlRejectRef.current = null;
+        if (reject) reject(new Error(data.error || "Failed to get preview HTML"));
       }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, [isInspectorMode, onElementSelected]);
+
+  // Expose getPreviewHtml to parent via ref when iframe is ready
+  useEffect(() => {
+    if (!previewApiRef || !previewUrl) return;
+    previewApiRef.current = {
+      getPreviewHtml: () =>
+        new Promise<string>((resolve, reject) => {
+          getPreviewHtmlResolveRef.current = resolve;
+          getPreviewHtmlRejectRef.current = reject;
+          try {
+            iframeRef.current?.contentWindow?.postMessage(
+              { type: "GET_PREVIEW_HTML" },
+              "*"
+            );
+          } catch (e) {
+            getPreviewHtmlResolveRef.current = null;
+            getPreviewHtmlRejectRef.current = null;
+            reject(e instanceof Error ? e : new Error(String(e)));
+          }
+          // Timeout in case iframe never responds
+          setTimeout(() => {
+            if (getPreviewHtmlResolveRef.current) {
+              getPreviewHtmlResolveRef.current = null;
+              getPreviewHtmlRejectRef.current = null;
+              reject(new Error("Preview HTML request timed out"));
+            }
+          }, 10000);
+        }),
+    };
+    return () => {
+      if (previewApiRef) previewApiRef.current = null;
+    };
+  }, [previewApiRef, previewUrl]);
 
   const handleRefresh = () => {
     setIframeLoading(true);

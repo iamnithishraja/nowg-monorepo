@@ -60,6 +60,7 @@ interface RightPanelProps {
   conversationId?: string;
   onElementSelected?: (info: any) => void;
   onInspectorEnable?: () => void;
+  previewApiRef?: React.MutableRefObject<import("./Preview").PreviewApiHandle | null>;
 }
 
 function RightPanelComponent({
@@ -77,6 +78,7 @@ function RightPanelComponent({
   conversationId,
   onElementSelected,
   onInspectorEnable,
+  previewApiRef,
 }: RightPanelProps) {
   const [leftPane, setLeftPane] = useState<"files" | "search">("files");
   const [isDownloading, setIsDownloading] = useState(false);
@@ -607,6 +609,7 @@ function RightPanelComponent({
                 terminalLines={terminalLines}
                 onElementSelected={onElementSelected}
                 onInspectorEnable={onInspectorEnable}
+                previewApiRef={previewApiRef}
               />
             </div>
           </TabsContent>
