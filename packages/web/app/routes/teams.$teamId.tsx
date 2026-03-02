@@ -663,7 +663,7 @@ export default function TeamDetailPage() {
                       className={cn(
                         "px-4 py-3 sm:py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap min-h-[44px] sm:min-h-0 flex items-center touch-manipulation",
                         activeTab === tab.id
-                          ? "border-primary text-primary"
+                          ? "border-(--accent-primary) text-(--accent-primary)"
                           : "border-transparent text-muted-foreground hover:text-foreground"
                       )}
                     >
@@ -842,7 +842,7 @@ export default function TeamDetailPage() {
                                       {status === "pending" && !isExpired && (
                                         <>
                                           {" • "}
-                                          <span className="text-primary">
+                                          <span className="text-(--accent-primary)">
                                             Pending
                                           </span>
                                           {" • Expires "}
@@ -944,7 +944,7 @@ export default function TeamDetailPage() {
                         </p>
                         <Button
                           onClick={() => setShowCreateProjectDialog(true)}
-                          className="min-h-[44px] touch-manipulation"
+                          className="min-h-[44px] touch-manipulation bg-(--accent-primary) hover:bg-(--accent-hover)"
                         >
                           <Plus className="w-4 h-4 mr-2" />
                           Create Project
@@ -955,7 +955,7 @@ export default function TeamDetailPage() {
                         {localProjects.map((project) => (
                           <div
                             key={project.id}
-                            className="p-4 rounded-xl border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 active:border-primary/50 transition-colors cursor-pointer touch-manipulation"
+                            className="p-4 rounded-xl border border-border bg-card/80 backdrop-blur-sm hover:border-(--accent-primary)/50 active:border-(--accent-primary)/50 transition-colors cursor-pointer touch-manipulation"
                             onClick={() =>
                               navigate(
                                 `/workspace?conversationId=${project.id}`
@@ -992,7 +992,7 @@ export default function TeamDetailPage() {
                 open={showInviteDialog}
                 onOpenChange={setShowInviteDialog}
               >
-                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
+                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full border border-(--accent-primary)/20">
                   <DialogHeader>
                     <DialogTitle>Invite Team Member</DialogTitle>
                     <DialogDescription>
@@ -1139,7 +1139,7 @@ export default function TeamDetailPage() {
                     <div className="flex items-center gap-4 flex-wrap">
                       {/* Supabase Toggle */}
                       <div className="flex items-center gap-2">
-                        <Database className="w-4 h-4 text-primary" />
+                        <Database className="w-4 h-4 text-(--accent-primary)" />
                         <Label htmlFor="supabase-toggle" className="text-sm">
                           Enable Database
                         </Label>
@@ -1151,7 +1151,7 @@ export default function TeamDetailPage() {
                             loading ||
                             (!hasSupabaseConnected && !isCheckingSupabase)
                           }
-                          className="data-[state=checked]:bg-primary"
+                          className="data-[state=checked]:bg-(--accent-primary)"
                         />
                         {!hasSupabaseConnected && !isCheckingSupabase && (
                           <Button
@@ -1168,7 +1168,7 @@ export default function TeamDetailPage() {
 
                       {/* Design Scheme Toggle */}
                       <div className="flex items-center gap-2">
-                        <Palette className="w-4 h-4 text-primary" />
+                        <Palette className="w-4 h-4 text-(--accent-primary)" />
                         <Label
                           htmlFor="design-scheme-toggle"
                           className="text-sm"
@@ -1185,7 +1185,7 @@ export default function TeamDetailPage() {
                             }
                           }}
                           disabled={loading}
-                          className="data-[state=checked]:bg-primary"
+                          className="data-[state=checked]:bg-(--accent-primary)"
                         />
                         {enableDesignScheme && (
                           <Button
@@ -1241,7 +1241,7 @@ export default function TeamDetailPage() {
                       <Button
                         type="submit"
                         disabled={loading || !projectPrompt.trim()}
-                        className="bg-primary hover:bg-primary/90"
+                        className="bg-(--accent-primary) hover:bg-(--accent-hover)"
                       >
                         {loading ? (
                           <>
@@ -1522,7 +1522,7 @@ export default function TeamDetailPage() {
               >
                 <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
-                    <DialogTitle>Edit Team</DialogTitle>
+                    <DialogTitle className="text-(--accent-primary)">Edit Team</DialogTitle>
                     <DialogDescription>
                       Update team name and description
                     </DialogDescription>
@@ -1572,7 +1572,7 @@ export default function TeamDetailPage() {
                     className="space-y-4"
                   >
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Team Name</label>
+                      <label className="text-sm font-medium text-(--accent-primary)">Team Name</label>
                       <Input
                         type="text"
                         value={editTeamName}
@@ -1582,7 +1582,7 @@ export default function TeamDetailPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Description</label>
+                      <label className="text-sm font-medium text-(--accent-primary)">Description</label>
                       <textarea
                         value={editTeamDescription}
                         onChange={(e) => setEditTeamDescription(e.target.value)}
@@ -1607,12 +1607,14 @@ export default function TeamDetailPage() {
                           setError(null);
                         }}
                         disabled={loading}
+                        className="hover:border-(--accent-primary)/40"
                       >
                         Cancel
                       </Button>
                       <Button
                         type="submit"
                         disabled={loading || !editTeamName.trim()}
+                        className="bg-(--accent-primary) hover:bg-(--accent-hover)"
                       >
                         {loading ? (
                           <>

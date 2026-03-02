@@ -282,7 +282,7 @@ export default function TeamsPage() {
                     </div>
                     <Button
                       onClick={() => setShowCreateDialog(true)}
-                      className="w-full sm:w-auto min-h-[44px] sm:min-h-9 bg-primary hover:bg-primary/90 shrink-0 touch-manipulation"
+                      className="w-full sm:w-auto min-h-[44px] sm:min-h-9 bg-(--accent-primary) hover:bg-(--accent-hover) shrink-0 touch-manipulation"
                     >
                       <Plus className="w-4 h-4 mr-2 shrink-0" />
                       Create Team
@@ -377,7 +377,7 @@ export default function TeamsPage() {
                       {teams.map((team) => (
                         <div
                           key={team.id}
-                          className="p-4 sm:p-6 rounded-xl border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 active:border-primary/50 transition-colors cursor-pointer touch-manipulation"
+                          className="p-4 sm:p-6 rounded-xl border border-border bg-card/80 backdrop-blur-sm hover:border-(--accent-primary)/50 active:border-(--accent-primary)/50 transition-colors cursor-pointer touch-manipulation"
                           onClick={() => navigate(`/teams/${team.id}`)}
                         >
                           <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
@@ -392,7 +392,7 @@ export default function TeamsPage() {
                               )}
                             </div>
                             {team.role === "admin" && (
-                              <span className="px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary shrink-0">
+                              <span className="px-2 py-1 text-xs font-medium rounded-md bg-(--accent-primary)/10 text-(--accent-primary) shrink-0">
                                 Admin
                               </span>
                             )}
