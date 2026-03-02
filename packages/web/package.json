@@ -14,7 +14,7 @@
     "cap:sync": "cap sync",
     "cap:open:ios": "cap open ios",
     "cap:open:android": "cap open android",
-    "cap:run:android": "cap run android",
+    "cap:android": "cap run android",
     "cap:build:android:debug": "cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
