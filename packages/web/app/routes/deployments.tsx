@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ArrowLeft,
   Archive,
+  Menu,
   RotateCcw,
   Zap,
 } from "lucide-react";
@@ -433,17 +434,17 @@ export default function Deployments() {
 
   if (loading || isRefreshing) {
     return (
-      <div className="h-screen w-screen bg-canvas text-white flex overflow-hidden">
+      <div className="h-screen w-screen bg-canvas text-white flex overflow-hidden safe-area-padding">
         {/* Sidebar */}
         <ProjectSidebar user={null} />
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col relative overflow-hidden">
+        <div className="flex-1 flex flex-col relative overflow-hidden min-w-0">
           {/* Gradient Background */}
           <GradientGlow />
 
           <main className="relative z-20 flex flex-col h-full overflow-hidden">
-            <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+            <div className="flex-1 overflow-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <DeploymentsSkeleton />
             </div>
           </main>
@@ -454,17 +455,17 @@ export default function Deployments() {
 
   if (error) {
     return (
-      <div className="h-screen w-screen bg-canvas text-white flex overflow-hidden">
+      <div className="h-screen w-screen bg-canvas text-white flex overflow-hidden safe-area-padding">
         {/* Sidebar */}
         <ProjectSidebar user={null} />
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col relative overflow-hidden">
+        <div className="flex-1 flex flex-col relative overflow-hidden min-w-0">
           {/* Gradient Background */}
           <GradientGlow />
 
           <main className="relative z-20 flex flex-col h-full overflow-hidden">
-            <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+            <div className="flex-1 overflow-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <Card className="bg-surface-1 border border-subtle rounded-[12px]">
                 <CardHeader>
                   <div className="flex items-center gap-3 mb-2">
@@ -494,97 +495,116 @@ export default function Deployments() {
   }
 
   return (
-    <div className="h-screen w-screen bg-canvas text-white flex overflow-hidden">
+    <div className="h-screen w-screen bg-canvas text-white flex overflow-hidden safe-area-padding">
       {/* Sidebar */}
       <ProjectSidebar user={null} />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
+      <div className="flex-1 flex flex-col relative overflow-hidden min-w-0">
         {/* Gradient Background */}
         <GradientGlow />
 
         <main className="relative z-20 flex flex-col h-full overflow-hidden">
-          <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
-            {/* Back Button */}
+          {/* Mobile: top bar with menu and back */}
+          <div className="md:hidden flex items-center justify-between px-3 py-2 border-b border-border/30 shrink-0">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("openProjectSidebar"))}
+              className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-white/5 text-tertiary hover:text-primary transition-colors touch-manipulation"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <Link
               to="/home"
-              className="inline-flex items-center gap-2 text-sm text-tertiary hover:text-primary transition-colors mb-6"
+              className="inline-flex items-center gap-2 text-sm text-tertiary hover:text-primary transition-colors py-2 touch-manipulation"
             >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Home
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              <span className="truncate">Back to Home</span>
+            </Link>
+          </div>
+          <div className="flex-1 overflow-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {/* Back Button - desktop only */}
+            <Link
+              to="/home"
+              className="hidden md:inline-flex items-center justify-center sm:justify-start gap-2 text-sm text-tertiary hover:text-primary transition-colors mb-4 sm:mb-6 min-h-[44px] min-w-[44px] -ml-2 sm:min-w-0"
+            >
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Back to Home</span>
             </Link>
 
-            {/* Page Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-[var(--accent-primary)]/10 hover:bg-[var(--accent-primary)]/20 transition-colors duration-300">
-                    <Rocket className="w-8 h-8 text-accent-primary" />
+            {/* Page Header - responsive stack on mobile */}
+            <div className="mb-6 sm:mb-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-xl bg-[var(--accent-primary)]/10 hover:bg-[var(--accent-primary)]/20 transition-colors duration-300 shrink-0">
+                    <Rocket className="w-7 h-7 sm:w-8 sm:h-8 text-accent-primary" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl font-bold text-primary">
+                  <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary truncate">
                       Deployments
                     </h1>
+                    <p className="text-tertiary text-sm sm:text-base mt-0.5 sm:hidden">
+                      {stats.total} active · {archivedDeployments.length} archived
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => fetchDeployments(true)}
                     disabled={isRefreshing || loading}
-                    className="bg-surface-2/50 backdrop-blur-sm border-subtle hover:bg-surface-3/50 hover:border-[var(--accent-primary)]/30 transition-all duration-300 group"
+                    className="min-h-[44px] sm:min-h-9 bg-surface-2/50 backdrop-blur-sm border-subtle hover:bg-surface-3/50 hover:border-[var(--accent-primary)]/30 transition-all duration-300 group px-3 sm:px-4"
                   >
                     {isRefreshing ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
                     ) : (
-                      <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
+                      <RefreshCw className="h-4 w-4 sm:mr-2 group-hover:rotate-180 transition-transform duration-500" />
                     )}
-                    Refresh
+                    <span className="hidden sm:inline">Refresh</span>
                   </Button>
                   {deployments.length > 0 && (
                     <button
                       onClick={() => setDeleteAllDialogOpen(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-[var(--error-500)] hover:bg-[var(--error-400)] text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center gap-2 min-h-[44px] min-w-[44px] sm:min-w-0 px-3 sm:px-4 py-2 bg-[var(--error-500)] hover:bg-[var(--error-400)] text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={isDeletingAll || loading || isRefreshing}
+                      title="Delete all deployments"
                     >
                       {isDeletingAll ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Deleting...
-                        </>
+                        <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <>
-                          <Trash2 className="w-4 h-4" />
-                          Delete All
-                        </>
+                        <Trash2 className="w-4 h-4" />
                       )}
+                      <span className="hidden sm:inline">
+                        {isDeletingAll ? "Deleting..." : "Delete All"}
+                      </span>
                     </button>
                   )}
                 </div>
               </div>
-              <p className="text-tertiary">
+              <p className="text-tertiary text-sm sm:text-base hidden sm:block mt-1">
                 Manage and monitor all your project deployments
               </p>
             </div>
 
-            {/* Summary Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+            {/* Summary Stats Grid - 2x2 on mobile, 4 on large */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
               {statsCards.map((stat, index) => (
                 <Card
                   key={index}
-                  className="bg-surface-1 border border-subtle rounded-[12px] hover:border-[var(--accent-primary)]/30 transition-all duration-300 h-full"
+                  className="bg-surface-1 border border-subtle rounded-xl hover:border-[var(--accent-primary)]/30 transition-all duration-300 h-full"
                 >
-                  <CardHeader className="flex flex-row items-center justify-between pb-3">
-                    <CardTitle className="text-sm font-medium text-tertiary">
+                  <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 sm:pb-3">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-tertiary truncate pr-2">
                       {stat.title}
                     </CardTitle>
-                    <div className="p-2 rounded-lg bg-surface-2">
-                      <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-surface-2 shrink-0">
+                      <stat.icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${stat.color}`} />
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-primary">
+                  <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+                    <div className="text-2xl sm:text-3xl font-bold text-primary">
                       {stat.value}
                     </div>
                   </CardContent>
@@ -592,7 +612,7 @@ export default function Deployments() {
               ))}
             </div>
 
-            {/* Filter Tabs */}
+            {/* Filter Tabs - scrollable on mobile */}
             <Tabs
               value={showArchived ? "archived" : filter}
               onValueChange={(v) => {
@@ -603,52 +623,62 @@ export default function Deployments() {
                   setFilter(v);
                 }
               }}
-              className="mb-6"
+              className="mb-4 sm:mb-6"
             >
-              <TabsList className="bg-surface-2/50 border border-subtle">
-                <TabsTrigger value="all">Active</TabsTrigger>
-                <TabsTrigger value="success">Successful</TabsTrigger>
-                <TabsTrigger value="failed">Failed</TabsTrigger>
-                <TabsTrigger value="pending">Pending</TabsTrigger>
-                <TabsTrigger value="archived">
-                  <Archive className="w-4 h-4 mr-2" />
-                  Archived ({archivedDeployments.length})
-                </TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-surface-3 touch-pan-x">
+                <TabsList className="bg-surface-2/50 border border-subtle inline-flex w-max h-auto flex-nowrap gap-1 p-1.5 sm:p-[3px]">
+                  <TabsTrigger value="all" className="shrink-0 text-xs sm:text-sm px-3 sm:px-2 py-2.5 sm:py-1 min-h-[44px] sm:min-h-0">
+                    Active
+                  </TabsTrigger>
+                  <TabsTrigger value="success" className="shrink-0 text-xs sm:text-sm px-3 sm:px-2 py-2.5 sm:py-1 min-h-[44px] sm:min-h-0">
+                    Success
+                  </TabsTrigger>
+                  <TabsTrigger value="failed" className="shrink-0 text-xs sm:text-sm px-3 sm:px-2 py-2.5 sm:py-1 min-h-[44px] sm:min-h-0">
+                    Failed
+                  </TabsTrigger>
+                  <TabsTrigger value="pending" className="shrink-0 text-xs sm:text-sm px-3 sm:px-2 py-2.5 sm:py-1 min-h-[44px] sm:min-h-0">
+                    Pending
+                  </TabsTrigger>
+                  <TabsTrigger value="archived" className="shrink-0 text-xs sm:text-sm px-3 sm:px-2 py-2.5 sm:py-1 min-h-[44px] sm:min-h-0 inline-flex items-center gap-1.5">
+                    <Archive className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                    Archived ({archivedDeployments.length})
+                  </TabsTrigger>
+                </TabsList>
+              </div>
             </Tabs>
 
             {/* Deployments Grid */}
             {showArchived ? (
               archivedDeployments.length === 0 ? (
-                <Card className="bg-surface-1 border border-subtle rounded-[12px]">
-                  <CardContent className="p-12 text-center">
-                    <div className="bg-surface-2 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Archive className="w-10 h-10 text-tertiary" />
+                <Card className="bg-surface-1 border border-subtle rounded-xl sm:rounded-[12px]">
+                  <CardContent className="p-8 sm:p-12 text-center">
+                    <div className="bg-surface-2 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Archive className="w-8 h-8 sm:w-10 sm:h-10 text-tertiary" />
                     </div>
-                    <h3 className="text-xl font-semibold text-primary mb-2">
+                    <h3 className="text-lg sm:text-xl font-semibold text-primary mb-2">
                       No Archived Deployments
                     </h3>
-                    <p className="text-tertiary">
+                    <p className="text-tertiary text-sm sm:text-base">
                       Archived deployments will appear here when you create new
                       deployments
                     </p>
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                   {archivedDeployments.map((d) => (
                     <Card
                       key={d.id}
-                      className="bg-surface-1 border border-subtle rounded-[12px] hover:border-[var(--accent-primary)]/30 transition-all duration-300 h-full opacity-75"
+                      className="bg-surface-1 border border-subtle rounded-xl sm:rounded-[12px] hover:border-[var(--accent-primary)]/30 transition-all duration-300 h-full opacity-75"
                     >
-                      <CardHeader className="pb-4">
+                      <CardHeader className="p-4 sm:pb-4">
                         {/* Header */}
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <CardTitle className="text-xl font-bold text-primary mb-3 line-clamp-2">
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-lg sm:text-xl font-bold text-primary mb-2 sm:mb-3 line-clamp-2">
                               {d.conversationTitle || "Untitled Project"}
                             </CardTitle>
-                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 sm:gap-2 mb-2 flex-wrap">
                               <span
                                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${getPlatformColor(
                                   d.platform
@@ -669,12 +699,12 @@ export default function Deployments() {
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                             {getStatusIcon(d.status)}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button
-                                  className="p-1.5 rounded-lg hover:bg-surface-3/50 transition-colors duration-200"
+                                  className="p-2.5 sm:p-1.5 rounded-lg hover:bg-surface-3/50 transition-colors duration-200 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
                                   title="More options"
                                 >
                                   <MoreHorizontal className="w-4 h-4 text-tertiary" />
@@ -727,7 +757,7 @@ export default function Deployments() {
 
                         {/* Status Badge */}
                         <div
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border ${getStatusBadge(
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border ${getStatusBadge(
                             d.status
                           )}`}
                         >
@@ -735,13 +765,13 @@ export default function Deployments() {
                         </div>
                       </CardHeader>
 
-                      <CardContent>
+                      <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                         {/* Details */}
-                        <div className="space-y-3 mb-4">
-                          <div className="flex items-center gap-2 text-sm text-tertiary">
-                            <Calendar className="w-4 h-4" />
-                            <span className="font-medium">Archived:</span>
-                            <span className="text-secondary">
+                        <div className="space-y-2 sm:space-y-3 mb-4">
+                          <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary min-h-[20px]">
+                            <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                            <span className="font-medium shrink-0">Archived:</span>
+                            <span className="text-secondary truncate">
                               {d.archivedAt
                                 ? new Date(d.archivedAt).toLocaleDateString(
                                     "en-US",
@@ -757,10 +787,10 @@ export default function Deployments() {
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-2 text-sm text-tertiary">
-                            <Calendar className="w-4 h-4" />
-                            <span className="font-medium">Deployed:</span>
-                            <span className="text-secondary">
+                          <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary min-h-[20px]">
+                            <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                            <span className="font-medium shrink-0">Deployed:</span>
+                            <span className="text-secondary truncate">
                               {d.deployedAt
                                 ? new Date(d.deployedAt).toLocaleDateString(
                                     "en-US",
@@ -777,31 +807,31 @@ export default function Deployments() {
                           </div>
 
                           {d.deploymentId && (
-                            <div className="flex items-center gap-2 text-sm text-tertiary">
-                              <Package className="w-4 h-4" />
-                              <span className="font-medium">ID:</span>
-                              <code className="bg-surface-2 px-2 py-0.5 rounded text-xs text-secondary border border-subtle">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary min-h-[20px]">
+                              <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                              <span className="font-medium shrink-0">ID:</span>
+                              <code className="bg-surface-2 px-2 py-0.5 rounded text-xs text-secondary border border-subtle truncate max-w-[120px] sm:max-w-[200px]">
                                 {d.deploymentId.substring(0, 12)}...
                               </code>
                             </div>
                           )}
 
                           {(d.uniqueDeploymentUrl || d.deploymentUrl) && (
-                            <div className="flex items-center gap-2 text-sm text-tertiary">
-                              <Globe className="w-4 h-4" />
-                              <span className="font-medium">
-                                {d.uniqueDeploymentUrl ? "Unique URL:" : "URL:"}
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary min-h-[20px]">
+                              <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                              <span className="font-medium shrink-0">
+                                {d.uniqueDeploymentUrl ? "URL:" : "URL:"}
                               </span>
-                              <code className="bg-surface-2 px-2 py-0.5 rounded text-xs text-secondary border border-subtle truncate max-w-[200px]">
+                              <code className="bg-surface-2 px-2 py-0.5 rounded text-xs text-secondary border border-subtle truncate min-w-0 max-w-[140px] sm:max-w-[200px]" title={(d.uniqueDeploymentUrl || d.deploymentUrl).replace(/^https?:\/\//, '')}>
                                 {(d.uniqueDeploymentUrl || d.deploymentUrl).replace(/^https?:\/\//, '')}
                               </code>
                             </div>
                           )}
                         </div>
 
-                        {/* Action Buttons */}
+                        {/* Action Buttons - touch-friendly min height */}
                         {(d.uniqueDeploymentUrl || d.deploymentUrl) && d.status === "success" && (
-                          <div className="space-y-2">
+                          <div className="space-y-2 sm:space-y-2">
                             {d.uniqueDeploymentUrl ? (
                               <div className="text-xs text-success-500 text-center mb-2">
                                 This URL shows the exact archived version
@@ -815,25 +845,24 @@ export default function Deployments() {
                               href={d.uniqueDeploymentUrl || d.deploymentUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center justify-center gap-2 w-full bg-surface-2 hover:bg-surface-3 text-secondary px-4 py-3 rounded-xl font-semibold transition-all border border-subtle"
+                              className="flex items-center justify-center gap-2 w-full bg-surface-2 hover:bg-surface-3 text-secondary px-4 py-3.5 sm:py-3 min-h-[48px] rounded-xl font-semibold transition-all border border-subtle"
                             >
                               View Archived Version
-                              <ExternalLink className="w-4 h-4" />
+                              <ExternalLink className="w-4 h-4 shrink-0" />
                             </a>
-                            {/* Primary action: Promote to Live (instant alias switch) */}
                             <button
                               onClick={() => handlePromoteDeployment(d)}
                               disabled={isPromoting === d.id || isRestoring === d.id}
-                              className="flex items-center justify-center gap-2 w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white px-4 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="flex items-center justify-center gap-2 w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white px-4 py-3.5 sm:py-3 min-h-[48px] rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isPromoting === d.id ? (
                                 <>
-                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                                   Promoting...
                                 </>
                               ) : (
                                 <>
-                                  <Zap className="w-4 h-4" />
+                                  <Zap className="w-4 h-4 shrink-0" />
                                   Promote to Live
                                 </>
                               )}
@@ -849,15 +878,15 @@ export default function Deployments() {
                 </div>
               )
             ) : filteredDeployments.length === 0 ? (
-              <Card className="bg-surface-1 border border-subtle rounded-[12px]">
-                <CardContent className="p-12 text-center">
-                  <div className="bg-surface-2 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Rocket className="w-10 h-10 text-tertiary" />
+              <Card className="bg-surface-1 border border-subtle rounded-xl sm:rounded-[12px]">
+                <CardContent className="p-8 sm:p-12 text-center">
+                  <div className="bg-surface-2 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Rocket className="w-8 h-8 sm:w-10 sm:h-10 text-tertiary" />
                   </div>
-                  <h3 className="text-xl font-semibold text-primary mb-2">
+                  <h3 className="text-lg sm:text-xl font-semibold text-primary mb-2">
                     No Deployments Found
                   </h3>
-                  <p className="text-tertiary">
+                  <p className="text-tertiary text-sm sm:text-base">
                     {filter === "all"
                       ? "Start deploying your projects to see them here 🚀"
                       : `No ${filter} deployments at the moment`}
@@ -865,48 +894,48 @@ export default function Deployments() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {filteredDeployments.map((d) => (
                   <Card
                     key={d.id}
-                    className="bg-surface-1 border border-subtle rounded-[12px] hover:border-[var(--accent-primary)]/30 transition-all duration-300 h-full"
+                    className="bg-surface-1 border border-subtle rounded-xl sm:rounded-[12px] hover:border-[var(--accent-primary)]/30 transition-all duration-300 h-full"
                   >
-                    <CardHeader className="pb-4">
+                    <CardHeader className="p-4 sm:pb-4">
                       {/* Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <CardTitle className="text-xl font-bold text-primary mb-3 line-clamp-2">
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg sm:text-xl font-bold text-primary mb-2 sm:mb-3 line-clamp-2">
                             {d.conversationTitle || "Untitled Project"}
                           </CardTitle>
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                             <span
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${getPlatformColor(
+                              className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold border ${getPlatformColor(
                                 d.platform
                               )}`}
                             >
-                              <Globe className="w-3 h-3" />
+                              <Globe className="w-3 h-3 shrink-0" />
                               {d.platform}
                             </span>
                             {d.versionNumber && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-[var(--info-500)]/10 text-info-500 border-[var(--info-500)]/20">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold border bg-[var(--info-500)]/10 text-info-500 border-[var(--info-500)]/20">
                                 v{d.versionNumber}
                                 {d.totalVersions && d.totalVersions > 1 && ` of ${d.totalVersions}`}
                               </span>
                             )}
                             {d.isLive && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-[var(--success-500)]/10 text-success-500 border-[var(--success-500)]/20">
-                                <Zap className="w-3 h-3" />
+                              <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold border bg-[var(--success-500)]/10 text-success-500 border-[var(--success-500)]/20">
+                                <Zap className="w-3 h-3 shrink-0" />
                                 Live
                               </span>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                           {getStatusIcon(d.status)}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button
-                                className="p-1.5 rounded-lg hover:bg-surface-3/50 transition-colors duration-200"
+                                className="p-2.5 sm:p-1.5 rounded-lg hover:bg-surface-3/50 transition-colors duration-200 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
                                 title="More options"
                               >
                                 <MoreHorizontal className="w-4 h-4 text-tertiary" />
@@ -927,7 +956,7 @@ export default function Deployments() {
 
                       {/* Status Badge */}
                       <div
-                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border ${getStatusBadge(
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border ${getStatusBadge(
                           d.status
                         )}`}
                       >
@@ -935,13 +964,13 @@ export default function Deployments() {
                       </div>
                     </CardHeader>
 
-                    <CardContent>
+                    <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                       {/* Details */}
-                      <div className="space-y-3 mb-4">
-                        <div className="flex items-center gap-2 text-sm text-tertiary">
-                          <Calendar className="w-4 h-4" />
-                          <span className="font-medium">Deployed:</span>
-                          <span className="text-secondary">
+                      <div className="space-y-2 sm:space-y-3 mb-4">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary min-h-[20px]">
+                          <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                          <span className="font-medium shrink-0">Deployed:</span>
+                          <span className="text-secondary truncate">
                             {d.deployedAt
                               ? new Date(d.deployedAt).toLocaleDateString(
                                   "en-US",
@@ -958,39 +987,39 @@ export default function Deployments() {
                         </div>
 
                         {d.deploymentId && (
-                          <div className="flex items-center gap-2 text-sm text-tertiary">
-                            <Package className="w-4 h-4" />
-                            <span className="font-medium">ID:</span>
-                            <code className="bg-surface-2 px-2 py-0.5 rounded text-xs text-secondary border border-subtle">
+                          <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary min-h-[20px]">
+                            <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                            <span className="font-medium shrink-0">ID:</span>
+                            <code className="bg-surface-2 px-2 py-0.5 rounded text-xs text-secondary border border-subtle truncate max-w-[120px] sm:max-w-none">
                               {d.deploymentId.substring(0, 12)}...
                             </code>
                           </div>
                         )}
                       </div>
 
-                      {/* Action Button */}
+                      {/* Action Button - touch-friendly */}
                       {d.deploymentUrl && d.status === "success" && (
                         <a
                           href={d.deploymentUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-2 w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white px-4 py-3 rounded-xl font-semibold transition-all"
+                          className="flex items-center justify-center gap-2 w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white px-4 py-3.5 sm:py-3 min-h-[48px] rounded-xl font-semibold transition-all"
                         >
                           View Live Deployment
-                          <ExternalLink className="w-4 h-4" />
+                          <ExternalLink className="w-4 h-4 shrink-0" />
                         </a>
                       )}
 
                       {d.status === "pending" && (
-                        <div className="flex items-center justify-center gap-2 w-full bg-surface-2 text-tertiary px-4 py-3 rounded-xl font-semibold border border-subtle">
-                          <Loader className="w-4 h-4 animate-spin" />
-                          Deployment in progress...
+                        <div className="flex items-center justify-center gap-2 w-full bg-surface-2 text-tertiary px-4 py-3.5 sm:py-3 min-h-[48px] rounded-xl font-semibold border border-subtle">
+                          <Loader className="w-4 h-4 animate-spin shrink-0" />
+                          <span className="truncate">Deployment in progress...</span>
                         </div>
                       )}
 
                       {d.status === "failed" && (
-                        <div className="flex items-center justify-center gap-2 w-full bg-[var(--error-500)]/10 text-error-500 px-4 py-3 rounded-xl font-semibold border border-[var(--error-500)]/20">
-                          <XCircle className="w-4 h-4" />
+                        <div className="flex items-center justify-center gap-2 w-full bg-[var(--error-500)]/10 text-error-500 px-4 py-3.5 sm:py-3 min-h-[48px] rounded-xl font-semibold border border-[var(--error-500)]/20">
+                          <XCircle className="w-4 h-4 shrink-0" />
                           Deployment failed
                         </div>
                       )}

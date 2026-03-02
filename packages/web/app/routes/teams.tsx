@@ -13,8 +13,8 @@ import * as React from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate } from "react-router";
 import { Header } from "~/components";
+import GradientGlow from "~/components/GradientGlow";
 import { ProjectSidebar } from "~/components/ProjectSidebar";
-import Background from "~/components/Background";
 import { TeamOnboardingDialog } from "~/components/TeamOnboardingDialog";
 import { Button } from "~/components/ui/button";
 import {
@@ -251,70 +251,66 @@ export default function TeamsPage() {
 
   return (
     <>
-    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <Background />
-        </div>
-
+    <div className="h-screen w-screen max-w-full bg-canvas text-white flex overflow-hidden safe-area-padding">
         <ProjectSidebar user={user} className="shrink-0" />
-
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col relative overflow-hidden min-w-0">
+          <GradientGlow />
           <Header showAuthButtons={false} showSidebarToggle={false} />
-
           <main className="relative z-20 flex flex-col h-full overflow-hidden">
-            <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+            <div className="flex-1 overflow-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <div className="container mx-auto max-w-7xl">
-                {/* Header */}
-                <div className="mb-8">
-                  <Button
-                    variant="ghost"
-                    className="mb-4"
-                    onClick={() => navigate(-1)}
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back
-                  </Button>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">
+                {/* Back - touch-friendly on mobile */}
+                <Button
+                  variant="ghost"
+                  className="mb-3 sm:mb-4 -ml-2 min-h-[44px] min-w-[44px] sm:min-w-0 sm:px-0 touch-manipulation"
+                  onClick={() => navigate(-1)}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2 shrink-0" />
+                  <span className="hidden sm:inline">Back</span>
+                </Button>
+
+                {/* Header - stack on mobile */}
+                <div className="mb-6 sm:mb-8">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-1 sm:mb-2 truncate">
                         Teams
                       </h1>
-                      <p className="text-muted-foreground">
-                        Manage your teams, invite members, and collaborate on
-                        projects
+                      <p className="text-muted-foreground text-sm sm:text-base">
+                        Manage your teams, invite members, and collaborate on projects
                       </p>
                     </div>
                     <Button
                       onClick={() => setShowCreateDialog(true)}
-                      className="bg-primary hover:bg-primary/90"
+                      className="w-full sm:w-auto min-h-[44px] sm:min-h-9 bg-primary hover:bg-primary/90 shrink-0 touch-manipulation"
                     >
-                      <Plus className="w-4 h-4 mr-2" />
+                      <Plus className="w-4 h-4 mr-2 shrink-0" />
                       Create Team
                     </Button>
                   </div>
                 </div>
 
                 {error && (
-                  <div className="mb-6 p-4 rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
+                  <div className="mb-4 sm:mb-6 p-3 sm:p-4 rounded-xl bg-destructive/10 text-destructive border border-destructive/20 text-sm sm:text-base">
                     {error}
                   </div>
                 )}
 
                 {/* Pending Invitations */}
                 {invitations.length > 0 && (
-                  <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-foreground mb-4">
+                  <div className="mb-6 sm:mb-8">
+                    <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">
                       Pending Invitations
                     </h2>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                       {invitations.map((inv) => (
                         <div
                           key={inv.id}
-                          className="p-4 rounded-lg border border-border bg-card"
+                          className="p-4 sm:p-5 rounded-xl border border-border bg-card/80 backdrop-blur-sm"
                         >
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <h3 className="font-medium text-foreground">
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-medium text-foreground truncate">
                                 {inv.teamName}
                               </h3>
                               <p className="text-sm text-muted-foreground">
@@ -330,9 +326,9 @@ export default function TeamsPage() {
                                 setShowAcceptDialog(true);
                               }}
                               disabled={loading}
-                              className="flex-1"
+                              className="flex-1 min-h-[44px] sm:min-h-9 touch-manipulation"
                             >
-                              <CheckCircle2 className="w-4 h-4 mr-1" />
+                              <CheckCircle2 className="w-4 h-4 mr-1 shrink-0" />
                               Accept
                             </Button>
                             <Button
@@ -343,6 +339,7 @@ export default function TeamsPage() {
                                 setShowRejectDialog(true);
                               }}
                               disabled={loading}
+                              className="min-h-[44px] w-10 sm:min-h-9 sm:w-9 p-0 touch-manipulation"
                             >
                               <XCircle className="w-4 h-4" />
                             </Button>
@@ -355,44 +352,47 @@ export default function TeamsPage() {
 
                 {/* Teams List */}
                 <div>
-                  <h2 className="text-xl font-semibold text-foreground mb-4">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">
                     Your Teams
                   </h2>
                   {teams.length === 0 ? (
-                    <div className="text-center py-12 rounded-lg border border-border bg-card">
+                    <div className="text-center py-10 sm:py-12 px-4 rounded-xl border border-border bg-card/80 backdrop-blur-sm">
                       <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                       <h3 className="text-lg font-medium text-foreground mb-2">
                         No teams yet
                       </h3>
-                      <p className="text-muted-foreground mb-4">
+                      <p className="text-muted-foreground mb-4 text-sm sm:text-base">
                         Create your first team to start collaborating
                       </p>
-                      <Button onClick={() => setShowCreateDialog(true)}>
+                      <Button
+                        onClick={() => setShowCreateDialog(true)}
+                        className="min-h-[44px] touch-manipulation"
+                      >
                         <Plus className="w-4 h-4 mr-2" />
                         Create Team
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                       {teams.map((team) => (
                         <div
                           key={team.id}
-                          className="p-6 rounded-lg border border-border bg-card hover:border-primary/50 transition-colors cursor-pointer"
+                          className="p-4 sm:p-6 rounded-xl border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 active:border-primary/50 transition-colors cursor-pointer touch-manipulation"
                           onClick={() => navigate(`/teams/${team.id}`)}
                         >
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              <h3 className="text-lg font-semibold text-foreground mb-1">
+                          <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 truncate">
                                 {team.name}
                               </h3>
                               {team.description && (
-                                <p className="text-sm text-muted-foreground mb-2">
+                                <p className="text-sm text-muted-foreground line-clamp-2">
                                   {team.description}
                                 </p>
                               )}
                             </div>
                             {team.role === "admin" && (
-                              <span className="px-2 py-1 text-xs font-medium rounded bg-primary/10 text-primary">
+                              <span className="px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary shrink-0">
                                 Admin
                               </span>
                             )}
@@ -400,17 +400,13 @@ export default function TeamsPage() {
 
                           <div className="space-y-2 mb-4">
                             <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Balance
-                              </span>
-                              <span className="font-medium text-foreground">
+                              <span className="text-muted-foreground">Balance</span>
+                              <span className="font-medium text-foreground tabular-nums">
                                 ${team.balance.toFixed(2)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Members
-                              </span>
+                              <span className="text-muted-foreground">Members</span>
                               <span className="font-medium text-foreground">
                                 {team.memberCount}
                               </span>
@@ -426,9 +422,9 @@ export default function TeamsPage() {
                                 setSelectedTeam(team);
                                 setShowInviteDialog(true);
                               }}
-                              className="flex-1"
+                              className="flex-1 min-h-[44px] sm:min-h-9 touch-manipulation"
                             >
-                              <UserPlus className="w-4 h-4 mr-1" />
+                              <UserPlus className="w-4 h-4 mr-1 shrink-0" />
                               Invite
                             </Button>
                             <Button
@@ -438,6 +434,7 @@ export default function TeamsPage() {
                                 e.stopPropagation();
                                 navigate(`/teams/${team.id}`);
                               }}
+                              className="min-h-[44px] w-10 sm:min-h-9 sm:w-9 p-0 touch-manipulation"
                             >
                               <Settings className="w-4 h-4" />
                             </Button>
@@ -461,7 +458,7 @@ export default function TeamsPage() {
                 open={showInviteDialog}
                 onOpenChange={setShowInviteDialog}
               >
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto max-[480px]:rounded-t-2xl max-[480px]:mx-0 max-[480px]:w-full">
                   <DialogHeader>
                     <DialogTitle>Invite Team Member</DialogTitle>
                     <DialogDescription>
