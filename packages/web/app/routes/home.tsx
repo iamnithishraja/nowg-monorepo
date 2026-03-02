@@ -803,18 +803,18 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {/* Gradient Background */}
         <GradientGlow />
 
-        {/* Header - Menu (mobile) + Balance + Profile */}
-        <header className="relative z-10 flex items-center justify-between px-4 sm:px-6 py-4">
-          {/* Mobile: hamburger to open sidebar so profile/analytics are reachable */}
+        {/* Header - hamburger only on small screens (lg:hidden); on desktop right-align balance + profile. z-20 so it stays on top and receives touch. */}
+        <header className="relative z-20 flex items-center justify-between lg:justify-end px-4 sm:px-6 py-3 min-h-[52px] shrink-0">
+          {/* Hamburger only on small screens (not on desktop) - 44px min touch target for mobile */}
           <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent("openProjectSidebar"))}
-            className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg hover:bg-white/[0.06] text-white/80 hover:text-white transition-colors touch-manipulation"
+            className="lg:hidden flex items-center justify-center min-w-[44px] min-h-[44px] -ml-1 rounded-lg hover:bg-white/[0.06] active:bg-white/[0.1] text-white/80 hover:text-white transition-colors touch-manipulation cursor-pointer"
             aria-label="Open menu"
           >
             <List className="w-6 h-6" weight="bold" />
           </button>
-          <div className="flex items-center gap-3 md:ml-0 ml-auto">
+          <div className="flex items-center gap-2 sm:gap-3 lg:ml-0 ml-auto">
             {/* Balance Display */}
             {balance !== null && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
@@ -834,10 +834,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               </div>
             )}
 
-            {/* User Dropdown */}
+            {/* User Dropdown - 44px min touch target on mobile so profile is tappable */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center justify-center hover:opacity-80 transition-opacity">
+                <button className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-full hover:opacity-80 active:opacity-100 transition-opacity touch-manipulation cursor-pointer">
                   <HomeAvatar displayName={displayName} imageUrl={imageUrl} />
                 </button>
               </DropdownMenuTrigger>
@@ -966,8 +966,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Notification Bell */}
-            <button className="p-2 rounded-lg hover:bg-white/[0.04] text-white/40 hover:text-white transition-colors">
+            {/* Notification Bell - 44px min touch target on mobile */}
+            <button className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg hover:bg-white/[0.04] active:bg-white/[0.08] text-white/40 hover:text-white transition-colors touch-manipulation cursor-pointer">
               <Bell className="w-5 h-5" weight="bold" />
             </button>
           </div>
