@@ -807,17 +807,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const imageUrl = user?.image;
 
   return (
-    <div className="h-screen w-screen bg-[#0c0c0c] text-white flex overflow-hidden">
+    <div className="h-screen w-screen bg-[#0c0c0c] text-white flex overflow-hidden safe-area-padding">
       {/* Sidebar */}
       <ProjectSidebar user={user} />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
+      <div className="flex-1 flex flex-col relative overflow-hidden min-w-0">
         {/* Gradient Background */}
         <GradientGlow />
 
-        {/* Header - balance + profile; z-20 so it stays on top and receives touch (no hamburger to avoid Capacitor touch issues). */}
-        <header className="relative z-20 flex items-center justify-end px-4 sm:px-6 py-3 min-h-[52px] shrink-0">
+        {/* Header - on mobile: fixed bar with max z-index so it always receives touch; on desktop: normal flow */}
+        <header className="mobile-header-fixed flex items-center justify-end px-4 sm:px-6 py-3 min-h-[52px] shrink-0">
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Balance Display */}
             {balance !== null && (
@@ -1094,6 +1094,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </button>
           </div>
         </header>
+
+        {/* Spacer so content is not under the fixed header on mobile */}
+        <div className="mobile-header-spacer" aria-hidden="true" />
 
         {/* Main Content Area */}
         <main
