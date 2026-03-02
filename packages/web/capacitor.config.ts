@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
     androidScheme: "https",
     // Set to your deployed web app URL so the native app loads it in the WebView.
     // Example: url: "https://app.nowgai.com"
-    url: "https://app.nowg.ai",
+    url: "https://stg.nowg.ai",
   },
 };
 
