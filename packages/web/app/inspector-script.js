@@ -570,6 +570,18 @@
         const elementInfo = createElementInfo(target);
         window.parent.postMessage({ type: "INSPECTOR_CLICK", elementInfo }, "*");
       } catch {}
+    } else if (event.data.type === "GET_PREVIEW_HTML") {
+      try {
+        var html = document.documentElement
+          ? document.documentElement.outerHTML
+          : (document.body && document.body.outerHTML) || "";
+        window.parent.postMessage({ type: "PREVIEW_HTML", html: html }, "*");
+      } catch (e) {
+        window.parent.postMessage(
+          { type: "PREVIEW_HTML_ERROR", error: (e && e.message) || "Failed to get HTML" },
+          "*"
+        );
+      }
     }
   });
 

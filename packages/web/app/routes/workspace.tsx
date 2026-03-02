@@ -8,7 +8,7 @@ import {
   SpinnerGap,
   Upload,
 } from "@phosphor-icons/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { redirect, useLocation, useSearchParams } from "react-router";
 import {
   AgentModal,
@@ -63,6 +63,7 @@ import {
 import type { DesignScheme } from "../types/design-scheme";
 import { getShortcutLabel } from "../utils/platform";
 import type { Route } from "./+types/workspace";
+import type { PreviewApiHandle } from "../components/Preview";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const authInstance = await auth;
@@ -161,6 +162,89 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
   const [selectedElementInfo, setSelectedElementInfo] = useState<any | null>(
     null
   );
+
+  const previewApiRef = useRef<PreviewApiHandle | null>(null);
+
+  const handleSaveEdit = useCallback(async () => {
+    const api = previewApiRef.current;
+    if (!api) {
+      console.warn("[Workspace] Preview not ready for save edit");
+      return;
+    }
+    const convId = controller.conversationId;
+    const files = controller.templateFilesState || [];
+    if (!convId || files.length === 0) {
+      console.warn("[Workspace] No conversation or files to save");
+      return;
+    }
+    try {
+      const html = await api.getPreviewHtml();
+      const res = await fetch("/api/applyEditToSource", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          files: files.map((f: { path: string; content: string }) => ({
+            path: f.path,
+            content: f.content,
+          })),
+          previewHtml: html,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || `Save edit failed: ${res.status}`);
+      }
+      const data = await res.json();
+      if (!data.success || !Array.isArray(data.files)) {
+        throw new Error(data?.error || "Invalid response from server");
+      }
+      const mergedFiles = (controller.templateFilesState || []).map(
+        (f: { path: string; content: string }) => {
+          const updated = data.files.find(
+            (x: { path: string }) => x.path === f.path
+          );
+          return updated
+            ? { path: updated.path, content: updated.content }
+            : { path: f.path, content: f.content };
+        }
+      );
+      for (const f of data.files) {
+        if (f.path && typeof f.content === "string") {
+          controller.saveFile(f.path, f.content);
+          if (!mergedFiles.some((m: { path: string }) => m.path === f.path)) {
+            mergedFiles.push({ path: f.path, content: f.content });
+          }
+        }
+      }
+      const { useWorkspaceStore } = await import("../stores/useWorkspaceStore");
+      const { uploadFilesToR2WithPresignedUrls, syncConversationJsonToR2 } =
+        await import("../lib/r2UploadClient");
+      const { filesToSnapshot, saveSnapshot } = await import(
+        "../lib/chatPersistence"
+      );
+      useWorkspaceStore.getState().setIsSyncingToR2(true);
+      try {
+        await uploadFilesToR2WithPresignedUrls(convId, undefined, mergedFiles);
+        await syncConversationJsonToR2(convId);
+        const snapshot = filesToSnapshot(
+          mergedFiles.map((f: { path: string; content: string }) => ({
+            path: f.path,
+            content: f.content,
+          }))
+        );
+        await saveSnapshot(convId, snapshot);
+      } finally {
+        useWorkspaceStore.getState().setIsSyncingToR2(false);
+      }
+    } catch (e) {
+      console.error("[Workspace] Save edit failed:", e);
+      throw e;
+    }
+  }, [
+    controller.conversationId,
+    controller.templateFilesState,
+    controller.saveFile,
+  ]);
 
   // Get file reconstruction state from store - use optimized selector
   const isReconstructingFiles = useIsReconstructingFiles();
@@ -1083,6 +1167,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                         conversationId={controller.conversationId}
                         selectedModel={controller.selectedModel}
                         onModelChange={controller.setSelectedModel}
+                        onSaveEdit={handleSaveEdit}
                       />
                     </div>
                   </div>
@@ -1137,6 +1222,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       conversationId={controller.conversationId || undefined}
                       onElementSelected={(info) => setSelectedElementInfo(info)}
                       onInspectorEnable={() => setSelectedElementInfo(null)}
+                      previewApiRef={previewApiRef}
                     />
                   </div>
                 </div>

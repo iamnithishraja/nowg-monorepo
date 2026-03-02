@@ -20,7 +20,7 @@ import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import type { DesignScheme } from "../types/design-scheme";
 import { getShortcutLabel } from "../utils/platform";
 
-import { ArrowUp, SelectionPlus } from "@phosphor-icons/react";
+import { ArrowUp, FloppyDisk, SelectionPlus } from "@phosphor-icons/react";
 import { FilePreview } from "./FileUpload";
 import { Button } from "./ui/button";
 import {
@@ -78,6 +78,8 @@ interface WorkspaceChatInputProps {
   onDesignSchemeChange?: (scheme: DesignScheme | undefined) => void;
   selectedModel?: string;
   onModelChange?: (model: string) => void;
+  /** When in edit mode, called when user clicks Save to persist HTML/CSS changes to source and sync */
+  onSaveEdit?: () => Promise<void>;
 }
 
 export function WorkspaceChatInput({
@@ -101,11 +103,13 @@ export function WorkspaceChatInput({
   onDesignSchemeChange,
   selectedModel: propSelectedModel,
   onModelChange,
+  onSaveEdit,
 }: WorkspaceChatInputProps) {
   const isDisabled = isLoading || isProcessingTemplate || isStreaming;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const shortcutLabel = getShortcutLabel();
 
   // Workspace state for switching tabs and edit mode
@@ -791,6 +795,40 @@ export function WorkspaceChatInput({
                 Edit
               </Button>
 
+              {/* Save Edit Button - Persist inspector changes to source and sync */}
+              {isEditActive && onSaveEdit && (
+                <Button
+                  onClick={async () => {
+                    if (isSavingEdit) return;
+                    setIsSavingEdit(true);
+                    try {
+                      await onSaveEdit();
+                      setIsEditActive(false);
+                      const event = new CustomEvent("toggleInspector", {
+                        detail: { enabled: false },
+                      });
+                      window.dispatchEvent(event);
+                      try {
+                        window.dispatchEvent(new CustomEvent("endEditMode"));
+                      } catch {}
+                    } finally {
+                      setIsSavingEdit(false);
+                    }
+                  }}
+                  disabled={isSavingEdit}
+                  variant="default"
+                  size="sm"
+                  className="h-7 px-2 text-xs gap-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white"
+                  title="Save changes to source files and sync"
+                >
+                  {isSavingEdit ? (
+                    <SpinnerGap className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FloppyDisk className="w-3.5 h-3.5" />
+                  )}
+                  Save
+                </Button>
+              )}
               {/* Cancel Edit Button - Shows when edit mode is active */}
               {isEditActive && (
                 <Button
