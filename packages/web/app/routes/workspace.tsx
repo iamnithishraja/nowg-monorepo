@@ -132,12 +132,12 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     () => {
       const state = location.state as any;
       return state?.designScheme;
-    }
+    },
   );
   const [enableDesignScheme, setEnableDesignScheme] = useState<boolean>(false);
 
   const [hadInitialPrompt] = useState(
-    () => !!(location.state as any)?.initialPrompt
+    () => !!(location.state as any)?.initialPrompt,
   );
 
   // Handle insufficient balance modal
@@ -157,11 +157,11 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
         clearTimeout(chatTitlePollIntervalRef.current);
         chatTitlePollIntervalRef.current = null;
       }
-    }
+    },
   );
 
   const [selectedElementInfo, setSelectedElementInfo] = useState<any | null>(
-    null
+    null,
   );
 
   const previewApiRef = useRef<PreviewApiHandle | null>(null);
@@ -202,12 +202,12 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
       const mergedFiles = (controller.templateFilesState || []).map(
         (f: { path: string; content: string }) => {
           const updated = data.files.find(
-            (x: { path: string }) => x.path === f.path
+            (x: { path: string }) => x.path === f.path,
           );
           return updated
             ? { path: updated.path, content: updated.content }
             : { path: f.path, content: f.content };
-        }
+        },
       );
       for (const f of data.files) {
         if (f.path && typeof f.content === "string") {
@@ -220,9 +220,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
       const { useWorkspaceStore } = await import("../stores/useWorkspaceStore");
       const { uploadFilesToR2WithPresignedUrls, syncConversationJsonToR2 } =
         await import("../lib/r2UploadClient");
-      const { filesToSnapshot, saveSnapshot } = await import(
-        "../lib/chatPersistence"
-      );
+      const { filesToSnapshot, saveSnapshot } =
+        await import("../lib/chatPersistence");
       useWorkspaceStore.getState().setIsSyncingToR2(true);
       try {
         await uploadFilesToR2WithPresignedUrls(convId, undefined, mergedFiles);
@@ -231,7 +230,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
           mergedFiles.map((f: { path: string; content: string }) => ({
             path: f.path,
             content: f.content,
-          }))
+          })),
         );
         await saveSnapshot(convId, snapshot);
       } finally {
@@ -360,13 +359,13 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
 
     const timeout = setTimeout(() => {
       console.warn(
-        "[Workspace] Loading timeout (15s) - checking for stuck states"
+        "[Workspace] Loading timeout (15s) - checking for stuck states",
       );
 
       // Check if we have messages loaded - if so, we shouldn't be showing loader
       if (controller.messages.length > 0) {
         console.warn(
-          "[Workspace] Messages exist but loader still showing - forcing reset"
+          "[Workspace] Messages exist but loader still showing - forcing reset",
         );
 
         // Force reset loading states via the store
@@ -439,7 +438,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
         setHasLoadedConversationData(false);
         try {
           const response = await fetch(
-            `/api/conversations?conversationId=${controller.conversationId}`
+            `/api/conversations?conversationId=${controller.conversationId}`,
           );
           if (response.ok) {
             const data = await response.json();
@@ -448,7 +447,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
               setAdminProjectId(
                 typeof data.conversation.adminProjectId === "string"
                   ? data.conversation.adminProjectId
-                  : data.conversation.adminProjectId.toString()
+                  : data.conversation.adminProjectId.toString(),
               );
             } else {
               setAdminProjectId(null);
@@ -510,7 +509,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           alert(
-            `Failed to provision Neon: ${errorData.message || "Unknown error"}`
+            `Failed to provision Neon: ${errorData.message || "Unknown error"}`,
           );
           return;
         }
@@ -545,7 +544,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
           alert(
             `Failed to provision Supabase: ${
               errorData.message || "Unknown error"
-            }`
+            }`,
           );
           if (errorData.error === "SUPABASE_NOT_CONNECTED") {
             handleConnectSupabase();
@@ -713,7 +712,9 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
             <div className="md:hidden relative z-10 flex items-center justify-end px-4 py-3">
               <button
                 type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("openProjectSidebar"))}
+                onClick={() =>
+                  window.dispatchEvent(new CustomEvent("openProjectSidebar"))
+                }
                 className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-white/[0.06] text-white/80 hover:text-white transition-colors touch-manipulation"
                 aria-label="Open menu"
               >
@@ -724,250 +725,254 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
               {...dragHandlers}
               className={cn(
                 "relative z-10 flex-1 flex flex-col items-center justify-center px-6 pb-24 overflow-y-auto",
-                isDragging && "bg-purple-500/5"
+                isDragging && "bg-purple-500/5",
               )}
             >
-            {/* Hero */}
-            <div className="text-center mb-8">
-              <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mb-3">
-                Your next big thing starts here
-              </h1>
-              <p className="text-lg text-white/50 font-medium">
-                Prompt to Production Ready Apps
-              </p>
-            </div>
+              {/* Hero */}
+              <div className="text-center mb-8">
+                <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mb-3">
+                  Your next big thing starts here
+                </h1>
+                <p className="text-lg text-white/50 font-medium">
+                  Prompt to Production Ready Apps
+                </p>
+              </div>
 
-            {/* Input Container */}
-            <div className="w-full max-w-3xl">
-              {/* Model & Options Row */}
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                {/* Model Selection */}
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-white/60">
-                    Model:
-                  </label>
-                  <Select
-                    value={controller.selectedModel}
-                    onValueChange={controller.setSelectedModel}
-                  >
-                    <SelectTrigger className="w-52 bg-white/[0.04] border-white/[0.08] text-white h-9 hover:bg-white/[0.06]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#1a1a1a] border-white/10">
-                      {OPENROUTER_MODELS.map((model) => (
-                        <SelectItem
-                          key={model.id}
-                          value={model.id}
-                          className="text-white hover:bg-white/10"
-                        >
-                          <div className="flex flex-col">
-                            <span className="text-sm">{model.name}</span>
-                            <span className="text-xs text-white/50">
-                              {model.provider}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Input Container */}
+              <div className="w-full max-w-3xl">
+                {/* Model & Options Row */}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  {/* Model Selection */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-white/60">
+                      Model:
+                    </label>
+                    <Select
+                      value={controller.selectedModel}
+                      onValueChange={controller.setSelectedModel}
+                    >
+                      <SelectTrigger className="w-52 bg-white/[0.04] border-white/[0.08] text-white h-9 hover:bg-white/[0.06]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-white/10">
+                        {OPENROUTER_MODELS.map((model) => (
+                          <SelectItem
+                            key={model.id}
+                            value={model.id}
+                            className="text-white hover:bg-white/10"
+                          >
+                            <div className="flex flex-col">
+                              <span className="text-sm">{model.name}</span>
+                              <span className="text-xs text-white/50">
+                                {model.provider}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Options */}
-                <div className="flex items-center gap-3">
-                  {/* Database Toggle */}
-                  {selectedDbProvider !== null ? (
-                    // Database enabled - show checkmark
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                      <Database className="w-4 h-4 text-purple-400" />
-                      <Label className="text-xs text-white/80">
-                        Database Enabled
-                      </Label>
-                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-purple-500/20">
-                        <Check className="w-3 h-3 text-purple-400" />
+                  {/* Options */}
+                  <div className="flex items-center gap-3">
+                    {/* Database Toggle */}
+                    {selectedDbProvider !== null ? (
+                      // Database enabled - show checkmark
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                        <Database className="w-4 h-4 text-purple-400" />
+                        <Label className="text-xs text-white/80">
+                          Database Enabled
+                        </Label>
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-purple-500/20">
+                          <Check className="w-3 h-3 text-purple-400" />
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    // Database not enabled - show toggle
+                    ) : (
+                      // Database not enabled - show toggle
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                        <Database
+                          className="w-4 h-4 text-purple-400"
+                          weight="bold"
+                        />
+                        <Label
+                          htmlFor="db-toggle"
+                          className="text-xs text-white/60 cursor-pointer"
+                        >
+                          Enable Database
+                        </Label>
+                        <Switch
+                          id="db-toggle"
+                          checked={false}
+                          onCheckedChange={handleDatabaseToggle}
+                          className="scale-75 data-[state=checked]:bg-purple-500"
+                        />
+                        {selectedDbProvider !== null && (
+                          <Button
+                            onClick={() => setShowDatabaseDialog(true)}
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 w-5 p-0 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                          >
+                            <Gear className="w-3 h-3" weight="bold" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Color Scheme Toggle */}
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                      <Database
-                        className="w-4 h-4 text-purple-400"
+                      <Palette
+                        className="w-4 h-4 text-pink-400"
                         weight="bold"
                       />
                       <Label
-                        htmlFor="db-toggle"
+                        htmlFor="design-toggle"
                         className="text-xs text-white/60 cursor-pointer"
                       >
-                        Enable Database
+                        Color Scheme
                       </Label>
                       <Switch
-                        id="db-toggle"
-                        checked={false}
-                        onCheckedChange={handleDatabaseToggle}
-                        className="scale-75 data-[state=checked]:bg-purple-500"
+                        id="design-toggle"
+                        checked={enableDesignScheme}
+                        onCheckedChange={(checked) => {
+                          setEnableDesignScheme(!!checked);
+                          if (!checked) setDesignScheme(undefined);
+                        }}
+                        className="scale-75 data-[state=checked]:bg-pink-500"
                       />
-                      {selectedDbProvider !== null && (
+                      {enableDesignScheme && (
                         <Button
-                          onClick={() => setShowDatabaseDialog(true)}
+                          onClick={() => {
+                            const event = new CustomEvent(
+                              "openColorSchemeDialog",
+                            );
+                            window.dispatchEvent(event);
+                          }}
                           variant="ghost"
                           size="sm"
-                          className="h-5 w-5 p-0 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                          className="h-5 w-5 p-0 text-pink-400 hover:text-pink-300 hover:bg-pink-500/10"
                         >
-                          <Gear className="w-3 h-3" weight="bold" />
+                          <Palette className="w-3 h-3" weight="bold" />
                         </Button>
                       )}
                     </div>
-                  )}
-
-                  {/* Color Scheme Toggle */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                    <Palette className="w-4 h-4 text-pink-400" weight="bold" />
-                    <Label
-                      htmlFor="design-toggle"
-                      className="text-xs text-white/60 cursor-pointer"
-                    >
-                      Color Scheme
-                    </Label>
-                    <Switch
-                      id="design-toggle"
-                      checked={enableDesignScheme}
-                      onCheckedChange={(checked) => {
-                        setEnableDesignScheme(!!checked);
-                        if (!checked) setDesignScheme(undefined);
-                      }}
-                      className="scale-75 data-[state=checked]:bg-pink-500"
-                    />
-                    {enableDesignScheme && (
-                      <Button
-                        onClick={() => {
-                          const event = new CustomEvent(
-                            "openColorSchemeDialog"
-                          );
-                          window.dispatchEvent(event);
-                        }}
-                        variant="ghost"
-                        size="sm"
-                        className="h-5 w-5 p-0 text-pink-400 hover:text-pink-300 hover:bg-pink-500/10"
-                      >
-                        <Palette className="w-3 h-3" weight="bold" />
-                      </Button>
-                    )}
                   </div>
                 </div>
-              </div>
 
-              {/* File Preview */}
-              {controller.uploadedFiles.length > 0 && (
-                <FilePreview
-                  files={controller.uploadedFiles}
-                  onRemove={handleRemoveFile}
-                  removeIcon="✕"
-                  fileIcon="📄"
-                  imageDataList={imageDataList}
-                  className="mb-4"
-                />
-              )}
-
-              {/* Input Field */}
-              <div
-                className={cn(
-                  "relative bg-[#1a1a1a]/80 backdrop-blur-xl border rounded-2xl overflow-hidden shadow-2xl shadow-black/40 transition-colors",
-                  isDragging
-                    ? "border-purple-500/50 bg-purple-500/5"
-                    : "border-white/[0.08]"
+                {/* File Preview */}
+                {controller.uploadedFiles.length > 0 && (
+                  <FilePreview
+                    files={controller.uploadedFiles}
+                    onRemove={handleRemoveFile}
+                    removeIcon="✕"
+                    fileIcon="📄"
+                    imageDataList={imageDataList}
+                    className="mb-4"
+                  />
                 )}
-              >
-                <textarea
-                  value={controller.input}
-                  onChange={(e) => controller.setInput(e.target.value)}
-                  onKeyDown={controller.handleKeyDown}
-                  placeholder={`What shall we build today? (${shortcutLabel} to start)`}
-                  disabled={
-                    controller.chatIsLoading || controller.isProcessingTemplate
-                  }
-                  rows={1}
-                  className="w-full bg-transparent text-white placeholder:text-white/30 px-5 py-4 pr-28 resize-none focus:outline-none text-base min-h-[56px] max-h-[200px] overflow-y-scroll"
-                  style={{ height: "96px" }}
-                />
 
-                {/* Bottom Action Bar */}
-                <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.04]">
-                  <div className="flex items-center gap-2">
-                    {/* File Upload Button */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={handleFileSelect}
-                          className="p-2 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white/70 transition-colors"
-                        >
-                          <Upload className="w-4 h-4" weight="bold" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>Upload files</TooltipContent>
-                    </Tooltip>
+                {/* Input Field */}
+                <div
+                  className={cn(
+                    "relative bg-[#1a1a1a]/80 backdrop-blur-xl border rounded-2xl overflow-hidden shadow-2xl shadow-black/40 transition-colors",
+                    isDragging
+                      ? "border-purple-500/50 bg-purple-500/5"
+                      : "border-white/[0.08]",
+                  )}
+                >
+                  <textarea
+                    value={controller.input}
+                    onChange={(e) => controller.setInput(e.target.value)}
+                    onKeyDown={controller.handleKeyDown}
+                    placeholder={`What shall we build today? (${shortcutLabel} to start)`}
+                    disabled={
+                      controller.chatIsLoading ||
+                      controller.isProcessingTemplate
+                    }
+                    rows={1}
+                    className="w-full bg-transparent text-white placeholder:text-white/30 px-5 py-4 pr-28 resize-none focus:outline-none text-base min-h-[56px] max-h-[200px] overflow-y-scroll"
+                    style={{ height: "96px" }}
+                  />
 
-                    {/* GitHub Import */}
-                    <button
-                      onClick={() => setShowGitHubModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 hover:text-white text-sm font-medium transition-all"
-                    >
-                      <GithubLogo className="w-3.5 h-3.5" weight="bold" />
-                      Import from GitHub
-                    </button>
+                  {/* Bottom Action Bar */}
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.04]">
+                    <div className="flex items-center gap-2">
+                      {/* File Upload Button */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={handleFileSelect}
+                            className="p-2 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white/70 transition-colors"
+                          >
+                            <Upload className="w-4 h-4" weight="bold" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Upload files</TooltipContent>
+                      </Tooltip>
 
-                    {/* Figma Import */}
-                    <button
-                      onClick={() => setShowFigmaModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 hover:text-white text-sm font-medium transition-all"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        viewBox="0 0 38 57"
-                        fill="currentColor"
-                        xmlns="http://www.w3.org/2000/svg"
+                      {/* GitHub Import */}
+                      <button
+                        onClick={() => setShowGitHubModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 hover:text-white text-sm font-medium transition-all"
                       >
-                        <path d="M19 28.5C19 23.2533 23.2533 19 28.5 19C33.7467 19 38 23.2533 38 28.5C38 33.7467 33.7467 38 28.5 38C23.2533 38 19 33.7467 19 28.5Z" />
-                        <path d="M0 47.5C0 42.2533 4.25329 38 9.5 38H19V47.5C19 52.7467 14.7467 57 9.5 57C4.25329 57 0 52.7467 0 47.5Z" />
-                        <path d="M19 0V19H28.5C33.7467 19 38 14.7467 38 9.5C38 4.25329 33.7467 0 28.5 0H19Z" />
-                        <path d="M0 9.5C0 14.7467 4.25329 19 9.5 19H19V0H9.5C4.25329 0 0 4.25329 0 9.5Z" />
-                        <path d="M0 28.5C0 33.7467 4.25329 38 9.5 38H19V19H9.5C4.25329 19 0 23.2533 0 28.5Z" />
-                      </svg>
-                      Import from Figma
-                    </button>
-                  </div>
+                        <GithubLogo className="w-3.5 h-3.5" weight="bold" />
+                        Import from GitHub
+                      </button>
 
-                  <div className="flex items-center gap-2">
-                    {/* Submit Button */}
-                    <button
-                      onClick={controller.handleSubmit}
-                      disabled={
-                        !controller.input.trim() ||
-                        controller.chatIsLoading ||
-                        controller.isProcessingTemplate
-                      }
-                      className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center transition-all",
-                        controller.input.trim() &&
-                          !controller.chatIsLoading &&
-                          !controller.isProcessingTemplate
-                          ? "bg-white text-black hover:bg-white/90"
-                          : "bg-white/10 text-white/30 cursor-not-allowed"
-                      )}
-                    >
-                      {controller.chatIsLoading ||
-                      controller.isProcessingTemplate ? (
-                        <SpinnerGap
-                          className="w-4 h-4 animate-spin"
-                          weight="bold"
-                        />
-                      ) : (
-                        <ArrowUp className="w-4 h-4" weight="bold" />
-                      )}
-                    </button>
+                      {/* Figma Import */}
+                      <button
+                        onClick={() => setShowFigmaModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 hover:text-white text-sm font-medium transition-all"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          viewBox="0 0 38 57"
+                          fill="currentColor"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path d="M19 28.5C19 23.2533 23.2533 19 28.5 19C33.7467 19 38 23.2533 38 28.5C38 33.7467 33.7467 38 28.5 38C23.2533 38 19 33.7467 19 28.5Z" />
+                          <path d="M0 47.5C0 42.2533 4.25329 38 9.5 38H19V47.5C19 52.7467 14.7467 57 9.5 57C4.25329 57 0 52.7467 0 47.5Z" />
+                          <path d="M19 0V19H28.5C33.7467 19 38 14.7467 38 9.5C38 4.25329 33.7467 0 28.5 0H19Z" />
+                          <path d="M0 9.5C0 14.7467 4.25329 19 9.5 19H19V0H9.5C4.25329 0 0 4.25329 0 9.5Z" />
+                          <path d="M0 28.5C0 33.7467 4.25329 38 9.5 38H19V19H9.5C4.25329 19 0 23.2533 0 28.5Z" />
+                        </svg>
+                        Import from Figma
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Submit Button */}
+                      <button
+                        onClick={controller.handleSubmit}
+                        disabled={
+                          !controller.input.trim() ||
+                          controller.chatIsLoading ||
+                          controller.isProcessingTemplate
+                        }
+                        className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                          controller.input.trim() &&
+                            !controller.chatIsLoading &&
+                            !controller.isProcessingTemplate
+                            ? "bg-white text-black hover:bg-white/90"
+                            : "bg-white/10 text-white/30 cursor-not-allowed",
+                        )}
+                      >
+                        {controller.chatIsLoading ||
+                        controller.isProcessingTemplate ? (
+                          <SpinnerGap
+                            className="w-4 h-4 animate-spin"
+                            weight="bold"
+                          />
+                        ) : (
+                          <ArrowUp className="w-4 h-4" weight="bold" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </main>
+            </main>
           </>
         ) : (
           // Regular workspace view (when conversation has messages)
@@ -1015,12 +1020,12 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                         } catch (jsonError) {
                           console.error(
                             "Error parsing JSON response:",
-                            jsonError
+                            jsonError,
                           );
                           const text = await response.text();
                           console.error("Response text:", text);
                           alert(
-                            `Failed to create chat: Invalid response from server (${response.status})`
+                            `Failed to create chat: Invalid response from server (${response.status})`,
                           );
                           return;
                         }
@@ -1028,10 +1033,10 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                         if (!response.ok) {
                           console.error(
                             "Error creating chat:",
-                            data.error || data.message || "Unknown error"
+                            data.error || data.message || "Unknown error",
                           );
                           alert(
-                            `Failed to create chat: ${data.error || data.message || `Server error (${response.status})`}`
+                            `Failed to create chat: ${data.error || data.message || `Server error (${response.status})`}`,
                           );
                           return;
                         }
@@ -1040,7 +1045,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                           // Navigate to the new chat with chatId query parameter
                           // Use setSearchParams instead of reload to preserve WebContainer state and preview
                           const newSearchParams = new URLSearchParams(
-                            searchParams
+                            searchParams,
                           );
                           newSearchParams.set("chatId", data.chatId);
                           setSearchParams(newSearchParams);
@@ -1049,7 +1054,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                         } else {
                           console.error("Unexpected response format:", data);
                           alert(
-                            "Failed to create chat: Invalid response format"
+                            "Failed to create chat: Invalid response format",
                           );
                         }
                       } catch (error) {
@@ -1067,7 +1072,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                         } else {
                           // For network errors, try to create chat again silently or just navigate
                           console.warn(
-                            "Network error during chat creation, but continuing..."
+                            "Network error during chat creation, but continuing...",
                           );
                         }
                       } finally {
@@ -1109,7 +1114,9 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       chatId={currentChatId || undefined}
                       conversationTitle={
                         currentChatId
-                          ? (currentChatTitle ?? controller.conversationTitle) || undefined
+                          ? (currentChatTitle ??
+                              controller.conversationTitle) ||
+                            undefined
                           : controller.conversationTitle || undefined
                       }
                       onFileClick={(filePath) => {
@@ -1118,7 +1125,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                         if (normalizedPath.startsWith("/home/project/")) {
                           normalizedPath = normalizedPath.replace(
                             "/home/project/",
-                            ""
+                            "",
                           );
                         } else if (normalizedPath.startsWith("/")) {
                           normalizedPath = normalizedPath.slice(1);
@@ -1127,6 +1134,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                         // Switch to files tab to show the file in editor
                         controller.setActiveTab("files");
                       }}
+                      onSaveEdit={handleSaveEdit}
                     />
                   </div>
                   {/* Bottom Section with Balance and Input */}

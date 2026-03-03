@@ -9,13 +9,18 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "./ui/accordion";
+import { Button } from "./ui/button";
+import { Check, FloppyDisk } from "@phosphor-icons/react";
+import { toast } from "sonner";
 
 interface SelectedElementCardProps {
   info: any;
+  onSave?: () => Promise<void>;
 }
 
 export default function SelectedElementCard({
   info,
+  onSave,
 }: SelectedElementCardProps) {
   const classList: string[] = Array.isArray(info?.classList)
     ? info.classList
@@ -25,13 +30,16 @@ export default function SelectedElementCard({
         .filter(Boolean);
   const parsed = useMemo(
     () => parseTailwindClasses(classList),
-    [classList.join(" ")]
+    [classList.join(" ")],
   );
   const attrSummary = useMemo(
     () => summarizeAttributes(info?.attributes, info?.tagName),
-    [info?.attributes, info?.tagName]
+    [info?.attributes, info?.tagName],
   );
   const computed = info?.styles || {};
+
+  // --- Save state ---
+  const [isSaving, setIsSaving] = useState(false);
 
   // --- Typography local state (preview-only, applied as inline styles in iframe) ---
   const [fontSize, setFontSize] = useState<string>("");
@@ -165,7 +173,7 @@ export default function SelectedElementCard({
         window.postMessage({ type: "HOST_APPLY_INLINE_STYLES", payload }, "*");
       } catch {}
     },
-    [info?.selector, info?.elementPath]
+    [info?.selector, info?.elementPath],
   );
 
   const handleChange = (key: string, value: string) => {
@@ -267,7 +275,7 @@ export default function SelectedElementCard({
         window.postMessage({ type: "HOST_APPLY_TEXT_CONTENT", payload }, "*");
       } catch {}
     },
-    [info?.selector, info?.elementPath]
+    [info?.selector, info?.elementPath],
   );
 
   const sendAttributeUpdate = useCallback(
@@ -283,18 +291,61 @@ export default function SelectedElementCard({
         window.postMessage({ type: "HOST_SET_ATTRIBUTE", payload }, "*");
       } catch {}
     },
-    [info?.selector, info?.elementPath]
+    [info?.selector, info?.elementPath],
   );
+
+  const handleSave = useCallback(async () => {
+    if (!onSave) return;
+
+    setIsSaving(true);
+    try {
+      await onSave();
+      toast.success("Changes saved successfully!", {
+        description: "Your edits have been synced to R2.",
+      });
+    } catch (error) {
+      console.error("Failed to save changes:", error);
+      toast.error("Failed to save changes", {
+        description:
+          error instanceof Error
+            ? error.message
+            : "An error occurred while saving.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [onSave]);
 
   return (
     <div className="w-full text-foreground p-3 md:p-4">
+      {/* Save Button */}
+      {onSave && (
+        <div className="mb-4">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200"
+          >
+            {isSaving ? (
+              <>
+                <span className="animate-spin mr-2">⏳</span>
+                Saving...
+              </>
+            ) : (
+              <>
+                <FloppyDisk className="w-4 h-4 mr-2" weight="bold" />
+                Save Changes to R2
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Accordion Sections */}
       <div className="space-y-4">
         <Accordion
           type="multiple"
           className="w-full"
-          collapsible
           defaultValue={[
             ...(canEditContent ? ["content"] : []),
             "typography",
@@ -450,7 +501,7 @@ export default function SelectedElementCard({
                           >
                             {pos}
                           </button>
-                        )
+                        ),
                       )}
                     </div>
                   </div>
@@ -471,7 +522,7 @@ export default function SelectedElementCard({
                         onClick={() =>
                           handleChange(
                             "fontStyle",
-                            fontStyle === "italic" ? "normal" : "italic"
+                            fontStyle === "italic" ? "normal" : "italic",
                           )
                         }
                         style={{ fontStyle: "italic" }}
@@ -508,7 +559,7 @@ export default function SelectedElementCard({
                               {dec}
                             </button>
                           );
-                        }
+                        },
                       )}
                     </div>
                   </div>
@@ -773,7 +824,7 @@ export default function SelectedElementCard({
             <AccordionContent>
               <div className="px-1 space-y-3 text-sm">
                 {attrSummary.filter(
-                  (a) => a.name !== "class" && a.name !== "data-nowgai-uid"
+                  (a) => a.name !== "class" && a.name !== "data-nowgai-uid",
                 ).length === 0 ? (
                   <div className="text-center py-6 text-muted-foreground/50 text-xs italic">
                     No attributes
@@ -781,14 +832,11 @@ export default function SelectedElementCard({
                 ) : (
                   attrSummary
                     .filter(
-                      (a) => a.name !== "class" && a.name !== "data-nowgai-uid"
+                      (a) => a.name !== "class" && a.name !== "data-nowgai-uid",
                     )
                     .slice(0, 12)
                     .map((a) => (
-                      <div
-                        key={a.name}
-                        className="flex items-center gap-3 p-2"
-                      >
+                      <div key={a.name} className="flex items-center gap-3 p-2">
                         <div className="min-w-28 text-xs font-bold text-foreground/80 uppercase tracking-wider">
                           {a.name}
                         </div>
@@ -807,8 +855,7 @@ export default function SelectedElementCard({
               </div>
             </AccordionContent>
           </AccordionItem>
-
-          </Accordion>
+        </Accordion>
       </div>
     </div>
   );

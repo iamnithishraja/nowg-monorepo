@@ -1,5 +1,13 @@
 import { ChatCircle } from "@phosphor-icons/react";
-import { Bot, Download, FileText, Loader2, RotateCcw, ShieldCheck, X } from "lucide-react";
+import {
+  Bot,
+  Download,
+  FileText,
+  Loader2,
+  RotateCcw,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import type React from "react";
 import {
   Fragment,
@@ -79,6 +87,7 @@ interface ChatPanelProps {
   chatId?: string | null; // Chat ID to detect if we're in a chat
   onFileClick?: (filePath: string) => void; // Callback when a file in tool call is clicked
   conversationTitle?: string; // Conversation/project title for metadata
+  onSaveEdit?: () => Promise<void>; // Callback to save edits to R2
 }
 
 // Memoized file attachment component
@@ -197,10 +206,11 @@ function ChatPanelComponent({
   chatId,
   onFileClick,
   conversationTitle,
+  onSaveEdit,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [fileDataMap, setFileDataMap] = useState<Map<string, string>>(
-    new Map()
+    new Map(),
   );
   // keep simple chat-only view
 
@@ -289,20 +299,20 @@ function ChatPanelComponent({
   // Memoize user messages for revert check
   const userMessages = useMemo(
     () => messages.filter((m) => m.role === "user"),
-    [messages]
+    [messages],
   );
 
   const getIsLastUserMessage = useCallback(
     (messageId: string) => {
       return userMessages[userMessages.length - 1]?.id === messageId;
     },
-    [userMessages]
+    [userMessages],
   );
 
   // Format all messages as text for copying/downloading
   const formatMessagesAsText = useCallback(() => {
     const lines: string[] = [];
-    
+
     // Add project metadata header
     if (conversationTitle) {
       lines.push(`Project: ${conversationTitle}`);
@@ -322,14 +332,17 @@ function ChatPanelComponent({
     // Format each message
     messages.forEach((message, index) => {
       const timestamp = formatMessageTime(
-        (message as any).createdAt || (message as any).timestamp
+        (message as any).createdAt || (message as any).timestamp,
       );
-      
+
       // Handle toolcall role for agentic chats
-      const role = message.role === "toolcall" ? "ASSISTANT (Tool Call)" : message.role.toUpperCase();
+      const role =
+        message.role === "toolcall"
+          ? "ASSISTANT (Tool Call)"
+          : message.role.toUpperCase();
       lines.push(`[${index + 1}] ${role}${timestamp ? ` - ${timestamp}` : ""}`);
       lines.push("-".repeat(60));
-      
+
       // Add message content
       if (typeof message.content === "string") {
         const cleanContent = cleanMessageContent(message);
@@ -339,7 +352,7 @@ function ChatPanelComponent({
       } else if (message.content) {
         lines.push(JSON.stringify(message.content, null, 2));
       }
-      
+
       // Add tool calls if present (for both assistant and toolcall messages)
       const toolCalls = (message as any).toolCalls || [];
       if (toolCalls.length > 0) {
@@ -351,12 +364,13 @@ function ChatPanelComponent({
             lines.push(`     Arguments: ${JSON.stringify(tc.args, null, 2)}`);
           }
           if (tc.result) {
-            const resultOutput = tc.result.output || tc.result.error || JSON.stringify(tc.result);
+            const resultOutput =
+              tc.result.output || tc.result.error || JSON.stringify(tc.result);
             lines.push(`     Result: ${resultOutput}`);
           }
         });
       }
-      
+
       // Add tool results if present
       const toolResults = (message as any).toolResults || [];
       if (toolResults.length > 0) {
@@ -369,7 +383,7 @@ function ChatPanelComponent({
           }
         });
       }
-      
+
       // Add file attachments if present
       if (message.files && message.files.length > 0) {
         lines.push("");
@@ -378,12 +392,12 @@ function ChatPanelComponent({
           lines.push(`  - ${file.name} (${file.type})`);
         });
       }
-      
+
       lines.push("");
       lines.push("=".repeat(60));
       lines.push("");
     });
-    
+
     return lines.join("\n");
   }, [messages, conversationTitle, conversationId, chatId]);
 
@@ -391,14 +405,17 @@ function ChatPanelComponent({
   const handleDownloadHistory = useCallback(async () => {
     try {
       const text = formatMessagesAsText();
-      
+
       // Get title - use conversationTitle, or extract from first user message as fallback
       const firstUserMessage = messages.find((m) => m.role === "user");
-      const extractedTitle = firstUserMessage && typeof firstUserMessage.content === "string"
-        ? firstUserMessage.content.slice(0, 50).trim() + (firstUserMessage.content.length > 50 ? "..." : "")
-        : null;
-      const projectTitle = conversationTitle || extractedTitle || "Chat History";
-      
+      const extractedTitle =
+        firstUserMessage && typeof firstUserMessage.content === "string"
+          ? firstUserMessage.content.slice(0, 50).trim() +
+            (firstUserMessage.content.length > 50 ? "..." : "")
+          : null;
+      const projectTitle =
+        conversationTitle || extractedTitle || "Chat History";
+
       // Create download data with metadata
       const downloadData = {
         metadata: {
@@ -412,25 +429,28 @@ function ChatPanelComponent({
           const baseMessage: any = {
             id: msg.id,
             role: msg.role,
-            content: typeof msg.content === "string" ? cleanMessageContent(msg) : msg.content,
+            content:
+              typeof msg.content === "string"
+                ? cleanMessageContent(msg)
+                : msg.content,
             timestamp: (msg as any).createdAt || (msg as any).timestamp || null,
           };
-          
+
           // Add model info if present
           if ((msg as any).model) {
             baseMessage.model = (msg as any).model;
           }
-          
+
           // Add tool calls (including for agentic chats)
           if ((msg as any).toolCalls) {
             baseMessage.toolCalls = (msg as any).toolCalls;
           }
-          
+
           // Add tool results
           if ((msg as any).toolResults) {
             baseMessage.toolResults = (msg as any).toolResults;
           }
-          
+
           // Add file metadata (not the actual files, just references)
           if (msg.files) {
             baseMessage.files = msg.files.map((f) => ({
@@ -440,20 +460,20 @@ function ChatPanelComponent({
               size: (f as any).size || null,
             }));
           }
-          
+
           return baseMessage;
         }),
       };
-      
+
       // Create JSON blob
       const jsonBlob = new Blob([JSON.stringify(downloadData, null, 2)], {
         type: "application/json",
       });
-      
+
       // Create download link
       const url = URL.createObjectURL(jsonBlob);
       const link = document.createElement("a");
-      const sanitizedTitle = (projectTitle)
+      const sanitizedTitle = projectTitle
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "")
@@ -463,13 +483,19 @@ function ChatPanelComponent({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // Clean up
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to download chat history:", error);
     }
-  }, [formatMessagesAsText, messages, conversationTitle, conversationId, chatId]);
+  }, [
+    formatMessagesAsText,
+    messages,
+    conversationTitle,
+    conversationId,
+    chatId,
+  ]);
 
   // Clean message content by removing artifacts and handling special components
   const cleanMessageContent = (message: Message) => {
@@ -482,31 +508,25 @@ function ChatPanelComponent({
     // Remove complete artifact tags and their content
     content = content.replace(
       /<nowgaiArtifact[^>]*>[\s\S]*?<\/nowgaiArtifact>/g,
-      ""
+      "",
     );
     // Remove complete action tags and their content
     content = content.replace(
       /<nowgaiAction[^>]*>[\s\S]*?<\/nowgaiAction>/g,
-      ""
+      "",
     );
-    
+
     // During streaming, also remove incomplete/partial tags that haven't closed yet
     // This handles the case where we're mid-stream and the closing tag hasn't arrived
     // Remove incomplete artifact tags (opened but not closed)
-    content = content.replace(
-      /<nowgaiArtifact[^>]*>[\s\S]*$/,
-      ""
-    );
+    content = content.replace(/<nowgaiArtifact[^>]*>[\s\S]*$/, "");
     // Remove incomplete action tags (opened but not closed)
-    content = content.replace(
-      /<nowgaiAction[^>]*>[\s\S]*$/,
-      ""
-    );
+    content = content.replace(/<nowgaiAction[^>]*>[\s\S]*$/, "");
 
     // Remove file checklist markup since we show it separately
     content = content.replace(
       /<div class=\"__nowgai_file_checklist__\">([\s\S]*?)<\/div>/g,
-      ""
+      "",
     );
 
     // Only remove excessive blank lines (3+ consecutive newlines) but preserve normal paragraph breaks
@@ -557,7 +577,7 @@ function ChatPanelComponent({
             parts.push(
               <strong key={`bold-${match.index}`} className="font-semibold">
                 {match[2]}
-              </strong>
+              </strong>,
             );
           } else if (match[3]) {
             // Italic: *text*
@@ -570,7 +590,7 @@ function ChatPanelComponent({
                 className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-xs"
               >
                 {match[4]}
-              </code>
+              </code>,
             );
           } else if (match[5] && match[6]) {
             // Link: [text](url)
@@ -583,7 +603,7 @@ function ChatPanelComponent({
                 className="text-purple-400 hover:text-purple-300 underline underline-offset-2"
               >
                 {match[5]}
-              </a>
+              </a>,
             );
           }
 
@@ -745,7 +765,7 @@ function ChatPanelComponent({
                 {codeLines.join("\n")}
               </code>
             </pre>
-          </div>
+          </div>,
         );
         continue;
       }
@@ -763,7 +783,10 @@ function ChatPanelComponent({
       // Horizontal rules
       if (isHorizontalRule(line)) {
         elements.push(
-          <hr key={`hr-${elements.length}`} className="my-4 border-border/30" />
+          <hr
+            key={`hr-${elements.length}`}
+            className="my-4 border-border/30"
+          />,
         );
         i++;
         continue;
@@ -786,7 +809,7 @@ function ChatPanelComponent({
                 {handleLongContent(ql)}
               </p>
             ))}
-          </blockquote>
+          </blockquote>,
         );
         continue;
       }
@@ -811,7 +834,7 @@ function ChatPanelComponent({
                 {handleLongContent(it)}
               </li>
             ))}
-          </ul>
+          </ul>,
         );
         continue;
       }
@@ -834,7 +857,7 @@ function ChatPanelComponent({
                 {handleLongContent(it)}
               </li>
             ))}
-          </ol>
+          </ol>,
         );
         continue;
       }
@@ -848,7 +871,7 @@ function ChatPanelComponent({
             className="my-2 leading-relaxed wrap-break-words overflow-wrap-anywhere"
           >
             {handleLongContent(line)}
-          </p>
+          </p>,
         );
       }
       i++;
@@ -861,7 +884,7 @@ function ChatPanelComponent({
     if (typeof message.content !== "string") return null;
 
     const checklistMatch = message.content.match(
-      /<div class=\"__nowgai_file_checklist__\">([\s\S]*?)<\/div>/
+      /<div class=\"__nowgai_file_checklist__\">([\s\S]*?)<\/div>/,
     );
     if (!checklistMatch) return null;
 
@@ -1100,7 +1123,7 @@ function ChatPanelComponent({
           </Button>
         </div>
         <div className="flex-1 overflow-auto p-3 modern-scrollbar">
-          <SelectedElementCard info={selectedElementInfo} />
+          <SelectedElementCard info={selectedElementInfo} onSave={onSaveEdit} />
         </div>
       </div>
     );
@@ -1128,7 +1151,7 @@ function ChatPanelComponent({
                   ];
 
             const timestamp = formatMessageTime(
-              (message as any).createdAt || (message as any).timestamp
+              (message as any).createdAt || (message as any).timestamp,
             );
 
             // For agent messages, check if this is a tool call message
@@ -1142,7 +1165,7 @@ function ChatPanelComponent({
                   "group relative w-full transition-all duration-300",
                   message.role === "user"
                     ? "flex flex-col items-end"
-                    : "flex flex-col items-start"
+                    : "flex flex-col items-start",
                 )}
               >
                 {/* Timestamp */}
@@ -1192,7 +1215,7 @@ function ChatPanelComponent({
                           {renderRichContent(
                             typeof message.content === "string"
                               ? message.content
-                              : JSON.stringify(message.content)
+                              : JSON.stringify(message.content),
                           )}
                         </div>
                       )}
@@ -1252,195 +1275,197 @@ function ChatPanelComponent({
                 )}
 
                 {/* Assistant message - clean text with file changes */}
-                {message.role === "assistant" && (segments.length > 0 || (message as any).toolCalls?.length > 0 || message.content) && (
-                  <div className="w-full max-w-full space-y-2">
-                    {(() => {
-                      // Get the full text content
-                      const textContent =
-                        typeof message.content === "string"
-                          ? message.content
-                          : segments
-                              .filter(
-                                (s) =>
-                                  s.type === "text" ||
-                                  s.type === "textAfterChecklist"
-                              )
-                              .map((s) => s.content)
-                              .join("\n");
+                {message.role === "assistant" &&
+                  (segments.length > 0 ||
+                    (message as any).toolCalls?.length > 0 ||
+                    message.content) && (
+                    <div className="w-full max-w-full space-y-2">
+                      {(() => {
+                        // Get the full text content
+                        const textContent =
+                          typeof message.content === "string"
+                            ? message.content
+                            : segments
+                                .filter(
+                                  (s) =>
+                                    s.type === "text" ||
+                                    s.type === "textAfterChecklist",
+                                )
+                                .map((s) => s.content)
+                                .join("\n");
 
-                      // Get tool calls and segments (from message or currentToolCalls for streaming)
-                      const messageToolCalls = (message as any).toolCalls;
-                      const messageSegments = (message as any).segments;
-                      const isLastMessage =
-                        message.id === messages[messages.length - 1]?.id;
+                        // Get tool calls and segments (from message or currentToolCalls for streaming)
+                        const messageToolCalls = (message as any).toolCalls;
+                        const messageSegments = (message as any).segments;
+                        const isLastMessage =
+                          message.id === messages[messages.length - 1]?.id;
 
-                      // For streaming message, use streamingSegments for ordered rendering
-                      const hasStreamingSegments =
-                        isLastMessage &&
-                        streamingSegments &&
-                        streamingSegments.length > 0;
+                        // For streaming message, use streamingSegments for ordered rendering
+                        const hasStreamingSegments =
+                          isLastMessage &&
+                          streamingSegments &&
+                          streamingSegments.length > 0;
 
-                      if (hasStreamingSegments) {
-                        // Render streaming segments in order (interleaved text and tool calls)
-                        return (
-                          <>
-                            {streamingSegments.map((segment, idx) => (
-                              <div key={`streaming-segment-${idx}`}>
-                                {segment.type === "text" && segment.content && (
-                                  <div className="text-sm leading-relaxed text-foreground/90">
-                                    {renderRichContent(segment.content)}
-                                  </div>
-                                )}
-                                {segment.type === "toolCall" && (
-                                  <div className="my-1">
-                                    <ToolCallItem
-                                      toolCall={segment.toolCall}
-                                      isCompact
-                                      onFileClick={onFileClick}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </>
-                        );
-                      }
-
-                      // Check if message has saved segments (preserves correct order)
-                      const hasSavedSegments =
-                        messageSegments &&
-                        Array.isArray(messageSegments) &&
-                        messageSegments.length > 0;
-
-                      if (hasSavedSegments) {
-                        // Render saved segments in their correct order (interleaved text and tool calls)
-                        return (
-                          <>
-                            {messageSegments.map(
-                              (segment: any, idx: number) => (
-                                <div key={`saved-segment-${idx}`}>
+                        if (hasStreamingSegments) {
+                          // Render streaming segments in order (interleaved text and tool calls)
+                          return (
+                            <>
+                              {streamingSegments.map((segment, idx) => (
+                                <div key={`streaming-segment-${idx}`}>
                                   {segment.type === "text" &&
                                     segment.content && (
                                       <div className="text-sm leading-relaxed text-foreground/90">
                                         {renderRichContent(segment.content)}
                                       </div>
                                     )}
-                                  {segment.type === "toolCall" &&
-                                    segment.toolCall && (
-                                      <div className="my-1">
-                                        <ToolCallItem
-                                          toolCall={segment.toolCall}
-                                          isCompact
-                                          onFileClick={onFileClick}
+                                  {segment.type === "toolCall" && (
+                                    <div className="my-1">
+                                      <ToolCallItem
+                                        toolCall={segment.toolCall}
+                                        isCompact
+                                        onFileClick={onFileClick}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </>
+                          );
+                        }
+
+                        // Check if message has saved segments (preserves correct order)
+                        const hasSavedSegments =
+                          messageSegments &&
+                          Array.isArray(messageSegments) &&
+                          messageSegments.length > 0;
+
+                        if (hasSavedSegments) {
+                          // Render saved segments in their correct order (interleaved text and tool calls)
+                          return (
+                            <>
+                              {messageSegments.map(
+                                (segment: any, idx: number) => (
+                                  <div key={`saved-segment-${idx}`}>
+                                    {segment.type === "text" &&
+                                      segment.content && (
+                                        <div className="text-sm leading-relaxed text-foreground/90">
+                                          {renderRichContent(segment.content)}
+                                        </div>
+                                      )}
+                                    {segment.type === "toolCall" &&
+                                      segment.toolCall && (
+                                        <div className="my-1">
+                                          <ToolCallItem
+                                            toolCall={segment.toolCall}
+                                            isCompact
+                                            onFileClick={onFileClick}
+                                          />
+                                        </div>
+                                      )}
+                                  </div>
+                                ),
+                              )}
+                            </>
+                          );
+                        }
+
+                        // Fallback for messages without saved segments (legacy or loaded from DB without segments)
+                        // Combine message tool calls with current tool calls for the last message
+                        let toolCallsToUse: any[] = [];
+                        const messageToolCallsArray =
+                          messageToolCalls &&
+                          Array.isArray(messageToolCalls) &&
+                          messageToolCalls.length > 0
+                            ? messageToolCalls
+                            : [];
+                        const currentToolCallsArray =
+                          isLastMessage &&
+                          currentToolCalls &&
+                          currentToolCalls.length > 0
+                            ? currentToolCalls
+                            : [];
+
+                        // For the last message during streaming, merge both arrays
+                        // Use a Map to deduplicate by ID (message tool calls take precedence)
+                        if (
+                          isLastMessage &&
+                          (messageToolCallsArray.length > 0 ||
+                            currentToolCallsArray.length > 0)
+                        ) {
+                          const toolCallMap = new Map();
+                          // Add current tool calls first
+                          currentToolCallsArray.forEach((tc: any) => {
+                            toolCallMap.set(tc.id, tc);
+                          });
+                          // Override with message tool calls (more up-to-date)
+                          messageToolCallsArray.forEach((tc: any) => {
+                            toolCallMap.set(tc.id, tc);
+                          });
+                          toolCallsToUse = Array.from(toolCallMap.values());
+                        } else if (messageToolCallsArray.length > 0) {
+                          // For non-last messages, just use message tool calls
+                          toolCallsToUse = messageToolCallsArray;
+                        }
+
+                        // Render segments normally, then tool calls at end (legacy fallback)
+                        return (
+                          <>
+                            {/* Render text segments */}
+                            {segments.length > 0
+                              ? segments.map((segment, idx) => (
+                                  <div key={`segment-${idx}`}>
+                                    {segment.type === "text" && (
+                                      <div className="text-sm leading-relaxed text-foreground/90">
+                                        {renderRichContent(segment.content)}
+                                      </div>
+                                    )}
+                                    {segment.type === "checklist" && (
+                                      <div className="w-full mt-4">
+                                        <FileCreationChecklist
+                                          title={segment.data.title}
+                                          files={segment.data.files}
+                                          isApplicationStarted={
+                                            segment.data.isApplicationStarted
+                                          }
+                                          command={segment.data.command}
                                         />
                                       </div>
                                     )}
-                                </div>
-                              )
+                                    {segment.type === "textAfterChecklist" && (
+                                      <div className="text-sm leading-relaxed text-foreground/90 mt-4">
+                                        {renderRichContent(segment.content)}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))
+                              : /* Fallback: if no segments but content exists, render raw content */
+                                message.content && (
+                                  <div className="text-sm leading-relaxed text-foreground/90">
+                                    {renderRichContent(
+                                      typeof message.content === "string"
+                                        ? message.content
+                                        : JSON.stringify(message.content),
+                                    )}
+                                  </div>
+                                )}
+                            {/* Tool calls at end only if no saved segments (legacy fallback) */}
+                            {toolCallsToUse.length > 0 && (
+                              <div className="space-y-0.5 mt-2">
+                                {toolCallsToUse.map((tc: any) => (
+                                  <ToolCallItem
+                                    key={tc.id}
+                                    toolCall={tc}
+                                    isCompact
+                                    onFileClick={onFileClick}
+                                  />
+                                ))}
+                              </div>
                             )}
                           </>
                         );
-                      }
-
-                      // Fallback for messages without saved segments (legacy or loaded from DB without segments)
-                      // Combine message tool calls with current tool calls for the last message
-                      let toolCallsToUse: any[] = [];
-                      const messageToolCallsArray =
-                        messageToolCalls &&
-                        Array.isArray(messageToolCalls) &&
-                        messageToolCalls.length > 0
-                          ? messageToolCalls
-                          : [];
-                      const currentToolCallsArray =
-                        isLastMessage &&
-                        currentToolCalls &&
-                        currentToolCalls.length > 0
-                          ? currentToolCalls
-                          : [];
-
-                      // For the last message during streaming, merge both arrays
-                      // Use a Map to deduplicate by ID (message tool calls take precedence)
-                      if (
-                        isLastMessage &&
-                        (messageToolCallsArray.length > 0 ||
-                          currentToolCallsArray.length > 0)
-                      ) {
-                        const toolCallMap = new Map();
-                        // Add current tool calls first
-                        currentToolCallsArray.forEach((tc: any) => {
-                          toolCallMap.set(tc.id, tc);
-                        });
-                        // Override with message tool calls (more up-to-date)
-                        messageToolCallsArray.forEach((tc: any) => {
-                          toolCallMap.set(tc.id, tc);
-                        });
-                        toolCallsToUse = Array.from(toolCallMap.values());
-                      } else if (messageToolCallsArray.length > 0) {
-                        // For non-last messages, just use message tool calls
-                        toolCallsToUse = messageToolCallsArray;
-                      }
-
-                      // Render segments normally, then tool calls at end (legacy fallback)
-                      return (
-                        <>
-                          {/* Render text segments */}
-                          {segments.length > 0 ? (
-                            segments.map((segment, idx) => (
-                              <div key={`segment-${idx}`}>
-                                {segment.type === "text" && (
-                                  <div className="text-sm leading-relaxed text-foreground/90">
-                                    {renderRichContent(segment.content)}
-                                  </div>
-                                )}
-                                {segment.type === "checklist" && (
-                                  <div className="w-full mt-4">
-                                    <FileCreationChecklist
-                                      title={segment.data.title}
-                                      files={segment.data.files}
-                                      isApplicationStarted={
-                                        segment.data.isApplicationStarted
-                                      }
-                                      command={segment.data.command}
-                                    />
-                                  </div>
-                                )}
-                                {segment.type === "textAfterChecklist" && (
-                                  <div className="text-sm leading-relaxed text-foreground/90 mt-4">
-                                    {renderRichContent(segment.content)}
-                                  </div>
-                                )}
-                              </div>
-                            ))
-                          ) : (
-                            /* Fallback: if no segments but content exists, render raw content */
-                            message.content && (
-                              <div className="text-sm leading-relaxed text-foreground/90">
-                                {renderRichContent(
-                                  typeof message.content === "string"
-                                    ? message.content
-                                    : JSON.stringify(message.content)
-                                )}
-                              </div>
-                            )
-                          )}
-                          {/* Tool calls at end only if no saved segments (legacy fallback) */}
-                          {toolCallsToUse.length > 0 && (
-                            <div className="space-y-0.5 mt-2">
-                              {toolCallsToUse.map((tc: any) => (
-                                <ToolCallItem
-                                  key={tc.id}
-                                  toolCall={tc}
-                                  isCompact
-                                  onFileClick={onFileClick}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
+                      })()}
+                    </div>
+                  )}
               </div>
             );
           })}
@@ -1498,7 +1523,7 @@ function ChatPanelComponent({
             !isProcessingTemplate &&
             !isStreamingText &&
             !currentToolCalls.some(
-              (tc) => tc.status === "pending" || tc.status === "executing"
+              (tc) => tc.status === "pending" || tc.status === "executing",
             ) && (
               <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground/70">
                 <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
@@ -1506,45 +1531,47 @@ function ChatPanelComponent({
               </div>
             )}
 
-          {error && (() => {
-            const isMaintenance =
-              error.includes("under maintenance") ||
-              error.includes("won't be deducted") ||
-              error.includes("credits won't be");
-            if (isMaintenance) {
+          {error &&
+            (() => {
+              const isMaintenance =
+                error.includes("under maintenance") ||
+                error.includes("won't be deducted") ||
+                error.includes("credits won't be");
+              if (isMaintenance) {
+                return (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                      <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-lg space-y-1">
+                        <p className="text-sm font-semibold text-amber-400">
+                          NowGAI is under maintenance
+                        </p>
+                        <p className="text-sm text-amber-300/80">
+                          Your credits are safe — nothing will be deducted.
+                          We'll be back shortly.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <div className="w-8 h-8 rounded-full bg-destructive flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-foreground" />
                   </div>
                   <div className="flex-1">
-                    <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-lg space-y-1">
-                      <p className="text-sm font-semibold text-amber-400">
-                        NowGAI is under maintenance
-                      </p>
-                      <p className="text-sm text-amber-300/80">
-                        Your credits are safe — nothing will be deducted. We'll be back shortly.
-                      </p>
+                    <div className="bg-destructive/20 border border-destructive/20 p-3 rounded-lg">
+                      <div className="text-sm text-destructive">
+                        {error === "Chat aborted." ? error : `Error: ${error}`}
+                      </div>
                     </div>
                   </div>
                 </div>
               );
-            }
-            return (
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-destructive flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="bg-destructive/20 border border-destructive/20 p-3 rounded-lg">
-                    <div className="text-sm text-destructive">
-                      {error === "Chat aborted." ? error : `Error: ${error}`}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+            })()}
 
           <div ref={messagesEndRef} />
         </div>
