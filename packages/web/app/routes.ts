@@ -6,7 +6,7 @@ export default [
   route("/home", "routes/home.tsx"),
   route(
     "/.well-known/appspecific/com.chrome.devtools.json",
-    "routes/.well-known/appspecific/com.chrome.devtools.json.tsx"
+    "routes/.well-known/appspecific/com.chrome.devtools.json.tsx",
   ),
   route("/workspace/*", "routes/workspace.tsx"),
   route("/signup", "routes/signup.tsx"),
@@ -42,22 +42,22 @@ export default [
   route("/admin/organizations", "routes/admin.organizations.tsx"),
   route(
     "/admin/organizations/:organizationId/wallet",
-    "routes/admin.organizations.$organizationId.wallet.tsx"
+    "routes/admin.organizations.$organizationId.wallet.tsx",
   ),
   route("/admin/organizations/ledger", "routes/admin.organizations.ledger.tsx"),
   route("/admin/projects", "routes/admin.projects.tsx"),
   route(
     "/admin/projects/:projectId/members",
-    "routes/admin.projects.$projectId.members.tsx"
+    "routes/admin.projects.$projectId.members.tsx",
   ),
 
   route(
     "/admin/projects/:projectId/wallet",
-    "routes/admin.projects.$projectId.wallet.tsx"
+    "routes/admin.projects.$projectId.wallet.tsx",
   ),
   route(
     "/admin/projects/:projectId/fund-requests",
-    "routes/admin.projects.$projectId.fund-requests.tsx"
+    "routes/admin.projects.$projectId.fund-requests.tsx",
   ),
   route("/admin/projects/ledger", "routes/admin.projects.ledger.tsx"),
   route("/admin/fund-requests", "routes/admin.fund-requests.tsx"),
@@ -65,7 +65,7 @@ export default [
   route("/admin/analytics", "routes/admin.analytics.tsx"),
   route(
     "/admin/analytics/project/:projectId",
-    "routes/admin.analytics.project.$projectId.tsx"
+    "routes/admin.analytics.project.$projectId.tsx",
   ),
   route("/admin/ledger", "routes/admin.ledger.tsx"),
   route("/admin/markup", "routes/admin.markup.tsx"),
@@ -74,29 +74,29 @@ export default [
   route("/api/auth/login", "routes/api.auth.login.tsx"),
   route(
     "/api/admin/project-wallets/:projectId/transfer-from-org",
-    "routes/api.admin.project-wallets.$projectId.transfer-from-org.tsx"
+    "routes/api.admin.project-wallets.$projectId.transfer-from-org.tsx",
   ),
   route(
     "/api/admin/project-wallets/:projectId/credit-back-to-org",
-    "routes/api.admin.project-wallets.$projectId.credit-back-to-org.tsx"
+    "routes/api.admin.project-wallets.$projectId.credit-back-to-org.tsx",
   ),
   route(
     "/api/admin/project-wallets/:projectId/stripe-checkout",
-    "routes/api.admin.project-wallets.$projectId.stripe-checkout.tsx"
+    "routes/api.admin.project-wallets.$projectId.stripe-checkout.tsx",
   ),
   route(
     "/api/admin/project-wallets/:projectId/stripe-verify",
-    "routes/api.admin.project-wallets.$projectId.stripe-verify.tsx"
+    "routes/api.admin.project-wallets.$projectId.stripe-verify.tsx",
   ),
   route("/api/admin/fund-requests", "routes/api.admin.fund-requests.tsx"),
   route(
     "/api/admin/fund-requests/:requestId/approve",
-    "routes/api.admin.fund-requests.$requestId.approve.tsx"
+    "routes/api.admin.fund-requests.$requestId.approve.tsx",
   ),
   route("/api/admin/markup", "routes/api.admin.markup.tsx"),
   route(
     "/api/admin/fund-requests/:requestId/reject",
-    "routes/api.admin.fund-requests.$requestId.reject.tsx"
+    "routes/api.admin.fund-requests.$requestId.reject.tsx",
   ),
   route("/api/admin/upload-image", "routes/api.admin.upload-image.tsx"),
   route("/api/check-user", "routes/api.check-user.tsx"),
@@ -126,22 +126,23 @@ export default [
   route("/api/github/import/callback", "routes/api.github.import.callback.tsx"),
   route(
     "/api/github/repository/create",
-    "routes/api.github.repository.create.tsx"
+    "routes/api.github.repository.create.tsx",
   ),
   route("/api/github/repository/push", "routes/api.github.repository.push.tsx"),
   route(
     "/api/github/repository/status",
-    "routes/api.github.repository.status.tsx"
+    "routes/api.github.repository.status.tsx",
   ),
   route(
     "/api/github/repository/delete",
-    "routes/api.github.repository.delete.tsx"
+    "routes/api.github.repository.delete.tsx",
   ),
   route(
     "/api/github/repository/token",
-    "routes/api.github.repository.token.tsx"
+    "routes/api.github.repository.token.tsx",
   ),
   route("/api/llm/analyze", "routes/api.llm.analyze.tsx"),
+  route("/api/applyEditToSource", "routes/api.applyEditToSource.tsx"),
   route("/api/deploy/vercel", "routes/api.deploy.vercel.tsx"),
   route("/api/deploy/netlify", "routes/api.deploy.netlify.tsx"),
   route("/api/deployments", "routes/api.deployments.tsx"),
@@ -150,30 +151,30 @@ export default [
   route("/api/analytics", "routes/api.analytics.tsx"),
   route(
     "/api/organization-conversations",
-    "routes/api.organization-conversations.tsx"
+    "routes/api.organization-conversations.tsx",
   ),
   route("/api/organizations", "routes/api.organizations.tsx"),
   route("/api/user-organizations", "routes/api.user-organizations.tsx"),
   route(
     "/api/user-project-memberships",
-    "routes/api.user-project-memberships.tsx"
+    "routes/api.user-project-memberships.tsx",
   ),
   route("/api/organizations/wallet", "routes/api.organizations.wallet.tsx"),
   route(
     "/api/organizations/user/accept",
-    "routes/api.organizations.user.accept.tsx"
+    "routes/api.organizations.user.accept.tsx",
   ),
   route(
     "/api/organizations/user/reject",
-    "routes/api.organizations.user.reject.tsx"
+    "routes/api.organizations.user.reject.tsx",
   ),
   route(
     "/api/organizations/wallet/checkout",
-    "routes/api.organizations.wallet.checkout.tsx"
+    "routes/api.organizations.wallet.checkout.tsx",
   ),
   route(
     "/api/organizations/wallet/verify",
-    "routes/api.organizations.wallet.verify.tsx"
+    "routes/api.organizations.wallet.verify.tsx",
   ),
 
   // Team API routes
@@ -196,116 +197,116 @@ export default [
   route("/api/admin/organizations", "routes/api.admin.organizations.tsx"),
   route(
     "/api/admin/organizations/search-user",
-    "routes/api.admin.organizations.search-user.tsx"
+    "routes/api.admin.organizations.search-user.tsx",
   ),
   route(
     "/api/admin/organizations/:organizationId/invite-user",
-    "routes/api.admin.organizations.$organizationId.invite-user.tsx"
+    "routes/api.admin.organizations.$organizationId.invite-user.tsx",
   ),
   route(
     "/api/admin/organizations/:organizationId/users",
-    "routes/api.admin.organizations.$organizationId.users.tsx"
+    "routes/api.admin.organizations.$organizationId.users.tsx",
   ),
   route(
     "/api/admin/organizations/:organizationId/users/:userId",
-    "routes/api.admin.organizations.$organizationId.users.$userId.tsx"
+    "routes/api.admin.organizations.$organizationId.users.$userId.tsx",
   ),
   route(
     "/api/admin/organizations/:organizationId/users/:userId/role",
-    "routes/api.admin.organizations.$organizationId.users.$userId.role.tsx"
+    "routes/api.admin.organizations.$organizationId.users.$userId.role.tsx",
   ),
   route(
     "/api/admin/organizations/:organizationId",
-    "routes/api.admin.organizations.$organizationId.tsx"
+    "routes/api.admin.organizations.$organizationId.tsx",
   ),
   route(
     "/api/admin/organizations/:organizationId/payment-provider",
-    "routes/api.admin.organizations.$organizationId.payment-provider.tsx"
+    "routes/api.admin.organizations.$organizationId.payment-provider.tsx",
   ),
   route("/api/admin/projects", "routes/api.admin.projects.tsx"),
   route(
     "/api/admin/projects/:projectId",
-    "routes/api.admin.projects.$projectId.tsx"
+    "routes/api.admin.projects.$projectId.tsx",
   ),
   route(
     "/api/admin/projects/:projectId/members",
-    "routes/api.admin.projects.$projectId.members.tsx"
+    "routes/api.admin.projects.$projectId.members.tsx",
   ),
   route(
     "/api/admin/projects/:projectId/members/:memberId",
-    "routes/api.admin.projects.$projectId.members.$memberId.tsx"
+    "routes/api.admin.projects.$projectId.members.$memberId.tsx",
   ),
   route(
     "/api/admin/projects/:projectId/users/:userId/role",
-    "routes/api.admin.projects.$projectId.users.$userId.role.tsx"
+    "routes/api.admin.projects.$projectId.users.$userId.role.tsx",
   ),
   route(
     "/api/admin/organizations/:organizationId/available-users",
-    "routes/api.admin.organizations.$organizationId.available-users.tsx"
+    "routes/api.admin.organizations.$organizationId.available-users.tsx",
   ),
   route(
     "/api/admin/project-admin/users",
-    "routes/api.admin.project-admin.users.tsx"
+    "routes/api.admin.project-admin.users.tsx",
   ),
   route(
     "/api/admin/projects/:projectId/assign-admin",
-    "routes/api.admin.projects.$projectId.assign-admin.tsx"
+    "routes/api.admin.projects.$projectId.assign-admin.tsx",
   ),
   route(
     "/api/admin/projects/:projectId/admin",
-    "routes/api.admin.projects.$projectId.admin.tsx"
+    "routes/api.admin.projects.$projectId.admin.tsx",
   ),
   route(
     "/api/admin/org-wallets/:organizationId/stripe-checkout",
-    "routes/api.admin.org-wallets.$organizationId.stripe-checkout.tsx"
+    "routes/api.admin.org-wallets.$organizationId.stripe-checkout.tsx",
   ),
   route(
     "/api/admin/org-wallets/:organizationId/stripe-verify",
-    "routes/api.admin.org-wallets.$organizationId.stripe-verify.tsx"
+    "routes/api.admin.org-wallets.$organizationId.stripe-verify.tsx",
   ),
   route(
     "/api/admin/org-wallets/:organizationId/add-credits",
-    "routes/api.admin.org-wallets.$organizationId.add-credits.tsx"
+    "routes/api.admin.org-wallets.$organizationId.add-credits.tsx",
   ),
   route(
     "/api/admin/org-wallets/:organizationId/transactions",
-    "routes/api.admin.org-wallets.$organizationId.transactions.tsx"
+    "routes/api.admin.org-wallets.$organizationId.transactions.tsx",
   ),
   route(
     "/api/admin/org-wallets/:organizationId/ledger",
-    "routes/api.admin.org-wallets.$organizationId.ledger.tsx"
+    "routes/api.admin.org-wallets.$organizationId.ledger.tsx",
   ),
   route(
     "/api/admin/org-wallets/:organizationId",
-    "routes/api.admin.org-wallets.$organizationId.tsx"
+    "routes/api.admin.org-wallets.$organizationId.tsx",
   ),
   route(
     "/api/admin/project-wallets/:projectId/transactions",
-    "routes/api.admin.project-wallets.$projectId.transactions.tsx"
+    "routes/api.admin.project-wallets.$projectId.transactions.tsx",
   ),
   route(
     "/api/admin/project-wallets/:projectId/ledger",
-    "routes/api.admin.project-wallets.$projectId.ledger.tsx"
+    "routes/api.admin.project-wallets.$projectId.ledger.tsx",
   ),
   route(
     "/api/admin/project-wallets/:projectId",
-    "routes/api.admin.project-wallets.$projectId.tsx"
+    "routes/api.admin.project-wallets.$projectId.tsx",
   ),
   route(
     "/api/admin/user-project-wallets/project/:projectId",
-    "routes/api.admin.user-project-wallets.project.$projectId.tsx"
+    "routes/api.admin.user-project-wallets.project.$projectId.tsx",
   ),
   route(
     "/api/admin/user-project-wallets/user/:userId",
-    "routes/api.admin.user-project-wallets.user.$userId.tsx"
+    "routes/api.admin.user-project-wallets.user.$userId.tsx",
   ),
   route(
     "/api/admin/user-project-wallets/:projectId/:userId/set-limit",
-    "routes/api.admin.user-project-wallets.$projectId.$userId.set-limit.tsx"
+    "routes/api.admin.user-project-wallets.$projectId.$userId.set-limit.tsx",
   ),
   route(
     "/api/admin/user-project-wallets/:projectId/:userId/reset-spending",
-    "routes/api.admin.user-project-wallets.$projectId.$userId.reset-spending.tsx"
+    "routes/api.admin.user-project-wallets.$projectId.$userId.reset-spending.tsx",
   ),
   route("/api/admin/vercel-stats", "routes/api.admin.vercel-stats.tsx"),
   route("/api/admin/netlify-stats", "routes/api.admin.netlify-stats.tsx"),
@@ -313,22 +314,22 @@ export default [
   route("/api/admin/env-configs", "routes/api.admin.env-configs.tsx"),
   route(
     "/api/admin/analytics/project/:projectId",
-    "routes/api.admin.analytics.project.$projectId.tsx"
+    "routes/api.admin.analytics.project.$projectId.tsx",
   ),
   route(
     "/api/admin/analytics/organization/:organizationId",
-    "routes/api.admin.analytics.organization.$organizationId.tsx"
+    "routes/api.admin.analytics.organization.$organizationId.tsx",
   ),
   route("/api/admin/ledger", "routes/api.admin.ledger.tsx"),
   route("/api/admin/ledger/summary", "routes/api.admin.ledger.summary.tsx"),
   route(
     "/api/admin/ledger/organizations",
-    "routes/api.admin.ledger.organizations.tsx"
+    "routes/api.admin.ledger.organizations.tsx",
   ),
   route("/api/admin/ledger/projects", "routes/api.admin.ledger.projects.tsx"),
   route(
     "/api/admin/ledger/download-pdf",
-    "routes/api.admin.ledger.download-pdf.tsx"
+    "routes/api.admin.ledger.download-pdf.tsx",
   ),
 
   route("/api/preload-cache", "routes/api.preload-cache.tsx"),
