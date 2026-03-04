@@ -2224,29 +2224,27 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                     Phone Number
                   </Label>
                   <div className="mt-2 flex gap-2">
-                    <Select
+                    <select
                       value={contactCountryCode}
-                      onValueChange={setContactCountryCode}
+                      onChange={(e) => setContactCountryCode(e.target.value)}
+                      className="w-[140px] h-9 px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 cursor-pointer appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%23ffffff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "right 8px center",
+                        paddingRight: "28px",
+                      }}
                     >
-                      <SelectTrigger className="w-[140px] bg-white/5 border-white/10 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent
-                        className="bg-[#1a1a1a] border-white/10 max-h-[300px] overflow-y-auto z-[9999]"
-                        position="popper"
-                        sideOffset={5}
-                      >
-                        {countryCodes.map((country) => (
-                          <SelectItem
-                            key={country.code}
-                            value={country.code}
-                            className="text-white hover:bg-white/5 cursor-pointer"
-                          >
-                            {country.flag} {country.country} ({country.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      {countryCodes.map((country) => (
+                        <option
+                          key={country.code}
+                          value={country.code}
+                          className="bg-[#1a1a1a] text-white"
+                        >
+                          {country.flag} {country.country} ({country.code})
+                        </option>
+                      ))}
+                    </select>
                     <Input
                       id="contact-phone"
                       type="tel"
