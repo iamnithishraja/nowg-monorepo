@@ -1,9 +1,11 @@
 import {
   ArrowLeft,
   DollarSign,
+  HelpCircle,
   Link2,
   Link2Off,
   Loader2,
+  Lock,
   Menu,
   Zap,
 } from "lucide-react";
@@ -30,7 +32,7 @@ import { ProfileAvatar } from "../components/profile/ProfileAvatar";
 import { ProfileBasicInfo } from "../components/profile/ProfileBasicInfo";
 import { ProfileSocialMediaForm } from "../components/profile/ProfileSocialMediaForm";
 import { ProfileLegalSection } from "../components/profile/ProfileLegalSection";
-import { ChangePasswordForm } from "../components/profile/ChangePasswordForm";
+import { ChangePasswordDialog } from "../components/profile/ChangePasswordDialog";
 import type { Route } from "./+types/profile";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -341,6 +343,8 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
   >([]);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
+  const [showChangePasswordDialog, setShowChangePasswordDialog] =
+    useState(false);
 
   // Supabase integration (for database, not auth)
   const {
@@ -497,10 +501,29 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                     <ProfileSocialMediaForm initialData={profile} />
 
                     <div className="pt-4 border-t border-subtle">
-                      <ChangePasswordForm />
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Lock className="w-5 h-5 text-accent-primary flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-base font-semibold text-primary">
+                              Change Password
+                            </h3>
+                            <p className="text-sm text-secondary mt-1">
+                              Update your account password for better security
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowChangePasswordDialog(true)}
+                          className="bg-accent-primary/10 hover:bg-accent-primary/20 border-accent-primary/30 text-accent-primary flex-shrink-0"
+                        >
+                          Change
+                        </Button>
+                      </div>
                     </div>
-
-                    <ProfileLegalSection />
                   </CardContent>
                 </Card>
               </div>
@@ -712,9 +735,24 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
             <div className="mt-4 sm:mt-6 min-w-0">
               <ContributionGraph edits={edits || []} projectName="Nowgai" />
             </div>
+
+            {/* Legal & Policies - Footer */}
+            <div className="mt-4 sm:mt-6">
+              <Card className="bg-surface-1 border border-subtle rounded-xl sm:rounded-[12px] overflow-hidden">
+                <CardContent className="px-3 sm:px-6 py-4 sm:py-6">
+                  <ProfileLegalSection />
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </main>
       </div>
+
+      {/* Change Password Dialog */}
+      <ChangePasswordDialog
+        open={showChangePasswordDialog}
+        onOpenChange={setShowChangePasswordDialog}
+      />
     </div>
   );
 }

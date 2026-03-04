@@ -13,11 +13,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const body = await request.json();
-    const { title, message } = body;
+    const { fullName, email, phone, countryCode, company, subject, message } = body;
 
-    if (!title || !message) {
+    if (!fullName || !email || !subject || !message) {
       return new Response(
-        JSON.stringify({ error: "Title and message are required" }),
+        JSON.stringify({ error: "Full name, email, subject, and message are required" }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -64,9 +64,14 @@ export async function action({ request }: ActionFunctionArgs) {
     const emailData = {
       from: fromEmail,
       to: "tech@nowg.ai",
-      subject: `Contact Form: ${title}`,
+      subject: `Contact Form: ${subject}`,
       html: createContactEmailTemplate({
-        title,
+        fullName,
+        email,
+        phone,
+        countryCode,
+        company,
+        subject,
         message,
         senderInfo,
       }),
@@ -103,14 +108,27 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 function createContactEmailTemplate({
-  title,
+  fullName,
+  email,
+  phone,
+  countryCode,
+  company,
+  subject,
   message,
   senderInfo,
 }: {
-  title: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  countryCode?: string;
+  company?: string;
+  subject: string;
   message: string;
   senderInfo: string;
 }): string {
+  const phoneNumber = phone && countryCode ? `${countryCode} ${phone}` : phone || "Not provided";
+  const companyName = company || "Not provided";
+  
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -183,18 +201,38 @@ function createContactEmailTemplate({
         </div>
         
         <div class="field">
-          <div class="field-label">From</div>
-          <div class="field-value">${senderInfo}</div>
+          <div class="field-label">Full Name</div>
+          <div class="field-value">${fullName}</div>
+        </div>
+        
+        <div class="field">
+          <div class="field-label">Email Address</div>
+          <div class="field-value">${email}</div>
+        </div>
+        
+        <div class="field">
+          <div class="field-label">Phone Number</div>
+          <div class="field-value">${phoneNumber}</div>
+        </div>
+        
+        <div class="field">
+          <div class="field-label">Company / Organization</div>
+          <div class="field-value">${companyName}</div>
         </div>
         
         <div class="field">
           <div class="field-label">Subject</div>
-          <div class="field-value">${title}</div>
+          <div class="field-value">${subject}</div>
         </div>
         
         <div class="field">
           <div class="field-label">Message</div>
           <div class="field-value message-content">${message}</div>
+        </div>
+        
+        <div class="field">
+          <div class="field-label">Authenticated User</div>
+          <div class="field-value">${senderInfo}</div>
         </div>
         
         <div class="footer">

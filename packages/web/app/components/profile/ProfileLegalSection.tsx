@@ -3,10 +3,8 @@ import { Link } from "react-router";
 export function ProfileLegalSection() {
   return (
     <div className="pt-4 border-t border-subtle">
-      <p className="text-xs text-tertiary mb-3 font-medium">
-        Legal & Policies
-      </p>
-      <div className="flex flex-col gap-2">
+      <p className="text-xs text-tertiary mb-3 font-medium">Legal & Policies</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
         <Link
           to="/privacy-policy"
           className="text-sm text-tertiary hover:text-primary transition-colors underline underline-offset-2"
@@ -17,7 +15,7 @@ export function ProfileLegalSection() {
           to="/terms-and-conditions"
           className="text-sm text-tertiary hover:text-primary transition-colors underline underline-offset-2"
         >
-          Terms and Conditions
+          Terms & Conditions
         </Link>
         <Link
           to="/refund-policy"
@@ -29,7 +27,7 @@ export function ProfileLegalSection() {
           to="/EULA"
           className="text-sm text-tertiary hover:text-primary transition-colors underline underline-offset-2"
         >
-          End User License Agreement (EULA)
+          EULA
         </Link>
         <Link
           to="/support"

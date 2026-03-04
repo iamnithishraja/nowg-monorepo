@@ -59,7 +59,16 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { ScrollArea } from "./ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Textarea } from "./ui/textarea";
+import { contactFormSchema } from "~/lib/validations/contact";
+import { countryCodes } from "~/lib/countryCodes";
 
 interface Project {
   id: string;
@@ -202,10 +211,18 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
 
   // Contact dialog state
   const [showContactDialog, setShowContactDialog] = useState(false);
-  const [contactTitle, setContactTitle] = useState("");
+  const [contactFullName, setContactFullName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactCountryCode, setContactCountryCode] = useState("+91");
+  const [contactCompany, setContactCompany] = useState("");
+  const [contactSubject, setContactSubject] = useState("");
   const [contactMessage, setContactMessage] = useState("");
   const [isSendingContact, setIsSendingContact] = useState(false);
   const [contactSuccess, setContactSuccess] = useState(false);
+  const [contactErrors, setContactErrors] = useState<Record<string, string>>(
+    {},
+  );
 
   const currentProjectId = useMemo(
     () => new URLSearchParams(location.search).get("conversationId"),
@@ -284,9 +301,10 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
 
   // Filter and deduplicate search results based on query
   const filteredSearchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
     const query = searchQuery.toLowerCase();
     const filtered = searchResults.filter((project) => {
+      // If no search query, show all projects
+      if (!query.trim()) return true;
       const title = (project.title || "").toLowerCase();
       return title.includes(query);
     });
@@ -846,9 +864,59 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
     }
   }, []);
 
+  // Validate individual field - MEMOIZED
+  const validateField = useCallback((fieldName: string, value: string) => {
+    const fieldSchema =
+      contactFormSchema.shape[
+        fieldName as keyof typeof contactFormSchema.shape
+      ];
+    if (!fieldSchema) return;
+
+    try {
+      fieldSchema.parse(value);
+      // Clear error if validation passes
+      setContactErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    } catch (error: any) {
+      // Set error if validation fails
+      if (error.issues && error.issues[0]) {
+        setContactErrors((prev) => ({
+          ...prev,
+          [fieldName]: error.issues[0].message,
+        }));
+      }
+    }
+  }, []);
+
   // Handle contact form submission - MEMOIZED
   const handleContactSubmit = useCallback(async () => {
-    if (!contactTitle.trim() || !contactMessage.trim()) {
+    // Clear previous errors
+    setContactErrors({});
+
+    // Validate form data with Zod
+    const validationResult = contactFormSchema.safeParse({
+      fullName: contactFullName.trim(),
+      email: contactEmail.trim(),
+      phone: contactPhone.trim(),
+      countryCode: contactCountryCode,
+      company: contactCompany.trim(),
+      subject: contactSubject.trim(),
+      message: contactMessage.trim(),
+    });
+
+    if (!validationResult.success) {
+      // Extract and set validation errors
+      const errors: Record<string, string> = {};
+      const zodError = validationResult.error;
+      zodError.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          errors[String(issue.path[0])] = issue.message;
+        }
+      });
+      setContactErrors(errors);
       return;
     }
 
@@ -857,10 +925,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: contactTitle.trim(),
-          message: contactMessage.trim(),
-        }),
+        body: JSON.stringify(validationResult.data),
       });
 
       if (!response.ok) {
@@ -875,8 +940,14 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
       setTimeout(() => {
         setShowContactDialog(false);
         setContactSuccess(false);
-        setContactTitle("");
+        setContactFullName("");
+        setContactEmail("");
+        setContactPhone("");
+        setContactCountryCode("+91");
+        setContactCompany("");
+        setContactSubject("");
         setContactMessage("");
+        setContactErrors({});
       }, 2000);
     } catch (err) {
       console.error("Error sending contact message:", err);
@@ -888,7 +959,15 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
     } finally {
       setIsSendingContact(false);
     }
-  }, [contactTitle, contactMessage]);
+  }, [
+    contactFullName,
+    contactEmail,
+    contactPhone,
+    contactCountryCode,
+    contactCompany,
+    contactSubject,
+    contactMessage,
+  ]);
 
   // Memoize user avatar props
   const avatarProps = useMemo(
@@ -1993,17 +2072,6 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                     Loading projects...
                   </div>
                 </div>
-              ) : searchQuery.trim() === "" ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <MagnifyingGlass className="w-8 h-8 text-white/20 mb-3" />
-                  <div className="text-sm text-white/50">
-                    Type to search across your projects
-                  </div>
-                  <div className="text-xs text-white/30 mt-1">
-                    {searchResults.length > 0 &&
-                      `${searchResults.length} project${searchResults.length !== 1 ? "s" : ""} available`}
-                  </div>
-                </div>
               ) : filteredSearchResults.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <MagnifyingGlass className="w-8 h-8 text-white/20 mb-3" />
@@ -2071,7 +2139,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
 
       {/* Contact Dialog */}
       <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
-        <DialogContent className="bg-[#1a1a1a] border-white/10 sm:max-w-md">
+        <DialogContent className="bg-[#1a1a1a] border-white/10 sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           {contactSuccess ? (
             // Success State
             <div className="py-8">
@@ -2098,42 +2166,161 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
               }}
             >
               <DialogHeader>
-                <DialogTitle className="text-white flex items-center gap-2">
-                  <Envelope className="w-5 h-5 text-purple-400" />
-                  Contact Support
+                <DialogTitle className="text-white text-2xl font-bold">
+                  Send Us a Message
                 </DialogTitle>
-                <DialogDescription className="text-white/50">
-                  Send us a message and we'll get back to you as soon as
-                  possible.
-                </DialogDescription>
               </DialogHeader>
               <div className="py-4 space-y-4">
                 <div>
-                  <Label htmlFor="contact-title" className="text-white/70">
-                    Subject
+                  <Label htmlFor="contact-fullname" className="text-white/70">
+                    Full Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
-                    id="contact-title"
-                    value={contactTitle}
-                    onChange={(e) => setContactTitle(e.target.value)}
-                    placeholder="What's this about?"
-                    className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                    id="contact-fullname"
+                    value={contactFullName}
+                    onChange={(e) => setContactFullName(e.target.value)}
+                    onBlur={(e) =>
+                      validateField("fullName", e.target.value.trim())
+                    }
+                    placeholder="John Doe"
+                    className={cn(
+                      "mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40",
+                      contactErrors.fullName && "border-red-500/50",
+                    )}
                     autoFocus
-                    required
+                  />
+                  {contactErrors.fullName && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {contactErrors.fullName}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="contact-email" className="text-white/70">
+                    Email Address <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="contact-email"
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    onBlur={(e) =>
+                      validateField("email", e.target.value.trim())
+                    }
+                    placeholder="user@example.com"
+                    className={cn(
+                      "mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40",
+                      contactErrors.email && "border-red-500/50",
+                    )}
+                  />
+                  {contactErrors.email && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {contactErrors.email}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="contact-phone" className="text-white/70">
+                    Phone Number
+                  </Label>
+                  <div className="mt-2 flex gap-2">
+                    <Select
+                      value={contactCountryCode}
+                      onValueChange={setContactCountryCode}
+                    >
+                      <SelectTrigger className="w-[140px] bg-white/5 border-white/10 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-white/10 max-h-[300px]">
+                        {countryCodes.map((country) => (
+                          <SelectItem
+                            key={country.code}
+                            value={country.code}
+                            className="text-white hover:bg-white/5"
+                          >
+                            {country.flag} {country.country} ({country.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      id="contact-phone"
+                      type="tel"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      onBlur={(e) =>
+                        validateField("phone", e.target.value.trim())
+                      }
+                      placeholder="1234567890"
+                      className={cn(
+                        "flex-1 bg-white/5 border-white/10 text-white placeholder:text-white/40",
+                        contactErrors.phone && "border-red-500/50",
+                      )}
+                    />
+                  </div>
+                  {contactErrors.phone && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {contactErrors.phone}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="contact-company" className="text-white/70">
+                    Company / Organization
+                  </Label>
+                  <Input
+                    id="contact-company"
+                    value={contactCompany}
+                    onChange={(e) => setContactCompany(e.target.value)}
+                    placeholder="Your Company"
+                    className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40"
                   />
                 </div>
                 <div>
+                  <Label htmlFor="contact-subject" className="text-white/70">
+                    Subject <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="contact-subject"
+                    value={contactSubject}
+                    onChange={(e) => setContactSubject(e.target.value)}
+                    onBlur={(e) =>
+                      validateField("subject", e.target.value.trim())
+                    }
+                    placeholder="e.g., Technical Support, Billing Question, Feature Request"
+                    className={cn(
+                      "mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40",
+                      contactErrors.subject && "border-red-500/50",
+                    )}
+                  />
+                  {contactErrors.subject && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {contactErrors.subject}
+                    </p>
+                  )}
+                </div>
+                <div>
                   <Label htmlFor="contact-message" className="text-white/70">
-                    Message
+                    Message <span className="text-red-500">*</span>
                   </Label>
                   <Textarea
                     id="contact-message"
                     value={contactMessage}
                     onChange={(e) => setContactMessage(e.target.value)}
-                    placeholder="Tell us more about your question or issue..."
-                    className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40 min-h-[120px]"
-                    required
+                    onBlur={(e) =>
+                      validateField("message", e.target.value.trim())
+                    }
+                    placeholder="Tell us about your inquiry..."
+                    className={cn(
+                      "mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40 min-h-[120px]",
+                      contactErrors.message && "border-red-500/50",
+                    )}
                   />
+                  {contactErrors.message && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {contactErrors.message}
+                    </p>
+                  )}
                 </div>
               </div>
               <DialogFooter>
@@ -2142,7 +2329,12 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                   variant="outline"
                   onClick={() => {
                     setShowContactDialog(false);
-                    setContactTitle("");
+                    setContactFullName("");
+                    setContactEmail("");
+                    setContactPhone("");
+                    setContactCountryCode("+91");
+                    setContactCompany("");
+                    setContactSubject("");
                     setContactMessage("");
                   }}
                   disabled={isSendingContact}
@@ -2153,7 +2345,9 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                 <Button
                   type="submit"
                   disabled={
-                    !contactTitle.trim() ||
+                    !contactFullName.trim() ||
+                    !contactEmail.trim() ||
+                    !contactSubject.trim() ||
                     !contactMessage.trim() ||
                     isSendingContact
                   }
