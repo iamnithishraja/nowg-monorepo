@@ -312,7 +312,7 @@ export function VideoCarousel({ videos, className = "" }: VideoCarouselProps) {
                       inset: 0,
                       width: "100%",
                       height: "100%",
-                      objectFit: "cover",
+                      objectFit: "contain",
                       opacity: i === current ? 1 : 0,
                       transition: "opacity .5s ease",
                       display: "block",
