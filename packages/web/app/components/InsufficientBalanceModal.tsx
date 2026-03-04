@@ -24,12 +24,15 @@ interface InsufficientBalanceModalProps {
     limit?: number;
     balance?: number;
   };
+  /** When true, the modal cannot be dismissed - user must recharge */
+  persistent?: boolean;
 }
 
 export function InsufficientBalanceModal({
   isOpen,
   onClose,
   errorData,
+  persistent = false,
 }: InsufficientBalanceModalProps) {
   const navigate = useNavigate();
 
@@ -90,8 +93,17 @@ export function InsufficientBalanceModal({
     navigate("/recharge");
   };
 
+  // Handle dialog open change - prevent closing if persistent
+  const handleOpenChange = (open: boolean) => {
+    if (!open && persistent) {
+      // Don't allow closing when persistent
+      return;
+    }
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogPortal>
         {/* Custom darker overlay with subtle blur */}
         <DialogOverlay className="bg-black/70 backdrop-blur-[2px]" />
@@ -99,15 +111,19 @@ export function InsufficientBalanceModal({
         <DialogContent
           showCloseButton={false}
           className="sm:max-w-md border-0 bg-background/95 backdrop-blur-xl shadow-2xl"
+          onPointerDownOutside={persistent ? (e) => e.preventDefault() : undefined}
+          onEscapeKeyDown={persistent ? (e) => e.preventDefault() : undefined}
         >
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 rounded-full p-1.5 opacity-70 hover:opacity-100 transition-all hover:bg-accent z-10"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
+          {/* Close button - hidden when persistent */}
+          {!persistent && (
+            <button
+              onClick={onClose}
+              className="absolute right-4 top-4 rounded-full p-1.5 opacity-70 hover:opacity-100 transition-all hover:bg-accent z-10"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          )}
 
           <DialogHeader className="text-center space-y-6 pt-2">
             <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30">
@@ -124,13 +140,15 @@ export function InsufficientBalanceModal({
           </DialogHeader>
 
           <DialogFooter className="flex-col gap-3 sm:flex-row mt-6">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="w-full sm:w-auto border-border hover:bg-accent"
-            >
-              Close
-            </Button>
+            {!persistent && (
+              <Button
+                variant="outline"
+                onClick={onClose}
+                className="w-full sm:w-auto border-border hover:bg-accent"
+              >
+                Close
+              </Button>
+            )}
             {showRechargeButton && (
               <Button
                 onClick={handleRecharge}

@@ -97,6 +97,9 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
   const [errorData, setErrorData] = useState<any>(null);
+  const [userBalance, setUserBalance] = useState<number | null>(null);
+  const [isBalanceLoading, setIsBalanceLoading] = useState(true);
+  const [isPersistentModal, setIsPersistentModal] = useState(false);
   const [showGitHubModal, setShowGitHubModal] = useState(false);
   const [showFigmaModal, setShowFigmaModal] = useState(false);
   const [showDatabaseDialog, setShowDatabaseDialog] = useState(false);
@@ -140,9 +143,10 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     () => !!(location.state as any)?.initialPrompt,
   );
 
-  // Handle insufficient balance modal
+  // Handle insufficient balance modal (triggered by prompts - not persistent)
   const handleInsufficientBalance = (errorData?: any) => {
     setErrorData(errorData || null);
+    setIsPersistentModal(false); // Not persistent when triggered by prompt
     setShowInsufficientBalanceModal(true);
   };
 
@@ -429,6 +433,50 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     }, 1500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Fetch user balance on page load and show persistent modal if balance is 0
+  useEffect(() => {
+    let aborted = false;
+    const fetchBalance = async () => {
+      try {
+        setIsBalanceLoading(true);
+        const res = await fetch("/api/profile/balance", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!aborted) {
+            setUserBalance(data.balance);
+            // Show persistent modal if balance is 0 or less
+            if (data.balance !== null && data.balance <= 0 && !data.isWhitelisted) {
+              setIsPersistentModal(true);
+              setShowInsufficientBalanceModal(true);
+              setErrorData({
+                error: "Your credits are exhausted. Please recharge to continue using the workspace.",
+                errorType: "insufficient_balance",
+                balance: data.balance,
+                requiresRecharge: true,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch balance:", error);
+      } finally {
+        if (!aborted) {
+          setIsBalanceLoading(false);
+        }
+      }
+    };
+    
+    if (user) {
+      fetchBalance();
+    }
+    
+    return () => {
+      aborted = true;
+    };
+  }, [user]);
 
   // Load conversation data to check adminProjectId and database provider
   useEffect(() => {
@@ -1258,10 +1306,14 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
       <InsufficientBalanceModal
         isOpen={showInsufficientBalanceModal}
         onClose={() => {
-          setShowInsufficientBalanceModal(false);
-          setErrorData(null);
+          // Only allow closing if not persistent
+          if (!isPersistentModal) {
+            setShowInsufficientBalanceModal(false);
+            setErrorData(null);
+          }
         }}
         errorData={errorData}
+        persistent={isPersistentModal}
       />
 
       {/* GitHub Import Modal */}
