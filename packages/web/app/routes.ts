@@ -9,6 +9,7 @@ export default [
     "routes/.well-known/appspecific/com.chrome.devtools.json.tsx",
   ),
   route("/workspace/*", "routes/workspace.tsx"),
+  route("/api/contact", "routes/api.contact.tsx"),
   route("/signup", "routes/signup.tsx"),
   route("/forgot-password", "routes/forgot-password.tsx"),
   route("/reset-password", "routes/reset-password.tsx"),

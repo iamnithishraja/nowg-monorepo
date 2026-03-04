@@ -10,11 +10,13 @@ import {
   Compass,
   Cube,
   DotsThreeOutline,
+  Envelope,
   Funnel,
   Globe,
   House,
   KanbanIcon,
   MagnifyingGlass,
+  PaperPlaneTilt,
   PencilSimple,
   Robot,
   SidebarSimple,
@@ -26,7 +28,14 @@ import {
   Warning,
   X,
 } from "@phosphor-icons/react";
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useIsMobile } from "~/hooks/use-mobile";
 import crop from "~/assets/crop.png";
@@ -50,6 +59,7 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { ScrollArea } from "./ui/scroll-area";
+import { Textarea } from "./ui/textarea";
 
 interface Project {
   id: string;
@@ -78,7 +88,12 @@ const FILTERS_STORAGE_KEY = "nowgai:projectFilters";
 type TimeFilter = "all" | "today" | "thisWeek" | "thisMonth" | "thisYear";
 
 // Sort order
-type SortOrder = "updatedDesc" | "updatedAsc" | "createdDesc" | "createdAsc" | "alphabetical";
+type SortOrder =
+  | "updatedDesc"
+  | "updatedAsc"
+  | "createdDesc"
+  | "createdAsc"
+  | "alphabetical";
 
 // Deployment filter
 type DeploymentFilter = "all" | "deployed" | "notDeployed";
@@ -136,10 +151,7 @@ interface ProjectSidebarProps {
   } | null;
 }
 
-function ProjectSidebarComponent({
-  className,
-  user,
-}: ProjectSidebarProps) {
+function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -159,16 +171,17 @@ function ProjectSidebarComponent({
   const [isLoading, setIsLoading] = useState(true);
   const [recentProjectsExpanded, setRecentProjectsExpanded] = useState(true);
   const [projectView, setProjectView] = useState<"recent" | "all" | "starred">(
-    "recent"
+    "recent",
   );
-  
+
   // Filter states
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("updatedDesc");
-  const [deploymentFilter, setDeploymentFilter] = useState<DeploymentFilter>("all");
+  const [deploymentFilter, setDeploymentFilter] =
+    useState<DeploymentFilter>("all");
   const [modelFilter, setModelFilter] = useState<ModelFilter>("all");
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
-  
+
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [visibleMonthsCount, setVisibleMonthsCount] = useState(2); // Show first 2 months initially
@@ -187,9 +200,16 @@ function ProjectSidebarComponent({
   const [isSearching, setIsSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Contact dialog state
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [contactTitle, setContactTitle] = useState("");
+  const [contactMessage, setContactMessage] = useState("");
+  const [isSendingContact, setIsSendingContact] = useState(false);
+  const [contactSuccess, setContactSuccess] = useState(false);
+
   const currentProjectId = useMemo(
     () => new URLSearchParams(location.search).get("conversationId"),
-    [location.search]
+    [location.search],
   );
 
   // Close dropdown when clicking outside
@@ -282,15 +302,20 @@ function ProjectSidebarComponent({
   // Highlight search terms in text
   const highlightText = (text: string, query: string): React.ReactNode => {
     if (!query.trim()) return text;
-    const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+    const parts = text.split(
+      new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"),
+    );
     return parts.map((part, i) =>
       part.toLowerCase() === query.toLowerCase() ? (
-        <mark key={i} className="bg-purple-500/30 text-purple-200 px-0.5 rounded">
+        <mark
+          key={i}
+          className="bg-purple-500/30 text-purple-200 px-0.5 rounded"
+        >
           {part}
         </mark>
       ) : (
         part
-      )
+      ),
     );
   };
 
@@ -306,13 +331,30 @@ function ProjectSidebarComponent({
       const storedFilters = window.localStorage.getItem(FILTERS_STORAGE_KEY);
       if (storedFilters) {
         const filters = JSON.parse(storedFilters);
-        if (filters.timeFilter && ["all", "today", "thisWeek", "thisMonth", "thisYear"].includes(filters.timeFilter)) {
+        if (
+          filters.timeFilter &&
+          ["all", "today", "thisWeek", "thisMonth", "thisYear"].includes(
+            filters.timeFilter,
+          )
+        ) {
           setTimeFilter(filters.timeFilter);
         }
-        if (filters.sortOrder && ["updatedDesc", "updatedAsc", "createdDesc", "createdAsc", "alphabetical"].includes(filters.sortOrder)) {
+        if (
+          filters.sortOrder &&
+          [
+            "updatedDesc",
+            "updatedAsc",
+            "createdDesc",
+            "createdAsc",
+            "alphabetical",
+          ].includes(filters.sortOrder)
+        ) {
           setSortOrder(filters.sortOrder);
         }
-        if (filters.deploymentFilter && ["all", "deployed", "notDeployed"].includes(filters.deploymentFilter)) {
+        if (
+          filters.deploymentFilter &&
+          ["all", "deployed", "notDeployed"].includes(filters.deploymentFilter)
+        ) {
           setDeploymentFilter(filters.deploymentFilter);
         }
         if (filters.modelFilter) {
@@ -339,12 +381,15 @@ function ProjectSidebarComponent({
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
-        timeFilter,
-        sortOrder,
-        deploymentFilter,
-        modelFilter,
-      }));
+      window.localStorage.setItem(
+        FILTERS_STORAGE_KEY,
+        JSON.stringify({
+          timeFilter,
+          sortOrder,
+          deploymentFilter,
+          modelFilter,
+        }),
+      );
     } catch (err) {
       console.error("Error saving filters to localStorage:", err);
     }
@@ -365,7 +410,7 @@ function ProjectSidebarComponent({
 
     // Notify listeners in the same tab (home.tsx listens for this)
     window.dispatchEvent(
-      new CustomEvent("sidebarContextChange", { detail: nextContext })
+      new CustomEvent("sidebarContextChange", { detail: nextContext }),
     );
   }, [selectedWorkspace, hasLoadedWorkspaceFromStorage]);
 
@@ -406,7 +451,7 @@ function ProjectSidebarComponent({
                 starred: conv.starred || false,
                 model: conv.model || null,
                 deploymentUrl: conv.deploymentUrl || null,
-              })
+              }),
             );
             orgs = orgData.organizations || [];
           }
@@ -449,7 +494,7 @@ function ProjectSidebarComponent({
           p.type === "organization" && p.organizationId === selectedWorkspace
         );
       }),
-    [projects, selectedWorkspace]
+    [projects, selectedWorkspace],
   );
 
   // Helper to check if project is starred
@@ -458,7 +503,7 @@ function ProjectSidebarComponent({
       const project = projects.find((p) => p.id === projectId);
       return project?.starred || false;
     },
-    [projects]
+    [projects],
   );
 
   // Get unique models from projects for the filter dropdown
@@ -472,7 +517,12 @@ function ProjectSidebarComponent({
 
   // Check if any filter is active
   const hasActiveFilters = useMemo(() => {
-    return timeFilter !== "all" || sortOrder !== "updatedDesc" || deploymentFilter !== "all" || modelFilter !== "all";
+    return (
+      timeFilter !== "all" ||
+      sortOrder !== "updatedDesc" ||
+      deploymentFilter !== "all" ||
+      modelFilter !== "all"
+    );
   }, [timeFilter, sortOrder, deploymentFilter, modelFilter]);
 
   // Clear all filters
@@ -484,90 +534,127 @@ function ProjectSidebarComponent({
   }, []);
 
   // Filter projects by time frame - MEMOIZED (simplified)
-  const filterProjectsByTime = useCallback((projects: Project[], filter: TimeFilter): Project[] => {
-    if (filter === "all") return projects;
+  const filterProjectsByTime = useCallback(
+    (projects: Project[], filter: TimeFilter): Project[] => {
+      if (filter === "all") return projects;
 
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    return projects.filter((project) => {
-      const projectDate = new Date(project.updatedAt);
-      const projectDateOnly = new Date(projectDate.getFullYear(), projectDate.getMonth(), projectDate.getDate());
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-      switch (filter) {
-        case "today": {
-          return projectDateOnly.getTime() === today.getTime();
+      return projects.filter((project) => {
+        const projectDate = new Date(project.updatedAt);
+        const projectDateOnly = new Date(
+          projectDate.getFullYear(),
+          projectDate.getMonth(),
+          projectDate.getDate(),
+        );
+
+        switch (filter) {
+          case "today": {
+            return projectDateOnly.getTime() === today.getTime();
+          }
+          case "thisWeek": {
+            const dayOfWeek = now.getDay();
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - dayOfWeek);
+            return projectDateOnly >= startOfWeek;
+          }
+          case "thisMonth": {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            return projectDateOnly >= startOfMonth;
+          }
+          case "thisYear": {
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            return projectDateOnly >= startOfYear;
+          }
+          default:
+            return true;
         }
-        case "thisWeek": {
-          const dayOfWeek = now.getDay();
-          const startOfWeek = new Date(today);
-          startOfWeek.setDate(today.getDate() - dayOfWeek);
-          return projectDateOnly >= startOfWeek;
-        }
-        case "thisMonth": {
-          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          return projectDateOnly >= startOfMonth;
-        }
-        case "thisYear": {
-          const startOfYear = new Date(now.getFullYear(), 0, 1);
-          return projectDateOnly >= startOfYear;
-        }
-        default:
-          return true;
-      }
-    });
-  }, []);
+      });
+    },
+    [],
+  );
 
   // Filter projects by deployment status
-  const filterByDeployment = useCallback((projects: Project[], filter: DeploymentFilter): Project[] => {
-    if (filter === "all") return projects;
-    return projects.filter((p) => {
-      if (filter === "deployed") return !!p.deploymentUrl;
-      if (filter === "notDeployed") return !p.deploymentUrl;
-      return true;
-    });
-  }, []);
+  const filterByDeployment = useCallback(
+    (projects: Project[], filter: DeploymentFilter): Project[] => {
+      if (filter === "all") return projects;
+      return projects.filter((p) => {
+        if (filter === "deployed") return !!p.deploymentUrl;
+        if (filter === "notDeployed") return !p.deploymentUrl;
+        return true;
+      });
+    },
+    [],
+  );
 
   // Filter projects by model
-  const filterByModel = useCallback((projects: Project[], filter: ModelFilter): Project[] => {
-    if (filter === "all") return projects;
-    return projects.filter((p) => p.model === filter);
-  }, []);
+  const filterByModel = useCallback(
+    (projects: Project[], filter: ModelFilter): Project[] => {
+      if (filter === "all") return projects;
+      return projects.filter((p) => p.model === filter);
+    },
+    [],
+  );
 
   // Sort projects
-  const sortProjects = useCallback((projects: Project[], order: SortOrder): Project[] => {
-    const sorted = [...projects];
-    switch (order) {
-      case "updatedDesc":
-        return sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-      case "updatedAsc":
-        return sorted.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
-      case "createdDesc":
-        return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      case "createdAsc":
-        return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      case "alphabetical":
-        return sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-      default:
-        return sorted;
-    }
-  }, []);
+  const sortProjects = useCallback(
+    (projects: Project[], order: SortOrder): Project[] => {
+      const sorted = [...projects];
+      switch (order) {
+        case "updatedDesc":
+          return sorted.sort(
+            (a, b) =>
+              new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+          );
+        case "updatedAsc":
+          return sorted.sort(
+            (a, b) =>
+              new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+          );
+        case "createdDesc":
+          return sorted.sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          );
+        case "createdAsc":
+          return sorted.sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+          );
+        case "alphabetical":
+          return sorted.sort((a, b) =>
+            (a.title || "").localeCompare(b.title || ""),
+          );
+        default:
+          return sorted;
+      }
+    },
+    [],
+  );
 
   // Get recent projects (last 5) - MEMOIZED (for display in recent section)
-  const recentProjects = useMemo(
-    () => {
-      let recent = [...filteredProjects];
-      
-      // Apply all filters
-      recent = filterProjectsByTime(recent, timeFilter);
-      recent = filterByDeployment(recent, deploymentFilter);
-      recent = filterByModel(recent, modelFilter);
-      recent = sortProjects(recent, sortOrder);
-      
-      return recent.slice(0, 5);
-    },
-    [filteredProjects, timeFilter, deploymentFilter, modelFilter, sortOrder, filterProjectsByTime, filterByDeployment, filterByModel, sortProjects]
-  );
+  const recentProjects = useMemo(() => {
+    let recent = [...filteredProjects];
+
+    // Apply all filters
+    recent = filterProjectsByTime(recent, timeFilter);
+    recent = filterByDeployment(recent, deploymentFilter);
+    recent = filterByModel(recent, modelFilter);
+    recent = sortProjects(recent, sortOrder);
+
+    return recent.slice(0, 5);
+  }, [
+    filteredProjects,
+    timeFilter,
+    deploymentFilter,
+    modelFilter,
+    sortOrder,
+    filterProjectsByTime,
+    filterByDeployment,
+    filterByModel,
+    sortProjects,
+  ]);
 
   // Get projects based on view and all filters - MEMOIZED
   const displayedProjects = useMemo(() => {
@@ -586,7 +673,18 @@ function ProjectSidebarComponent({
     projectsToShow = sortProjects(projectsToShow, sortOrder);
 
     return projectsToShow;
-  }, [filteredProjects, projectView, timeFilter, deploymentFilter, modelFilter, sortOrder, filterProjectsByTime, filterByDeployment, filterByModel, sortProjects]);
+  }, [
+    filteredProjects,
+    projectView,
+    timeFilter,
+    deploymentFilter,
+    modelFilter,
+    sortOrder,
+    filterProjectsByTime,
+    filterByDeployment,
+    filterByModel,
+    sortProjects,
+  ]);
 
   // Auto-switch to "all" view when any filter is applied
   useEffect(() => {
@@ -598,11 +696,11 @@ function ProjectSidebarComponent({
   // Group projects by month - MEMOIZED
   const projectsByMonth = useMemo(() => {
     const grouped: Record<string, Project[]> = {};
-    
+
     displayedProjects.forEach((project) => {
       const date = new Date(project.updatedAt);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
       if (!grouped[monthKey]) {
         grouped[monthKey] = [];
       }
@@ -619,9 +717,9 @@ function ProjectSidebarComponent({
 
   // Format month label for display
   const formatMonthLabel = useCallback((monthKey: string) => {
-    const [year, month] = monthKey.split('-');
+    const [year, month] = monthKey.split("-");
     const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   }, []);
 
   // Toggle month expansion
@@ -682,7 +780,7 @@ function ProjectSidebarComponent({
       });
       if (response.ok) {
         setProjects((prev) =>
-          prev.map((p) => (p.id === projectId ? { ...p, title } : p))
+          prev.map((p) => (p.id === projectId ? { ...p, title } : p)),
         );
         setEditingProject(null);
         setNewTitle("");
@@ -716,7 +814,7 @@ function ProjectSidebarComponent({
         setIsDeleting(false);
       }
     },
-    [currentProjectId, navigate]
+    [currentProjectId, navigate],
   );
 
   // Handle star/unstar project - MEMOIZED
@@ -740,13 +838,57 @@ function ProjectSidebarComponent({
       // Update local state
       setProjects((prev) =>
         prev.map((p) =>
-          p.id === projectId ? { ...p, starred: data.starred } : p
-        )
+          p.id === projectId ? { ...p, starred: data.starred } : p,
+        ),
       );
     } catch (err) {
       console.error("Error toggling star:", err);
     }
   }, []);
+
+  // Handle contact form submission - MEMOIZED
+  const handleContactSubmit = useCallback(async () => {
+    if (!contactTitle.trim() || !contactMessage.trim()) {
+      return;
+    }
+
+    setIsSendingContact(true);
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: contactTitle.trim(),
+          message: contactMessage.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to send message");
+      }
+
+      // Success - show success state
+      setContactSuccess(true);
+
+      // Auto-close after 2 seconds
+      setTimeout(() => {
+        setShowContactDialog(false);
+        setContactSuccess(false);
+        setContactTitle("");
+        setContactMessage("");
+      }, 2000);
+    } catch (err) {
+      console.error("Error sending contact message:", err);
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Failed to send message. Please try again.",
+      );
+    } finally {
+      setIsSendingContact(false);
+    }
+  }, [contactTitle, contactMessage]);
 
   // Memoize user avatar props
   const avatarProps = useMemo(
@@ -754,7 +896,7 @@ function ProjectSidebarComponent({
       displayName: user?.name || user?.email,
       imageUrl: user?.image,
     }),
-    [user?.name, user?.email, user?.image]
+    [user?.name, user?.email, user?.image],
   );
 
   // On mobile drawer always show full (expanded) content
@@ -773,921 +915,927 @@ function ProjectSidebarComponent({
               : "w-60 overflow-hidden",
         isMobile && !mobileOpen && "-translate-x-full",
         isMobile && mobileOpen && "translate-x-0",
-        className
+        className,
       )}
       style={isMobile ? { transitionProperty: "transform" } : undefined}
     >
-        {/* Sidebar glow effect - bottom left */}
-        <div
-          className="pointer-events-none absolute"
-          style={{
-            bottom: "-80px",
-            left: "-100px",
-            width: "350px",
-            height: "280px",
-            borderRadius: "50%",
-            background:
-              "radial-gradient(50% 50% at 50% 50%, rgba(139, 92, 246, 0.25) 0%, rgba(123, 76, 255, 0.15) 40%, transparent 70%)",
-            filter: "blur(50px)",
-          }}
-        />
-        {/* Header */}
-        <div
-          className={cn(
-            "flex items-center py-4",
-            effectiveCollapsed ? "justify-center px-2" : "justify-between px-4"
-          )}
-        >
-          {!isWorkspace && !effectiveCollapsed && (
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
-                <img
-                  src={crop}
-                  alt="Logo"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <span className="text-white font-semibold text-sm tracking-tight">
-                NowgAI
-              </span>
+      {/* Sidebar glow effect - bottom left */}
+      <div
+        className="pointer-events-none absolute"
+        style={{
+          bottom: "-80px",
+          left: "-100px",
+          width: "350px",
+          height: "280px",
+          borderRadius: "50%",
+          background:
+            "radial-gradient(50% 50% at 50% 50%, rgba(139, 92, 246, 0.25) 0%, rgba(123, 76, 255, 0.15) 40%, transparent 70%)",
+          filter: "blur(50px)",
+        }}
+      />
+      {/* Header */}
+      <div
+        className={cn(
+          "flex items-center py-4",
+          effectiveCollapsed ? "justify-center px-2" : "justify-between px-4",
+        )}
+      >
+        {!isWorkspace && !effectiveCollapsed && (
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+              <img
+                src={crop}
+                alt="Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
-          )}
-          {isMobile ? (
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="p-1.5 rounded-md hover:bg-white/5 text-white/50 hover:text-white transition-colors shrink-0"
-              aria-label="Close menu"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-1.5 rounded-md hover:bg-white/5 text-white/50 hover:text-white transition-colors shrink-0"
-            >
-              <SidebarSimple className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Workspace Selector */}
-        {!effectiveCollapsed && (
-          <div className="px-3 mb-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-colors group">
-                  <div className="w-6 h-6 rounded-md bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
-                    {selectedWorkspace === "personal"
-                      ? "P"
-                      : getWorkspaceName().charAt(0)}
-                  </div>
-                  <span className="flex-1 text-left text-white text-sm font-medium truncate">
-                    {getWorkspaceName()}
-                  </span>
-                  <CaretDown className="w-4 h-4 text-white/40 group-hover:text-white/60 transition-colors" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-56 bg-[#1a1a1a] border-white/10"
-              >
-                <DropdownMenuItem
-                  onClick={() => setSelectedWorkspace("personal")}
-                  className="gap-2 cursor-pointer"
-                >
-                  <User className="w-4 h-4" />
-                  Personal Projects
-                </DropdownMenuItem>
-                {organizations.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator className="bg-white/10" />
-                    {organizations.map((org) => (
-                      <DropdownMenuItem
-                        key={org.id}
-                        onClick={() => setSelectedWorkspace(org.id)}
-                        className="gap-2 cursor-pointer"
-                      >
-                        <Buildings className="w-4 h-4" />
-                        {org.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <span className="text-white font-semibold text-sm tracking-tight">
+              NowgAI
+            </span>
           </div>
         )}
-
-        {/* Navigation */}
-        <ScrollArea className="flex-1 min-h-0 px-3 space-y-1">
-          {/* Primary Navigation */}
-          <Link
-            to="/home"
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-              location.pathname === "/home"
-                ? "bg-white/[0.08] text-white"
-                : "text-white/60 hover:text-white hover:bg-white/[0.04]"
-            )}
-            onClick={() => {
-              setOpenDropdownId(null);
-              if (isMobile) setMobileOpen(false);
-            }}
-          >
-            <House className="w-4 h-4" />
-            {!effectiveCollapsed && "Home"}
-          </Link>
-
+        {isMobile ? (
           <button
-            onClick={() => {
-              setOpenDropdownId(null);
-              setShowSearchDialog(true);
-            }}
-            className={cn(
-              "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-              "text-white/60 hover:text-white hover:bg-white/[0.04]"
-            )}
+            onClick={() => setMobileOpen(false)}
+            className="p-1.5 rounded-md hover:bg-white/5 text-white/50 hover:text-white transition-colors shrink-0"
+            aria-label="Close menu"
           >
-            <MagnifyingGlass className="w-4 h-4" />
-            {!effectiveCollapsed && "Search"}
+            <X className="w-5 h-5" />
           </button>
+        ) : (
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1.5 rounded-md hover:bg-white/5 text-white/50 hover:text-white transition-colors shrink-0"
+          >
+            <SidebarSimple className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
-              {/* Projects Section */}
-              {!effectiveCollapsed && (
+      {/* Workspace Selector */}
+      {!effectiveCollapsed && (
+        <div className="px-3 mb-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-colors group">
+                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
+                  {selectedWorkspace === "personal"
+                    ? "P"
+                    : getWorkspaceName().charAt(0)}
+                </div>
+                <span className="flex-1 text-left text-white text-sm font-medium truncate">
+                  {getWorkspaceName()}
+                </span>
+                <CaretDown className="w-4 h-4 text-white/40 group-hover:text-white/60 transition-colors" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="w-56 bg-[#1a1a1a] border-white/10"
+            >
+              <DropdownMenuItem
+                onClick={() => setSelectedWorkspace("personal")}
+                className="gap-2 cursor-pointer"
+              >
+                <User className="w-4 h-4" />
+                Personal Projects
+              </DropdownMenuItem>
+              {organizations.length > 0 && (
                 <>
-                  <div className="pt-4 pb-2 flex items-center justify-between px-3">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                      Projects
-                    </span>
-                    <button
-                      onClick={() => setShowFiltersPanel(!showFiltersPanel)}
-                      className={cn(
-                        "flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors",
-                        hasActiveFilters
-                          ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
-                          : "text-white/40 hover:text-white/60 hover:bg-white/5"
-                      )}
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  {organizations.map((org) => (
+                    <DropdownMenuItem
+                      key={org.id}
+                      onClick={() => setSelectedWorkspace(org.id)}
+                      className="gap-2 cursor-pointer"
                     >
-                      <Funnel className="w-3 h-3" />
-                      {hasActiveFilters && (
-                        <span className="text-[10px]">{displayedProjects.length}</span>
-                      )}
-                    </button>
-                  </div>
+                      <Buildings className="w-4 h-4" />
+                      {org.name}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
 
-                  {/* Filters Panel */}
-                  {showFiltersPanel && (
-                    <div className="px-3 mb-3 space-y-2">
-                      {/* Clear All Button */}
-                      {hasActiveFilters && (
-                        <button
-                          onClick={clearAllFilters}
-                          className="w-full text-xs text-purple-400 hover:text-purple-300 py-1 transition-colors"
-                        >
-                          Clear all filters
-                        </button>
-                      )}
+      {/* Navigation */}
+      <ScrollArea className="flex-1 min-h-0 px-3 space-y-1">
+        {/* Primary Navigation */}
+        <Link
+          to="/home"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            location.pathname === "/home"
+              ? "bg-white/[0.08] text-white"
+              : "text-white/60 hover:text-white hover:bg-white/[0.04]",
+          )}
+          onClick={() => {
+            setOpenDropdownId(null);
+            if (isMobile) setMobileOpen(false);
+          }}
+        >
+          <House className="w-4 h-4" />
+          {!effectiveCollapsed && "Home"}
+        </Link>
 
-                      {/* Time Filter */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          Time
-                        </label>
-                        <div className="flex flex-wrap gap-1">
-                          {[
-                            { value: "today", label: "Today" },
-                            { value: "thisWeek", label: "Week" },
-                            { value: "thisMonth", label: "Month" },
-                            { value: "thisYear", label: "Year" },
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                // Toggle: if already selected, reset to all
-                                if (timeFilter === option.value) {
-                                  setTimeFilter("all");
-                                } else {
-                                  setTimeFilter(option.value as TimeFilter);
-                                }
-                              }}
-                              className={cn(
-                                "px-2 py-1 text-xs rounded transition-colors",
-                                timeFilter === option.value
-                                  ? "bg-purple-500/20 text-purple-400"
-                                  : "bg-white/5 text-white/60 hover:bg-white/10"
-                              )}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+        <button
+          onClick={() => {
+            setOpenDropdownId(null);
+            setShowSearchDialog(true);
+          }}
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            "text-white/60 hover:text-white hover:bg-white/[0.04]",
+          )}
+        >
+          <MagnifyingGlass className="w-4 h-4" />
+          {!effectiveCollapsed && "Search"}
+        </button>
 
-                      {/* Sort Order - only show non-default options, clicking toggles */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
-                          <SortAscending className="w-3 h-3" />
-                          Sort
-                          <span className="text-white/20 font-normal normal-case">(default: recent)</span>
-                        </label>
-                        <div className="flex flex-wrap gap-1">
-                          {[
-                            { value: "createdDesc", label: "Newest" },
-                            { value: "createdAsc", label: "Oldest" },
-                            { value: "alphabetical", label: "A-Z" },
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                // Toggle: if already selected, reset to default
-                                if (sortOrder === option.value) {
-                                  setSortOrder("updatedDesc");
-                                } else {
-                                  setSortOrder(option.value as SortOrder);
-                                }
-                              }}
-                              className={cn(
-                                "px-2 py-1 text-xs rounded transition-colors",
-                                sortOrder === option.value
-                                  ? "bg-purple-500/20 text-purple-400"
-                                  : "bg-white/5 text-white/60 hover:bg-white/10"
-                              )}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Deployment Filter */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
-                          <Globe className="w-3 h-3" />
-                          Deployment
-                        </label>
-                        <div className="flex flex-wrap gap-1">
-                          {[
-                            { value: "deployed", label: "Deployed" },
-                            { value: "notDeployed", label: "Not Deployed" },
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                // Toggle: if already selected, reset to all
-                                if (deploymentFilter === option.value) {
-                                  setDeploymentFilter("all");
-                                } else {
-                                  setDeploymentFilter(option.value as DeploymentFilter);
-                                }
-                              }}
-                              className={cn(
-                                "px-2 py-1 text-xs rounded transition-colors",
-                                deploymentFilter === option.value
-                                  ? "bg-purple-500/20 text-purple-400"
-                                  : "bg-white/5 text-white/60 hover:bg-white/10"
-                              )}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Model Filter */}
-                      {availableModels.length > 0 && (
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
-                            <Robot className="w-3 h-3" />
-                            Model
-                          </label>
-                          <div className="flex flex-wrap gap-1">
-                            {availableModels.map((model) => (
-                              <button
-                                key={model}
-                                onClick={() => {
-                                  // Toggle: if already selected, deselect (reset to all)
-                                  if (modelFilter === model) {
-                                    setModelFilter("all");
-                                  } else {
-                                    setModelFilter(model);
-                                  }
-                                }}
-                                className={cn(
-                                  "px-2 py-1 text-xs rounded transition-colors truncate max-w-[80px]",
-                                  modelFilter === model
-                                    ? "bg-purple-500/20 text-purple-400"
-                                    : "bg-white/5 text-white/60 hover:bg-white/10"
-                                )}
-                                title={model}
-                              >
-                                {model.split('/').pop()?.split('-')[0] || model}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      setOpenDropdownId(null);
-                      // If filter is active, keep "all" view; otherwise toggle
-                      if (hasActiveFilters) {
-                        setProjectView("all");
-                      } else {
-                        setProjectView(projectView === "all" ? "recent" : "all");
-                      }
-                    }}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      (projectView === "all" || hasActiveFilters)
-                        ? "bg-white/[0.08] text-white"
-                        : "text-white/60 hover:text-white hover:bg-white/[0.04]"
-                    )}
-                  >
-                    <Cardholder className="w-4 h-4" />
-                    <span className="flex-1 text-left">
-                      {hasActiveFilters ? "Filtered" : "All Projects"}
-                    </span>
-                    {hasActiveFilters && (
-                      <span className="text-xs text-purple-400">{displayedProjects.length}</span>
-                    )}
-                  </button>
-
+        {/* Projects Section */}
+        {!effectiveCollapsed && (
+          <>
+            <div className="pt-4 pb-2 flex items-center justify-between px-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                Projects
+              </span>
               <button
-                onClick={() => {
-                  setOpenDropdownId(null);
-                  // Toggle: if already "starred", go back to "recent", otherwise set to "starred"
-                  setProjectView(
-                    projectView === "starred" ? "recent" : "starred"
-                  );
-                }}
+                onClick={() => setShowFiltersPanel(!showFiltersPanel)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  projectView === "starred"
-                    ? "bg-white/[0.08] text-white"
-                    : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                  "flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors",
+                  hasActiveFilters
+                    ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+                    : "text-white/40 hover:text-white/60 hover:bg-white/5",
                 )}
               >
-                <Star
-                  className={cn(
-                    "w-4 h-4",
-                    projectView === "starred" && "fill-current"
-                  )}
-                />
-                Starred
+                <Funnel className="w-3 h-3" />
+                {hasActiveFilters && (
+                  <span className="text-[10px]">
+                    {displayedProjects.length}
+                  </span>
+                )}
               </button>
+            </div>
 
-              {/* Recent Projects - Only show when not viewing All or Starred and no filter is active */}
-              {projectView === "recent" && !hasActiveFilters && (
-                <div className="pt-4">
+            {/* Filters Panel */}
+            {showFiltersPanel && (
+              <div className="px-3 mb-3 space-y-2">
+                {/* Clear All Button */}
+                {hasActiveFilters && (
                   <button
-                    onClick={() => {
-                      setOpenDropdownId(null);
-                      setRecentProjectsExpanded(!recentProjectsExpanded);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 hover:text-white/50 transition-colors"
+                    onClick={clearAllFilters}
+                    className="w-full text-xs text-purple-400 hover:text-purple-300 py-1 transition-colors"
                   >
-                    {recentProjectsExpanded ? (
-                      <CaretDown className="w-5 h-5" />
-                    ) : (
-                      <CaretRight className="w-5 h-5" />
-                    )}
-                    Recent Projects
+                    Clear all filters
                   </button>
+                )}
 
-                  {recentProjectsExpanded && (
-                    <div className="mt-1 space-y-0.5">
-                      {isLoading ? (
-                        <div className="flex items-center justify-center py-4">
-                          <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
-                        </div>
-                      ) : recentProjects.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-white/30">
-                          No projects yet
-                        </p>
-                      ) : (
-                        recentProjects.map((project) => (
-                          <div
-                            key={project.id}
-                            className="group relative max-w-54"
-                          >
-                            <Link
-                              to={`/workspace?conversationId=${project.id}`}
-                              className={cn(
-                                "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
-                                currentProjectId === project.id
-                                  ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
-                                  : "text-white/60 hover:text-white hover:bg-white/[0.04]"
-                              )}
-                              onClick={() => {
-                                setOpenDropdownId(null);
-                                if (isMobile) setMobileOpen(false);
-                              }}
-                            >
-                              <ChatTeardropDots className="w-5 h-5 shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="truncate font-medium text-sm block">
-                                    {project.title || "Untitled Project"}
-                                  </span>
-                                  {project.starred && (
-                                    <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
-                                  )}
-                                </div>
-                                <div className="text-[10px] text-white/30 truncate">
-                                  {formatDate(project.updatedAt)}
-                                </div>
-                              </div>
-                            </Link>
-
-                            {/* Actions Menu */}
-                            <DropdownMenu
-                              open={openDropdownId === project.id}
-                              onOpenChange={(open) =>
-                                setOpenDropdownId(open ? project.id : null)
-                              }
-                            >
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                  }}
-                                >
-                                  <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="end"
-                                className="w-40 bg-[#1a1a1a] border-white/10"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleStarToggle(project.id);
-                                    setOpenDropdownId(null);
-                                  }}
-                                  className="gap-2 cursor-pointer"
-                                >
-                                  <Star
-                                    className={cn(
-                                      "w-5 h-5",
-                                      project.starred && "fill-current"
-                                    )}
-                                  />
-                                  {project.starred ? "Unstar" : "Star"}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setProjectToDelete(project);
-                                    setDeleteDialogOpen(true);
-                                    setOpenDropdownId(null);
-                                  }}
-                                  className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
-                                >
-                                  <Trash className="w-5 h-5" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* All Projects - Show when selected or when filter is active */}
-              {(projectView === "all" || hasActiveFilters) && (
-                <div className="pt-4">
-                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1 flex items-center justify-between">
-                    <span>
-                      {hasActiveFilters ? "Filtered Projects" : "All Projects"}
-                    </span>
-                    {hasActiveFilters && (
+                {/* Time Filter */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    Time
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { value: "today", label: "Today" },
+                      { value: "thisWeek", label: "Week" },
+                      { value: "thisMonth", label: "Month" },
+                      { value: "thisYear", label: "Year" },
+                    ].map((option) => (
                       <button
-                        onClick={clearAllFilters}
-                        className="text-[9px] text-purple-400 hover:text-purple-300 transition-colors"
-                        title="Clear all filters"
+                        key={option.value}
+                        onClick={() => {
+                          // Toggle: if already selected, reset to all
+                          if (timeFilter === option.value) {
+                            setTimeFilter("all");
+                          } else {
+                            setTimeFilter(option.value as TimeFilter);
+                          }
+                        }}
+                        className={cn(
+                          "px-2 py-1 text-xs rounded transition-colors",
+                          timeFilter === option.value
+                            ? "bg-purple-500/20 text-purple-400"
+                            : "bg-white/5 text-white/60 hover:bg-white/10",
+                        )}
                       >
-                        Clear
+                        {option.label}
                       </button>
-                    )}
+                    ))}
                   </div>
+                </div>
+
+                {/* Sort Order - only show non-default options, clicking toggles */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
+                    <SortAscending className="w-3 h-3" />
+                    Sort
+                    <span className="text-white/20 font-normal normal-case">
+                      (default: recent)
+                    </span>
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { value: "createdDesc", label: "Newest" },
+                      { value: "createdAsc", label: "Oldest" },
+                      { value: "alphabetical", label: "A-Z" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          // Toggle: if already selected, reset to default
+                          if (sortOrder === option.value) {
+                            setSortOrder("updatedDesc");
+                          } else {
+                            setSortOrder(option.value as SortOrder);
+                          }
+                        }}
+                        className={cn(
+                          "px-2 py-1 text-xs rounded transition-colors",
+                          sortOrder === option.value
+                            ? "bg-purple-500/20 text-purple-400"
+                            : "bg-white/5 text-white/60 hover:bg-white/10",
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Deployment Filter */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
+                    <Globe className="w-3 h-3" />
+                    Deployment
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { value: "deployed", label: "Deployed" },
+                      { value: "notDeployed", label: "Not Deployed" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          // Toggle: if already selected, reset to all
+                          if (deploymentFilter === option.value) {
+                            setDeploymentFilter("all");
+                          } else {
+                            setDeploymentFilter(
+                              option.value as DeploymentFilter,
+                            );
+                          }
+                        }}
+                        className={cn(
+                          "px-2 py-1 text-xs rounded transition-colors",
+                          deploymentFilter === option.value
+                            ? "bg-purple-500/20 text-purple-400"
+                            : "bg-white/5 text-white/60 hover:bg-white/10",
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Model Filter */}
+                {availableModels.length > 0 && (
                   <div className="space-y-1">
-                    {isLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
-                      </div>
-                    ) : displayedProjects.length === 0 ? (
-                      <div className="px-3 py-4 text-center">
-                        <p className="text-xs text-white/30 mb-1">
-                          {hasActiveFilters 
-                            ? `No projects match your filters`
-                            : "No projects yet"}
-                        </p>
-                        {hasActiveFilters && (
-                          <button
-                            onClick={clearAllFilters}
-                            className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                          >
-                            Clear filters
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        {projectsByMonth.sortedMonths.slice(0, visibleMonthsCount).map((monthKey) => {
-                        const monthProjects = projectsByMonth.grouped[monthKey];
-                        const isExpanded = expandedMonths.has(monthKey);
-                        
-                        return (
-                          <div key={monthKey} className="space-y-0.5">
-                            {/* Month Header with Expand/Collapse */}
-                            <button
-                              onClick={() => {
-                                setOpenDropdownId(null);
-                                toggleMonthExpansion(monthKey);
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30 hover:text-white/50 transition-colors"
-                            >
-                              {isExpanded ? (
-                                <CaretDown className="w-4 h-4" />
-                              ) : (
-                                <CaretRight className="w-4 h-4" />
-                              )}
-                              <span className="flex-1 text-left">
-                                {formatMonthLabel(monthKey)}
-                              </span>
-                              <span className="text-white/20">
-                                ({monthProjects.length})
-                              </span>
-                            </button>
-
-                            {/* Projects under this month */}
-                            {isExpanded && (
-                              <div className="ml-2 space-y-0.5">
-                                {monthProjects.map((project) => (
-                                  <div
-                                    key={project.id}
-                                    className="group relative max-w-54"
-                                  >
-                                    <Link
-                                      to={`/workspace?conversationId=${project.id}`}
-                                      className={cn(
-                                        "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
-                                        currentProjectId === project.id
-                                          ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
-                                          : "text-white/60 hover:text-white hover:bg-white/[0.04]"
-                                      )}
-                                      onClick={() => {
-                                setOpenDropdownId(null);
-                                if (isMobile) setMobileOpen(false);
-                              }}
-                                    >
-                                      <ChatTeardropDots className="w-5 h-5 shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1.5 min-w-0">
-                                          <span className="truncate font-medium text-sm block">
-                                            {project.title || "Untitled Project"}
-                                          </span>
-                                          {project.starred && (
-                                            <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
-                                          )}
-                                        </div>
-                                        <div className="text-[10px] text-white/30 truncate">
-                                          {formatDate(project.updatedAt)}
-                                        </div>
-                                      </div>
-                                    </Link>
-
-                                    {/* Actions Menu */}
-                                    <DropdownMenu
-                                      open={openDropdownId === project.id}
-                                      onOpenChange={(open) =>
-                                        setOpenDropdownId(open ? project.id : null)
-                                      }
-                                    >
-                                      <DropdownMenuTrigger asChild>
-                                        <button
-                                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                          }}
-                                        >
-                                          <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
-                                        </button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent
-                                        align="end"
-                                        className="w-40 bg-[#1a1a1a] border-white/10"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <DropdownMenuItem
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleStarToggle(project.id);
-                                            setOpenDropdownId(null);
-                                          }}
-                                          className="gap-2 cursor-pointer"
-                                        >
-                                          <Star
-                                            className={cn(
-                                              "w-5 h-5",
-                                              project.starred && "fill-current"
-                                            )}
-                                          />
-                                          {project.starred ? "Unstar" : "Star"}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setProjectToDelete(project);
-                                            setDeleteDialogOpen(true);
-                                            setOpenDropdownId(null);
-                                          }}
-                                          className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
-                                        >
-                                          <Trash className="w-5 h-5" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                        })}
-                        {/* Load More Button */}
-                        {projectsByMonth.sortedMonths.length > visibleMonthsCount && (
-                          <div className="mt-4 pt-3 border-t border-white/10">
-                            <button
-                              onClick={() => {
-                                setVisibleMonthsCount(prev => prev + 2); // Load 2 more months at a time
-                              }}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
-                            >
-                              <CaretDown className="w-4 h-4" />
-                              <span>Load More Months</span>
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
+                    <label className="text-[10px] text-white/40 uppercase tracking-wider flex items-center gap-1">
+                      <Robot className="w-3 h-3" />
+                      Model
+                    </label>
+                    <div className="flex flex-wrap gap-1">
+                      {availableModels.map((model) => (
+                        <button
+                          key={model}
+                          onClick={() => {
+                            // Toggle: if already selected, deselect (reset to all)
+                            if (modelFilter === model) {
+                              setModelFilter("all");
+                            } else {
+                              setModelFilter(model);
+                            }
+                          }}
+                          className={cn(
+                            "px-2 py-1 text-xs rounded transition-colors truncate max-w-[80px]",
+                            modelFilter === model
+                              ? "bg-purple-500/20 text-purple-400"
+                              : "bg-white/5 text-white/60 hover:bg-white/10",
+                          )}
+                          title={model}
+                        >
+                          {model.split("/").pop()?.split("-")[0] || model}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* Starred Projects - Show when selected */}
-              {projectView === "starred" && (
-                <div className="pt-4">
-                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1">
-                    Starred Projects
-                  </div>
-                  <div className="space-y-1">
-                    {isLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
-                      </div>
-                    ) : displayedProjects.length === 0 ? (
-                      <div className="px-3 py-4 text-center">
-                        <p className="text-xs text-white/30 mb-1">
-                          {hasActiveFilters 
-                            ? `No starred projects match your filters`
-                            : "No starred projects yet"}
-                        </p>
-                        {hasActiveFilters && (
-                          <button
-                            onClick={clearAllFilters}
-                            className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                          >
-                            Clear filters
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        {projectsByMonth.sortedMonths.slice(0, visibleMonthsCount).map((monthKey) => {
-                        const monthProjects = projectsByMonth.grouped[monthKey];
-                        const isExpanded = expandedMonths.has(monthKey);
-                        
-                        return (
-                          <div key={monthKey} className="space-y-0.5">
-                            {/* Month Header with Expand/Collapse */}
-                            <button
-                              onClick={() => {
-                                setOpenDropdownId(null);
-                                toggleMonthExpansion(monthKey);
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30 hover:text-white/50 transition-colors"
-                            >
-                              {isExpanded ? (
-                                <CaretDown className="w-4 h-4" />
-                              ) : (
-                                <CaretRight className="w-4 h-4" />
-                              )}
-                              <span className="flex-1 text-left">
-                                {formatMonthLabel(monthKey)}
-                              </span>
-                              <span className="text-white/20">
-                                ({monthProjects.length})
-                              </span>
-                            </button>
-
-                            {/* Projects under this month */}
-                            {isExpanded && (
-                              <div className="ml-2 space-y-0.5">
-                                {monthProjects.map((project) => (
-                                  <div
-                                    key={project.id}
-                                    className="group relative max-w-54"
-                                  >
-                                    <Link
-                                      to={`/workspace?conversationId=${project.id}`}
-                                      className={cn(
-                                        "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
-                                        currentProjectId === project.id
-                                          ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
-                                          : "text-white/60 hover:text-white hover:bg-white/[0.04]"
-                                      )}
-                                      onClick={() => {
-                                setOpenDropdownId(null);
-                                if (isMobile) setMobileOpen(false);
-                              }}
-                                    >
-                                      <ChatTeardropDots className="w-5 h-5 shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1.5 min-w-0">
-                                          <span className="truncate font-medium text-sm block">
-                                            {project.title || "Untitled Project"}
-                                          </span>
-                                          {project.starred && (
-                                            <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
-                                          )}
-                                        </div>
-                                        <div className="text-[10px] text-white/30 truncate">
-                                          {formatDate(project.updatedAt)}
-                                        </div>
-                                      </div>
-                                    </Link>
-
-                                    {/* Actions Menu */}
-                                    <DropdownMenu
-                                      open={openDropdownId === project.id}
-                                      onOpenChange={(open) =>
-                                        setOpenDropdownId(open ? project.id : null)
-                                      }
-                                    >
-                                      <DropdownMenuTrigger asChild>
-                                        <button
-                                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                          }}
-                                        >
-                                          <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
-                                        </button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent
-                                        align="end"
-                                        className="w-40 bg-[#1a1a1a] border-white/10"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <DropdownMenuItem
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleStarToggle(project.id);
-                                            setOpenDropdownId(null);
-                                          }}
-                                          className="gap-2 cursor-pointer"
-                                        >
-                                          <Star
-                                            className={cn(
-                                              "w-5 h-5",
-                                              project.starred && "fill-current"
-                                            )}
-                                          />
-                                          {project.starred ? "Unstar" : "Star"}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setProjectToDelete(project);
-                                            setDeleteDialogOpen(true);
-                                            setOpenDropdownId(null);
-                                          }}
-                                          className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
-                                        >
-                                          <Trash className="w-5 h-5" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                        })}
-                        {/* Load More Button */}
-                        {projectsByMonth.sortedMonths.length > visibleMonthsCount && (
-                          <div className="mt-4 pt-3 border-t border-white/10">
-                            <button
-                              onClick={() => {
-                                setVisibleMonthsCount(prev => prev + 2); // Load 2 more months at a time
-                              }}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
-                            >
-                              <CaretDown className="w-4 h-4" />
-                              <span>Load More Months</span>
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Resources Section */}
-              <div className="pt-6">
-                <div className="flex items-center gap-2 px-3 py-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                    Resources
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-white/10 text-white/40">
-                    Soon
-                  </span>
-                </div>
-
-                <div className="mt-1 space-y-0.5 opacity-40">
-                  <button
-                    disabled
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-white/40 cursor-not-allowed"
-                  >
-                    <Compass className="w-4 h-4" />
-                    Explore
-                  </button>
-                  <button
-                    disabled
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-white/40 cursor-not-allowed"
-                  >
-                    <Cube className="w-4 h-4" />
-                    Templates
-                  </button>
-                  <button
-                    disabled
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-white/40 cursor-not-allowed"
-                  >
-                    <KanbanIcon className="w-4 h-4" />
-                    Learn
-                  </button>
-                </div>
+                )}
               </div>
-            </>
-          )}
-        </ScrollArea>
+            )}
 
-        {/* Footer */}
-        <div className="px-3 py-4 border-t border-white/6">
-          <div className="flex items-center justify-between">
             <button
               onClick={() => {
-                navigate("/profile");
-                if (isMobile) setMobileOpen(false);
+                setOpenDropdownId(null);
+                // If filter is active, keep "all" view; otherwise toggle
+                if (hasActiveFilters) {
+                  setProjectView("all");
+                } else {
+                  setProjectView(projectView === "all" ? "recent" : "all");
+                }
               }}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/4 transition-colors"
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                projectView === "all" || hasActiveFilters
+                  ? "bg-white/[0.08] text-white"
+                  : "text-white/60 hover:text-white hover:bg-white/[0.04]",
+              )}
             >
-              <UserAvatar
-                displayName={avatarProps.displayName}
-                imageUrl={avatarProps.imageUrl}
-              />
-              {!effectiveCollapsed && (
-                <span className="text-sm text-white/70 truncate max-w-30">
-                  {user?.name || user?.email || "User"}
+              <Cardholder className="w-4 h-4" />
+              <span className="flex-1 text-left">
+                {hasActiveFilters ? "Filtered" : "All Projects"}
+              </span>
+              {hasActiveFilters && (
+                <span className="text-xs text-purple-400">
+                  {displayedProjects.length}
                 </span>
               )}
             </button>
-            {!effectiveCollapsed && (
-              <button className="p-2 rounded-lg hover:bg-white/4 text-white/40 hover:text-white transition-colors relative">
-                <Bell className="w-4 h-4" />
-              </button>
+
+            <button
+              onClick={() => {
+                setOpenDropdownId(null);
+                // Toggle: if already "starred", go back to "recent", otherwise set to "starred"
+                setProjectView(
+                  projectView === "starred" ? "recent" : "starred",
+                );
+              }}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                projectView === "starred"
+                  ? "bg-white/[0.08] text-white"
+                  : "text-white/60 hover:text-white hover:bg-white/[0.04]",
+              )}
+            >
+              <Star
+                className={cn(
+                  "w-4 h-4",
+                  projectView === "starred" && "fill-current",
+                )}
+              />
+              Starred Projects
+            </button>
+
+            {/* Recent Projects - Only show when not viewing All or Starred and no filter is active */}
+            {projectView === "recent" && !hasActiveFilters && (
+              <div className="pt-4">
+                <button
+                  onClick={() => {
+                    setOpenDropdownId(null);
+                    setRecentProjectsExpanded(!recentProjectsExpanded);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 hover:text-white/50 transition-colors"
+                >
+                  {recentProjectsExpanded ? (
+                    <CaretDown className="w-5 h-5" />
+                  ) : (
+                    <CaretRight className="w-5 h-5" />
+                  )}
+                  Recent Projects
+                </button>
+
+                {recentProjectsExpanded && (
+                  <div className="mt-1 space-y-0.5">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
+                      </div>
+                    ) : recentProjects.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-white/30">
+                        No projects yet
+                      </p>
+                    ) : (
+                      recentProjects.map((project) => (
+                        <div
+                          key={project.id}
+                          className="group relative max-w-54"
+                        >
+                          <Link
+                            to={`/workspace?conversationId=${project.id}`}
+                            className={cn(
+                              "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
+                              currentProjectId === project.id
+                                ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
+                                : "text-white/60 hover:text-white hover:bg-white/[0.04]",
+                            )}
+                            onClick={() => {
+                              setOpenDropdownId(null);
+                              if (isMobile) setMobileOpen(false);
+                            }}
+                          >
+                            <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="truncate font-medium text-sm block">
+                                  {project.title || "Untitled Project"}
+                                </span>
+                                {project.starred && (
+                                  <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
+                                )}
+                              </div>
+                              <div className="text-[10px] text-white/30 truncate">
+                                {formatDate(project.updatedAt)}
+                              </div>
+                            </div>
+                          </Link>
+
+                          {/* Actions Menu */}
+                          <DropdownMenu
+                            open={openDropdownId === project.id}
+                            onOpenChange={(open) =>
+                              setOpenDropdownId(open ? project.id : null)
+                            }
+                          >
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                              >
+                                <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-40 bg-[#1a1a1a] border-white/10"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStarToggle(project.id);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="gap-2 cursor-pointer"
+                              >
+                                <Star
+                                  className={cn(
+                                    "w-5 h-5",
+                                    project.starred && "fill-current",
+                                  )}
+                                />
+                                {project.starred ? "Unstar" : "Star"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setProjectToDelete(project);
+                                  setDeleteDialogOpen(true);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
+                              >
+                                <Trash className="w-5 h-5" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             )}
-          </div>
+
+            {/* All Projects - Show when selected or when filter is active */}
+            {(projectView === "all" || hasActiveFilters) && (
+              <div className="pt-4">
+                <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1 flex items-center justify-between">
+                  <span>
+                    {hasActiveFilters ? "Filtered Projects" : "All Projects"}
+                  </span>
+                  {hasActiveFilters && (
+                    <button
+                      onClick={clearAllFilters}
+                      className="text-[9px] text-purple-400 hover:text-purple-300 transition-colors"
+                      title="Clear all filters"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
+                    </div>
+                  ) : displayedProjects.length === 0 ? (
+                    <div className="px-3 py-4 text-center">
+                      <p className="text-xs text-white/30 mb-1">
+                        {hasActiveFilters
+                          ? `No projects match your filters`
+                          : "No projects yet"}
+                      </p>
+                      {hasActiveFilters && (
+                        <button
+                          onClick={clearAllFilters}
+                          className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                        >
+                          Clear filters
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {projectsByMonth.sortedMonths
+                        .slice(0, visibleMonthsCount)
+                        .map((monthKey) => {
+                          const monthProjects =
+                            projectsByMonth.grouped[monthKey];
+                          const isExpanded = expandedMonths.has(monthKey);
+
+                          return (
+                            <div key={monthKey} className="space-y-0.5">
+                              {/* Month Header with Expand/Collapse */}
+                              <button
+                                onClick={() => {
+                                  setOpenDropdownId(null);
+                                  toggleMonthExpansion(monthKey);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30 hover:text-white/50 transition-colors"
+                              >
+                                {isExpanded ? (
+                                  <CaretDown className="w-4 h-4" />
+                                ) : (
+                                  <CaretRight className="w-4 h-4" />
+                                )}
+                                <span className="flex-1 text-left">
+                                  {formatMonthLabel(monthKey)}
+                                </span>
+                                <span className="text-white/20">
+                                  ({monthProjects.length})
+                                </span>
+                              </button>
+
+                              {/* Projects under this month */}
+                              {isExpanded && (
+                                <div className="ml-2 space-y-0.5">
+                                  {monthProjects.map((project) => (
+                                    <div
+                                      key={project.id}
+                                      className="group relative max-w-54"
+                                    >
+                                      <Link
+                                        to={`/workspace?conversationId=${project.id}`}
+                                        className={cn(
+                                          "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
+                                          currentProjectId === project.id
+                                            ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
+                                            : "text-white/60 hover:text-white hover:bg-white/[0.04]",
+                                        )}
+                                        onClick={() => {
+                                          setOpenDropdownId(null);
+                                          if (isMobile) setMobileOpen(false);
+                                        }}
+                                      >
+                                        <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="truncate font-medium text-sm block">
+                                              {project.title ||
+                                                "Untitled Project"}
+                                            </span>
+                                            {project.starred && (
+                                              <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
+                                            )}
+                                          </div>
+                                          <div className="text-[10px] text-white/30 truncate">
+                                            {formatDate(project.updatedAt)}
+                                          </div>
+                                        </div>
+                                      </Link>
+
+                                      {/* Actions Menu */}
+                                      <DropdownMenu
+                                        open={openDropdownId === project.id}
+                                        onOpenChange={(open) =>
+                                          setOpenDropdownId(
+                                            open ? project.id : null,
+                                          )
+                                        }
+                                      >
+                                        <DropdownMenuTrigger asChild>
+                                          <button
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                            }}
+                                          >
+                                            <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
+                                          </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                          align="end"
+                                          className="w-40 bg-[#1a1a1a] border-white/10"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <DropdownMenuItem
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleStarToggle(project.id);
+                                              setOpenDropdownId(null);
+                                            }}
+                                            className="gap-2 cursor-pointer"
+                                          >
+                                            <Star
+                                              className={cn(
+                                                "w-5 h-5",
+                                                project.starred &&
+                                                  "fill-current",
+                                              )}
+                                            />
+                                            {project.starred
+                                              ? "Unstar"
+                                              : "Star"}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setProjectToDelete(project);
+                                              setDeleteDialogOpen(true);
+                                              setOpenDropdownId(null);
+                                            }}
+                                            className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
+                                          >
+                                            <Trash className="w-5 h-5" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      {/* Load More Button */}
+                      {projectsByMonth.sortedMonths.length >
+                        visibleMonthsCount && (
+                        <div className="mt-4 pt-3 border-t border-white/10">
+                          <button
+                            onClick={() => {
+                              setVisibleMonthsCount((prev) => prev + 2); // Load 2 more months at a time
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
+                          >
+                            <CaretDown className="w-4 h-4" />
+                            <span>Load More Months</span>
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Starred Projects - Show when selected */}
+            {projectView === "starred" && (
+              <div className="pt-4">
+                <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1">
+                  Starred Projects
+                </div>
+                <div className="space-y-1">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <SpinnerGap className="w-4 h-4 animate-spin text-white/30" />
+                    </div>
+                  ) : displayedProjects.length === 0 ? (
+                    <div className="px-3 py-4 text-center">
+                      <p className="text-xs text-white/30 mb-1">
+                        {hasActiveFilters
+                          ? `No starred projects match your filters`
+                          : "No starred projects yet"}
+                      </p>
+                      {hasActiveFilters && (
+                        <button
+                          onClick={clearAllFilters}
+                          className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                        >
+                          Clear filters
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {projectsByMonth.sortedMonths
+                        .slice(0, visibleMonthsCount)
+                        .map((monthKey) => {
+                          const monthProjects =
+                            projectsByMonth.grouped[monthKey];
+                          const isExpanded = expandedMonths.has(monthKey);
+
+                          return (
+                            <div key={monthKey} className="space-y-0.5">
+                              {/* Month Header with Expand/Collapse */}
+                              <button
+                                onClick={() => {
+                                  setOpenDropdownId(null);
+                                  toggleMonthExpansion(monthKey);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30 hover:text-white/50 transition-colors"
+                              >
+                                {isExpanded ? (
+                                  <CaretDown className="w-4 h-4" />
+                                ) : (
+                                  <CaretRight className="w-4 h-4" />
+                                )}
+                                <span className="flex-1 text-left">
+                                  {formatMonthLabel(monthKey)}
+                                </span>
+                                <span className="text-white/20">
+                                  ({monthProjects.length})
+                                </span>
+                              </button>
+
+                              {/* Projects under this month */}
+                              {isExpanded && (
+                                <div className="ml-2 space-y-0.5">
+                                  {monthProjects.map((project) => (
+                                    <div
+                                      key={project.id}
+                                      className="group relative max-w-54"
+                                    >
+                                      <Link
+                                        to={`/workspace?conversationId=${project.id}`}
+                                        className={cn(
+                                          "flex items-center gap-3 pl-6 pr-10 py-2 rounded-lg text-sm transition-colors w-full",
+                                          currentProjectId === project.id
+                                            ? "bg-purple-500/10 text-white border-l-2 border-purple-500 ml-1"
+                                            : "text-white/60 hover:text-white hover:bg-white/[0.04]",
+                                        )}
+                                        onClick={() => {
+                                          setOpenDropdownId(null);
+                                          if (isMobile) setMobileOpen(false);
+                                        }}
+                                      >
+                                        <ChatTeardropDots className="w-5 h-5 shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="truncate font-medium text-sm block">
+                                              {project.title ||
+                                                "Untitled Project"}
+                                            </span>
+                                            {project.starred && (
+                                              <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />
+                                            )}
+                                          </div>
+                                          <div className="text-[10px] text-white/30 truncate">
+                                            {formatDate(project.updatedAt)}
+                                          </div>
+                                        </div>
+                                      </Link>
+
+                                      {/* Actions Menu */}
+                                      <DropdownMenu
+                                        open={openDropdownId === project.id}
+                                        onOpenChange={(open) =>
+                                          setOpenDropdownId(
+                                            open ? project.id : null,
+                                          )
+                                        }
+                                      >
+                                        <DropdownMenuTrigger asChild>
+                                          <button
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all z-10"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                            }}
+                                          >
+                                            <DotsThreeOutline className="w-4 h-4 text-white/60 hover:text-white" />
+                                          </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                          align="end"
+                                          className="w-40 bg-[#1a1a1a] border-white/10"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <DropdownMenuItem
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleStarToggle(project.id);
+                                              setOpenDropdownId(null);
+                                            }}
+                                            className="gap-2 cursor-pointer"
+                                          >
+                                            <Star
+                                              className={cn(
+                                                "w-5 h-5",
+                                                project.starred &&
+                                                  "fill-current",
+                                              )}
+                                            />
+                                            {project.starred
+                                              ? "Unstar"
+                                              : "Star"}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setProjectToDelete(project);
+                                              setDeleteDialogOpen(true);
+                                              setOpenDropdownId(null);
+                                            }}
+                                            className="gap-2 cursor-pointer text-red-400 focus:text-red-400"
+                                          >
+                                            <Trash className="w-5 h-5" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      {/* Load More Button */}
+                      {projectsByMonth.sortedMonths.length >
+                        visibleMonthsCount && (
+                        <div className="mt-4 pt-3 border-t border-white/10">
+                          <button
+                            onClick={() => {
+                              setVisibleMonthsCount((prev) => prev + 2); // Load 2 more months at a time
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
+                          >
+                            <CaretDown className="w-4 h-4" />
+                            <span>Load More Months</span>
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Contact Section */}
+            <div className="pt-6">
+              <button
+                onClick={() => {
+                  setOpenDropdownId(null);
+                  setShowContactDialog(true);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-white/60 hover:text-white hover:bg-white/[0.04]"
+              >
+                <Envelope className="w-4 h-4" />
+                Contact Support
+              </button>
+            </div>
+          </>
+        )}
+      </ScrollArea>
+
+      {/* Footer */}
+      <div className="px-3 py-4 border-t border-white/6">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => {
+              navigate("/profile");
+              if (isMobile) setMobileOpen(false);
+            }}
+            className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/4 transition-colors"
+          >
+            <UserAvatar
+              displayName={avatarProps.displayName}
+              imageUrl={avatarProps.imageUrl}
+            />
+            {!effectiveCollapsed && (
+              <span className="text-sm text-white/70 truncate max-w-30">
+                {user?.name || user?.email || "User"}
+              </span>
+            )}
+          </button>
+          {!effectiveCollapsed && (
+            <button className="p-2 rounded-lg hover:bg-white/4 text-white/40 hover:text-white transition-colors relative">
+              <Bell className="w-4 h-4" />
+            </button>
+          )}
         </div>
-      </aside>
+      </div>
+    </aside>
   );
 
   return (
@@ -1841,14 +1989,19 @@ function ProjectSidebarComponent({
               {isSearching ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <SpinnerGap className="w-5 h-5 animate-spin text-purple-400 mb-2" />
-                  <div className="text-sm text-white/50">Loading projects...</div>
+                  <div className="text-sm text-white/50">
+                    Loading projects...
+                  </div>
                 </div>
               ) : searchQuery.trim() === "" ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <MagnifyingGlass className="w-8 h-8 text-white/20 mb-3" />
-                  <div className="text-sm text-white/50">Type to search across your projects</div>
+                  <div className="text-sm text-white/50">
+                    Type to search across your projects
+                  </div>
                   <div className="text-xs text-white/30 mt-1">
-                    {searchResults.length > 0 && `${searchResults.length} project${searchResults.length !== 1 ? 's' : ''} available`}
+                    {searchResults.length > 0 &&
+                      `${searchResults.length} project${searchResults.length !== 1 ? "s" : ""} available`}
                   </div>
                 </div>
               ) : filteredSearchResults.length === 0 ? (
@@ -1862,7 +2015,8 @@ function ProjectSidebarComponent({
               ) : (
                 <div className="space-y-1">
                   <div className="px-3 py-1.5 text-xs font-medium text-white/40 uppercase tracking-wider">
-                    {filteredSearchResults.length} result{filteredSearchResults.length !== 1 ? 's' : ''}
+                    {filteredSearchResults.length} result
+                    {filteredSearchResults.length !== 1 ? "s" : ""}
                   </div>
                   {filteredSearchResults.map((project) => (
                     <button
@@ -1880,16 +2034,23 @@ function ProjectSidebarComponent({
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-white group-hover:text-purple-200 transition-colors break-words">
-                            {highlightText(project.title || "Untitled Project", searchQuery)}
+                            {highlightText(
+                              project.title || "Untitled Project",
+                              searchQuery,
+                            )}
                           </div>
                           {project.updatedAt && (
                             <div className="flex items-center gap-2 mt-1.5">
                               <div className="text-xs text-white/40">
-                                Updated {new Date(project.updatedAt).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric'
-                                })}
+                                Updated{" "}
+                                {new Date(project.updatedAt).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  },
+                                )}
                               </div>
                               {project.starred && (
                                 <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
@@ -1905,6 +2066,114 @@ function ProjectSidebarComponent({
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Contact Dialog */}
+      <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
+        <DialogContent className="bg-[#1a1a1a] border-white/10 sm:max-w-md">
+          {contactSuccess ? (
+            // Success State
+            <div className="py-8">
+              <div className="flex flex-col items-center justify-center text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <span className="text-4xl">✓</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-white mb-2">
+                    Message Sent!
+                  </h3>
+                  <p className="text-white/60 text-sm">
+                    We'll get back to you as soon as possible.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Form State
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleContactSubmit();
+              }}
+            >
+              <DialogHeader>
+                <DialogTitle className="text-white flex items-center gap-2">
+                  <Envelope className="w-5 h-5 text-purple-400" />
+                  Contact Support
+                </DialogTitle>
+                <DialogDescription className="text-white/50">
+                  Send us a message and we'll get back to you as soon as
+                  possible.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <div>
+                  <Label htmlFor="contact-title" className="text-white/70">
+                    Subject
+                  </Label>
+                  <Input
+                    id="contact-title"
+                    value={contactTitle}
+                    onChange={(e) => setContactTitle(e.target.value)}
+                    placeholder="What's this about?"
+                    className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                    autoFocus
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="contact-message" className="text-white/70">
+                    Message
+                  </Label>
+                  <Textarea
+                    id="contact-message"
+                    value={contactMessage}
+                    onChange={(e) => setContactMessage(e.target.value)}
+                    placeholder="Tell us more about your question or issue..."
+                    className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40 min-h-[120px]"
+                    required
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowContactDialog(false);
+                    setContactTitle("");
+                    setContactMessage("");
+                  }}
+                  disabled={isSendingContact}
+                  className="border-white/10 text-white hover:bg-white/5"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    !contactTitle.trim() ||
+                    !contactMessage.trim() ||
+                    isSendingContact
+                  }
+                  className="bg-purple-500 hover:bg-purple-600 text-white"
+                >
+                  {isSendingContact ? (
+                    <>
+                      <SpinnerGap className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <PaperPlaneTilt className="w-4 h-4 mr-2" />
+                      Send Message
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </>
