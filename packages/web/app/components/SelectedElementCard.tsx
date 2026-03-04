@@ -10,8 +10,7 @@ import {
   AccordionTrigger,
 } from "./ui/accordion";
 import { Button } from "./ui/button";
-import { Check, FloppyDisk } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { Check } from "@phosphor-icons/react";
 
 interface SelectedElementCardProps {
   info: any;
@@ -37,9 +36,6 @@ export default function SelectedElementCard({
     [info?.attributes, info?.tagName],
   );
   const computed = info?.styles || {};
-
-  // --- Save state ---
-  const [isSaving, setIsSaving] = useState(false);
 
   // --- Typography local state (preview-only, applied as inline styles in iframe) ---
   const [fontSize, setFontSize] = useState<string>("");
@@ -294,53 +290,8 @@ export default function SelectedElementCard({
     [info?.selector, info?.elementPath],
   );
 
-  const handleSave = useCallback(async () => {
-    if (!onSave) return;
-
-    setIsSaving(true);
-    try {
-      await onSave();
-      toast.success("Changes saved successfully!", {
-        description: "Your edits have been synced to R2.",
-      });
-    } catch (error) {
-      console.error("Failed to save changes:", error);
-      toast.error("Failed to save changes", {
-        description:
-          error instanceof Error
-            ? error.message
-            : "An error occurred while saving.",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  }, [onSave]);
-
   return (
     <div className="w-full text-foreground p-3 md:p-4">
-      {/* Save Button */}
-      {onSave && (
-        <div className="mb-4">
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200"
-          >
-            {isSaving ? (
-              <>
-                <span className="animate-spin mr-2">⏳</span>
-                Saving...
-              </>
-            ) : (
-              <>
-                <FloppyDisk className="w-4 h-4 mr-2" weight="bold" />
-                Save Changes to R2
-              </>
-            )}
-          </Button>
-        </div>
-      )}
-
       {/* Accordion Sections */}
       <div className="space-y-4">
         <Accordion
