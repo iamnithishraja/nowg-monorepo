@@ -2231,12 +2231,16 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                       <SelectTrigger className="w-[140px] bg-white/5 border-white/10 text-white">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#1a1a1a] border-white/10 max-h-[300px]">
+                      <SelectContent
+                        className="bg-[#1a1a1a] border-white/10 max-h-[300px] overflow-y-auto z-[9999]"
+                        position="popper"
+                        sideOffset={5}
+                      >
                         {countryCodes.map((country) => (
                           <SelectItem
                             key={country.code}
                             value={country.code}
-                            className="text-white hover:bg-white/5"
+                            className="text-white hover:bg-white/5 cursor-pointer"
                           >
                             {country.flag} {country.country} ({country.code})
                           </SelectItem>
@@ -2247,7 +2251,37 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                       id="contact-phone"
                       type="tel"
                       value={contactPhone}
-                      onChange={(e) => setContactPhone(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Only allow digits
+                        const digitsOnly = value.replace(/\D/g, "");
+                        // Limit to 10 digits
+                        const limited = digitsOnly.slice(0, 10);
+                        setContactPhone(limited);
+
+                        // Real-time validation
+                        if (limited.length > 0) {
+                          if (limited.length < 10) {
+                            setContactErrors((prev) => ({
+                              ...prev,
+                              phone: `Phone number must be exactly 10 digits (currently ${limited.length}/10)`,
+                            }));
+                          } else if (limited.length === 10) {
+                            setContactErrors((prev) => {
+                              const newErrors = { ...prev };
+                              delete newErrors.phone;
+                              return newErrors;
+                            });
+                          }
+                        } else {
+                          // Clear error when empty (optional field)
+                          setContactErrors((prev) => {
+                            const newErrors = { ...prev };
+                            delete newErrors.phone;
+                            return newErrors;
+                          });
+                        }
+                      }}
                       onBlur={(e) =>
                         validateField("phone", e.target.value.trim())
                       }
