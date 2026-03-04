@@ -1,12 +1,18 @@
-import { redirect } from "react-router";
+import { redirect, useNavigate } from "react-router";
 import { useState } from "react";
 import { Header } from "../components";
 import { ProjectSidebar } from "../components/ProjectSidebar";
 import Background from "../components/Background";
 import { Button } from "../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
+import { ArrowLeft } from "lucide-react";
 import { auth } from "../lib/auth";
 import type { Route } from "./+types/support";
 
@@ -26,11 +32,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Support - Nowgai" },
-    { name: "description", content: "Contact support via Gmail with your subject and message" },
+    {
+      name: "description",
+      content: "Contact support via Gmail with your subject and message",
+    },
   ];
 }
 
 export default function Support({ loaderData }: Route.ComponentProps) {
+  const navigate = useNavigate();
   const user = loaderData?.user;
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -58,6 +68,17 @@ export default function Support({ loaderData }: Route.ComponentProps) {
         <Background />
       </div>
 
+      {/* Persistent Back Button */}
+      <Button
+        onClick={() => navigate(-1)}
+        variant="ghost"
+        size="sm"
+        className="fixed top-20 left-72 z-50 bg-background/80 backdrop-blur-sm border border-border/60 hover:bg-background/90 transition-all shadow-lg"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back
+      </Button>
+
       {/* Left Sidebar - ProjectSidebar */}
       <ProjectSidebar user={user} className="flex-shrink-0" />
 
@@ -65,51 +86,58 @@ export default function Support({ loaderData }: Route.ComponentProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header showAuthButtons={false} showSidebarToggle={false} />
 
-          <main className="relative z-20 flex flex-col h-full overflow-hidden">
-            <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
-              <div className="max-w-3xl mx-auto p-[1px] rounded-2xl bg-gradient-to-b from-white/15 via-white/5 to-transparent">
-                <Card className="bg-background/70 backdrop-blur-xl border border-border/50 rounded-2xl shadow-xl shadow-black/30">
-                  <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-foreground">
-                      Contact Support
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <label className="text-sm text-muted-foreground">Subject</label>
-                      <Input
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        placeholder="Briefly describe your issue"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">Message</label>
-                      <Textarea
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        placeholder="Provide more details so we can help faster"
-                        rows={8}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div className="flex items-center gap-3 pt-2">
-                      <Button onClick={handleSend} disabled={isDisabled} className="min-w-28">
-                        Send
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      We’ll open a pre-filled email in Gmail. Review and send it from your account.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+        <main className="relative z-20 flex flex-col h-full overflow-hidden">
+          <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+            <div className="max-w-3xl mx-auto p-[1px] rounded-2xl bg-gradient-to-b from-white/15 via-white/5 to-transparent">
+              <Card className="bg-background/70 backdrop-blur-xl border border-border/50 rounded-2xl shadow-xl shadow-black/30">
+                <CardHeader>
+                  <CardTitle className="text-xl font-semibold text-foreground">
+                    Contact Support
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="text-sm text-muted-foreground">
+                      Subject
+                    </label>
+                    <Input
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      placeholder="Briefly describe your issue"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">
+                      Message
+                    </label>
+                    <Textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Provide more details so we can help faster"
+                      rows={8}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <Button
+                      onClick={handleSend}
+                      disabled={isDisabled}
+                      className="min-w-28"
+                    >
+                      Send
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    We’ll open a pre-filled email in Gmail. Review and send it
+                    from your account.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
-          </main>
-        </div>
+          </div>
+        </main>
       </div>
+    </div>
   );
 }
-
-
