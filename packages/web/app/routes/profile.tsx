@@ -1,11 +1,24 @@
-import { ArrowLeft, DollarSign, Link2, Link2Off, Loader2, Menu, Zap } from "lucide-react";
+import {
+  ArrowLeft,
+  DollarSign,
+  Link2,
+  Link2Off,
+  Loader2,
+  Menu,
+  Zap,
+} from "lucide-react";
 import { Link, redirect, useRevalidator } from "react-router";
 import { useState, useEffect } from "react";
 import GradientGlow from "../components/GradientGlow";
 import { ProjectSidebar } from "../components/ProjectSidebar";
 import { ContributionGraph } from "../components/ContributionGraph";
 import { Button } from "../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import { auth } from "../lib/auth";
 import { authClient } from "../lib/authClient";
 import { connectToDatabase } from "../lib/mongo";
@@ -17,11 +30,12 @@ import { ProfileAvatar } from "../components/profile/ProfileAvatar";
 import { ProfileBasicInfo } from "../components/profile/ProfileBasicInfo";
 import { ProfileSocialMediaForm } from "../components/profile/ProfileSocialMediaForm";
 import { ProfileLegalSection } from "../components/profile/ProfileLegalSection";
+import { ChangePasswordForm } from "../components/profile/ChangePasswordForm";
 import type { Route } from "./+types/profile";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { Profile: ProfileModel } = await import("@nowgai/shared/models");
-  
+
   const authInstance = await auth;
   const session = await authInstance.api.getSession({
     headers: request.headers,
@@ -56,7 +70,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Aggregate user messages by date (counts user activity/contributions)
   // This runs server-side in the loader for performance - avoids fetching all messages client-side
   let editData: Array<{ date: string; count: number }> = [];
-  
+
   try {
     editData = await Messages.aggregate([
       {
@@ -148,7 +162,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const { Profile: ProfileModel } = await import("@nowgai/shared/models");
-  
+
   const authInstance = await auth;
   const session = await authInstance.api.getSession({
     headers: request.headers,
@@ -173,7 +187,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     await connectToDatabase();
-    
+
     // Parse FormData (React Router sends FormData by default)
     const fd = await request.formData();
     const linkedin = fd.get("linkedin")?.toString() || "";
@@ -182,8 +196,9 @@ export async function action({ request }: Route.ActionArgs) {
     const discord = fd.get("discord")?.toString() || "";
     const portfolio = fd.get("portfolio")?.toString() || "";
     const bio = fd.get("bio")?.toString() || "";
-    const customUrls = fd.getAll("customUrls")
-      .map(url => url.toString())
+    const customUrls = fd
+      .getAll("customUrls")
+      .map((url) => url.toString())
       .filter((url) => url.trim());
 
     // Find or create profile
@@ -199,7 +214,9 @@ export async function action({ request }: Route.ActionArgs) {
     profile.discord = discord || "";
     profile.portfolio = portfolio || "";
     profile.bio = bio || "";
-    profile.customUrls = Array.isArray(customUrls) ? customUrls.filter((url: string) => url.trim()) : [];
+    profile.customUrls = Array.isArray(customUrls)
+      ? customUrls.filter((url: string) => url.trim())
+      : [];
     profile.lastUpdated = new Date();
 
     await profile.save();
@@ -213,7 +230,7 @@ export async function action({ request }: Route.ActionArgs) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -228,32 +245,68 @@ export function meta({}: Route.MetaArgs) {
 // Provider icons
 const GoogleIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    <path
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      fill="#4285F4"
+    />
+    <path
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      fill="#34A853"
+    />
+    <path
+      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      fill="#FBBC05"
+    />
+    <path
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      fill="#EA4335"
+    />
   </svg>
 );
 
 const GitHubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
   </svg>
 );
 
 const SupabaseIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 109 113" fill="none">
-    <path d="M63.7076 110.284C60.8481 113.885 55.0502 111.912 54.9813 107.314L53.9738 40.0627L99.1935 40.0627C107.384 40.0627 111.952 49.5228 106.859 55.9374L63.7076 110.284Z" fill="url(#paint0_linear)"/>
-    <path d="M63.7076 110.284C60.8481 113.885 55.0502 111.912 54.9813 107.314L53.9738 40.0627L99.1935 40.0627C107.384 40.0627 111.952 49.5228 106.859 55.9374L63.7076 110.284Z" fill="url(#paint1_linear)" fillOpacity="0.2"/>
-    <path d="M45.317 2.07103C48.1765 -1.53037 53.9745 0.442937 54.0434 5.041L54.4849 72.2922H9.83113C1.64038 72.2922 -2.92775 62.8321 2.1655 56.4175L45.317 2.07103Z" fill="#3ECF8E"/>
+    <path
+      d="M63.7076 110.284C60.8481 113.885 55.0502 111.912 54.9813 107.314L53.9738 40.0627L99.1935 40.0627C107.384 40.0627 111.952 49.5228 106.859 55.9374L63.7076 110.284Z"
+      fill="url(#paint0_linear)"
+    />
+    <path
+      d="M63.7076 110.284C60.8481 113.885 55.0502 111.912 54.9813 107.314L53.9738 40.0627L99.1935 40.0627C107.384 40.0627 111.952 49.5228 106.859 55.9374L63.7076 110.284Z"
+      fill="url(#paint1_linear)"
+      fillOpacity="0.2"
+    />
+    <path
+      d="M45.317 2.07103C48.1765 -1.53037 53.9745 0.442937 54.0434 5.041L54.4849 72.2922H9.83113C1.64038 72.2922 -2.92775 62.8321 2.1655 56.4175L45.317 2.07103Z"
+      fill="#3ECF8E"
+    />
     <defs>
-      <linearGradient id="paint0_linear" x1="53.9738" y1="54.974" x2="94.1635" y2="71.8295" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#249361"/>
-        <stop offset="1" stopColor="#3ECF8E"/>
+      <linearGradient
+        id="paint0_linear"
+        x1="53.9738"
+        y1="54.974"
+        x2="94.1635"
+        y2="71.8295"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop stopColor="#249361" />
+        <stop offset="1" stopColor="#3ECF8E" />
       </linearGradient>
-      <linearGradient id="paint1_linear" x1="36.1558" y1="30.578" x2="54.4844" y2="65.0806" gradientUnits="userSpaceOnUse">
-        <stop/>
-        <stop offset="1" stopOpacity="0"/>
+      <linearGradient
+        id="paint1_linear"
+        x1="36.1558"
+        y1="30.578"
+        x2="54.4844"
+        y2="65.0806"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop />
+        <stop offset="1" stopOpacity="0" />
       </linearGradient>
     </defs>
   </svg>
@@ -279,11 +332,13 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
   const revalidator = useRevalidator();
 
   // Connected accounts state
-  const [linkedAccounts, setLinkedAccounts] = useState<Array<{
-    id: string;
-    providerId: string;
-    accountId: string;
-  }>>([]);
+  const [linkedAccounts, setLinkedAccounts] = useState<
+    Array<{
+      id: string;
+      providerId: string;
+      accountId: string;
+    }>
+  >([]);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
 
@@ -353,11 +408,12 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
     revalidator.revalidate();
   };
 
-
   return (
     <div className="h-screen w-screen max-w-full bg-canvas text-white flex overflow-hidden">
       {/* Sidebar */}
-      <ProjectSidebar user={user ? { ...user, image: user.image ?? undefined } : undefined} />
+      <ProjectSidebar
+        user={user ? { ...user, image: user.image ?? undefined } : undefined}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col relative overflow-hidden min-w-0">
@@ -369,7 +425,9 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
           <div className="md:hidden flex items-center justify-between px-3 py-2 border-b border-border/30 shrink-0">
             <button
               type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("openProjectSidebar"))}
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent("openProjectSidebar"))
+              }
               className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-white/5 text-tertiary hover:text-primary transition-colors touch-manipulation"
               aria-label="Open menu"
             >
@@ -436,9 +494,11 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                       onNameUpdate={handleNameUpdate}
                     />
 
-                    <ProfileSocialMediaForm
-                      initialData={profile}
-                    />
+                    <ProfileSocialMediaForm initialData={profile} />
+
+                    <div className="pt-4 border-t border-subtle">
+                      <ChangePasswordForm />
+                    </div>
 
                     <ProfileLegalSection />
                   </CardContent>
@@ -500,7 +560,8 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                     Connected Services
                   </CardTitle>
                   <p className="text-sm text-tertiary mt-1">
-                    Services linked to your account for authentication and integrations
+                    Services linked to your account for authentication and
+                    integrations
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-0 px-3 sm:px-6 pb-4 sm:pb-6">
@@ -511,8 +572,12 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                         <GoogleIcon className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-primary">Google</p>
-                        <p className="text-xs text-tertiary truncate">Sign in with Google</p>
+                        <p className="text-sm font-medium text-primary">
+                          Google
+                        </p>
+                        <p className="text-xs text-tertiary truncate">
+                          Sign in with Google
+                        </p>
                       </div>
                     </div>
                     <div className="flex-shrink-0 sm:pl-2">
@@ -523,7 +588,9 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                       ) : isProviderLinked("google") ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 w-fit">
                           <Link2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          <span className="text-sm text-green-500">Connected</span>
+                          <span className="text-sm text-green-500">
+                            Connected
+                          </span>
                         </div>
                       ) : (
                         <Button
@@ -551,7 +618,9 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                         <GitHubIcon className="w-5 h-5 text-primary" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-primary">GitHub</p>
+                        <p className="text-sm font-medium text-primary">
+                          GitHub
+                        </p>
                         <p className="text-xs text-tertiary truncate">
                           {isProviderLinked("github") || hasGitHubConnected
                             ? "Sign in & repository access"
@@ -567,7 +636,9 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                       ) : isProviderLinked("github") || hasGitHubConnected ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 w-fit">
                           <Link2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          <span className="text-sm text-green-500">Connected</span>
+                          <span className="text-sm text-green-500">
+                            Connected
+                          </span>
                         </div>
                       ) : (
                         <Button
@@ -595,7 +666,9 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                         <SupabaseIcon className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-primary">Supabase</p>
+                        <p className="text-sm font-medium text-primary">
+                          Supabase
+                        </p>
                         <p className="text-xs text-tertiary truncate">
                           {hasSupabaseConnected && supabaseUser?.email
                             ? supabaseUser.email
@@ -645,7 +718,3 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
     </div>
   );
 }
-
-
-
-
