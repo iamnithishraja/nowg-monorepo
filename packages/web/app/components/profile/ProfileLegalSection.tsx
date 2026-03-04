@@ -14,6 +14,18 @@ export function ProfileLegalSection() {
           Privacy Policy
         </Link>
         <Link
+          to="/terms-and-conditions"
+          className="text-sm text-tertiary hover:text-primary transition-colors underline underline-offset-2"
+        >
+          Terms and Conditions
+        </Link>
+        <Link
+          to="/refund-policy"
+          className="text-sm text-tertiary hover:text-primary transition-colors underline underline-offset-2"
+        >
+          Refund Policy
+        </Link>
+        <Link
           to="/EULA"
           className="text-sm text-tertiary hover:text-primary transition-colors underline underline-offset-2"
         >

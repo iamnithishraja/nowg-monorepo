@@ -27,6 +27,13 @@ export default function SignUp() {
         <p className="text-xs text-white/40 text-center">
           By creating an account, you agree to our{" "}
           <Link
+            to="/terms-and-conditions"
+            className="text-white/60 hover:text-white underline underline-offset-2 transition-colors"
+          >
+            Terms and Conditions
+          </Link>
+          {" "}and{" "}
+          <Link
             to="/privacy-policy"
             className="text-white/60 hover:text-white underline underline-offset-2 transition-colors"
           >
