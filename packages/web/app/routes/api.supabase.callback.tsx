@@ -87,7 +87,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     await connectToDatabase();
 
     // Get the origin from the request to construct the redirect URI dynamically
-    const origin = url.origin;
+    // Check for X-Forwarded-Proto header to determine the correct protocol
+    // This is important when behind a reverse proxy that terminates SSL
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+    const protocol = forwardedProto || url.protocol.replace(":", "");
+    const host = request.headers.get("x-forwarded-host") || url.host;
+    const origin = `${protocol}://${host}`;
     const redirectUri = `${origin}/api/supabase/callback`;
 
     const supabaseManager = new SupabaseOAuthManager(redirectUri);
@@ -111,7 +116,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         lastUsedAt: new Date(),
         $setOnInsert: { connectedAt: new Date() },
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     // Clear state cookie
@@ -129,7 +134,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       status: 302,
       headers: {
         Location: `/?supabase_error=${encodeURIComponent(
-          error instanceof Error ? error.message : "oauth_callback_failed"
+          error instanceof Error ? error.message : "oauth_callback_failed",
         )}`,
       },
     });

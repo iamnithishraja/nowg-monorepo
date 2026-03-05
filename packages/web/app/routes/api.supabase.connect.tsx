@@ -21,7 +21,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (!session?.user?.id) {
       return new Response(
         JSON.stringify({ error: "Authentication required" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
+        { status: 401, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -30,7 +30,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     // Get the origin from the request to construct the redirect URI dynamically
     const url = new URL(request.url);
-    const origin = url.origin;
+
+    // Check for X-Forwarded-Proto header to determine the correct protocol
+    // This is important when behind a reverse proxy that terminates SSL
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+    const protocol = forwardedProto || url.protocol.replace(":", "");
+    const host = request.headers.get("x-forwarded-host") || url.host;
+    const origin = `${protocol}://${host}`;
     const redirectUri = `${origin}/api/supabase/callback`;
 
     const supabaseManager = new SupabaseOAuthManager(redirectUri);
@@ -41,7 +47,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     // Debug logging
     const clientId = getEnv("SUPABASE_OAUTH_CLIENT_ID") || "";
-   // Redirect to Supabase OAuth
+    // Redirect to Supabase OAuth
     return new Response(null, {
       status: 302,
       headers: {
@@ -53,7 +59,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     console.error("Error initiating Supabase OAuth:", error);
     return new Response(
       JSON.stringify({ error: "Failed to initiate Supabase connection" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 }
