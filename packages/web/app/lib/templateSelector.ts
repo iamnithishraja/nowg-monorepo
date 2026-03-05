@@ -1,7 +1,7 @@
-import JSZip from 'jszip';
-import { GitHubRepoImporter } from './githubRepo';
-import { getEnv, getEnvWithDefault } from './env';
-import { PROVIDER_MAINTENANCE_MESSAGE } from './utils.server';
+import JSZip from "jszip";
+import { GitHubRepoImporter } from "./githubRepo";
+import { getEnv, getEnvWithDefault } from "./env";
+import { PROVIDER_MAINTENANCE_MESSAGE } from "./utils.server";
 
 // Template definitions
 interface Template {
@@ -16,12 +16,13 @@ interface Template {
 // Available starter templates - React only
 const STARTER_TEMPLATES: Template[] = [
   {
-    name: 'Vite React',
-    label: 'React + Vite + TypeScript',
-    description: 'React starter template powered by Vite for fast development experience',
-    githubRepo: 'nithish932/bolt-vite-react-ts-template',
-    tags: ['react', 'vite', 'frontend', 'website', 'app', 'typescript'],
-    icon: 'i-bolt:react',
+    name: "Vite React",
+    label: "React + Vite + TypeScript",
+    description:
+      "React starter template powered by Vite for fast development experience",
+    githubRepo: "nithish932/bolt-vite-react-ts-template",
+    tags: ["react", "vite", "frontend", "website", "app", "typescript"],
+    icon: "i-bolt:react",
   },
 ];
 
@@ -75,6 +76,11 @@ This platform ONLY generates React applications using Vite and TypeScript.
 
 Available templates:
 <template>
+  <name>invalid</name>
+  <description>Use this when the user input is gibberish, random characters, meaningless text, or not a valid project description</description>
+  <tags>invalid, gibberish, random, meaningless</tags>
+</template>
+<template>
   <name>blank</name>
   <description>Empty starter for simple scripts and trivial tasks that don't require a full template setup</description>
   <tags>basic, script</tags>
@@ -88,7 +94,7 @@ Available templates:
 Response Format:
 <selection>
   <templateName>{selected template name}</templateName>
-  <title>{a proper title for the project}</title>
+  <title>{a proper title for the project OR "Invalid Input" if gibberish}</title>
 </selection>
 
 Examples:
@@ -111,11 +117,30 @@ Response:
 </selection>
 </example>
 
+<example>
+User: afhhjhjkji
+Response:
+<selection>
+  <templateName>invalid</templateName>
+  <title>Invalid Input</title>
+</selection>
+</example>
+
+<example>
+User: asdfghjkl qwerty zxcvbn
+Response:
+<selection>
+  <templateName>invalid</templateName>
+  <title>Invalid Input</title>
+</selection>
+</example>
+
 Instructions:
-1. For trivial tasks and simple scripts, always recommend the blank template
-2. For any web application, UI, or frontend project, ALWAYS use "Vite React" template
-3. Follow the exact XML format
-4. This platform only supports React - do not suggest any other frameworks
+1. FIRST check if the input is gibberish, random characters, or meaningless text - if so, use "invalid" template
+2. For trivial tasks and simple scripts, always recommend the blank template
+3. For any web application, UI, or frontend project, ALWAYS use "Vite React" template
+4. Follow the exact XML format
+5. This platform only supports React - do not suggest any other frameworks
 
 Important: Provide only the selection tags in your response, no additional text.
 MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH 
@@ -128,7 +153,7 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
   private parseTemplateSelection(llmOutput: string): TemplateSelection | null {
     try {
       const templateNameMatch = llmOutput.match(
-        /<templateName>(.*?)<\/templateName>/
+        /<templateName>(.*?)<\/templateName>/,
       );
       const titleMatch = llmOutput.match(/<title>(.*?)<\/title>/);
 
@@ -152,13 +177,12 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
   private async callLLMForTemplateSelection(
     message: string,
     model: string = "anthropic/claude-4.5-sonnet",
-    apiKey?: string
+    apiKey?: string,
   ): Promise<TemplateSelection> {
     const templates = STARTER_TEMPLATES;
     const systemPrompt = this.createTemplateSelectionPrompt(templates);
 
     if (!apiKey) {
-
       return {
         template: "blank",
         title: "Untitled Project",
@@ -173,8 +197,10 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
           headers: {
             Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer":
-              getEnvWithDefault("OPENROUTER_SITE_URL", "http://localhost:5173"),
+            "HTTP-Referer": getEnvWithDefault(
+              "OPENROUTER_SITE_URL",
+              "http://localhost:5173",
+            ),
             "X-Title": getEnvWithDefault("OPENROUTER_SITE_NAME", "Nowgai"),
           },
           body: JSON.stringify({
@@ -192,7 +218,7 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
             temperature: 0.7,
             max_tokens: 1000,
           }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -216,7 +242,10 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
         };
       }
     } catch (error) {
-      if (error instanceof Error && error.message === PROVIDER_MAINTENANCE_MESSAGE) {
+      if (
+        error instanceof Error &&
+        error.message === PROVIDER_MAINTENANCE_MESSAGE
+      ) {
         throw error;
       }
       console.error("Error calling OpenRouter:", error);
@@ -230,7 +259,9 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
   /**
    * Fetches files from GitHub repository using GitHubRepoImporter
    */
-  private async fetchGitHubRepoContent(repoUrl: string): Promise<FileContent[]> {
+  private async fetchGitHubRepoContent(
+    repoUrl: string,
+  ): Promise<FileContent[]> {
     try {
       const importer = new GitHubRepoImporter({
         githubToken: this.config.githubToken,
@@ -238,14 +269,14 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
       });
 
       const result = await importer.importRepository(repoUrl);
-      
+
       if (!result.success) {
-        throw new Error(result.error || 'Failed to import repository');
+        throw new Error(result.error || "Failed to import repository");
       }
 
       // Convert to FileContent format
-      return result.files.map(file => ({
-        name: file.path.split('/').pop() || '',
+      return result.files.map((file) => ({
+        name: file.path.split("/").pop() || "",
         path: file.path,
         content: file.content,
       }));
@@ -261,16 +292,28 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
   async selectAndCloneTemplate(
     userPrompt: string,
     model: string = "anthropic/claude-4.5-sonnet",
-    apiKey?: string
+    apiKey?: string,
   ): Promise<TemplateResult> {
     // Step 1: Select template using LLM
     const selection = await this.callLLMForTemplateSelection(
       userPrompt,
       model,
-      apiKey
+      apiKey,
     );
 
-    // Step 2: Handle blank template
+    // Step 2: Handle invalid input
+    if (selection.template === "invalid") {
+      return {
+        assistantMessage:
+          "Please enter a valid project description. Your input doesn't appear to be a meaningful request.",
+        userMessage: "",
+        files: [],
+        repositoryUrl: undefined,
+        templateName: "invalid",
+      };
+    }
+
+    // Step 3: Handle blank template
     if (selection.template === "blank") {
       return {
         assistantMessage: "Starting with a blank project.",
@@ -282,26 +325,26 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
       };
     }
 
-    // Step 3: Find the selected template
+    // Step 4: Find the selected template
     const template = STARTER_TEMPLATES.find(
-      (t) => t.name === selection.template
+      (t) => t.name === selection.template,
     );
 
     if (!template) {
       throw new Error(`Template not found: ${selection.template}`);
     }
 
-    // Step 4: Fetch files from GitHub
+    // Step 5: Fetch files from GitHub
     const githubUrl = `https://github.com/${template.githubRepo}`;
     const files = await this.fetchGitHubRepoContent(githubUrl);
 
-    // Step 5: Filter files
+    // Step 6: Filter files
     let filteredFiles = files.filter((x) => !x.path.startsWith(".git"));
     filteredFiles = filteredFiles.filter((x) => !x.path.startsWith(".bolt"));
 
-    // Step 6: Check for ignore file in .bolt folder
+    // Step 7: Check for ignore file in .bolt folder
     const templateIgnoreFile = files.find(
-      (x) => x.path.startsWith(".bolt") && x.name === "ignore"
+      (x) => x.path.startsWith(".bolt") && x.name === "ignore",
     );
     const ignoredFiles: FileContent[] = [];
 
@@ -312,12 +355,12 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
       // Simple pattern matching (you might want to use a proper ignore library)
       ignoredFiles.push(
         ...filteredFiles.filter((file) =>
-          ignorePatterns.some((pattern) => file.path.includes(pattern))
-        )
+          ignorePatterns.some((pattern) => file.path.includes(pattern)),
+        ),
       );
     }
 
-    // Step 7: Create messages
+    // Step 8: Create messages
     const assistantMessage = `
 Nowgai is initializing your project with the required files using the ${
       template.name
@@ -330,7 +373,7 @@ ${filteredFiles
     (file) =>
       `<nowgaiAction type="file" filePath="${file.path}">
 ${file.content}
-</nowgaiAction>`
+</nowgaiAction>`,
   )
   .join("\n")}
 </nowgaiArtifact>
@@ -338,7 +381,7 @@ ${file.content}
 
     let templateUserMessage = "";
     const templatePromptFile = files.find(
-      (x) => x.path.startsWith(".bolt") && x.name === "prompt"
+      (x) => x.path.startsWith(".bolt") && x.name === "prompt",
     );
 
     if (templatePromptFile) {
@@ -409,7 +452,7 @@ IMPORTANT: Don't Forget to install the dependencies before running the app by us
    */
   async cloneTemplateByName(
     templateName: string,
-    title?: string
+    title?: string,
   ): Promise<TemplateResult> {
     const template = STARTER_TEMPLATES.find((t) => t.name === templateName);
 
@@ -419,8 +462,8 @@ IMPORTANT: Don't Forget to install the dependencies before running the app by us
 
     const githubUrl = `https://github.com/${template.githubRepo}`;
     const files = await this.fetchGitHubRepoContent(githubUrl);
-    let filteredFiles = files.filter((x) => !x.path.startsWith('.git'));
-    filteredFiles = filteredFiles.filter((x) => !x.path.startsWith('.bolt'));
+    let filteredFiles = files.filter((x) => !x.path.startsWith(".git"));
+    filteredFiles = filteredFiles.filter((x) => !x.path.startsWith(".bolt"));
 
     const assistantMessage = `
 Nowgai is initializing your project with the required files using the ${
@@ -434,7 +477,7 @@ ${filteredFiles
     (file) =>
       `<nowgaiAction type="file" filePath="${file.path}">
 ${file.content}
-</nowgaiAction>`
+</nowgaiAction>`,
   )
   .join("\n")}
 </nowgaiArtifact>
@@ -453,5 +496,10 @@ ${file.content}
 
 // Export the class and types
 export { TemplateSelector, STARTER_TEMPLATES };
-export type { Template, TemplateSelection, FileContent, TemplateResult, TemplateSelectorConfig };
-
+export type {
+  Template,
+  TemplateSelection,
+  FileContent,
+  TemplateResult,
+  TemplateSelectorConfig,
+};

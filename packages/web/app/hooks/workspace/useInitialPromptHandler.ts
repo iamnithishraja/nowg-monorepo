@@ -20,7 +20,7 @@ interface InitialPromptDeps {
     followupMessage?: string;
   };
   handleTemplateFiles: (
-    files: Array<{ name?: string; path: string; content: string }>
+    files: Array<{ name?: string; path: string; content: string }>,
   ) => Promise<void>;
   handleStreamingResponseWrapper: (response: Response) => Promise<void>;
   isMountedRef: React.RefObject<boolean>;
@@ -58,7 +58,7 @@ export function useInitialPromptHandler({
     async (
       messageContent: string,
       currentConversationId?: string,
-      displayMessage?: string
+      displayMessage?: string,
     ) => {
       if (!messageContent.trim() || chat.isLoading) return;
 
@@ -216,7 +216,7 @@ export function useInitialPromptHandler({
             getUploadedFiles ? getUploadedFiles() : undefined,
             designScheme,
             figmaUrl,
-            enableFigmaMCP
+            enableFigmaMCP,
           );
 
           // Clear uploaded files state immediately after sending
@@ -244,7 +244,7 @@ export function useInitialPromptHandler({
         const templateData = await (selectTemplate as any)(
           messageContent,
           effectiveModel,
-          hasImages ? "Vite React" : undefined
+          hasImages ? "Vite React" : undefined,
         );
 
         if (
@@ -258,7 +258,7 @@ export function useInitialPromptHandler({
                 name: f.name ?? (f.path.split("/").pop() || f.path),
                 path: f.path,
                 content: f.content,
-              })
+              }),
             );
             if (files && typeof files.setupTemplateFiles === "function") {
               files.setupTemplateFiles(normalizedPrime);
@@ -278,7 +278,7 @@ export function useInitialPromptHandler({
           // Extract project title from template assistant message
           if (templateData.assistantMessage && (chat as any).setProjectTitle) {
             const artifactMatch = templateData.assistantMessage.match(
-              /<nowgaiArtifact[^>]*title="([^"]*)"/i
+              /<nowgaiArtifact[^>]*title="([^"]*)"/i,
             );
             if (artifactMatch && artifactMatch[1]) {
               (chat as any).setProjectTitle(artifactMatch[1], isMountedRef);
@@ -338,7 +338,7 @@ export function useInitialPromptHandler({
           // so uploaded images are attached correctly on first send
           const historyExcludingPlaceholder =
             (chat as any).messages?.filter?.(
-              (m: any) => m.id !== placeholderId
+              (m: any) => m.id !== placeholderId,
             ) || [];
 
           // Ensure the template artifact message is present before the user message
@@ -365,7 +365,7 @@ export function useInitialPromptHandler({
             getUploadedFiles ? getUploadedFiles() : undefined,
             designScheme,
             figmaUrl,
-            enableFigmaMCP
+            enableFigmaMCP,
           );
 
           // Clear uploaded files state immediately after sending
@@ -383,6 +383,40 @@ export function useInitialPromptHandler({
           // Clean up uploaded files from IndexedDB after successful send
           await cleanupUploadedFiles(activeConversationId);
         } else {
+          // Check if the input was detected as invalid/gibberish
+          if (templateData.templateName === "invalid") {
+            // Update conversation title to "Invalid Input"
+            if (activeConversationId) {
+              try {
+                await fetch("/api/conversations", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: "updateTitle",
+                    conversationId: activeConversationId,
+                    title: "Invalid Input",
+                  }),
+                });
+              } catch (titleError) {
+                console.error("Error updating conversation title:", titleError);
+              }
+            }
+
+            // Show error message and don't proceed with chat
+            const errorMessage: Message = {
+              id: `assistant-error-${Date.now()}`,
+              role: "assistant",
+              content:
+                templateData.assistantMessage ||
+                "Please enter a valid project description. Your input doesn't appear to be a meaningful request.",
+            };
+            chat.addMessage(errorMessage, isMountedRef);
+            // Reset states and return early - don't continue with chat
+            setIsProcessingTemplate(false);
+            chat.setIsLoading(false);
+            return;
+          }
+
           const fallbackMessage: Message = {
             id: `assistant-fallback-${Date.now()}`,
             role: "assistant",
@@ -444,7 +478,7 @@ export function useInitialPromptHandler({
       clearUploadedFiles,
       figmaUrl,
       enableFigmaMCP,
-    ]
+    ],
   );
 
   return { handleInitialPrompt };
