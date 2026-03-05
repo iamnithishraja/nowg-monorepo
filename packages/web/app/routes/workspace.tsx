@@ -2,6 +2,7 @@ import {
   ArrowUp,
   Check,
   Database,
+  DownloadSimple,
   Gear,
   GithubLogo,
   List,
@@ -21,6 +22,7 @@ import {
   DatabaseConnectionDialog,
   type DbProvider,
 } from "../components/DatabaseConnectionDialog";
+import { DownloadModal } from "../components/DownloadModal";
 import FigmaImportModal from "../components/FigmaImportModal";
 import { FilePreview } from "../components/FileUpload";
 import GitHubImportModal from "../components/GitHubImportModal";
@@ -56,6 +58,8 @@ import { usePreventBrowserDragDrop } from "../hooks/usePreventBrowserDragDrop";
 import { useSupabaseAuth } from "../hooks/useSupabaseAuth";
 import { useWorkspaceController } from "../hooks/useWorkspaceController";
 import { auth } from "../lib/auth";
+import { downloadCodebaseAsZip, getProjectName } from "../lib/downloadCodebase";
+import { downloadMessagesAsHTML } from "../lib/downloadMessages";
 import { cn } from "../lib/utils";
 import {
   useIsReconstructingFiles,
@@ -122,6 +126,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
   const [currentChatTitle, setCurrentChatTitle] = useState<string | null>(null);
   const chatTitlePollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isCreatingNewChat, setIsCreatingNewChat] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const {
     hasSupabaseConnected,
@@ -448,11 +454,16 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
           if (!aborted) {
             setUserBalance(data.balance);
             // Show persistent modal if balance is 0 or less
-            if (data.balance !== null && data.balance <= 0 && !data.isWhitelisted) {
+            if (
+              data.balance !== null &&
+              data.balance <= 0 &&
+              !data.isWhitelisted
+            ) {
               setIsPersistentModal(true);
               setShowInsufficientBalanceModal(true);
               setErrorData({
-                error: "Your credits are exhausted. Please recharge to continue using the workspace.",
+                error:
+                  "Your credits are exhausted. Please recharge to continue using the workspace.",
                 errorType: "insufficient_balance",
                 balance: data.balance,
                 requiresRecharge: true,
@@ -468,11 +479,11 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
         }
       }
     };
-    
+
     if (user) {
       fetchBalance();
     }
-    
+
     return () => {
       aborted = true;
     };
@@ -537,6 +548,80 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
       setShowDatabaseDialog(true);
     }
   };
+
+  // Handle download codebase
+  const handleDownloadCodebase = useCallback(async () => {
+    if (controller.templateFilesState.length === 0) {
+      alert("No files to download. Create some files first!");
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+      const projectName = getProjectName(
+        controller.conversationTitle || undefined,
+      );
+      await downloadCodebaseAsZip(controller.templateFilesState, projectName);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert(
+        error instanceof Error ? error.message : "Failed to download codebase",
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [controller.templateFilesState, controller.conversationTitle]);
+
+  // Handle download messages
+  const handleDownloadMessages = useCallback(() => {
+    if (controller.messages.length === 0) {
+      alert("No messages to download.");
+      return;
+    }
+
+    try {
+      downloadMessagesAsHTML(
+        controller.messages,
+        controller.conversationTitle || undefined,
+        controller.conversationId || undefined,
+        currentChatId || undefined,
+      );
+    } catch (error) {
+      console.error("Failed to download messages:", error);
+      alert(
+        error instanceof Error ? error.message : "Failed to download messages",
+      );
+    }
+  }, [
+    controller.messages,
+    controller.conversationTitle,
+    controller.conversationId,
+    currentChatId,
+  ]);
+
+  // Handle download button click
+  const handleDownloadClick = useCallback(() => {
+    const hasCodebase = controller.templateFilesState.length > 0;
+    const hasMessages = controller.messages.length > 0;
+
+    if (hasCodebase && hasMessages) {
+      // Show modal to choose
+      setShowDownloadModal(true);
+    } else if (hasCodebase) {
+      // Only codebase, download directly
+      handleDownloadCodebase();
+    } else if (hasMessages) {
+      // Only messages, download directly
+      handleDownloadMessages();
+    } else {
+      alert("No files or messages to download.");
+    }
+  }, [
+    controller.templateFilesState.length,
+    controller.messages.length,
+    handleDownloadCodebase,
+    handleDownloadMessages,
+  ]);
 
   // Handle database provider selection from dialog
   const handleSelectDbProvider = async (provider: DbProvider) => {
@@ -867,6 +952,27 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                       </div>
                     )}
 
+                    {/* Download Button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-3 rounded-lg text-white/70 hover:text-white hover:bg-white/[0.08] text-xs font-medium flex items-center gap-1.5 bg-white/[0.03] border border-white/[0.06]"
+                      onClick={handleDownloadClick}
+                      disabled={
+                        isDownloading ||
+                        (controller.templateFilesState.length === 0 &&
+                          controller.messages.length === 0)
+                      }
+                    >
+                      <DownloadSimple
+                        className="w-4 h-4 text-blue-400"
+                        weight="bold"
+                      />
+                      <span className="text-xs text-white/60">
+                        {isDownloading ? "Downloading..." : "Download"}
+                      </span>
+                    </Button>
+
                     {/* Color Scheme Toggle */}
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
                       <Palette
@@ -1187,7 +1293,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                   </div>
                   {/* Bottom Section with Balance and Input */}
                   <div className="shrink-0 bg-canvas">
-                    {/* Database Toggle */}
+                    {/* Database Toggle and Download */}
                     <div className="px-3 pb-2 flex items-center gap-3">
                       {selectedDbProvider !== null ? (
                         // Database enabled - show checkmark
@@ -1218,6 +1324,27 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                           />
                         </div>
                       )}
+
+                      {/* Download Button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 rounded-lg text-white/70 hover:text-white hover:bg-white/[0.08] text-xs font-medium flex items-center gap-1.5 bg-white/[0.03] border border-white/[0.06]"
+                        onClick={handleDownloadClick}
+                        disabled={
+                          isDownloading ||
+                          (controller.templateFilesState.length === 0 &&
+                            controller.messages.length === 0)
+                        }
+                      >
+                        <DownloadSimple
+                          className="w-3.5 h-3.5 text-blue-400"
+                          weight="bold"
+                        />
+                        <span className="text-xs text-white/60">
+                          {isDownloading ? "..." : "Download"}
+                        </span>
+                      </Button>
                     </div>
 
                     {/* Chat Input */}
@@ -1357,6 +1484,15 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
         onSelectProvider={handleSelectDbProvider}
         isProvisioningNeon={isProvisioningNeon}
         isNeonAvailable={true}
+      />
+
+      {/* Download Modal */}
+      <DownloadModal
+        open={showDownloadModal}
+        onOpenChange={setShowDownloadModal}
+        onDownloadCodebase={handleDownloadCodebase}
+        onDownloadMessages={handleDownloadMessages}
+        hasCodebase={controller.templateFilesState.length > 0}
       />
     </div>
   );

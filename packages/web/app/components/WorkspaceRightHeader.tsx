@@ -12,7 +12,6 @@ import {
   CurrencyDollar,
   Database,
   DeviceMobile,
-  Download,
   GitBranch,
   GithubLogo,
   Globe,
@@ -20,7 +19,7 @@ import {
   Shield,
   SignOut,
   User as UserIcon,
-  Users
+  Users,
 } from "@phosphor-icons/react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router";
@@ -30,13 +29,9 @@ import { useGitHubRepository } from "~/hooks/useGitHubRepository";
 import { authClient } from "../lib/authClient";
 import { cn } from "../lib/utils";
 import { useIsSyncingToR2 } from "../stores/useWorkspaceStore";
-import { downloadCodebaseAsZip, getProjectName } from "../lib/downloadCodebase";
-import { downloadMessagesAsHTML } from "../lib/downloadMessages";
 import { UnifiedDeploymentDialog, useDeployDialog } from "./DeployDialog";
 import { GitHubDeleteDialog } from "./github/GitHubDeleteDialog";
 import { GitHubRepositoryDialog } from "./github/GitHubRepositoryDialog";
-import { DownloadModal } from "./DownloadModal";
-import type { Message } from "../types/chat";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -122,14 +117,6 @@ interface WorkspaceRightHeaderProps {
   onGoToLatest?: () => void;
   /** Whether restoring a version */
   isRestoringVersion?: boolean;
-  /** Files to download */
-  templateFilesState?: FileItem[];
-  /** Conversation title for download filename */
-  conversationTitle?: string;
-  /** Messages for downloading chat history */
-  messages?: Message[];
-  /** Chat ID for downloading messages */
-  chatId?: string;
 }
 
 export function WorkspaceRightHeader({
@@ -145,10 +132,6 @@ export function WorkspaceRightHeader({
   onRevertToVersion,
   onGoToLatest,
   isRestoringVersion = false,
-  templateFilesState = [],
-  conversationTitle,
-  messages = [],
-  chatId,
 }: WorkspaceRightHeaderProps) {
   const navigate = useNavigate();
   const [user, setUser] = useState<any | null>(null);
@@ -157,9 +140,7 @@ export function WorkspaceRightHeader({
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
   const [showGitHubDeleteDialog, setShowGitHubDeleteDialog] = useState(false);
   const [isGitHubDeleting, setIsGitHubDeleting] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
-  
+
   // R2 sync status
   const isSyncingToR2 = useIsSyncingToR2();
 
@@ -204,7 +185,7 @@ export function WorkspaceRightHeader({
     conversationId,
     messageCount,
     currentVersionId,
-    versions.length
+    versions.length,
   );
 
   const [userWithAccess, setUserWithAccess] = useState<any | null>(null);
@@ -309,7 +290,7 @@ export function WorkspaceRightHeader({
   const handleDeploy = (
     provider: "vercel" | "netlify",
     updateExisting = false,
-    versionId?: string
+    versionId?: string,
   ) => {
     if (versionId) {
       deployVersion(versionId, provider);
@@ -331,13 +312,13 @@ export function WorkspaceRightHeader({
   const handleCreateRepository = async (
     repoName: string,
     description: string,
-    isPrivate: boolean
+    isPrivate: boolean,
   ) => {
     const result = await createRepository(
       repoName,
       description,
       isPrivate,
-      githubToken
+      githubToken,
     );
     if (result) {
       setGithubToken("");
@@ -374,62 +355,6 @@ export function WorkspaceRightHeader({
     setShowGitHubDialog(false);
     clearGitHubMessages();
   };
-
-  const handleDownloadCodebase = useCallback(async () => {
-    if (templateFilesState.length === 0) {
-      alert("No files to download. Create some files first!");
-      return;
-    }
-
-    try {
-      setIsDownloading(true);
-      const projectName = getProjectName(conversationTitle);
-      await downloadCodebaseAsZip(templateFilesState, projectName);
-    } catch (error) {
-      console.error("Download failed:", error);
-      alert(
-        error instanceof Error ? error.message : "Failed to download codebase"
-      );
-    } finally {
-      setIsDownloading(false);
-    }
-  }, [templateFilesState, conversationTitle]);
-
-  const handleDownloadMessages = useCallback(() => {
-    if (messages.length === 0) {
-      alert("No messages to download.");
-      return;
-    }
-
-    try {
-      downloadMessagesAsHTML(messages, conversationTitle, conversationId, chatId);
-    } catch (error) {
-      console.error("Failed to download messages:", error);
-      alert(
-        error instanceof Error ? error.message : "Failed to download messages"
-      );
-    }
-  }, [messages, conversationTitle, conversationId, chatId]);
-
-  const handleDownloadClick = useCallback(() => {
-    // Show modal if we have both codebase and messages, or just messages
-    // If only codebase exists, download directly (for backwards compatibility)
-    const hasCodebase = templateFilesState.length > 0;
-    const hasMessages = messages.length > 0;
-
-    if (hasCodebase && hasMessages) {
-      // Show modal to choose
-      setShowDownloadModal(true);
-    } else if (hasCodebase) {
-      // Only codebase, download directly
-      handleDownloadCodebase();
-    } else if (hasMessages) {
-      // Only messages, download directly
-      handleDownloadMessages();
-    } else {
-      alert("No files or messages to download.");
-    }
-  }, [templateFilesState.length, messages.length, handleDownloadCodebase, handleDownloadMessages]);
 
   const hasRepository = repositoryStatus?.hasRepository || false;
   const isSynced = repositoryStatus?.isSynced !== false;
@@ -513,7 +438,7 @@ export function WorkspaceRightHeader({
                 "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all border",
                 activeTab === "preview"
                   ? "border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[#1a1a1a]/80"
-                  : "border-transparent text-white/60 hover:text-white"
+                  : "border-transparent text-white/60 hover:text-white",
               )}
             >
               <Globe className="w-3.5 h-3.5" />
@@ -525,7 +450,7 @@ export function WorkspaceRightHeader({
                 "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all border",
                 activeTab === "files"
                   ? "border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[#1a1a1a]/80"
-                  : "border-transparent text-white/60 hover:text-white"
+                  : "border-transparent text-white/60 hover:text-white",
               )}
             >
               <Code className="w-3.5 h-3.5" />
@@ -557,7 +482,7 @@ export function WorkspaceRightHeader({
                   window.dispatchEvent(
                     new CustomEvent("preview-control", {
                       detail: { action: "refresh" },
-                    })
+                    }),
                   )
                 }
                 className="p-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
@@ -570,7 +495,7 @@ export function WorkspaceRightHeader({
                   window.dispatchEvent(
                     new CustomEvent("preview-control", {
                       detail: { action: "toggleDeviceMode" },
-                    })
+                    }),
                   )
                 }
                 className="p-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
@@ -583,7 +508,7 @@ export function WorkspaceRightHeader({
                   window.dispatchEvent(
                     new CustomEvent("preview-control", {
                       detail: { action: "toggleFullscreen" },
-                    })
+                    }),
                   )
                 }
                 className="p-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
@@ -597,12 +522,13 @@ export function WorkspaceRightHeader({
 
         {/* Right: Deploy, Share, Avatar */}
         <div className="flex items-center gap-2">
-
           {/* R2 Sync Indicator - shows when syncing files to cloud */}
           {isSyncingToR2 && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/15 border border-violet-500/30 animate-pulse">
               <CloudArrowUp className="w-4 h-4 text-violet-400" weight="bold" />
-              <span className="text-xs text-violet-300 font-medium">Syncing to cloud...</span>
+              <span className="text-xs text-violet-300 font-medium">
+                Syncing to cloud...
+              </span>
               <CircleNotch className="w-3.5 h-3.5 text-violet-400 animate-spin" />
             </div>
           )}
@@ -612,7 +538,9 @@ export function WorkspaceRightHeader({
             <DropdownMenuTrigger asChild>
               <Button
                 className="h-8 gap-1.5 px-4 rounded-lg text-xs font-medium text-white bg-[#8b5cf6] hover:bg-[#7c4deb] border-0"
-                disabled={!!isDeploying || versions.length === 0 || isSyncingToR2}
+                disabled={
+                  !!isDeploying || versions.length === 0 || isSyncingToR2
+                }
               >
                 Deploy
                 <CaretDown className="w-3 h-3 ml-0.5" />
@@ -640,7 +568,7 @@ export function WorkspaceRightHeader({
                       handleDeploy(
                         "vercel",
                         false,
-                        currentVersionId || versions[0]?.id
+                        currentVersionId || versions[0]?.id,
                       )
                     }
                     className="gap-2 cursor-pointer"
@@ -673,18 +601,6 @@ export function WorkspaceRightHeader({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Download Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-3 rounded-lg text-white/70 hover:text-white hover:bg-white/[0.08] text-xs font-medium"
-            onClick={handleDownloadClick}
-            disabled={isDownloading || (templateFilesState.length === 0 && messages.length === 0)}
-          >
-            <Download className="w-3.5 h-3.5 mr-1.5" />
-            {isDownloading ? "Downloading..." : "Download"}
-          </Button>
 
           {/* User Avatar */}
           <DropdownMenu>
@@ -787,27 +703,37 @@ export function WorkspaceRightHeader({
                 <Database className="w-4 h-4" />
                 Supabase Projects
               </DropdownMenuItem>
-              {user && (() => {
-                const userRole = userWithAccess?.role || user?.role;
-                const hasOrgAdminAccess = userWithAccess?.hasOrgAdminAccess || user?.hasOrgAdminAccess || false;
-                const hasProjectAdminAccess = userWithAccess?.hasProjectAdminAccess || user?.hasProjectAdminAccess || false;
-                const isOrgAdmin = userRole === UserRole.ORG_ADMIN || hasOrgAdminAccess;
-                const isProjectAdmin = userRole === UserRole.PROJECT_ADMIN || hasProjectAdminAccess;
-                const isFullAdmin = hasAdminAccess(userRole);
-                
-                if (isFullAdmin || isOrgAdmin || isProjectAdmin) {
-                  return (
-                    <DropdownMenuItem
-                      onClick={() => navigate("/admin")}
-                      className="gap-2 cursor-pointer"
-                    >
-                      <Shield className="w-4 h-4" />
-                      Admin Panel
-                    </DropdownMenuItem>
-                  );
-                }
-                return null;
-              })()}
+              {user &&
+                (() => {
+                  const userRole = userWithAccess?.role || user?.role;
+                  const hasOrgAdminAccess =
+                    userWithAccess?.hasOrgAdminAccess ||
+                    user?.hasOrgAdminAccess ||
+                    false;
+                  const hasProjectAdminAccess =
+                    userWithAccess?.hasProjectAdminAccess ||
+                    user?.hasProjectAdminAccess ||
+                    false;
+                  const isOrgAdmin =
+                    userRole === UserRole.ORG_ADMIN || hasOrgAdminAccess;
+                  const isProjectAdmin =
+                    userRole === UserRole.PROJECT_ADMIN ||
+                    hasProjectAdminAccess;
+                  const isFullAdmin = hasAdminAccess(userRole);
+
+                  if (isFullAdmin || isOrgAdmin || isProjectAdmin) {
+                    return (
+                      <DropdownMenuItem
+                        onClick={() => navigate("/admin")}
+                        className="gap-2 cursor-pointer"
+                      >
+                        <Shield className="w-4 h-4" />
+                        Admin Panel
+                      </DropdownMenuItem>
+                    );
+                  }
+                  return null;
+                })()}
               <DropdownMenuSeparator className="bg-white/[0.08]" />
               <DropdownMenuItem
                 onClick={handleSignOut}
@@ -871,15 +797,6 @@ export function WorkspaceRightHeader({
         onDelete={handleGitHubDelete}
         isDeleting={isGitHubDeleting}
         error={gitHubError}
-      />
-
-      {/* Download Modal */}
-      <DownloadModal
-        open={showDownloadModal}
-        onOpenChange={setShowDownloadModal}
-        onDownloadCodebase={handleDownloadCodebase}
-        onDownloadMessages={handleDownloadMessages}
-        hasCodebase={templateFilesState.length > 0}
       />
     </>
   );
