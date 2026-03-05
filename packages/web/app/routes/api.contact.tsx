@@ -13,11 +13,14 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const body = await request.json();
-    const { fullName, email, phone, countryCode, company, subject, message } = body;
+    const { fullName, email, phone, countryCode, company, subject, message } =
+      body;
 
     if (!fullName || !email || !subject || !message) {
       return new Response(
-        JSON.stringify({ error: "Full name, email, subject, and message are required" }),
+        JSON.stringify({
+          error: "Full name, email, subject, and message are required",
+        }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -27,10 +30,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Get user session to include sender info
     let senderInfo = "Anonymous User";
+    let session = null;
 
     try {
       const authInstance = await auth;
-      const session = await authInstance.api.getSession({
+      session = await authInstance.api.getSession({
         headers: request.headers,
       });
 
@@ -60,10 +64,24 @@ export async function action({ request }: ActionFunctionArgs) {
       "Nowgai <no-reply@cuttheq.in>",
     );
 
-    // Send email to tech@nowg.ai
+    // Prepare CC recipients
+    const ccRecipients: string[] = [];
+
+    // Add the email from the form
+    if (email) {
+      ccRecipients.push(email);
+    }
+
+    // Add authenticated user's email if different from form email
+    if (session?.user?.email && session.user.email !== email) {
+      ccRecipients.push(session.user.email);
+    }
+
+    // Send email to tech@nowg.ai with CC to form email and authenticated user
     const emailData = {
       from: fromEmail,
       to: "tech@nowg.ai",
+      cc: ccRecipients.length > 0 ? ccRecipients : undefined,
       subject: `Contact Form: ${subject}`,
       html: createContactEmailTemplate({
         fullName,
@@ -126,9 +144,10 @@ function createContactEmailTemplate({
   message: string;
   senderInfo: string;
 }): string {
-  const phoneNumber = phone && countryCode ? `${countryCode} ${phone}` : phone || "Not provided";
+  const phoneNumber =
+    phone && countryCode ? `${countryCode} ${phone}` : phone || "Not provided";
   const companyName = company || "Not provided";
-  
+
   return `
     <!DOCTYPE html>
     <html lang="en">
