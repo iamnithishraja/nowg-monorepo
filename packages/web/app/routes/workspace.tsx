@@ -243,6 +243,11 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
           })),
         );
         await saveSnapshot(convId, snapshot);
+
+        // Create a new version after saving the edit
+        if (controller.handleManualVersionCreate) {
+          controller.handleManualVersionCreate();
+        }
       } finally {
         useWorkspaceStore.getState().setIsSyncingToR2(false);
       }
@@ -254,6 +259,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
     controller.conversationId,
     controller.templateFilesState,
     controller.saveFile,
+    controller.handleManualVersionCreate,
   ]);
 
   // Get file reconstruction state from store - use optimized selector
@@ -1390,12 +1396,6 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     onRevertToVersion={controller.handleRevertToVersion}
                     onGoToLatest={controller.handleReturnToLatestVersion}
                     isRestoringVersion={controller.isRestoringVersion}
-                    templateFilesState={controller.templateFilesState}
-                    conversationTitle={
-                      controller.conversationTitle || undefined
-                    }
-                    messages={controller.messages}
-                    chatId={currentChatId || undefined}
                   />
 
                   {/* Right Panel Content */}

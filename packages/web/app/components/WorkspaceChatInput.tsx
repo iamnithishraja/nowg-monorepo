@@ -10,7 +10,7 @@ import {
   Sparkle,
   SpinnerGap,
   Square,
-  Upload
+  Upload,
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { OPENROUTER_MODELS } from "../consts/models";
@@ -41,11 +41,7 @@ import {
 } from "./ui/select";
 import { Switch } from "./ui/switch";
 import { Textarea } from "./ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "./ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -155,7 +151,7 @@ export function WorkspaceChatInput({
   };
 
   const handleOpenProvider = async (
-    provider: "chatgpt" | "gemini" | "perplexity"
+    provider: "chatgpt" | "gemini" | "perplexity",
   ) => {
     const providerUrl: Record<typeof provider, string> = {
       chatgpt: "https://chat.openai.com/",
@@ -187,7 +183,11 @@ export function WorkspaceChatInput({
 
   // Handle Escape key to interrupt
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape" && (isLoading || isStreaming || isProcessingTemplate) && onInterrupt) {
+    if (
+      e.key === "Escape" &&
+      (isLoading || isStreaming || isProcessingTemplate) &&
+      onInterrupt
+    ) {
       setShowStopConfirmation(true);
       return;
     }
@@ -279,7 +279,7 @@ export function WorkspaceChatInput({
             {...dragHandlers}
             className={cn(
               "relative bg-background/70 backdrop-blur-xl border border-border/50 rounded-2xl sm:rounded-3xl shadow-xl shadow-black/30 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300",
-              isDragging && "border-primary/50 bg-primary/5"
+              isDragging && "border-primary/50 bg-primary/5",
             )}
           >
             <div className="p-4 sm:p-5 md:p-6">
@@ -344,7 +344,9 @@ export function WorkspaceChatInput({
                       />
                       <Button
                         onClick={() => {
-                          const event = new CustomEvent("openColorSchemeDialog");
+                          const event = new CustomEvent(
+                            "openColorSchemeDialog",
+                          );
                           window.dispatchEvent(event);
                         }}
                         variant="ghost"
@@ -356,7 +358,7 @@ export function WorkspaceChatInput({
                             ? "text-primary/80 hover:text-primary hover:bg-primary/10 border-primary/30 hover:border-primary/50"
                             : "text-muted-foreground border-border/40",
                           "transition-all duration-200 scale-90 hover:scale-100",
-                          "border rounded"
+                          "border rounded",
                         )}
                         title={
                           enableDesignScheme
@@ -379,9 +381,11 @@ export function WorkspaceChatInput({
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={chatMode === "ask"
+                    placeholder={
+                      chatMode === "ask"
                         ? `Ask a question... (${shortcutLabel} to send)`
-                        : `Describe what you want to build... (${shortcutLabel} to start)`}
+                        : `Describe what you want to build... (${shortcutLabel} to start)`
+                    }
                     disabled={isDisabled || isEnhancing}
                     className="w-full min-h-[96px] max-h-[120px] resize-none overflow-y-auto border-0 focus-visible:ring-0 shadow-none p-3"
                   />
@@ -399,7 +403,7 @@ export function WorkspaceChatInput({
                         "h-6 px-2 text-xs font-medium transition-all",
                         chatMode === "build"
                           ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                     >
                       <Cursor className="w-3 h-3 mr-1" />
@@ -413,7 +417,7 @@ export function WorkspaceChatInput({
                         "h-6 px-2 text-xs font-medium transition-all",
                         chatMode === "ask"
                           ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                     >
                       <ChatCircle className="w-3 h-3 mr-1" />
@@ -455,16 +459,17 @@ export function WorkspaceChatInput({
                   </Button>
 
                   {/* Stop button */}
-                  {(isLoading || isStreaming || isProcessingTemplate) && onInterrupt && (
-                    <Button
-                      onClick={handleStopClick}
-                      size="sm"
-                      className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full"
-                      title="Stop generation"
-                    >
-                      <Square className="w-4 h-4" />
-                    </Button>
-                  )}
+                  {(isLoading || isStreaming || isProcessingTemplate) &&
+                    onInterrupt && (
+                      <Button
+                        onClick={handleStopClick}
+                        size="sm"
+                        className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full"
+                        title="Stop generation"
+                      >
+                        <Square className="w-4 h-4" />
+                      </Button>
+                    )}
                 </div>
               </div>
 
@@ -483,7 +488,9 @@ export function WorkspaceChatInput({
                       Import from GitHub
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Import a repository from GitHub</TooltipContent>
+                  <TooltipContent>
+                    Import a repository from GitHub
+                  </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -629,7 +636,7 @@ export function WorkspaceChatInput({
             {...dragHandlers}
             className={cn(
               "relative",
-              isDragging && "bg-[var(--accent-primary)]/5"
+              isDragging && "bg-[var(--accent-primary)]/5",
             )}
           >
             {/* Text Input */}
@@ -682,7 +689,7 @@ export function WorkspaceChatInput({
                     onClick={() => setChatMode("build")}
                     className={cn(
                       "cursor-pointer hover:!text-[#7b4cff]",
-                      chatMode === "build" && "bg-primary/10"
+                      chatMode === "build" && "bg-primary/10",
                     )}
                   >
                     <div className="flex items-center gap-2">
@@ -694,7 +701,7 @@ export function WorkspaceChatInput({
                     onClick={() => setChatMode("ask")}
                     className={cn(
                       "cursor-pointer hover:!text-[#7b4cff]",
-                      chatMode === "ask" && "bg-primary/10"
+                      chatMode === "ask" && "bg-primary/10",
                     )}
                   >
                     <div className="flex items-center gap-2">
@@ -738,7 +745,7 @@ export function WorkspaceChatInput({
                         onClick={() => onModelChange(model.id)}
                         className={cn(
                           "cursor-pointer hover:!text-[#7b4cff]",
-                          selectedModel === model.id && "bg-primary/10"
+                          selectedModel === model.id && "bg-primary/10",
                         )}
                       >
                         <div className="flex flex-col">
@@ -783,7 +790,7 @@ export function WorkspaceChatInput({
                   "h-7 px-2 text-xs gap-1 transition-all",
                   isEditActive
                     ? "text-accent-primary accent-primary/20"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 title={
                   isEditActive
@@ -818,7 +825,7 @@ export function WorkspaceChatInput({
                   disabled={isSavingEdit}
                   variant="default"
                   size="sm"
-                  className="h-7 px-2 text-xs gap-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white"
+                  className="h-7 px-2 text-xs gap-1 bg-purple-600 hover:bg-purple-700 text-white"
                   title="Save changes to source files and sync"
                 >
                   {isSavingEdit ? (
@@ -906,7 +913,7 @@ export function WorkspaceChatInput({
                     "h-7 w-7 p-0 rounded-full transition-all",
                     input.trim() && !isDisabled && !isEnhancing
                       ? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-hover)]"
-                      : "bg-surface-3 text-tertiary cursor-not-allowed"
+                      : "bg-surface-3 text-tertiary cursor-not-allowed",
                   )}
                   title="Send message"
                 >
@@ -915,16 +922,17 @@ export function WorkspaceChatInput({
               )}
 
               {/* Stop button */}
-              {(isLoading || isStreaming || isProcessingTemplate) && onInterrupt && (
-                <Button
-                  onClick={handleStopClick}
-                  size="sm"
-                  className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full"
-                  title="Stop generation"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                </Button>
-              )}
+              {(isLoading || isStreaming || isProcessingTemplate) &&
+                onInterrupt && (
+                  <Button
+                    onClick={handleStopClick}
+                    size="sm"
+                    className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full"
+                    title="Stop generation"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                  </Button>
+                )}
             </div>
           </div>
         </div>
@@ -934,12 +942,16 @@ export function WorkspaceChatInput({
       </div>
 
       {/* Stop Confirmation Dialog */}
-      <Dialog open={showStopConfirmation} onOpenChange={setShowStopConfirmation}>
+      <Dialog
+        open={showStopConfirmation}
+        onOpenChange={setShowStopConfirmation}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Stop Generation?</DialogTitle>
             <DialogDescription className="pt-2">
-              Credits will be deducted based on tokens processed so far. Are you sure you want to stop?
+              Credits will be deducted based on tokens processed so far. Are you
+              sure you want to stop?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -949,10 +961,7 @@ export function WorkspaceChatInput({
             >
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmStop}
-            >
+            <Button variant="destructive" onClick={handleConfirmStop}>
               Stop
             </Button>
           </DialogFooter>

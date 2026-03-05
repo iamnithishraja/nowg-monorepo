@@ -14,8 +14,8 @@ interface ChatDeps {
   setHasHandledInitialPrompt: (v: boolean) => void;
   handleInitialPrompt: (
     messageContent: string,
-    currentConversationId?: string
-  ) => Promise<void>;
+    currentConversationId?: string,
+  ) => Promise<boolean>;
   isMountedRef: React.RefObject<boolean>;
   uploadedFiles?: File[];
   designScheme?: any;
@@ -185,16 +185,19 @@ export function useChatHandlers({
             if (response.status === 402) {
               const error = new Error(
                 errorMessage ||
-                  "Insufficient balance. Please recharge your account to continue."
+                  "Insufficient balance. Please recharge your account to continue.",
               ) as any;
               error.errorData = errorData;
               error.errorType = errorType || "insufficient_balance";
               throw error;
             }
-            if (response.status === 503 && errorType === "provider_maintenance") {
+            if (
+              response.status === 503 &&
+              errorType === "provider_maintenance"
+            ) {
               const error = new Error(
                 errorMessage ||
-                  "NowGAI is under maintenance. Your credits won't be deducted — you're safe."
+                  "NowGAI is under maintenance. Your credits won't be deducted — you're safe.",
               ) as any;
               error.errorType = "provider_maintenance";
               throw error;
@@ -203,10 +206,10 @@ export function useChatHandlers({
             console.error(
               "[ChatHandler] Agent API error:",
               response.status,
-              errorMessage
+              errorMessage,
             );
             throw new Error(
-              errorMessage || `Agent API error: ${response.status}`
+              errorMessage || `Agent API error: ${response.status}`,
             );
           }
 
@@ -216,7 +219,7 @@ export function useChatHandlers({
             sessionId?: string,
             currentStep = 0,
             isContinuation = false,
-            accumulatedToolCalls: any[] = [] // Pass tool calls directly instead of relying on React state
+            accumulatedToolCalls: any[] = [], // Pass tool calls directly instead of relying on React state
           ): Promise<{ text: string; toolCalls: any[] }> => {
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
@@ -241,19 +244,27 @@ export function useChatHandlers({
             if (!reader) {
               throw new Error("No response stream");
             }
-            
+
             // Buffer for incomplete lines that span multiple chunks
             let lineBuffer = "";
 
             while (true) {
               const { done, value } = await reader.read();
               if (done) {
-                console.log(`[ChatHandler] Reader done signal received, remaining buffer:`, lineBuffer.length > 0 ? lineBuffer.substring(0, 100) : '(empty)');
+                console.log(
+                  `[ChatHandler] Reader done signal received, remaining buffer:`,
+                  lineBuffer.length > 0
+                    ? lineBuffer.substring(0, 100)
+                    : "(empty)",
+                );
                 // Process any remaining buffered content
                 if (lineBuffer.startsWith("data: ")) {
                   try {
                     const data = JSON.parse(lineBuffer.slice(6));
-                    console.log(`[ChatHandler] Processing buffered event:`, data.type);
+                    console.log(
+                      `[ChatHandler] Processing buffered event:`,
+                      data.type,
+                    );
                     // Note: This buffered event will need to be handled, but the main processing
                     // is in the loop below. For now, just log it.
                   } catch (e) {
@@ -267,7 +278,7 @@ export function useChatHandlers({
               // Prepend any buffered content from previous chunk
               const fullChunk = lineBuffer + chunk;
               const lines = fullChunk.split("\n");
-              
+
               // The last line might be incomplete, so buffer it
               // Exception: if chunk ends with \n, the last element is empty string which is complete
               if (!chunk.endsWith("\n")) {
@@ -281,12 +292,16 @@ export function useChatHandlers({
 
                 try {
                   const data = JSON.parse(line.slice(6));
-                  
+
                   // Log all event types to help debug flow issues
-                  if (data.type && !['text_delta'].includes(data.type)) {
-                    console.log(`[ChatHandler] Event received:`, data.type, 
-                      data.type === 'tool_call' ? `(${data.name})` : '',
-                      data.type === 'step_complete' ? `(step: ${data.step})` : ''
+                  if (data.type && !["text_delta"].includes(data.type)) {
+                    console.log(
+                      `[ChatHandler] Event received:`,
+                      data.type,
+                      data.type === "tool_call" ? `(${data.name})` : "",
+                      data.type === "step_complete"
+                        ? `(step: ${data.step})`
+                        : "",
                     );
                   }
 
@@ -302,19 +317,22 @@ export function useChatHandlers({
                     // Update message content
                     chat.updateLastAssistantMessage(
                       assistantText,
-                      isMountedRef
+                      isMountedRef,
                     );
                     // Also append to streaming segments for ordered rendering
                     chat.appendTextSegment?.(data.delta, isMountedRef);
                   } else if (data.type === "tool_call") {
-                  // Log edit/multiedit tool calls for debugging
-                  if (data.name === "edit" || data.name === "multiedit") {
-                    console.log(`[FE Tool Call] ${data.name}:`, JSON.stringify(data, null, 2));
-                  }
-                    
+                    // Log edit/multiedit tool calls for debugging
+                    if (data.name === "edit" || data.name === "multiedit") {
+                      console.log(
+                        `[FE Tool Call] ${data.name}:`,
+                        JSON.stringify(data, null, 2),
+                      );
+                    }
+
                     // Check if tool call already exists (may be sent early via onStepFinish)
                     const existingToolCall = allToolCalls.find(
-                      (t) => t.id === data.id
+                      (t) => t.id === data.id,
                     );
 
                     if (!existingToolCall) {
@@ -344,12 +362,12 @@ export function useChatHandlers({
                           const existed = files.templateFilesState?.some(
                             (f: any) =>
                               f.path === filePath ||
-                              f.path.endsWith(`/${filePath}`)
+                              f.path.endsWith(`/${filePath}`),
                           );
                           chat.addFileCreationIndicator?.(
                             fileName,
                             existed ? "modified" : "created",
-                            isMountedRef
+                            isMountedRef,
                           );
                         }
                       }
@@ -371,7 +389,7 @@ export function useChatHandlers({
                       const newToolCalls: any[] = [];
                       for (const tc of data.toolCalls) {
                         const existing = allToolCalls.find(
-                          (t) => t.id === tc.id
+                          (t) => t.id === tc.id,
                         );
                         if (!existing) {
                           const toolCall = {
@@ -402,7 +420,7 @@ export function useChatHandlers({
                     const autoTools = data.autoTools || [];
                     const ackTools = data.ackTools || [];
                     const allToolsToExecute = [...autoTools, ...ackTools];
-                    
+
                     console.log(`[ChatHandler] Starting tool execution:`, {
                       autoToolsCount: autoTools.length,
                       ackToolsCount: ackTools.length,
@@ -413,7 +431,9 @@ export function useChatHandlers({
                     // Ensure WebContainer is available before executing tools
                     // WebContainer is booted when runWebContainer is called, but in chats we might not have files
                     // So we need to ensure it's booted. We can do this by calling runWebContainer with empty files
-                    console.log(`[ChatHandler] Ensuring WebContainer is available...`);
+                    console.log(
+                      `[ChatHandler] Ensuring WebContainer is available...`,
+                    );
                     try {
                       const { runWebContainer } =
                         await import("../../lib/webcontainer");
@@ -423,29 +443,36 @@ export function useChatHandlers({
                       // Check if WebContainer is already available
                       let container =
                         WebContainerProvider.getInstance().getContainerSync();
-                      console.log(`[ChatHandler] WebContainer sync check:`, { hasContainer: !!container });
-                      
+                      console.log(`[ChatHandler] WebContainer sync check:`, {
+                        hasContainer: !!container,
+                      });
+
                       if (!container) {
                         // Boot WebContainer by running with empty files (this will boot but not write anything)
                         console.log(`[ChatHandler] Booting WebContainer...`);
                         await runWebContainer([]);
                         // Wait a bit for container to be set
                         await new Promise((resolve) =>
-                          setTimeout(resolve, 200)
+                          setTimeout(resolve, 200),
                         );
                         container =
                           WebContainerProvider.getInstance().getContainerSync();
-                        console.log(`[ChatHandler] WebContainer boot complete:`, { hasContainer: !!container });
+                        console.log(
+                          `[ChatHandler] WebContainer boot complete:`,
+                          { hasContainer: !!container },
+                        );
                       }
                     } catch (wcError) {
                       console.error(
                         "[ChatHandler] Failed to ensure WebContainer:",
-                        wcError
+                        wcError,
                       );
                       // Continue anyway - some tools might not need WebContainer
                     }
-                    
-                    console.log(`[ChatHandler] WebContainer ready, starting tool execution loop`);
+
+                    console.log(
+                      `[ChatHandler] WebContainer ready, starting tool execution loop`,
+                    );
 
                     // Execute all tools
                     const toolResults = [];
@@ -457,15 +484,15 @@ export function useChatHandlers({
                         if (!tool) {
                           console.error(
                             "[ChatHandler] Tool not found:",
-                            toolCall.name
+                            toolCall.name,
                           );
                           throw new Error(
-                            `Tool "${toolCall.name}" not found in registry`
+                            `Tool "${toolCall.name}" not found in registry`,
                           );
                         }
 
                         const toolCallIndex = allToolCalls.findIndex(
-                          (tc) => tc.id === toolCall.id
+                          (tc) => tc.id === toolCall.id,
                         );
                         if (toolCallIndex >= 0) {
                           allToolCalls[toolCallIndex] = {
@@ -477,14 +504,14 @@ export function useChatHandlers({
                             prev.map((tc: any) =>
                               tc.id === toolCall.id
                                 ? { ...tc, status: "executing" as const }
-                                : tc
-                            )
+                                : tc,
+                            ),
                           );
                           // Update streaming segments too
                           chat.updateToolCallInSegments?.(
                             toolCall.id,
                             { status: "executing" as const },
-                            isMountedRef
+                            isMountedRef,
                           );
                         }
 
@@ -516,7 +543,7 @@ export function useChatHandlers({
                           if (!hasOutput && !hasError) {
                             console.warn(
                               "[ChatHandler] Tool result format unexpected:",
-                              result
+                              result,
                             );
                           }
                         } catch (executeError) {
@@ -524,16 +551,16 @@ export function useChatHandlers({
                             "[ChatHandler] Tool execution failed:",
                             toolCall.name,
                             "| Error:",
-                            executeError
+                            executeError,
                           );
                           // Re-throw with more context
                           throw new Error(
-                            `Tool "${toolCall.name}" execution failed: ${executeError instanceof Error ? executeError.message : String(executeError)}`
+                            `Tool "${toolCall.name}" execution failed: ${executeError instanceof Error ? executeError.message : String(executeError)}`,
                           );
                         }
 
                         const executedIndex = allToolCalls.findIndex(
-                          (tc) => tc.id === toolCall.id
+                          (tc) => tc.id === toolCall.id,
                         );
                         if (executedIndex >= 0) {
                           const endTime = Date.now();
@@ -553,8 +580,8 @@ export function useChatHandlers({
                                     result,
                                     endTime,
                                   }
-                                : tc
-                            )
+                                : tc,
+                            ),
                           );
                           // Update streaming segments too
                           chat.updateToolCallInSegments?.(
@@ -564,7 +591,7 @@ export function useChatHandlers({
                               result,
                               endTime,
                             },
-                            isMountedRef
+                            isMountedRef,
                           );
                         }
 
@@ -597,17 +624,17 @@ export function useChatHandlers({
                                     // Read the updated file from WebContainer
                                     const bytes =
                                       await container.fs.readFile(
-                                        normalizedPath
+                                        normalizedPath,
                                       );
                                     const content = new TextDecoder().decode(
-                                      bytes
+                                      bytes,
                                     );
 
                                     // Update UI files state
                                     files.updateFileInState(
                                       filePath,
                                       content,
-                                      isMountedRef
+                                      isMountedRef,
                                     );
 
                                     // Mark file as completed in checklist (shows checkmark)
@@ -615,13 +642,13 @@ export function useChatHandlers({
                                       filePath.split("/").pop() || filePath;
                                     chat.markFileCompleted?.(
                                       fileName,
-                                      isMountedRef
+                                      isMountedRef,
                                     );
                                   } catch (readError) {
                                     console.warn(
                                       "[ChatHandler] Could not read file to update UI state:",
                                       filePath,
-                                      readError
+                                      readError,
                                     );
                                   }
                                 }
@@ -644,17 +671,17 @@ export function useChatHandlers({
                                     // Read the updated file from WebContainer
                                     const bytes =
                                       await container.fs.readFile(
-                                        normalizedPath
+                                        normalizedPath,
                                       );
                                     const content = new TextDecoder().decode(
-                                      bytes
+                                      bytes,
                                     );
 
                                     // Update UI files state (use original filePath, not normalized)
                                     files.updateFileInState(
                                       filePath,
                                       content,
-                                      isMountedRef
+                                      isMountedRef,
                                     );
 
                                     // Mark file as completed in checklist (shows checkmark)
@@ -662,13 +689,13 @@ export function useChatHandlers({
                                       filePath.split("/").pop() || filePath;
                                     chat.markFileCompleted?.(
                                       fileName,
-                                      isMountedRef
+                                      isMountedRef,
                                     );
                                   } catch (readError) {
                                     console.warn(
                                       "[ChatHandler] Could not read file to update UI state:",
                                       filePath,
-                                      readError
+                                      readError,
                                     );
                                   }
                                 }
@@ -677,7 +704,7 @@ export function useChatHandlers({
                           } catch (updateError) {
                             console.warn(
                               "[ChatHandler] Failed to update UI files state:",
-                              updateError
+                              updateError,
                             );
                           }
                         }
@@ -700,21 +727,29 @@ export function useChatHandlers({
                             output: output || "",
                           },
                         });
-                        
-                        console.log(`[ChatHandler] Tool ${toolCall.name} completed successfully:`, {
-                          toolId: toolCall.id,
-                          outputLength: (output || "").length,
-                        });
+
+                        console.log(
+                          `[ChatHandler] Tool ${toolCall.name} completed successfully:`,
+                          {
+                            toolId: toolCall.id,
+                            outputLength: (output || "").length,
+                          },
+                        );
                       } catch (toolError) {
-                        const errorMessage = toolError instanceof Error ? toolError.message : String(toolError);
-                        
+                        const errorMessage =
+                          toolError instanceof Error
+                            ? toolError.message
+                            : String(toolError);
+
                         // Enhanced logging for edit/multiedit string matching failures
                         if (["edit", "multiedit"].includes(toolCall.name)) {
-                          const isStringNotFound = errorMessage.includes("oldString not found") || 
-                                                   errorMessage.includes("not found in content");
-                          const isMultipleMatches = errorMessage.includes("multiple matches") || 
-                                                    errorMessage.includes("Found multiple");
-                          
+                          const isStringNotFound =
+                            errorMessage.includes("oldString not found") ||
+                            errorMessage.includes("not found in content");
+                          const isMultipleMatches =
+                            errorMessage.includes("multiple matches") ||
+                            errorMessage.includes("Found multiple");
+
                           if (isStringNotFound || isMultipleMatches) {
                             console.error(
                               `[FE Tool Error] ${toolCall.name} FAILED - String matching error:`,
@@ -722,26 +757,33 @@ export function useChatHandlers({
                                 toolId: toolCall.id,
                                 filePath: toolCall.args?.filePath,
                                 error: errorMessage,
-                                oldStringPreview: toolCall.args?.oldString?.substring(0, 300) + 
-                                  (toolCall.args?.oldString?.length > 300 ? "..." : ""),
-                              }
+                                oldStringPreview:
+                                  toolCall.args?.oldString?.substring(0, 300) +
+                                  (toolCall.args?.oldString?.length > 300
+                                    ? "..."
+                                    : ""),
+                              },
                             );
                           } else {
                             console.error(
                               `[FE Tool Error] ${toolCall.name} FAILED:`,
-                              { toolId: toolCall.id, filePath: toolCall.args?.filePath, error: errorMessage }
+                              {
+                                toolId: toolCall.id,
+                                filePath: toolCall.args?.filePath,
+                                error: errorMessage,
+                              },
                             );
                           }
                         } else {
                           console.error(
                             "[ChatHandler] Tool execution error:",
                             toolCall.name,
-                            toolError
+                            toolError,
                           );
                         }
-                        
+
                         const errorIndex = allToolCalls.findIndex(
-                          (tc) => tc.id === toolCall.id
+                          (tc) => tc.id === toolCall.id,
                         );
                         if (errorIndex >= 0) {
                           const endTime = Date.now();
@@ -767,8 +809,8 @@ export function useChatHandlers({
                                     result: errorResult,
                                     endTime,
                                   }
-                                : tc
-                            )
+                                : tc,
+                            ),
                           );
                           // Update streaming segments too
                           chat.updateToolCallInSegments?.(
@@ -778,7 +820,7 @@ export function useChatHandlers({
                               result: errorResult,
                               endTime,
                             },
-                            isMountedRef
+                            isMountedRef,
                           );
                         }
 
@@ -798,22 +840,30 @@ export function useChatHandlers({
 
                     // Continue agent loop with tool results
                     console.log(`[ChatHandler] All tools executed:`, {
-                      successCount: toolResults.filter((r: any) => r.result.success).length,
-                      errorCount: toolResults.filter((r: any) => !r.result.success).length,
+                      successCount: toolResults.filter(
+                        (r: any) => r.result.success,
+                      ).length,
+                      errorCount: toolResults.filter(
+                        (r: any) => !r.result.success,
+                      ).length,
                       totalResults: toolResults.length,
                       currentStep,
                     });
-                    
+
                     if (toolResults.length > 0 && currentStep < 50) {
                       // Send continuation request with parts-based messages (OpenCode-aligned)
                       // The backend will prefer messagesWithParts for proper tool result tracking
-                      console.log(`[ChatHandler] Sending continuation request:`, {
-                        step: data.step || currentStep,
-                        toolResultsCount: toolResults.length,
-                        hasMessagesWithParts: !!messagesWithPartsForContinuation,
-                        messagesCount: messagesForContinuation.length,
-                      });
-                      
+                      console.log(
+                        `[ChatHandler] Sending continuation request:`,
+                        {
+                          step: data.step || currentStep,
+                          toolResultsCount: toolResults.length,
+                          hasMessagesWithParts:
+                            !!messagesWithPartsForContinuation,
+                          messagesCount: messagesForContinuation.length,
+                        },
+                      );
+
                       const continuationResponse = await fetch("/api/agent", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -846,7 +896,7 @@ export function useChatHandlers({
                             .catch(() => ({}));
                           const error = new Error(
                             (errorData as any).error ||
-                              "Insufficient balance. Please recharge your account to continue."
+                              "Insufficient balance. Please recharge your account to continue.",
                           ) as any;
                           error.errorData = errorData;
                           error.errorType =
@@ -861,26 +911,31 @@ export function useChatHandlers({
                         console.error(
                           "[ChatHandler] Continuation error:",
                           continuationResponse.status,
-                          errorText
+                          errorText,
                         );
                         throw new Error(
-                          `Agent continuation error: ${continuationResponse.status} - ${errorText}`
+                          `Agent continuation error: ${continuationResponse.status} - ${errorText}`,
                         );
                       }
 
                       // Recursively process the continuation stream (appends to same message)
-                      console.log(`[ChatHandler] Starting recursive processAgentStream for continuation`);
+                      console.log(
+                        `[ChatHandler] Starting recursive processAgentStream for continuation`,
+                      );
                       const continuationResult = await processAgentStream(
                         continuationResponse,
                         currentSessionId,
                         (data.step || currentStep) + 1,
                         true,
-                        allToolCalls // Pass accumulated tool calls directly
+                        allToolCalls, // Pass accumulated tool calls directly
                       );
-                      console.log(`[ChatHandler] Recursive processAgentStream completed:`, {
-                        textLength: continuationResult.text?.length,
-                        toolCallsCount: continuationResult.toolCalls?.length,
-                      });
+                      console.log(
+                        `[ChatHandler] Recursive processAgentStream completed:`,
+                        {
+                          textLength: continuationResult.text?.length,
+                          toolCallsCount: continuationResult.toolCalls?.length,
+                        },
+                      );
                       // Continuation already updates streaming segments and tool calls directly
                       // Return the accumulated values from the continuation (which includes everything)
                       return continuationResult;
@@ -903,12 +958,17 @@ export function useChatHandlers({
                   }
                 } catch (parseError) {
                   // Log parse errors instead of silently ignoring
-                  const linePreview = line.length > 200 ? line.substring(0, 200) + '...' : line;
-                  console.warn(`[ChatHandler] Parse error for line:`, linePreview, parseError);
+                  const linePreview =
+                    line.length > 200 ? line.substring(0, 200) + "..." : line;
+                  console.warn(
+                    `[ChatHandler] Parse error for line:`,
+                    linePreview,
+                    parseError,
+                  );
                 }
               }
             }
-            
+
             console.log(`[ChatHandler] Stream ended:`, {
               assistantTextLength: assistantText.length,
               toolCallsCount: allToolCalls.length,
@@ -923,7 +983,7 @@ export function useChatHandlers({
           // Get current messages snapshot
           const currentMessages = [...chat.messages];
           const allAssistantMessages = currentMessages.filter(
-            (m) => m.role === "assistant"
+            (m) => m.role === "assistant",
           );
           const lastAssistantMessage =
             allAssistantMessages[allAssistantMessages.length - 1];
@@ -959,7 +1019,7 @@ export function useChatHandlers({
                 if (segment.type === "toolCall") {
                   // Find the finalized version of this tool call
                   const finalizedTc = finalizedToolCalls.find(
-                    (tc: any) => tc.id === segment.toolCall.id
+                    (tc: any) => tc.id === segment.toolCall.id,
                   );
                   return {
                     type: "toolCall" as const,
@@ -970,7 +1030,7 @@ export function useChatHandlers({
                   };
                 }
                 return segment;
-              }
+              },
             );
 
             // Update message with toolCalls AND segments (preserves order)
@@ -983,7 +1043,7 @@ export function useChatHandlers({
                       toolCalls: finalizedToolCalls,
                       segments: finalizedSegments,
                     }
-                  : msg
+                  : msg,
               );
 
               return updated;
@@ -1005,19 +1065,22 @@ export function useChatHandlers({
               const fileModifyingTools = result.toolCalls.filter(
                 (tc) =>
                   ["edit", "write", "multiedit"].includes(tc.name) &&
-                  tc.status !== "error"
+                  tc.status !== "error",
               );
 
-              console.log(`%c[R2 Sync] 🔍 Tool calls: ${result.toolCalls.length}, file-modifying: ${fileModifyingTools.length}`, 'color: #8b5cf6; font-weight: bold');
+              console.log(
+                `%c[R2 Sync] 🔍 Tool calls: ${result.toolCalls.length}, file-modifying: ${fileModifyingTools.length}`,
+                "color: #8b5cf6; font-weight: bold",
+              );
 
               if (fileModifyingTools.length > 0) {
                 // When files are modified in agentic chat, sync ALL files to R2
                 // This ensures that when reloading the conversation, all files are available
                 // Previously we only synced modified files, which caused missing files on reload
-                
+
                 // Get ALL current files from files state
                 const allFiles = files.templateFilesState || [];
-                
+
                 if (allFiles.length > 0) {
                   const filesToSync = allFiles.map((f: any) => ({
                     path: f.path,
@@ -1027,45 +1090,55 @@ export function useChatHandlers({
                   // Sync ALL files to R2 using pre-signed URLs (client-side upload)
                   const { setIsSyncingToR2 } = useWorkspaceStore.getState();
                   try {
-                    console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = true (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
-                    setIsSyncingToR2(true);
-                    
-                    // Use client-side upload with pre-signed URLs
-                    const { uploadFilesToR2WithPresignedUrls } = await import(
-                      "../../lib/r2UploadClient"
+                    console.log(
+                      `%c[R2 Sync] 🔄 Setting isSyncingToR2 = true (agentic chat)`,
+                      "color: #8b5cf6; font-weight: bold",
                     );
-                    
-                    console.log(`%c[R2 Sync] 📤 Starting upload of ALL ${filesToSync.length} files (agentic chat - ensures complete restore on reload)`, 'color: #8b5cf6; font-weight: bold');
-                    
+                    setIsSyncingToR2(true);
+
+                    // Use client-side upload with pre-signed URLs
+                    const { uploadFilesToR2WithPresignedUrls } =
+                      await import("../../lib/r2UploadClient");
+
+                    console.log(
+                      `%c[R2 Sync] 📤 Starting upload of ALL ${filesToSync.length} files (agentic chat - ensures complete restore on reload)`,
+                      "color: #8b5cf6; font-weight: bold",
+                    );
+
                     const uploadResult = await uploadFilesToR2WithPresignedUrls(
                       conversationId,
                       chatId || undefined,
-                      filesToSync
+                      filesToSync,
                     );
 
                     if (uploadResult.success) {
                       console.log(
-                        `%c[R2 Sync] ✅ Successfully uploaded ${uploadResult.uploadedFiles.length} files to R2`, 'color: #22c55e; font-weight: bold'
+                        `%c[R2 Sync] ✅ Successfully uploaded ${uploadResult.uploadedFiles.length} files to R2`,
+                        "color: #22c55e; font-weight: bold",
                       );
                     } else {
                       console.warn(
-                        `%c[R2 Sync] ⚠️ Some files failed to upload to R2:`, 'color: #f59e0b; font-weight: bold',
-                        uploadResult.failedFiles
+                        `%c[R2 Sync] ⚠️ Some files failed to upload to R2:`,
+                        "color: #f59e0b; font-weight: bold",
+                        uploadResult.failedFiles,
                       );
                     }
 
                     // Also sync conversation.json (metadata) to R2
-                    const { syncConversationJsonToR2 } = await import(
-                      "../../lib/r2UploadClient"
-                    );
+                    const { syncConversationJsonToR2 } =
+                      await import("../../lib/r2UploadClient");
                     await syncConversationJsonToR2(conversationId);
                   } catch (syncError) {
                     console.error(
-                      `%c[R2 Sync] ❌ Error syncing files to R2:`, 'color: #ef4444; font-weight: bold',
-                      syncError
+                      `%c[R2 Sync] ❌ Error syncing files to R2:`,
+                      "color: #ef4444; font-weight: bold",
+                      syncError,
                     );
                   } finally {
-                    console.log(`%c[R2 Sync] 🔄 Setting isSyncingToR2 = false (agentic chat)`, 'color: #8b5cf6; font-weight: bold');
+                    console.log(
+                      `%c[R2 Sync] 🔄 Setting isSyncingToR2 = false (agentic chat)`,
+                      "color: #8b5cf6; font-weight: bold",
+                    );
                     setIsSyncingToR2(false);
                   }
 
@@ -1079,13 +1152,13 @@ export function useChatHandlers({
                       filesToSync.map((f: any) => ({
                         path: f.path,
                         content: f.content,
-                      }))
+                      })),
                     );
                     await saveSnapshot(conversationId, snapshot);
                   } catch (snapshotError) {
                     console.error(
                       "[ChatHandler] Error saving IndexedDB snapshot:",
-                      snapshotError
+                      snapshotError,
                     );
                   }
                 }
@@ -1093,7 +1166,7 @@ export function useChatHandlers({
             } catch (syncError) {
               console.error(
                 "[ChatHandler] Error in post-tool-call sync:",
-                syncError
+                syncError,
               );
             }
           }
@@ -1113,7 +1186,7 @@ export function useChatHandlers({
             } catch (versionError) {
               console.error(
                 "[ChatHandler] Error creating version snapshot:",
-                versionError
+                versionError,
               );
             }
           }
@@ -1206,7 +1279,7 @@ export function useChatHandlers({
           uploadedFiles,
           designScheme,
           figmaUrl,
-          enableFigmaMCP
+          enableFigmaMCP,
         );
         // Streaming handled by caller
         return response;
@@ -1283,7 +1356,7 @@ export function useChatHandlers({
       onInsufficientBalance,
       figmaUrl,
       enableFigmaMCP,
-    ]
+    ],
   );
 
   const handleSubmit = useCallback(
@@ -1299,8 +1372,13 @@ export function useChatHandlers({
         await handleSend(messageContent);
         setHasHandledInitialPrompt(true);
       } else if (!hasHandledInitialPrompt) {
-        await handleInitialPrompt(messageContent, conversationId || undefined);
-        setHasHandledInitialPrompt(true);
+        const success = await handleInitialPrompt(
+          messageContent,
+          conversationId || undefined,
+        );
+        if (success) {
+          setHasHandledInitialPrompt(true);
+        }
       } else {
         await handleSend(messageContent);
       }
@@ -1314,7 +1392,7 @@ export function useChatHandlers({
       setHasHandledInitialPrompt,
       handleSend,
       designScheme,
-    ]
+    ],
   );
 
   const handleKeyDown = useCallback(
@@ -1326,7 +1404,7 @@ export function useChatHandlers({
         handleSubmit(undefined, input);
       }
     },
-    [handleSubmit]
+    [handleSubmit],
   );
 
   return { handleSend, handleSubmit, handleKeyDown };
