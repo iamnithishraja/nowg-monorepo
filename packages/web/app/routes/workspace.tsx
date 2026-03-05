@@ -1433,11 +1433,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
       <InsufficientBalanceModal
         isOpen={showInsufficientBalanceModal}
         onClose={() => {
-          // Only allow closing if not persistent
-          if (!isPersistentModal) {
-            setShowInsufficientBalanceModal(false);
-            setErrorData(null);
-          }
+          setShowInsufficientBalanceModal(false);
+          setErrorData(null);
         }}
         errorData={errorData}
         persistent={isPersistentModal}
