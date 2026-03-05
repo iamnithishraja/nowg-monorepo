@@ -59,8 +59,8 @@ export function useInitialPromptHandler({
       messageContent: string,
       currentConversationId?: string,
       displayMessage?: string,
-    ) => {
-      if (!messageContent.trim() || chat.isLoading) return;
+    ): Promise<boolean> => {
+      if (!messageContent.trim() || chat.isLoading) return false;
 
       const activeConversationId = currentConversationId || conversationId;
       const effectiveModel = selectedModel || OPENROUTER_MODELS[0].id;
@@ -95,7 +95,7 @@ export function useInitialPromptHandler({
         // Only skip if streaming actually completed ("done"), not just started ("pending")
         if (status === "done") {
           // Streaming completed successfully in this session, skip
-          return;
+          return true;
         }
 
         // Mark as pending (will be changed to "done" after successful streaming)
@@ -233,7 +233,7 @@ export function useInitialPromptHandler({
 
           // Clean up uploaded files from IndexedDB after successful send
           await cleanupUploadedFiles(activeConversationId);
-          return;
+          return true;
         }
 
         // If screenshots/images are present on first prompt, bias to React template
@@ -411,10 +411,37 @@ export function useInitialPromptHandler({
                 "Please enter a valid project description. Your input doesn't appear to be a meaningful request.",
             };
             chat.addMessage(errorMessage, isMountedRef);
+
+            // Save the error message to the database
+            if (activeConversationId) {
+              try {
+                const response = await fetch("/api/conversations", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    action: "addMessage",
+                    conversationId: activeConversationId,
+                    message: {
+                      role: "assistant",
+                      content: errorMessage.content,
+                    },
+                  }),
+                });
+
+                if (!response.ok) {
+                  console.error("Failed to save error message to database");
+                }
+              } catch (error) {
+                console.error("Error saving error message:", error);
+              }
+            }
+
             // Reset states and return early - don't continue with chat
             setIsProcessingTemplate(false);
             chat.setIsLoading(false);
-            return;
+            return false;
           }
 
           const fallbackMessage: Message = {
@@ -449,6 +476,7 @@ export function useInitialPromptHandler({
         } else {
           chat.setError("An error occurred");
         }
+        return false;
       } finally {
         setIsProcessingTemplate(false);
         chat.setIsLoading(false);
@@ -458,6 +486,7 @@ export function useInitialPromptHandler({
           (chat as any).markAllFilesCompleted(isMountedRef);
         }
       }
+      return true;
     },
     [
       chat,

@@ -50,19 +50,19 @@ interface InitDeps {
   setHasHandledInitialPrompt: (v: boolean) => void;
   setInput: (v: string) => void;
   handleTemplateFiles: (
-    files: Array<{ path: string; content: string }>
+    files: Array<{ path: string; content: string }>,
   ) => Promise<void>;
   handleInitialPrompt: (
     messageContent: string,
     currentConversationId?: string,
-    displayMessage?: string
-  ) => Promise<void>;
+    displayMessage?: string,
+  ) => Promise<boolean>;
   createConversation: (title: string, model: string) => Promise<string>;
   loadConversation: (id: string, chatId?: string | null) => Promise<any>;
   updateConversationUrl: (
     newConversationId: string,
     searchParams: URLSearchParams,
-    location: { pathname: string }
+    location: { pathname: string },
   ) => void;
   convertToUIMessages: (messages: any[]) => any[];
   chat: {
@@ -79,13 +79,13 @@ interface InitDeps {
       uploadedFiles?: File[],
       designScheme?: any,
       figmaUrl?: string,
-      enableFigmaMCP?: boolean
+      enableFigmaMCP?: boolean,
     ) => Promise<Response>;
     resumeGeneration?: (
       conversationId: string,
       selectedModel: string,
       files: any,
-      incompleteMessage?: any
+      incompleteMessage?: any,
     ) => Promise<Response | null>;
   };
   handleStreamingResponseWrapper?: (response: Response) => Promise<void>;
@@ -104,7 +104,7 @@ export async function reconstructFilesFromArtifacts(
   artifacts: any,
   files: any,
   saveFile: any,
-  runLinear: any
+  runLinear: any,
 ) {
   try {
     if (
@@ -120,7 +120,7 @@ export async function reconstructFilesFromArtifacts(
         name: filePath.split("/").pop() || filePath,
         path: files.normalizeFilePath(filePath, true),
         content: content as string,
-      })
+      }),
     );
 
     // Update UI file state first to prevent layout shift
@@ -149,7 +149,7 @@ export async function reconstructFilesFromArtifacts(
     // Initialize WebContainer with files
     if (wcFiles.length > 0) {
       await runLinear(
-        wcFiles.map((f) => ({ path: f.path, content: f.content }))
+        wcFiles.map((f) => ({ path: f.path, content: f.content })),
       );
     }
 
@@ -201,7 +201,7 @@ export async function restoreFilesFromR2(
   conversationId: string,
   files: any,
   saveFile: any,
-  runLinear: any
+  runLinear: any,
 ): Promise<boolean> {
   try {
     // Use the server-side API to fetch all files from R2
@@ -269,7 +269,7 @@ export async function restoreFilesFromR2(
     // Initialize WebContainer with files
     if (wcFiles.length > 0) {
       await runLinear(
-        wcFiles.map((f) => ({ path: f.path, content: f.content }))
+        wcFiles.map((f) => ({ path: f.path, content: f.content })),
       );
     }
 
@@ -278,7 +278,7 @@ export async function restoreFilesFromR2(
 
     // Save snapshot to IndexedDB for fast future restore
     const snapshot = filesToSnapshot(
-      wcFiles.map((f) => ({ path: f.path, content: f.content }))
+      wcFiles.map((f) => ({ path: f.path, content: f.content })),
     );
     await saveSnapshot(conversationId, snapshot);
 
@@ -298,7 +298,7 @@ export async function restoreFilesFromSnapshot(
   messages: Message[],
   files: any,
   saveFile: any,
-  runLinear: any
+  runLinear: any,
 ): Promise<boolean> {
   try {
     // Try fast path: restore from IndexedDB snapshot
@@ -334,7 +334,7 @@ export async function restoreFilesFromSnapshot(
       // Initialize WebContainer with files
       if (wcFiles.length > 0) {
         await runLinear(
-          wcFiles.map((f) => ({ path: f.path, content: f.content }))
+          wcFiles.map((f) => ({ path: f.path, content: f.content })),
         );
       }
 
@@ -357,7 +357,7 @@ export async function restoreFilesFromSnapshot(
  * Checks node_modules cache first for faster restoration
  */
 async function runProjectSetupFromFiles(
-  wcFiles: Array<{ path: string; content: string }>
+  wcFiles: Array<{ path: string; content: string }>,
 ) {
   try {
     const { appendTerminalLine, setIsTerminalRunning } =
@@ -365,7 +365,7 @@ async function runProjectSetupFromFiles(
 
     // Find package.json to check for node_modules cache
     const packageJsonFile = wcFiles.find(
-      (f) => f.path === "package.json" || f.path.endsWith("/package.json")
+      (f) => f.path === "package.json" || f.path.endsWith("/package.json"),
     );
 
     if (packageJsonFile) {
@@ -386,7 +386,7 @@ async function runProjectSetupFromFiles(
             await runDevServer(
               wcFiles,
               appendTerminalLine,
-              setIsTerminalRunning
+              setIsTerminalRunning,
             );
             return;
           }
@@ -395,7 +395,7 @@ async function runProjectSetupFromFiles(
           // This prevents running npm install while GitHub clone is happening
           if (isPreloadInProgress()) {
             appendTerminalLine(
-              "⏳ Waiting for node_modules cache to be ready..."
+              "⏳ Waiting for node_modules cache to be ready...",
             );
             await waitForPreloadComplete();
             appendTerminalLine("✅ Cache ready!");
@@ -405,20 +405,20 @@ async function runProjectSetupFromFiles(
           // This key is populated by the preloader on the home page
           let restoredFromCache = false;
           const hasCache = await hasNodeModulesSnapshotByHash(
-            BASE_TEMPLATE_CACHE_KEY
+            BASE_TEMPLATE_CACHE_KEY,
           );
 
           if (hasCache) {
             appendTerminalLine("📦 Restoring node_modules from cache...");
 
             const cachedFiles = await loadNodeModulesSnapshotByHash(
-              BASE_TEMPLATE_CACHE_KEY
+              BASE_TEMPLATE_CACHE_KEY,
             );
 
             if (cachedFiles && cachedFiles.length > 0) {
               const restored = await restoreNodeModulesToContainer(
                 wc,
-                cachedFiles
+                cachedFiles,
               );
 
               if (restored) {
@@ -426,7 +426,7 @@ async function runProjectSetupFromFiles(
                 restoredFromCache = true;
               } else {
                 appendTerminalLine(
-                  "⚠️ Cache incomplete, running npm install..."
+                  "⚠️ Cache incomplete, running npm install...",
                 );
               }
             }
@@ -441,7 +441,7 @@ async function runProjectSetupFromFiles(
           appendTerminalLine(
             restoredFromCache
               ? "📦 Installing any additional dependencies..."
-              : "📦 Installing dependencies..."
+              : "📦 Installing dependencies...",
           );
 
           setIsTerminalRunning(true);
@@ -452,7 +452,7 @@ async function runProjectSetupFromFiles(
                 .replace(/\u001b\[[0-9;]*[A-Za-z]/g, "")
                 .replace(/\r/g, "");
               if (cleaned) appendTerminalLine(cleaned);
-            }
+            },
           );
           setIsTerminalRunning(false);
           appendTerminalLine("✅ Dependencies installed!");
@@ -476,7 +476,7 @@ async function runProjectSetupFromFiles(
 async function runDevServer(
   wcFiles: Array<{ path: string; content: string }>,
   appendTerminalLine: (line: string) => void,
-  setIsTerminalRunning: (running: boolean) => void
+  setIsTerminalRunning: (running: boolean) => void,
 ) {
   try {
     const projectCommands = await detectProjectCommands(wcFiles);
@@ -506,7 +506,7 @@ export async function reconstructFilesFromMessages(
   saveFile: any,
   runLinear: any,
   conversationId?: string,
-  options?: { skipCommands?: boolean }
+  options?: { skipCommands?: boolean },
 ) {
   const { skipCommands = false } = options || {};
 
@@ -562,7 +562,7 @@ export async function reconstructFilesFromMessages(
         name: path.split("/").pop() || path,
         path,
         content,
-      })
+      }),
     );
 
     // Update UI file state first to prevent layout shift
@@ -587,7 +587,7 @@ export async function reconstructFilesFromMessages(
     // Initialize WebContainer with files
     if (wcFiles.length > 0) {
       await runLinear(
-        wcFiles.map((f) => ({ path: f.path, content: f.content }))
+        wcFiles.map((f) => ({ path: f.path, content: f.content })),
       );
     }
 
@@ -596,7 +596,7 @@ export async function reconstructFilesFromMessages(
       // Save snapshot to IndexedDB for fast future restore
       if (conversationId && wcFiles.length > 0) {
         const snapshot = filesToSnapshot(
-          wcFiles.map((f) => ({ path: f.path, content: f.content }))
+          wcFiles.map((f) => ({ path: f.path, content: f.content })),
         );
         await saveSnapshot(conversationId, snapshot);
       }
@@ -628,7 +628,7 @@ export async function reconstructFilesFromMessages(
           // This prevents running npm install while GitHub clone is happening
           if (isPreloadInProgress()) {
             appendTerminalLine(
-              "⏳ Waiting for node_modules cache to be ready..."
+              "⏳ Waiting for node_modules cache to be ready...",
             );
             await waitForPreloadComplete();
             appendTerminalLine("✅ Cache ready!");
@@ -636,19 +636,19 @@ export async function reconstructFilesFromMessages(
 
           // Check for cached node_modules using BASE_TEMPLATE_CACHE_KEY
           const hasCache = await hasNodeModulesSnapshotByHash(
-            BASE_TEMPLATE_CACHE_KEY
+            BASE_TEMPLATE_CACHE_KEY,
           );
 
           if (hasCache) {
             appendTerminalLine("📦 Restoring node_modules from cache...");
             const cachedFiles = await loadNodeModulesSnapshotByHash(
-              BASE_TEMPLATE_CACHE_KEY
+              BASE_TEMPLATE_CACHE_KEY,
             );
 
             if (cachedFiles && cachedFiles.length > 0) {
               const restored = await restoreNodeModulesToContainer(
                 wc,
-                cachedFiles
+                cachedFiles,
               );
               if (restored) {
                 appendTerminalLine("✅ Restored node_modules from cache!");
@@ -669,7 +669,7 @@ ${wcFiles
   .map(
     (f) => `<nowgaiAction type="file" filePath="${f.path}">
 ${f.content}
-</nowgaiAction>`
+</nowgaiAction>`,
   )
   .join("\n")}
 ${commandActionsString}
@@ -699,7 +699,7 @@ ${commandActionsString}
               finalCommand =
                 "npm install --prefer-offline --legacy-peer-deps --no-audit --no-fund";
               appendTerminalLine(
-                "📦 Installing any additional dependencies..."
+                "📦 Installing any additional dependencies...",
               );
             } else if (nodeModulesExisted) {
               // node_modules existed, run quick update
@@ -738,7 +738,7 @@ ${commandActionsString}
     // Save snapshot to IndexedDB for fast future restore
     if (conversationId && wcFiles.length > 0) {
       const snapshot = filesToSnapshot(
-        wcFiles.map((f) => ({ path: f.path, content: f.content }))
+        wcFiles.map((f) => ({ path: f.path, content: f.content })),
       );
       await saveSnapshot(conversationId, snapshot);
     }
@@ -869,10 +869,10 @@ export function useWorkspaceInit({
             const chatId = searchParams?.get("chatId") || null;
             conversationData = await loadConversation(
               urlConversationId,
-              chatId
+              chatId,
             );
             setSelectedModel(
-              conversationData.conversation?.model || selectedModel
+              conversationData.conversation?.model || selectedModel,
             );
             setConversationTitle(conversationData.conversation?.title || null);
           } catch (error) {
@@ -896,7 +896,7 @@ export function useWorkspaceInit({
             // Check if the conversation already has a REAL AI response (not just template init message)
             const assistantMessages =
               conversationData?.messages?.filter(
-                (m: any) => m.role === "assistant"
+                (m: any) => m.role === "assistant",
               ) || [];
 
             // The template init message is saved to DB before LLM streaming starts.
@@ -913,10 +913,10 @@ export function useWorkspaceInit({
               (lastAssistant.content?.includes("Project set up successfully") ||
                 lastAssistant.content?.includes("Nowgai is initializing") ||
                 lastAssistant.content?.includes(
-                  "Now processing your request"
+                  "Now processing your request",
                 ) ||
                 lastAssistant.content?.includes(
-                  "Starting with a blank project"
+                  "Starting with a blank project",
                 ));
 
             // Check if last message is incomplete (streaming interrupted)
@@ -941,7 +941,7 @@ export function useWorkspaceInit({
               try {
                 const fileStorageService = createClientFileStorageService();
                 await fileStorageService.deleteFilesForConversation(
-                  urlConversationId
+                  urlConversationId,
                 );
               } catch (error) {
                 console.error("Error cleaning up IndexedDB files:", error);
@@ -960,7 +960,7 @@ export function useWorkspaceInit({
                     urlConversationId,
                     files,
                     saveFile,
-                    runLinear
+                    runLinear,
                   );
 
                   if (!r2Restored) {
@@ -970,7 +970,7 @@ export function useWorkspaceInit({
                       uiMessages,
                       files,
                       saveFile,
-                      runLinear
+                      runLinear,
                     );
 
                     if (!snapshotRestored) {
@@ -980,7 +980,7 @@ export function useWorkspaceInit({
                         files,
                         saveFile,
                         runLinear,
-                        urlConversationId
+                        urlConversationId,
                       );
                     }
                   }
@@ -989,7 +989,7 @@ export function useWorkspaceInit({
                 } catch (restoreError) {
                   console.error(
                     "[File Restore] Error restoring files:",
-                    restoreError
+                    restoreError,
                   );
                   const { setIsReconstructingFiles } =
                     useWorkspaceStore.getState() as any;
@@ -1010,7 +1010,7 @@ export function useWorkspaceInit({
                   urlConversationId,
                   selectedModel,
                   files.filesMap || {},
-                  lastAssistant
+                  lastAssistant,
                 );
 
                 if (response) {
@@ -1043,7 +1043,7 @@ export function useWorkspaceInit({
                     (m: any) =>
                       m.role === "assistant" &&
                       typeof m.content === "string" &&
-                      m.content.includes("<nowgaiAction")
+                      m.content.includes("<nowgaiAction"),
                   );
 
                   if (hasFileActions) {
@@ -1051,7 +1051,7 @@ export function useWorkspaceInit({
                       urlConversationId,
                       files,
                       saveFile,
-                      runLinear
+                      runLinear,
                     );
 
                     if (!restored) {
@@ -1061,7 +1061,7 @@ export function useWorkspaceInit({
                         saveFile,
                         runLinear,
                         urlConversationId,
-                        { skipCommands: true }
+                        { skipCommands: true },
                       );
                     }
                   }
@@ -1072,14 +1072,14 @@ export function useWorkspaceInit({
                     uiMessages,
                     files.filesMap || {},
                     urlConversationId,
-                    effectiveModel
+                    effectiveModel,
                   );
 
                   await handleStreamingResponseWrapper(response);
                 } catch (e) {
                   console.error(
                     "[WorkspaceInit] Error sending chat message:",
-                    e
+                    e,
                   );
                 }
               }
@@ -1105,7 +1105,7 @@ export function useWorkspaceInit({
                 conversationData.messages.length > 0
               ) {
                 const uiMessages = convertToUIMessages(
-                  conversationData.messages
+                  conversationData.messages,
                 );
                 chat.setMessages(uiMessages);
               }
@@ -1115,12 +1115,14 @@ export function useWorkspaceInit({
                   await beforeInitialPrompt(urlConversationId);
                 } catch (e) {}
               }
-              await handleInitialPrompt(
+              const success = await handleInitialPrompt(
                 initialPrompt,
                 urlConversationId,
-                isSystemPrompt ? displayMessage : undefined
+                isSystemPrompt ? displayMessage : undefined,
               );
-              setHasHandledInitialPrompt(true);
+              if (success) {
+                setHasHandledInitialPrompt(true);
+              }
             }
           } else if (!initialPrompt) {
             try {
@@ -1143,7 +1145,7 @@ export function useWorkspaceInit({
 
               // Check conversation state to determine what action to take
               const assistantMsgs = uiMessages.filter(
-                (m: any) => m.role === "assistant"
+                (m: any) => m.role === "assistant",
               );
               const userMsgs = uiMessages.filter((m: any) => m.role === "user");
               const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
@@ -1160,14 +1162,14 @@ export function useWorkspaceInit({
                 lastAssistant &&
                 typeof lastAssistant.content === "string" &&
                 (lastAssistant.content.includes(
-                  "Project set up successfully"
+                  "Project set up successfully",
                 ) ||
                   lastAssistant.content.includes("Nowgai is initializing") ||
                   lastAssistant.content.includes(
-                    "Now processing your request"
+                    "Now processing your request",
                   ) ||
                   lastAssistant.content.includes(
-                    "Starting with a blank project"
+                    "Starting with a blank project",
                   ));
 
               // Case 3: Incomplete message (streaming was interrupted after partial save)
@@ -1179,14 +1181,15 @@ export function useWorkspaceInit({
                 const userMsg = userMsgs[0];
                 if (userMsg && typeof userMsg.content === "string") {
                   try {
-                    await handleInitialPrompt(
+                    const success = await handleInitialPrompt(
                       userMsg.content,
-                      urlConversationId
+                      urlConversationId,
                     );
+                    // Note: We don't set hasHandledInitialPrompt here as this is a different flow
                   } catch (e) {
                     console.error(
                       "[WorkspaceInit] Error running initial prompt:",
-                      e
+                      e,
                     );
                   }
                 }
@@ -1208,7 +1211,7 @@ export function useWorkspaceInit({
                       (m: any) =>
                         m.role === "assistant" &&
                         typeof m.content === "string" &&
-                        m.content.includes("<nowgaiAction")
+                        m.content.includes("<nowgaiAction"),
                     );
 
                     if (hasFileActions) {
@@ -1217,7 +1220,7 @@ export function useWorkspaceInit({
                         urlConversationId,
                         files,
                         saveFile,
-                        runLinear
+                        runLinear,
                       );
 
                       if (!restored) {
@@ -1227,7 +1230,7 @@ export function useWorkspaceInit({
                           saveFile,
                           runLinear,
                           urlConversationId,
-                          { skipCommands: true }
+                          { skipCommands: true },
                         );
                       }
                     }
@@ -1238,14 +1241,14 @@ export function useWorkspaceInit({
                       uiMessages,
                       files.filesMap || {},
                       urlConversationId,
-                      effectiveModel
+                      effectiveModel,
                     );
 
                     await handleStreamingResponseWrapper(response);
                   } catch (e) {
                     console.error(
                       "[WorkspaceInit] Error sending chat message:",
-                      e
+                      e,
                     );
                   }
                 }
@@ -1271,7 +1274,7 @@ export function useWorkspaceInit({
                     (m: any) =>
                       m.role === "assistant" &&
                       typeof m.content === "string" &&
-                      m.content.includes("<nowgaiAction")
+                      m.content.includes("<nowgaiAction"),
                   );
 
                   if (hasAnyFileActions) {
@@ -1283,7 +1286,7 @@ export function useWorkspaceInit({
                       urlConversationId,
                       files,
                       saveFile,
-                      runLinear
+                      runLinear,
                     );
 
                     // If R2 doesn't have files, fall back to message reconstruction
@@ -1297,7 +1300,7 @@ export function useWorkspaceInit({
                         saveFile,
                         runLinear,
                         urlConversationId,
-                        { skipCommands: true }
+                        { skipCommands: true },
                       );
                     }
 
@@ -1315,7 +1318,7 @@ export function useWorkspaceInit({
                     urlConversationId,
                     effectiveModel,
                     files.filesMap || {},
-                    lastAssistant // Pass the incomplete message directly
+                    lastAssistant, // Pass the incomplete message directly
                   );
 
                   if (response) {
@@ -1328,7 +1331,7 @@ export function useWorkspaceInit({
                     try {
                       const freshData = await loadConversation(
                         urlConversationId,
-                        null
+                        null,
                       );
                       const freshMessages = Array.isArray(freshData.messages)
                         ? freshData.messages
@@ -1339,14 +1342,14 @@ export function useWorkspaceInit({
                     } catch (reloadError) {
                       console.error(
                         "[Resume] Error reloading conversation:",
-                        reloadError
+                        reloadError,
                       );
                     }
                   }
                 } catch (resumeError) {
                   console.error(
                     "[Resume] Error during resume flow:",
-                    resumeError
+                    resumeError,
                   );
                   // Ensure all loading states are reset on error
                   if (chat.setIsLoading) chat.setIsLoading(false);
@@ -1356,7 +1359,7 @@ export function useWorkspaceInit({
                   try {
                     const freshData = await loadConversation(
                       urlConversationId,
-                      null
+                      null,
                     );
                     const freshMessages = Array.isArray(freshData.messages)
                       ? freshData.messages
@@ -1366,7 +1369,7 @@ export function useWorkspaceInit({
                   } catch (reloadError) {
                     console.error(
                       "[Resume] Error reloading conversation after error:",
-                      reloadError
+                      reloadError,
                     );
                   }
                 } finally {
@@ -1417,7 +1420,7 @@ export function useWorkspaceInit({
                       urlConversationId,
                       files,
                       saveFile,
-                      runLinear
+                      runLinear,
                     );
 
                     if (!r2Restored) {
@@ -1427,7 +1430,7 @@ export function useWorkspaceInit({
                         [],
                         files,
                         saveFile,
-                        runLinear
+                        runLinear,
                       );
 
                       if (!snapshotRestored) {
@@ -1435,17 +1438,17 @@ export function useWorkspaceInit({
                         // Get all messages from main conversation for reconstruction
                         const mainData = await loadConversation(
                           urlConversationId,
-                          null
+                          null,
                         );
                         const mainMessages = convertToUIMessages(
-                          mainData.messages || []
+                          mainData.messages || [],
                         );
                         await reconstructFilesFromMessages(
                           mainMessages,
                           files,
                           saveFile,
                           runLinear,
-                          urlConversationId
+                          urlConversationId,
                         );
                       }
                     }
@@ -1454,7 +1457,7 @@ export function useWorkspaceInit({
                   } catch (restoreError) {
                     console.error(
                       "[R2 Restore] Error restoring files for chat:",
-                      restoreError
+                      restoreError,
                     );
                     const { setIsReconstructingFiles } =
                       useWorkspaceStore.getState() as any;
@@ -1501,7 +1504,7 @@ export function useWorkspaceInit({
                       urlConversationId,
                       files,
                       saveFile,
-                      runLinear
+                      runLinear,
                     );
 
                     // If R2 restore failed, try snapshot (fast fallback)
@@ -1511,7 +1514,7 @@ export function useWorkspaceInit({
                         uiMessages,
                         files,
                         saveFile,
-                        runLinear
+                        runLinear,
                       );
 
                       // If snapshot also failed, fall back to message reconstruction (legacy)
@@ -1521,7 +1524,7 @@ export function useWorkspaceInit({
                           files,
                           saveFile,
                           runLinear,
-                          urlConversationId
+                          urlConversationId,
                         );
                       }
                     }
@@ -1553,7 +1556,7 @@ export function useWorkspaceInit({
         } else {
           const newConversationId = await createConversation(
             initialPrompt || "New Chat",
-            model || selectedModel || OPENROUTER_MODELS[0].id
+            model || selectedModel || OPENROUTER_MODELS[0].id,
           );
           setConversationId(newConversationId);
           updateConversationUrl(newConversationId, searchParams, location);
@@ -1576,12 +1579,14 @@ export function useWorkspaceInit({
                 await beforeInitialPrompt(newConversationId);
               } catch (e) {}
             }
-            await handleInitialPrompt(
+            const success = await handleInitialPrompt(
               initialPrompt,
               newConversationId,
-              isSystemPrompt ? displayMessage : undefined
+              isSystemPrompt ? displayMessage : undefined,
             );
-            setHasHandledInitialPrompt(true);
+            if (success) {
+              setHasHandledInitialPrompt(true);
+            }
           }
         }
       } catch (error) {
@@ -1595,7 +1600,7 @@ export function useWorkspaceInit({
         chat.setError(
           `Failed to initialize workspace: ${
             error instanceof Error ? error.message : "Unknown error"
-          }`
+          }`,
         );
       } finally {
         isInitializingRef.current = false;
