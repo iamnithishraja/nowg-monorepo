@@ -111,6 +111,7 @@ export const profileSchemaDefinition = {
   discord: { type: String, default: "" }, // Discord username
   portfolio: { type: String, default: "" }, // Portfolio website URL
   bio: { type: String, default: "" }, // User bio
+  address: { type: String, default: "" }, // User billing address
   customUrls: [{ type: String }], // Array of custom URLs
 
   lastUpdated: { type: Date, default: Date.now },

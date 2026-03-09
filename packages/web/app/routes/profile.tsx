@@ -157,6 +157,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       discord: profile.discord || "",
       portfolio: profile.portfolio || "",
       bio: profile.bio || "",
+      address: profile.address || "",
       customUrls: profile.customUrls || [],
     },
   };
@@ -198,6 +199,7 @@ export async function action({ request }: Route.ActionArgs) {
     const discord = fd.get("discord")?.toString() || "";
     const portfolio = fd.get("portfolio")?.toString() || "";
     const bio = fd.get("bio")?.toString() || "";
+    const address = fd.get("address")?.toString() || "";
     const customUrls = fd
       .getAll("customUrls")
       .map((url) => url.toString())
@@ -216,6 +218,7 @@ export async function action({ request }: Route.ActionArgs) {
     profile.discord = discord || "";
     profile.portfolio = portfolio || "";
     profile.bio = bio || "";
+    profile.address = address || "";
     profile.customUrls = Array.isArray(customUrls)
       ? customUrls.filter((url: string) => url.trim())
       : [];

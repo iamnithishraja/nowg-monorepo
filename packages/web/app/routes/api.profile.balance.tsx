@@ -56,6 +56,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         success: true,
         balance: profile.balance || 0,
         isWhitelisted,
+        address: profile?.address || "",
         transactions: recentTransactions,
       }),
       {

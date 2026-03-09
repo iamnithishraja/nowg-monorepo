@@ -64,6 +64,7 @@ export async function action({ request }: ActionFunctionArgs) {
         discord: formData.get("discord")?.toString() || "",
         portfolio: formData.get("portfolio")?.toString() || "",
         bio: formData.get("bio")?.toString() || "",
+        address: formData.get("address")?.toString() || "",
         customUrls: formData.getAll("customUrls")
           .map(url => url.toString())
           .filter((url) => url.trim()),
@@ -78,6 +79,7 @@ export async function action({ request }: ActionFunctionArgs) {
       discord: data.discord || "",
       portfolio: data.portfolio || "",
       bio: data.bio || "",
+      address: data.address || "",
       customUrls: Array.isArray(data.customUrls)
         ? data.customUrls.filter((url: string) => url.trim())
         : [],
@@ -101,13 +103,14 @@ export async function action({ request }: ActionFunctionArgs) {
       JSON.stringify({
         success: true,
         profile: {
-          linkedin: profile?.linkedin || updateData.linkedin,
-          instagram: profile?.instagram || updateData.instagram,
-          x: profile?.x || updateData.x,
-          discord: profile?.discord || updateData.discord,
-          portfolio: profile?.portfolio || updateData.portfolio,
-          bio: profile?.bio || updateData.bio,
-          customUrls: profile?.customUrls || updateData.customUrls,
+          linkedin: (profile as any)?.linkedin || updateData.linkedin,
+          instagram: (profile as any)?.instagram || updateData.instagram,
+          x: (profile as any)?.x || updateData.x,
+          discord: (profile as any)?.discord || updateData.discord,
+          portfolio: (profile as any)?.portfolio || updateData.portfolio,
+          bio: (profile as any)?.bio || updateData.bio,
+          address: (profile as any)?.address || updateData.address,
+          customUrls: (profile as any)?.customUrls || updateData.customUrls,
         },
       }),
       {

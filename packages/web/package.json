@@ -80,6 +80,8 @@
     "embla-carousel-react": "^8.6.0",
     "ignore": "^7.0.5",
     "isbot": "^5.1.27",
+    "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.7",
     "jszip": "^3.10.1",
     "lucide-react": "^0.542.0",
     "mammoth": "^1.8.0",

@@ -13,6 +13,7 @@ interface ProfileSocialMediaFormProps {
     discord: string;
     portfolio: string;
     bio: string;
+    address: string;
     customUrls: string[];
   };
 }
@@ -26,6 +27,7 @@ export function ProfileSocialMediaForm({
   const [discord, setDiscord] = useState(initialData.discord || "");
   const [portfolio, setPortfolio] = useState(initialData.portfolio || "");
   const [bio, setBio] = useState(initialData.bio || "");
+  const [address, setAddress] = useState(initialData.address || "");
   const [customUrls, setCustomUrls] = useState<string[]>(
     initialData.customUrls || []
   );
@@ -41,6 +43,7 @@ export function ProfileSocialMediaForm({
     setDiscord(initialData.discord || "");
     setPortfolio(initialData.portfolio || "");
     setBio(initialData.bio || "");
+    setAddress(initialData.address || "");
     setCustomUrls(initialData.customUrls || []);
   }, [initialData]);
 
@@ -58,6 +61,7 @@ export function ProfileSocialMediaForm({
       formData.append("discord", discord.trim());
       formData.append("portfolio", portfolio.trim());
       formData.append("bio", bio.trim());
+      formData.append("address", address.trim());
       
       // Add custom URLs
       customUrls
@@ -119,6 +123,18 @@ export function ProfileSocialMediaForm({
           onChange={(e) => setBio(e.target.value)}
           className="bg-surface-2/50 border-subtle text-secondary min-h-[100px]"
           placeholder="Tell us about yourself..."
+          disabled={isLoading}
+        />
+      </div>
+
+      {/* Address */}
+      <div className="mb-4">
+        <Label className="text-sm text-tertiary mb-2 block">Billing Address</Label>
+        <Textarea
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          className="bg-surface-2/50 border-subtle text-secondary min-h-[100px]"
+          placeholder="Enter your billing address for invoices..."
           disabled={isLoading}
         />
       </div>

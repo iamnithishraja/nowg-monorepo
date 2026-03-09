@@ -5,6 +5,7 @@ import {
   Loader2,
   TrendingUp,
   Zap,
+  Download,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { redirect } from "react-router";
@@ -54,6 +55,8 @@ export default function Recharge({ loaderData }: Route.ComponentProps) {
   const [balance, setBalance] = useState<number | null>(null);
   const [isWhitelisted, setIsWhitelisted] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [userAddress, setUserAddress] = useState<string>("");
+  const [downloadingTxId, setDownloadingTxId] = useState<string | null>(null);
 
   // Fetch current balance
   useEffect(() => {
@@ -67,10 +70,99 @@ export default function Recharge({ loaderData }: Route.ComponentProps) {
         const data = await response.json();
         setBalance(data.balance);
         setIsWhitelisted(data.isWhitelisted);
+        setUserAddress(data.address || "");
         setTransactions(data.transactions || []);
       }
     } catch (error) {
       console.error("Failed to fetch balance:", error);
+    }
+  };
+
+  const generateInvoice = async (tx: any) => {
+    try {
+      setDownloadingTxId(tx._id || tx.stripePaymentId || tx.razorpayPaymentId || tx.payuPaymentId || Math.random().toString());
+      
+      // Import jsPDF dynamically to avoid SSR issues
+      const { jsPDF } = await import("jspdf");
+      const autoTable = (await import("jspdf-autotable")).default;
+      
+      const doc = new jsPDF();
+      
+      // Add Company Logo / Header
+      doc.setFontSize(22);
+      doc.setTextColor(40, 40, 40);
+      doc.text("Nowgai AI", 14, 20);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Invoice Receipt", 14, 25);
+      
+      // Add Invoice Meta Info
+      const invoiceDate = new Date(tx.createdAt).toLocaleDateString();
+      const invoiceId = `INV-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Invoice Number: ${invoiceId}`, 140, 16);
+      doc.text(`Date: ${invoiceDate}`, 140, 22);
+      
+      // Billing Info section
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Billed To:", 14, 38);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(user?.name || user?.email || "Customer", 14, 44);
+      doc.text(user?.email || "", 14, 49);
+      
+      // Display address if exists
+      if (userAddress) {
+        const splitAddress = doc.splitTextToSize(userAddress, 80);
+        doc.text(splitAddress, 14, 54);
+      } else {
+        doc.text("No billing address provided", 14, 54);
+      }
+      
+      // Table Data
+      const tableColumn = ["Description", "Type", "Date", "Amount"];
+      const tableRows = [
+        [
+          tx.description || "Account Recharge",
+          tx.type === "recharge" ? "Credit" : "Debit",
+          invoiceDate,
+          `$${tx.amount.toFixed(2)}`
+        ]
+      ];
+      
+      const startY = userAddress ? 70 : 65;
+      
+      // Render Table
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: startY,
+        theme: "striped",
+        headStyles: { fillColor: [40, 40, 40] },
+      });
+      
+      // Footer / Total
+      const finalY = (doc as any).lastAutoTable.finalY || startY + 20;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      
+      const isDeduction = tx.type === "deduction";
+      const totalLabel = isDeduction ? "Credits Deducted" : "Total Paid";
+      
+      doc.text(`${totalLabel}: $${tx.amount.toFixed(2)}`, 140, finalY + 15);
+      
+      // Save the PDF
+      doc.save(`Invoice_${invoiceId}.pdf`);
+    } catch (error) {
+      console.error("Failed to generate invoice:", error);
+      alert("Failed to generate invoice. Please try again.");
+    } finally {
+      setDownloadingTxId(null);
     }
   };
 
@@ -279,9 +371,27 @@ export default function Recharge({ loaderData }: Route.ComponentProps) {
                                   {tx.type === "recharge" ? "+" : "-"}$
                                   {tx.amount.toFixed(2)}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(tx.createdAt).toLocaleDateString()}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground mr-1">
+                                    {new Date(tx.createdAt).toLocaleDateString()}
+                                  </span>
+                                  {['recharge', 'deduction'].includes(tx.type) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                      onClick={() => generateInvoice(tx)}
+                                      disabled={downloadingTxId === (tx._id || tx.stripePaymentId || tx.razorpayPaymentId || tx.payuPaymentId)}
+                                      title="Download Invoice"
+                                    >
+                                      {downloadingTxId === (tx._id || tx.stripePaymentId || tx.razorpayPaymentId || tx.payuPaymentId) ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <Download className="w-3 h-3" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                               <p className="text-xs text-muted-foreground">
                                 {tx.description}
