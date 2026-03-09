@@ -47,7 +47,7 @@ const isBase64DataUrl = (content: string) =>
   content.startsWith("data:") && content.includes("base64,");
 
 const cloneTemplateFiles = (
-  files: TemplateFileSnapshot[]
+  files: TemplateFileSnapshot[],
 ): TemplateFileSnapshot[] => files.map((file) => ({ ...file }));
 
 const buildFilesMapFromSnapshot = (snapshot: TemplateFileSnapshot[]): FileMap =>
@@ -120,7 +120,7 @@ function useConversationVersions(conversationId: string | null) {
         setIsSaving(false);
       }
     },
-    [conversationId]
+    [conversationId],
   );
 
   return {
@@ -135,7 +135,7 @@ function useConversationVersions(conversationId: string | null) {
 export function useWorkspaceController(
   designScheme?: any,
   onInsufficientBalance?: (errorData?: any) => void,
-  onChatTitleUpdated?: (title: string) => void
+  onChatTitleUpdated?: (title: string) => void,
 ) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -214,7 +214,7 @@ export function useWorkspaceController(
   const latestMessagesRef = useRef(chat.messages);
   const latestSelectedPathRef = useRef(files.selectedPath);
   const latestPreviewRef = useRef<string | null>(
-    livePreviewUrl || previewUrl || null
+    livePreviewUrl || previewUrl || null,
   );
   // Track if version was captured in current streaming session (prevents duplicates)
   const versionCapturedInSessionRef = useRef(false);
@@ -236,7 +236,7 @@ export function useWorkspaceController(
   }, [livePreviewUrl, previewUrl]);
 
   const captureVersionSnapshot = useCallback(
-    async (label?: string, force = false) => {
+    async (label?: string, force = false, filesOverride?: TemplateFileSnapshot[]) => {
       // Skip if already captured in this session (unless forced)
       if (!force && versionCapturedInSessionRef.current) {
         return;
@@ -244,7 +244,7 @@ export function useWorkspaceController(
 
       if (!versionsHydrated || !conversationId) return;
 
-      const filesSnapshot = cloneTemplateFiles(latestFilesRef.current);
+      const filesSnapshot = filesOverride ? cloneTemplateFiles(filesOverride) : cloneTemplateFiles(latestFilesRef.current);
       if (filesSnapshot.length === 0) {
         return;
       }
@@ -260,7 +260,7 @@ export function useWorkspaceController(
       } catch (error) {
         console.warn(
           "Failed to resolve persistent message id, falling back",
-          error
+          error,
         );
         const messagesSnapshot = latestMessagesRef.current;
         anchorMessageId =
@@ -292,7 +292,7 @@ export function useWorkspaceController(
       latestPreviewRef,
       latestMessagesRef,
       createVersion,
-    ]
+    ],
   );
 
   const handleVersionSelect = useCallback(
@@ -300,7 +300,7 @@ export function useWorkspaceController(
       if (!versionId || isRestoringVersion || !versionsHydrated) return;
 
       const targetVersion = versions.find(
-        (version) => version.id === versionId
+        (version) => version.id === versionId,
       );
       if (!targetVersion) return;
 
@@ -354,7 +354,7 @@ export function useWorkspaceController(
       files,
       chat,
       setPreviewUrl,
-    ]
+    ],
   );
 
   const ensureLatestVersionBeforeSend = useCallback(async () => {
@@ -373,9 +373,12 @@ export function useWorkspaceController(
     handleVersionSelect,
   ]);
 
-  const handleManualVersionCreate = useCallback(() => {
-    void captureVersionSnapshot();
-  }, [captureVersionSnapshot]);
+  const handleManualVersionCreate = useCallback(
+    (label?: string, force = false, filesOverride?: TemplateFileSnapshot[]) => {
+      void captureVersionSnapshot(label, force, filesOverride);
+    },
+    [captureVersionSnapshot],
+  );
 
   // File upload state
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -386,7 +389,7 @@ export function useWorkspaceController(
 
   // File restoration function
   const restoreFilesForConversation = async (
-    conversationId: string
+    conversationId: string,
   ): Promise<File[]> => {
     try {
       const fileStorageService = createClientFileStorageService();
@@ -439,7 +442,7 @@ export function useWorkspaceController(
           } catch (error) {
             console.error(
               `❌ [FILE RESTORE] Error restoring file ${fileMeta.name}:`,
-              error
+              error,
             );
           }
         }
@@ -517,13 +520,13 @@ export function useWorkspaceController(
       // Hide protected config files from UI checklist
       const isProtected =
         /^(tailwind\.config\.(js|ts)|postcss\.config\.(js|ts)|vite\.config\.(js|ts))$/i.test(
-          fileName
+          fileName,
         );
       if (isProtected) return;
 
       // Determine if file existed before updating state
       const existed = files.templateFilesState.some(
-        (f: any) => f.path === wcPath
+        (f: any) => f.path === wcPath,
       );
 
       // Update command progress to show file creation
@@ -541,7 +544,7 @@ export function useWorkspaceController(
       chat.addFileCreationIndicator(
         fileName,
         existed ? "modified" : "created",
-        isMountedRef
+        isMountedRef,
       );
     } catch (error) {
       console.error("File action start failed:", error);
@@ -560,7 +563,7 @@ export function useWorkspaceController(
       // Hide protected config files from UI checklist and skip marking as created/modified
       const isProtected =
         /^(tailwind\.config\.(js|ts)|postcss\.config\.(js|ts)|vite\.config\.(js|ts))$/i.test(
-          fileName
+          fileName,
         );
       if (isProtected) {
         // Non-blocking file write
@@ -605,7 +608,7 @@ export function useWorkspaceController(
             window.dispatchEvent(
               new CustomEvent("preview-control", {
                 detail: { action: "refresh" },
-              })
+              }),
             );
           } catch (error) {
             console.error("[Auto-Install] Failed:", error);
@@ -716,7 +719,7 @@ export function useWorkspaceController(
         try {
           const packageJsonFile = files.templateFilesState.find(
             (f: any) =>
-              f.path === "package.json" || f.path.endsWith("/package.json")
+              f.path === "package.json" || f.path.endsWith("/package.json"),
           );
 
           if (packageJsonFile) {
@@ -765,7 +768,7 @@ export function useWorkspaceController(
           window.dispatchEvent(
             new CustomEvent("preview-control", {
               detail: { action: "refresh" },
-            })
+            }),
           );
         }
 
@@ -773,7 +776,7 @@ export function useWorkspaceController(
         const lowerLine = line.toLowerCase();
         if (
           /ready in|local:|localhost:|compiled successfully|listening on|running at|➜\s+local:/i.test(
-            line
+            line,
           )
         ) {
           setCommandProgress({
@@ -793,7 +796,7 @@ export function useWorkspaceController(
           });
         } else if (
           /added\s+\d+\s+packages?|audited\s+\d+\s+packages?|up to date|done in\s+\d/i.test(
-            lowerLine
+            lowerLine,
           )
         ) {
           setCommandProgress({
@@ -804,7 +807,7 @@ export function useWorkspaceController(
           });
         } else if (
           /resolving|fetching|linking|installing|preinstall|postinstall/i.test(
-            lowerLine
+            lowerLine,
           )
         ) {
           setCommandProgress({
@@ -817,7 +820,7 @@ export function useWorkspaceController(
 
         // Filter noisy extension warnings
         const noisy = /origins don't match|preloaded using link preload/i.test(
-          line
+          line,
         );
         if (noisy) return;
       });
@@ -840,13 +843,13 @@ export function useWorkspaceController(
           // Skip if line only contains spinner characters
           const onlySpinners =
             /^[\\/|\-⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏➜←↑→↓◐◓◑◒◴◷◶◵⣾⣽⣻⢿⡿⣟⣯⣷▌▐█▀▄■□●○◆◇\s]+$/.test(
-              cleaned
+              cleaned,
             );
           if (onlySpinners) return;
 
           appendTerminalLine(cleaned);
         },
-        true
+        true,
       )
         .then(async () => {
           const { setCommandProgress, resetCommandProgress } =
@@ -863,7 +866,7 @@ export function useWorkspaceController(
             window.dispatchEvent(
               new CustomEvent("preview-control", {
                 detail: { action: "refresh" },
-              })
+              }),
             );
           }
 
@@ -883,7 +886,7 @@ export function useWorkspaceController(
                 window.dispatchEvent(
                   new CustomEvent("preview-control", {
                     detail: { action: "refresh" },
-                  })
+                  }),
                 );
               }
             }, 500);
@@ -939,7 +942,7 @@ export function useWorkspaceController(
         // Append all text deltas (including processing placeholder)
         chat.updateLastAssistantMessage(
           (prev: string) => prev + delta,
-          isMountedRef
+          isMountedRef,
         );
       },
       // Surface DB queries and results to terminal for visibility
@@ -959,7 +962,7 @@ export function useWorkspaceController(
             appendTerminalLine(`-- SQL OK`);
           } else {
             appendTerminalLine(
-              `-- SQL ERROR: ${data?.error || "unknown error"}`
+              `-- SQL ERROR: ${data?.error || "unknown error"}`,
             );
           }
         } catch {}
@@ -1005,7 +1008,7 @@ export function useWorkspaceController(
       onMessageComplete: (content: string) => {
         // Extract and set project title FIRST
         const artifactMatch = content.match(
-          /<nowgaiArtifact[^>]*title="([^"]*)"/i
+          /<nowgaiArtifact[^>]*title="([^"]*)"/i,
         );
         if (
           artifactMatch &&
@@ -1030,7 +1033,7 @@ export function useWorkspaceController(
         (async () => {
           console.log(
             `%c[R2 Sync] 🎯 onDone callback triggered - streaming complete`,
-            "color: #8b5cf6; font-weight: bold; font-size: 14px"
+            "color: #8b5cf6; font-weight: bold; font-size: 14px",
           );
           if (isMountedRef.current) {
             chat.setIsStreaming(false);
@@ -1050,7 +1053,7 @@ export function useWorkspaceController(
 
             console.log(
               `%c[R2 Sync] 🔍 onDone check: conversationId=${currentConvId}, filesCount=${currentFiles?.length || 0}`,
-              "color: #8b5cf6; font-weight: bold"
+              "color: #8b5cf6; font-weight: bold",
             );
 
             if (currentConvId && currentFiles.length > 0) {
@@ -1059,7 +1062,7 @@ export function useWorkspaceController(
               try {
                 console.log(
                   `%c[R2 Sync] 🔄 Setting isSyncingToR2 = true`,
-                  "color: #8b5cf6; font-weight: bold"
+                  "color: #8b5cf6; font-weight: bold",
                 );
                 setIsSyncingToR2(true);
 
@@ -1075,25 +1078,25 @@ export function useWorkspaceController(
 
                 console.log(
                   `%c[R2 Sync] 📤 Starting client-side upload of ${filesToSync.length} files...`,
-                  "color: #8b5cf6; font-weight: bold"
+                  "color: #8b5cf6; font-weight: bold",
                 );
 
                 const uploadResult = await uploadFilesToR2WithPresignedUrls(
                   currentConvId,
                   undefined, // No chatId for main conversation
-                  filesToSync
+                  filesToSync,
                 );
 
                 if (uploadResult.success) {
                   console.log(
                     `%c[R2 Sync] ✅ Successfully uploaded ${uploadResult.uploadedFiles.length} files`,
-                    "color: #22c55e; font-weight: bold"
+                    "color: #22c55e; font-weight: bold",
                   );
                 } else {
                   console.warn(
                     `%c[R2 Sync] ⚠️ Some files failed to upload:`,
                     "color: #f59e0b; font-weight: bold",
-                    uploadResult.failedFiles
+                    uploadResult.failedFiles,
                   );
                 }
 
@@ -1103,12 +1106,12 @@ export function useWorkspaceController(
                 console.error(
                   `%c[R2 Sync] ❌ Error syncing files to R2:`,
                   "color: #ef4444; font-weight: bold",
-                  syncError
+                  syncError,
                 );
               } finally {
                 console.log(
                   `%c[R2 Sync] 🔄 Setting isSyncingToR2 = false`,
-                  "color: #8b5cf6; font-weight: bold"
+                  "color: #8b5cf6; font-weight: bold",
                 );
                 setIsSyncingToR2(false);
               }
@@ -1119,7 +1122,7 @@ export function useWorkspaceController(
                   currentFiles.map((f: any) => ({
                     path: f.path,
                     content: f.content,
-                  }))
+                  })),
                 );
                 await saveSnapshot(currentConvId, snapshot);
               } catch (error) {
@@ -1137,7 +1140,7 @@ export function useWorkspaceController(
         throw new Error(error);
       },
     }),
-    isMountedRef
+    isMountedRef,
   );
 
   const { handleInitialPrompt } = useInitialPromptHandler({
@@ -1224,7 +1227,7 @@ export function useWorkspaceController(
           const result = await fileStorageService.storeFile(
             file,
             conversationId,
-            webContainer
+            webContainer,
           );
 
           if (result.success && result.fileId) {
@@ -1260,7 +1263,7 @@ export function useWorkspaceController(
           if (
             file.type.startsWith("text/") ||
             /json|javascript|typescript|csv|xml|html|css|md|markdown/.test(
-              file.type
+              file.type,
             ) ||
             /\.(txt|md|json|js|ts|tsx|jsx|css|html)$/i.test(file.name)
           ) {
@@ -1373,7 +1376,7 @@ export function useWorkspaceController(
   // Handle regular prompts (not templates) using normal chat flow
   const handleRegularPrompt = async (
     messageContent: string,
-    currentConversationId?: string
+    currentConversationId?: string,
   ) => {
     try {
       const activeConversationId = currentConversationId || conversationId;
@@ -1404,7 +1407,7 @@ export function useWorkspaceController(
         files.filesMap || {},
         activeConversationId,
         effectiveModel,
-        uploadedFiles
+        uploadedFiles,
       );
 
       await stream(response);
@@ -1484,7 +1487,7 @@ export function useWorkspaceController(
     try {
       // Only allow revert on user messages
       const targetMessage = chat.messages.find(
-        (m: Message) => m.id === messageId
+        (m: Message) => m.id === messageId,
       );
       if (!targetMessage || targetMessage.role !== "user") {
         return;
@@ -1528,7 +1531,7 @@ export function useWorkspaceController(
                 result.artifacts,
                 files,
                 saveFile,
-                runLinear
+                runLinear,
               );
             } else {
               // Fallback to message-based reconstruction
@@ -1536,7 +1539,7 @@ export function useWorkspaceController(
                 uiMessages,
                 files,
                 saveFile,
-                runLinear
+                runLinear,
               );
             }
 
@@ -1634,7 +1637,7 @@ export function useWorkspaceController(
         id: version.id,
         label: index === array.length - 1 ? "Latest" : version.label,
       })),
-    [versions]
+    [versions],
   );
 
   const canCreateVersion =
@@ -1653,7 +1656,7 @@ export function useWorkspaceController(
     }
 
     const sourceVersion = versions.find(
-      (version) => version.id === currentVersionId
+      (version) => version.id === currentVersionId,
     );
     const restoredLabel = sourceVersion
       ? `Restored - ${sourceVersion.label}`
@@ -1741,13 +1744,13 @@ export function useWorkspaceController(
             const uploadResult = await uploadFilesToR2WithPresignedUrls(
               conversationId,
               undefined, // No chatId for revert
-              filesToSync
+              filesToSync,
             );
 
             if (!uploadResult.success) {
               console.warn(
                 "[Revert] Some files failed to sync to R2:",
-                uploadResult.failedFiles
+                uploadResult.failedFiles,
               );
             }
           } catch (syncError) {
@@ -1763,7 +1766,7 @@ export function useWorkspaceController(
           } catch (snapshotError) {
             console.error(
               "[Revert] Error saving IndexedDB snapshot:",
-              snapshotError
+              snapshotError,
             );
           }
         }
@@ -1784,7 +1787,7 @@ export function useWorkspaceController(
       chat,
       setPreviewUrl,
       createVersion,
-    ]
+    ],
   );
 
   const handleReturnToLatestVersion = useCallback(() => {
@@ -1800,7 +1803,7 @@ export function useWorkspaceController(
       files.updateFileContent(path, content);
       return saveFile(path, content);
     },
-    [files.updateFileContent, saveFile]
+    [files.updateFileContent, saveFile],
   );
 
   // Memoize terminal state to prevent unnecessary re-renders
@@ -1810,23 +1813,23 @@ export function useWorkspaceController(
   // Memoize tool execution status to prevent re-renders
   const toolExecutionStatuses = useMemo(
     () => toolExecution.getAllStatuses(),
-    [toolExecution.getAllStatuses]
+    [toolExecution.getAllStatuses],
   );
 
   const availableTools = useMemo(
     () => toolExecution.getAvailableTools(),
-    [toolExecution.getAvailableTools]
+    [toolExecution.getAvailableTools],
   );
 
   const hasToolSupport = useMemo(
     () => toolExecution.hasToolSupport(),
-    [toolExecution.hasToolSupport]
+    [toolExecution.hasToolSupport],
   );
 
   // Memoize the preview URL to prevent unnecessary re-renders
   const resolvedPreviewUrl = useMemo(
     () => livePreviewUrl || previewUrl,
-    [livePreviewUrl, previewUrl]
+    [livePreviewUrl, previewUrl],
   );
 
   return {

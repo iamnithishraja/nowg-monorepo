@@ -210,20 +210,20 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
         throw new Error(data?.error || "Invalid response from server");
       }
       const mergedFiles = (controller.templateFilesState || []).map(
-        (f: { path: string; content: string }) => {
+        (f: { path: string; content: string; name?: string }) => {
           const updated = data.files.find(
             (x: { path: string }) => x.path === f.path,
           );
           return updated
-            ? { path: updated.path, content: updated.content }
-            : { path: f.path, content: f.content };
+            ? { name: f.name || f.path.split("/").pop() || "", path: updated.path, content: updated.content }
+            : { name: f.name || f.path.split("/").pop() || "", path: f.path, content: f.content };
         },
       );
       for (const f of data.files) {
         if (f.path && typeof f.content === "string") {
           controller.saveFile(f.path, f.content);
           if (!mergedFiles.some((m: { path: string }) => m.path === f.path)) {
-            mergedFiles.push({ path: f.path, content: f.content });
+            mergedFiles.push({ name: f.path.split("/").pop() || "", path: f.path, content: f.content });
           }
         }
       }
@@ -246,7 +246,8 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
 
         // Create a new version after saving the edit
         if (controller.handleManualVersionCreate) {
-          controller.handleManualVersionCreate();
+          // Force create a new version using the explicitly merged files
+          controller.handleManualVersionCreate("Canvas Edit", true, mergedFiles);
         }
       } finally {
         useWorkspaceStore.getState().setIsSyncingToR2(false);
