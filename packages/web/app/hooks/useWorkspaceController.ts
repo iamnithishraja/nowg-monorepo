@@ -892,7 +892,7 @@ export function useWorkspaceController(
             }, 500);
           }
         })
-        .catch((error) => {
+        .catch((error: any) => {
           const { setCommandProgress } = useWorkspaceStore.getState() as any;
           setCommandProgress({
             phase: "error",
@@ -1872,6 +1872,7 @@ export function useWorkspaceController(
     chat: {
       setIsLoading: chat.setIsLoading,
       setIsStreaming: chat.setIsStreaming,
+      setError: chat.setError,
     },
 
     // files state
