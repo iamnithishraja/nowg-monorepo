@@ -229,7 +229,11 @@ export function useStreamingHandler() {
                   break;
               }
             } catch (parseError) {
-
+              // Only swallow JSON parse errors - re-throw everything else
+              // (e.g. errors thrown by onError callback must propagate)
+              if (!(parseError instanceof SyntaxError)) {
+                throw parseError;
+              }
             }
           }
         }

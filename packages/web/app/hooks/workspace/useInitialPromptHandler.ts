@@ -154,6 +154,38 @@ export function useInitialPromptHandler({
         error: null,
       });
 
+      // Pre-check balance before cloning template or processing files
+      try {
+        const balanceRes = await fetch("/api/profile/balance", {
+          credentials: "include",
+        });
+        if (balanceRes.ok) {
+          const balanceData = await balanceRes.json();
+          if (
+            balanceData.balance !== null &&
+            balanceData.balance <= 0 &&
+            !balanceData.isWhitelisted
+          ) {
+            // Insufficient funds — don't clone template or process files
+            setIsProcessingTemplate(false);
+            chat.setIsLoading(false);
+            if (onInsufficientBalance) {
+              onInsufficientBalance({
+                error:
+                  "Insufficient balance. Please recharge your account to continue.",
+                errorType: "insufficient_balance",
+                balance: balanceData.balance,
+                requiresRecharge: true,
+              });
+            }
+            return false;
+          }
+        }
+      } catch (balanceCheckError) {
+        // If balance check fails, proceed anyway (server will catch it later)
+        console.warn("Balance pre-check failed, proceeding:", balanceCheckError);
+      }
+
       try {
         if (importedFiles && importedFiles.length > 0) {
           // Prime files map immediately so server-side context selection has access
