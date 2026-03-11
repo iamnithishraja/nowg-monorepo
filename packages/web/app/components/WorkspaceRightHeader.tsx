@@ -602,6 +602,7 @@ export function WorkspaceRightHeader({
             </DropdownMenuContent>
           </DropdownMenu>
 
+
           {/* User Avatar */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -668,6 +669,13 @@ export function WorkspaceRightHeader({
                   <DropdownMenuSeparator className="bg-white/[0.08]" />
                 </>
               )}
+              <DropdownMenuItem
+                onClick={() => navigate("/profile")}
+                className="gap-2 cursor-pointer"
+              >
+                <UserIcon className="w-3.5 h-3.5" />
+                View Profile
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => navigate("/analytics")}
                 className="gap-2 cursor-pointer"

@@ -20,7 +20,7 @@ import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import type { DesignScheme } from "../types/design-scheme";
 import { getShortcutLabel } from "../utils/platform";
 
-import { ArrowUp, FloppyDisk, SelectionPlus } from "@phosphor-icons/react";
+import { ArrowUp, FloppyDisk, SelectionPlus, X } from "@phosphor-icons/react";
 import { FilePreview } from "./FileUpload";
 import { Button } from "./ui/button";
 import {
@@ -640,7 +640,7 @@ export function WorkspaceChatInput({
             )}
           >
             {/* Text Input */}
-            <div className="pb-12">
+            <div className={cn("transition-all duration-200", isEditActive ? "pb-[88px]" : "pb-12")}>
               <Textarea
                 ref={textareaRef}
                 value={input}
@@ -656,188 +656,46 @@ export function WorkspaceChatInput({
               />
             </div>
 
-            {/* Bottom Bar with Buttons */}
-            <div className="absolute bottom-0 left-0 right-0 h-12 px-3 flex items-center gap-1.5 border-t border-border/20 bg-surface-2/50">
-              {/* Chat Mode Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+            {/* Edit Mode Actions Bar - separate row above main toolbar */}
+            {isEditActive && (
+              <div className="absolute bottom-12 left-0 right-0 h-10 px-3 flex items-center gap-2 border-t border-purple-500/20 bg-purple-500/5 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                <div className="flex items-center gap-1.5">
+                  <SelectionPlus className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-[11px] text-purple-400 font-medium">Edit Mode</span>
+                </div>
+                <div className="flex-1" />
+                {onSaveEdit && (
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
-                  >
-                    <div className="flex items-center gap-1">
-                      {chatMode === "build" ? (
-                        <Cursor className="w-3 h-3" />
-                      ) : (
-                        <ChatCircle className="w-3 h-3" />
-                      )}
-                      <span className="capitalize">{chatMode}</span>
-                    </div>
-                    <CaretRight className="w-3 h-3 rotate-90" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="w-40 bg-surface-1 border-border/50"
-                >
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">
-                    Chat Mode
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setChatMode("build")}
-                    className={cn(
-                      "cursor-pointer hover:!text-[#7b4cff]",
-                      chatMode === "build" && "bg-primary/10",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Cursor className="w-3 h-3" />
-                      <span>Build</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setChatMode("ask")}
-                    className={cn(
-                      "cursor-pointer hover:!text-[#7b4cff]",
-                      chatMode === "ask" && "bg-primary/10",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <ChatCircle className="w-3 h-3" />
-                      <span>Ask</span>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Divider */}
-              <div className="w-px h-5 bg-border/30" />
-
-              {/* Model Selector - Compact with concise names */}
-              {selectedModel && onModelChange && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
-                    >
-                      <span className="max-w-[100px] truncate">
-                        {OPENROUTER_MODELS.find((m) => m.id === selectedModel)
-                          ?.shortName || "Model"}
-                      </span>
-                      <CaretRight className="w-3 h-3 rotate-90" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="w-56 bg-surface-1 border-border/50"
-                  >
-                    <DropdownMenuLabel className="text-xs text-muted-foreground">
-                      Select Model
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {OPENROUTER_MODELS.map((model) => (
-                      <DropdownMenuItem
-                        key={model.id}
-                        onClick={() => onModelChange(model.id)}
-                        className={cn(
-                          "cursor-pointer hover:!text-[#7b4cff]",
-                          selectedModel === model.id && "bg-primary/10",
-                        )}
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-sm">{model.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {model.provider}
-                          </span>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-
-              {/* Divider */}
-              <div className="w-px h-5 bg-border/30" />
-
-              {/* Edit Button */}
-              <Button
-                onClick={() => {
-                  if (!isEditActive) {
-                    setWorkspaceActiveTab("preview");
-                    setIsEditActive(true);
-                    const event = new CustomEvent("toggleInspector", {
-                      detail: { enabled: true },
-                    });
-                    window.dispatchEvent(event);
-                  } else {
-                    setIsEditActive(false);
-                    const event = new CustomEvent("toggleInspector", {
-                      detail: { enabled: false },
-                    });
-                    window.dispatchEvent(event);
-                    try {
-                      window.dispatchEvent(new CustomEvent("endEditMode"));
-                    } catch {}
-                  }
-                }}
-                variant="outline"
-                size="sm"
-                className={cn(
-                  "h-7 px-2 text-xs gap-1 transition-all",
-                  isEditActive
-                    ? "text-accent-primary accent-primary/20"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-                title={
-                  isEditActive
-                    ? "Click an element in preview"
-                    : "Edit element in preview"
-                }
-              >
-                <SelectionPlus className="w-3.5 h-3.5" />
-                Edit
-              </Button>
-
-              {/* Save Edit Button - Persist inspector changes to source and sync */}
-              {isEditActive && onSaveEdit && (
-                <Button
-                  onClick={async () => {
-                    if (isSavingEdit) return;
-                    setIsSavingEdit(true);
-                    try {
-                      await onSaveEdit();
-                      setIsEditActive(false);
-                      const event = new CustomEvent("toggleInspector", {
-                        detail: { enabled: false },
-                      });
-                      window.dispatchEvent(event);
+                    onClick={async () => {
+                      if (isSavingEdit) return;
+                      setIsSavingEdit(true);
                       try {
-                        window.dispatchEvent(new CustomEvent("endEditMode"));
-                      } catch {}
-                    } finally {
-                      setIsSavingEdit(false);
-                    }
-                  }}
-                  disabled={isSavingEdit}
-                  variant="default"
-                  size="sm"
-                  className="h-7 px-2 text-xs gap-1 bg-purple-600 hover:bg-purple-700 text-white"
-                  title="Save changes to source files and sync"
-                >
-                  {isSavingEdit ? (
-                    <SpinnerGap className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <FloppyDisk className="w-3.5 h-3.5" />
-                  )}
-                  Save
-                </Button>
-              )}
-              {/* Cancel Edit Button - Shows when edit mode is active */}
-              {isEditActive && (
+                        await onSaveEdit();
+                        setIsEditActive(false);
+                        const event = new CustomEvent("toggleInspector", {
+                          detail: { enabled: false },
+                        });
+                        window.dispatchEvent(event);
+                        try {
+                          window.dispatchEvent(new CustomEvent("endEditMode"));
+                        } catch {}
+                      } finally {
+                        setIsSavingEdit(false);
+                      }
+                    }}
+                    disabled={isSavingEdit}
+                    size="sm"
+                    className="h-7 px-3 text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 text-white transition-all font-medium rounded-md"
+                    title="Save changes to source files and sync"
+                  >
+                    {isSavingEdit ? (
+                      <SpinnerGap className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <FloppyDisk className="w-3.5 h-3.5" />
+                    )}
+                    Save
+                  </Button>
+                )}
                 <Button
                   onClick={() => {
                     setIsEditActive(false);
@@ -849,90 +707,243 @@ export function WorkspaceChatInput({
                       window.dispatchEvent(new CustomEvent("endEditMode"));
                     } catch {}
                   }}
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="h-7 px-2 text-xs gap-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+                  className="h-7 px-3 text-xs gap-1.5 border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all rounded-md"
                   title="Cancel edit mode and revert changes"
                 >
-                  <Square className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                   Cancel
                 </Button>
-              )}
+              </div>
+            )}
+
+            {/* Bottom Bar with Buttons */}
+            <div className="absolute bottom-0 left-0 right-0 h-12 px-3 flex items-center border-t border-border/20 bg-surface-2/50">
+              {/* Left group - shrinkable, hides overflow gracefully */}
+              <div className="flex items-center gap-1.5 min-w-0 overflow-hidden shrink">
+                {/* Chat Mode Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1 shrink-0"
+                    >
+                      <div className="flex items-center gap-1">
+                        {chatMode === "build" ? (
+                          <Cursor className="w-3 h-3" />
+                        ) : (
+                          <ChatCircle className="w-3 h-3" />
+                        )}
+                        <span className="capitalize">{chatMode}</span>
+                      </div>
+                      <CaretRight className="w-3 h-3 rotate-90" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-40 bg-surface-1 border-border/50"
+                  >
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">
+                      Chat Mode
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setChatMode("build")}
+                      className={cn(
+                        "cursor-pointer hover:!text-[#7b4cff]",
+                        chatMode === "build" && "bg-primary/10",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Cursor className="w-3 h-3" />
+                        <span>Build</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setChatMode("ask")}
+                      className={cn(
+                        "cursor-pointer hover:!text-[#7b4cff]",
+                        chatMode === "ask" && "bg-primary/10",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ChatCircle className="w-3 h-3" />
+                        <span>Ask</span>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Divider */}
+                <div className="w-px h-5 bg-border/30 shrink-0" />
+
+                {/* Model Selector - Compact with concise names */}
+                {selectedModel && onModelChange && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1 shrink-0"
+                      >
+                        <span className="max-w-[100px] truncate">
+                          {OPENROUTER_MODELS.find((m) => m.id === selectedModel)
+                            ?.shortName || "Model"}
+                        </span>
+                        <CaretRight className="w-3 h-3 rotate-90" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="w-56 bg-surface-1 border-border/50"
+                    >
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">
+                        Select Model
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {OPENROUTER_MODELS.map((model) => (
+                        <DropdownMenuItem
+                          key={model.id}
+                          onClick={() => onModelChange(model.id)}
+                          className={cn(
+                            "cursor-pointer hover:!text-[#7b4cff]",
+                            selectedModel === model.id && "bg-primary/10",
+                          )}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-sm">{model.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {model.provider}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
+                {/* Divider */}
+                <div className="w-px h-5 bg-border/30 shrink-0" />
+
+                {/* Edit Button */}
+                <Button
+                  onClick={() => {
+                    if (!isEditActive) {
+                      setWorkspaceActiveTab("preview");
+                      setIsEditActive(true);
+                      const event = new CustomEvent("toggleInspector", {
+                        detail: { enabled: true },
+                      });
+                      window.dispatchEvent(event);
+                    } else {
+                      setIsEditActive(false);
+                      const event = new CustomEvent("toggleInspector", {
+                        detail: { enabled: false },
+                      });
+                      window.dispatchEvent(event);
+                      try {
+                        window.dispatchEvent(new CustomEvent("endEditMode"));
+                      } catch {}
+                    }
+                  }}
+                  variant={isEditActive ? "default" : "outline"}
+                  size="sm"
+                  className={cn(
+                    "h-7 px-2 text-xs gap-1 transition-all shrink-0",
+                    isEditActive
+                      ? "bg-purple-600 hover:bg-purple-700 text-white"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  title={
+                    isEditActive
+                      ? "Click an element in preview"
+                      : "Edit element in preview"
+                  }
+                >
+                  <SelectionPlus className="w-3.5 h-3.5" />
+                  Edit
+                </Button>
+              </div>
 
               {/* Spacer */}
-              <div className="flex-1" />
+              <div className="flex-1 min-w-1" />
 
-              {/* Upload Button - Right aligned */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={handleFileSelect}
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  Upload files
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Action Buttons */}
-              {!isLoading && !isStreaming && (
+              {/* Right group - never shrinks, always visible */}
+              <div className="flex items-center gap-1 shrink-0">
+                {/* Upload Button */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      onClick={handleEnhance}
-                      disabled={!input.trim() || isDisabled || isEnhancing}
+                      onClick={handleFileSelect}
                       variant="ghost"
                       size="sm"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-accent-primary disabled:opacity-30"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                     >
-                      {isEnhancing ? (
-                        <SpinnerGap className="w-3.5 h-3.5 animate-spin text-accent-primary" />
-                      ) : (
-                        <Sparkle className="w-3.5 h-3.5" />
-                      )}
+                      <Upload className="w-3.5 h-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">
-                    Enhance prompt
+                    Upload files
                   </TooltipContent>
                 </Tooltip>
-              )}
 
-              {/* Send button */}
-              {!isLoading && !isStreaming && (
-                <Button
-                  onClick={handleSend}
-                  disabled={!input.trim() || isDisabled || isEnhancing}
-                  size="sm"
-                  className={cn(
-                    "h-7 w-7 p-0 rounded-full transition-all",
-                    input.trim() && !isDisabled && !isEnhancing
-                      ? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-hover)]"
-                      : "bg-surface-3 text-tertiary cursor-not-allowed",
-                  )}
-                  title="Send message"
-                >
-                  <ArrowUp className="w-3.5 h-3.5" />
-                </Button>
-              )}
+                {/* Enhance Button */}
+                {!isLoading && !isStreaming && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={handleEnhance}
+                        disabled={!input.trim() || isDisabled || isEnhancing}
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-accent-primary disabled:opacity-30"
+                      >
+                        {isEnhancing ? (
+                          <SpinnerGap className="w-3.5 h-3.5 animate-spin text-accent-primary" />
+                        ) : (
+                          <Sparkle className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Enhance prompt
+                    </TooltipContent>
+                  </Tooltip>
+                )}
 
-              {/* Stop button */}
-              {(isLoading || isStreaming || isProcessingTemplate) &&
-                onInterrupt && (
+                {/* Send button */}
+                {!isLoading && !isStreaming && (
                   <Button
-                    onClick={handleStopClick}
+                    onClick={handleSend}
+                    disabled={!input.trim() || isDisabled || isEnhancing}
                     size="sm"
-                    className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full"
-                    title="Stop generation"
+                    className={cn(
+                      "h-7 w-7 p-0 rounded-full transition-all",
+                      input.trim() && !isDisabled && !isEnhancing
+                        ? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-hover)]"
+                        : "bg-surface-3 text-tertiary cursor-not-allowed",
+                    )}
+                    title="Send message"
                   >
-                    <Square className="w-3.5 h-3.5" />
+                    <ArrowUp className="w-3.5 h-3.5" />
                   </Button>
                 )}
+
+                {/* Stop button */}
+                {(isLoading || isStreaming || isProcessingTemplate) &&
+                  onInterrupt && (
+                    <Button
+                      onClick={handleStopClick}
+                      size="sm"
+                      className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full"
+                      title="Stop generation"
+                    >
+                      <Square className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+              </div>
             </div>
           </div>
         </div>

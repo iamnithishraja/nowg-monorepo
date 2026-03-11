@@ -376,6 +376,13 @@ export default function Header({
                     </>
                   )}
 
+                  <DropdownMenuItem
+                    onClick={() => navigate("/profile")}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <UserIcon className="w-4 h-4" />
+                    View Profile
+                  </DropdownMenuItem>
                   {user && (() => {
                     const userRole = userWithAccess?.role || user?.role;
                     const hasOrgAdminAccess = userWithAccess?.hasOrgAdminAccess || user?.hasOrgAdminAccess || false;

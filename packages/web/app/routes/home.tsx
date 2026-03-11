@@ -21,6 +21,7 @@ import {
   Sparkle,
   SpinnerGap,
   Star,
+  User as UserIcon,
   Users,
 } from "@phosphor-icons/react";
 import { memo, useEffect, useRef, useState } from "react";
@@ -1031,6 +1032,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   </>
                 )}
 
+                <DropdownMenuItem
+                  onClick={() => navigate("/profile")}
+                  className="gap-2 cursor-pointer"
+                >
+                  <UserIcon className="w-4 h-4" weight="bold" />
+                  View Profile
+                </DropdownMenuItem>
                 {canAccessAdminPanel && (
                   <DropdownMenuItem
                     onClick={() => navigate("/admin")}
