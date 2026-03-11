@@ -62,31 +62,7 @@ import { generateMessageId, generatePartId } from "~/models/agentMessageModel";
  * - done: Stream ended
  */
 
-/** Message shown when our OpenRouter credits are exhausted (provider-side). User credits are not deducted. */
-const PROVIDER_MAINTENANCE_MESSAGE =
-  "NowgAI is under maintenance. Your credits won't be deducted — you're safe.";
-
-function isOpenRouterExhausted(error: unknown): boolean {
-  const msg =
-    typeof error === "object" && error !== null && "message" in error
-      ? String((error as { message?: unknown }).message)
-      : String(error);
-  const s = msg.toLowerCase();
-  return (
-    s.includes("401") ||
-    s.includes("402") ||
-    s.includes("429") ||
-    s.includes("payment required") ||
-    s.includes("insufficient credits") ||
-    s.includes("quota exceeded") ||
-    (s.includes("quota") && (s.includes("exceeded") || s.includes("limit"))) ||
-    s.includes("rate limit") ||
-    s.includes("usage limit") ||
-    s.includes("credits exhausted") ||
-    s.includes("out of credits") ||
-    (s.includes("billing") && s.includes("limit"))
-  );
-}
+import { isOpenRouterExhausted, PROVIDER_MAINTENANCE_MESSAGE } from "~/lib/utils.server";
 
 /**
  * Tool categories for execution flow control

@@ -1437,7 +1437,11 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
           setShowInsufficientBalanceModal(false);
           setErrorData(null);
           // Show message on the left side (chat UI) when the user closes the modal
-          controller.chat.setError("You don't have enough funds to create this project.");
+          controller.chat.addMessage({
+            id: `insufficient-funds-${Date.now()}`,
+            role: "assistant",
+            content: "You don't have enough funds to create this project."
+          });
         }}
         errorData={errorData}
         persistent={isPersistentModal}

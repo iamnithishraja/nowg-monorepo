@@ -1,7 +1,10 @@
 import JSZip from "jszip";
 import { GitHubRepoImporter } from "./githubRepo";
 import { getEnv, getEnvWithDefault } from "./env";
-import { PROVIDER_MAINTENANCE_MESSAGE } from "./utils.server";
+import {
+  PROVIDER_MAINTENANCE_MESSAGE,
+  isOpenRouterExhausted,
+} from "./utils.server";
 
 // Template definitions
 interface Template {
@@ -222,11 +225,20 @@ MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
       );
 
       if (!response.ok) {
-        const status = response.status;
-        if (status === 401 || status === 402 || status === 429) {
+        let errorData: any = { statusCode: response.status };
+        try {
+          const text = await response.text();
+          errorData = JSON.parse(text);
+          errorData.statusCode = response.status;
+        } catch (e) {
+          // ignore parsing errors
+        }
+
+        if (isOpenRouterExhausted(errorData)) {
           throw new Error(PROVIDER_MAINTENANCE_MESSAGE);
         }
-        throw new Error(`OpenRouter API error: ${status}`);
+        
+        throw new Error(`OpenRouter API error: ${response.status}`);
       }
 
       const data = await response.json();

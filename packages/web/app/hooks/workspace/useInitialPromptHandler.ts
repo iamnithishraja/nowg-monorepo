@@ -283,7 +283,6 @@ export function useInitialPromptHandler({
           templateData.templateFiles &&
           templateData.templateFiles.length > 0
         ) {
-          // Prime files map immediately so server-side context selection has access
           try {
             const normalizedPrime = templateData.templateFiles.map(
               (f: any) => ({
@@ -292,128 +291,135 @@ export function useInitialPromptHandler({
                 content: f.content,
               }),
             );
+
+            // Build mock files map to send to LLM without committing to UI yet
+            const mockFilesMap: any = {};
+            for (const f of normalizedPrime) {
+              const absolutePath = `/home/project/${f.path.replace(/^\//, "")}`;
+              mockFilesMap[absolutePath] = { type: "file", content: f.content, isBinary: false };
+            }
+
+            const templateAssistantMessage: Message = {
+              id: `assistant-template-${Date.now()}`,
+              role: "assistant",
+              content:
+                templateData.assistantMessage ||
+                `Project set up successfully using ${
+                  templateData.templateName || "template"
+                }! Now processing your request...`,
+            };
+
+            const historyExcludingPlaceholder = (chat as any).messages || [];
+            
+            const templateContextMessage = {
+              id: templateAssistantMessage.id,
+              role: "assistant" as const,
+              content:
+                templateData.assistantMessage ||
+                `Project set up successfully using ${
+                  templateData.templateName || "template"
+                }.`,
+            };
+
+            // 1. Await sendChatMessage first to ensure OpenRouter is not exhausted
+            const response = await chat.sendChatMessage(
+              [
+                ...historyExcludingPlaceholder,
+                templateContextMessage,
+                aiUserMessage,
+              ],
+              Object.keys(files.filesMap).length > 0 ? files.filesMap : mockFilesMap,
+              activeConversationId,
+              effectiveModel,
+              getUploadedFiles ? getUploadedFiles() : undefined,
+              designScheme,
+              figmaUrl,
+              enableFigmaMCP,
+            );
+
+            // 2. If we reach here, no 503 or 402 was thrown! It's safe to commit to UI.
+            
+            // Setup files in UI
             if (files && typeof files.setupTemplateFiles === "function") {
               files.setupTemplateFiles(normalizedPrime);
             }
-          } catch (e) {}
 
-          // Kick off actual file writes and webcontainer sync in background
-          // to reduce latency before first streamed token
-          (async () => {
-            try {
-              await handleTemplateFiles(templateData.templateFiles);
-            } catch (err) {
-              console.error("Error writing template files (background):", err);
-            }
-          })();
-
-          // Extract project title from template assistant message
-          if (templateData.assistantMessage && (chat as any).setProjectTitle) {
-            const artifactMatch = templateData.assistantMessage.match(
-              /<nowgaiArtifact[^>]*title="([^"]*)"/i,
-            );
-            if (artifactMatch && artifactMatch[1]) {
-              (chat as any).setProjectTitle(artifactMatch[1], isMountedRef);
-            }
-          }
-
-          const templateAssistantMessage: Message = {
-            id: `assistant-template-${Date.now()}`,
-            role: "assistant",
-            content:
-              templateData.assistantMessage ||
-              `Project set up successfully using ${
-                templateData.templateName || "template"
-              }! Now processing your request...`,
-          };
-          chat.addMessage(templateAssistantMessage, isMountedRef);
-
-          // Save the template assistant message to the database
-          if (activeConversationId) {
-            try {
-              const response = await fetch("/api/conversations", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  action: "addMessage",
-                  conversationId: activeConversationId,
-                  message: {
-                    role: "assistant",
-                    content:
-                      templateData.assistantMessage ||
-                      templateAssistantMessage.content,
-                  },
-                }),
-              });
-
-              if (!response.ok) {
-                console.error("Failed to save template message to database");
+            // Write files in background
+            (async () => {
+              try {
+                await handleTemplateFiles(templateData.templateFiles);
+              } catch (err) {
+                console.error("Error writing template files (background):", err);
               }
-            } catch (error) {
-              console.error("Error saving template message:", error);
+            })();
+
+            // Extract project title from template assistant message
+            if (templateData.assistantMessage && (chat as any).setProjectTitle) {
+              const artifactMatch = templateData.assistantMessage.match(
+                /<nowgaiArtifact[^>]*title="([^"]*)"/i,
+              );
+              if (artifactMatch && artifactMatch[1]) {
+                (chat as any).setProjectTitle(artifactMatch[1], isMountedRef);
+              }
             }
+
+            chat.addMessage(templateAssistantMessage, isMountedRef);
+
+            // Save the template assistant message to the database
+            if (activeConversationId) {
+              try {
+                const dbResponse = await fetch("/api/conversations", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    action: "addMessage",
+                    conversationId: activeConversationId,
+                    message: {
+                      role: "assistant",
+                      content:
+                        templateData.assistantMessage ||
+                        templateAssistantMessage.content,
+                    },
+                  }),
+                });
+
+                if (!dbResponse.ok) {
+                  console.error("Failed to save template message to database");
+                }
+              } catch (error) {
+                console.error("Error saving template message:", error);
+              }
+            }
+
+            // Insert a separate assistant placeholder for the streamed response
+            chat.beginAssistantMessage(isMountedRef);
+            if ((chat as any).resetFileIndicators) {
+              (chat as any).resetFileIndicators();
+            }
+
+            chat.setIsLoading(true);
+            setIsProcessingTemplate(false);
+            chat.setIsStreaming(true);
+
+            // Clear uploaded files state immediately after API success
+            if (clearUploadedFiles) {
+              clearUploadedFiles();
+            }
+
+            await handleStreamingResponseWrapper(response);
+
+            // Mark idempotency key as done after successful streaming
+            if (idempotencyKey && typeof window !== "undefined") {
+              window.sessionStorage.setItem(idempotencyKey, "done");
+            }
+
+            // Clean up uploaded files from IndexedDB after successful send
+            await cleanupUploadedFiles(activeConversationId);
+          } catch (e) {
+            throw e; // Throw to the outer catch wrapper for error handling
           }
-
-          // Insert a separate assistant placeholder for the streamed response
-          const placeholderId = chat.beginAssistantMessage(isMountedRef);
-          if ((chat as any).resetFileIndicators) {
-            (chat as any).resetFileIndicators();
-          }
-
-          chat.setIsLoading(true);
-          setIsProcessingTemplate(false);
-          chat.setIsStreaming(true);
-
-          // Build model message history ensuring the last message is the user message,
-          // so uploaded images are attached correctly on first send
-          const historyExcludingPlaceholder =
-            (chat as any).messages?.filter?.(
-              (m: any) => m.id !== placeholderId,
-            ) || [];
-
-          // Ensure the template artifact message is present before the user message
-          // so the model sees the existing TypeScript/Vite project structure.
-          const templateContextMessage = {
-            id: `assistant-template-${Date.now()}`,
-            role: "assistant" as const,
-            content:
-              templateData.assistantMessage ||
-              `Project set up successfully using ${
-                templateData.templateName || "template"
-              }.`,
-          };
-
-          const response = await chat.sendChatMessage(
-            [
-              ...historyExcludingPlaceholder,
-              templateContextMessage,
-              aiUserMessage,
-            ],
-            files.filesMap,
-            activeConversationId,
-            effectiveModel,
-            getUploadedFiles ? getUploadedFiles() : undefined,
-            designScheme,
-            figmaUrl,
-            enableFigmaMCP,
-          );
-
-          // Clear uploaded files state immediately after sending
-          if (clearUploadedFiles) {
-            clearUploadedFiles();
-          }
-
-          await handleStreamingResponseWrapper(response);
-
-          // Mark idempotency key as done after successful streaming
-          if (idempotencyKey && typeof window !== "undefined") {
-            window.sessionStorage.setItem(idempotencyKey, "done");
-          }
-
-          // Clean up uploaded files from IndexedDB after successful send
-          await cleanupUploadedFiles(activeConversationId);
         } else {
           // Check if the input was detected as invalid/gibberish
           if (templateData.templateName === "invalid") {

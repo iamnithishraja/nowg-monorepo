@@ -10,6 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link } from "react-router";
+import { z } from "zod";
 import { authClient, signIn, signUp } from "../lib/authClient";
 import { Input } from "./ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -108,6 +109,16 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
     setShowResendVerification(false);
 
     try {
+      // Validate email format
+      const emailSchema = z.string().email();
+      const emailValidation = emailSchema.safeParse(signinEmail);
+
+      if (!emailValidation.success) {
+        setError("Please enter a valid email address.");
+        setIsLoading(false);
+        return;
+      }
+
       // First, check if the user exists
       const userExists = await checkUserExists(signinEmail);
       
@@ -218,6 +229,16 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
     setIsLoading(true);
     setError("");
     try {
+      // Validate email format
+      const emailSchema = z.string().email();
+      const emailValidation = emailSchema.safeParse(signupEmail);
+
+      if (!emailValidation.success) {
+        setError("Please enter a valid email address.");
+        setIsLoading(false);
+        return;
+      }
+
       // First, check if the user already exists
       const userExists = await checkUserExists(signupEmail);
       if (userExists) {

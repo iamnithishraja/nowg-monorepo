@@ -1873,6 +1873,7 @@ export function useWorkspaceController(
       setIsLoading: chat.setIsLoading,
       setIsStreaming: chat.setIsStreaming,
       setError: chat.setError,
+      addMessage: chat.addMessage,
     },
 
     // files state
