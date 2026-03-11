@@ -8,12 +8,14 @@ import {
   SpinnerGap,
   X,
 } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link } from "react-router";
 import { z } from "zod";
 import { authClient, signIn, signUp } from "../lib/authClient";
 import { Input } from "./ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+
+const emailSchema = z.string().email("Please enter a valid email address.");
 
 type AuthInitialTab = "signin" | "signup";
 
@@ -31,6 +33,8 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
 
   // sign in state
   const [signinEmail, setSigninEmail] = useState("");
+  const [signinEmailError, setSigninEmailError] = useState("");
+  const [signinEmailTouched, setSigninEmailTouched] = useState(false);
   const [signinPassword, setSigninPassword] = useState("");
   const [showSigninPassword, setShowSigninPassword] = useState(false);
   const [showResendVerification, setShowResendVerification] = useState(false);
@@ -40,6 +44,8 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
   // sign up state
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
+  const [signupEmailError, setSignupEmailError] = useState("");
+  const [signupEmailTouched, setSignupEmailTouched] = useState(false);
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
   const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -53,6 +59,30 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
     signupConfirm.length > 0 && signupPassword !== signupConfirm;
   const passwordValid = signupPassword.length >= 8;
   const showPasswordValidation = signupPassword.length > 0;
+
+  // Real-time email validation helper
+  const validateEmail = useCallback((email: string) => {
+    if (!email) return "";
+    const result = emailSchema.safeParse(email);
+    return result.success ? "" : result.error.issues[0]?.message || "Please enter a valid email address.";
+  }, []);
+
+  const handleSigninEmailChange = (value: string) => {
+    setSigninEmail(value);
+    if (signinEmailTouched) {
+      setSigninEmailError(validateEmail(value));
+    }
+  };
+
+  const handleSignupEmailChange = (value: string) => {
+    setSignupEmail(value);
+    if (signupEmailTouched) {
+      setSignupEmailError(validateEmail(value));
+    }
+  };
+
+  const signinEmailValid = signinEmail.length > 0 && !validateEmail(signinEmail);
+  const signupEmailValid = signupEmail.length > 0 && !validateEmail(signupEmail);
 
   const handleSocial = async (provider: "google" | "github") => {
     setIsLoading(true);
@@ -104,20 +134,19 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
     e.preventDefault();
     if (!signinEmail || !signinPassword) return;
 
+    // Validate email before submitting
+    setSigninEmailTouched(true);
+    const emailErr = validateEmail(signinEmail);
+    if (emailErr) {
+      setSigninEmailError(emailErr);
+      return;
+    }
+
     setIsLoading(true);
     setError("");
     setShowResendVerification(false);
 
     try {
-      // Validate email format
-      const emailSchema = z.string().email();
-      const emailValidation = emailSchema.safeParse(signinEmail);
-
-      if (!emailValidation.success) {
-        setError("Please enter a valid email address.");
-        setIsLoading(false);
-        return;
-      }
 
       // First, check if the user exists
       const userExists = await checkUserExists(signinEmail);
@@ -228,16 +257,17 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
       return;
     setIsLoading(true);
     setError("");
-    try {
-      // Validate email format
-      const emailSchema = z.string().email();
-      const emailValidation = emailSchema.safeParse(signupEmail);
+    // Validate email before submitting
+    setSignupEmailTouched(true);
+    const emailErr = validateEmail(signupEmail);
+    if (emailErr) {
+      setSignupEmailError(emailErr);
+      return;
+    }
 
-      if (!emailValidation.success) {
-        setError("Please enter a valid email address.");
-        setIsLoading(false);
-        return;
-      }
+    setIsLoading(true);
+    setError("");
+    try {
 
       // First, check if the user already exists
       const userExists = await checkUserExists(signupEmail);
@@ -347,12 +377,30 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
               <Input
                 type="email"
                 placeholder="you@example.com"
-                className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
+                className={`h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300 ${signinEmailTouched && signinEmailError ? "border-red-500/40 focus:border-red-500/50 focus:ring-red-500/20" : ""}`}
                 value={signinEmail}
-                onChange={(e) => setSigninEmail(e.target.value)}
+                onChange={(e) => handleSigninEmailChange(e.target.value)}
+                onBlur={() => {
+                  setSigninEmailTouched(true);
+                  setSigninEmailError(validateEmail(signinEmail));
+                }}
                 disabled={isLoading}
                 required
               />
+              {signinEmailTouched && signinEmail.length > 0 && (
+                <div className="flex items-center gap-3 text-xs mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center ${signinEmailValid ? "bg-green-500/20" : "bg-red-500/20"}`}>
+                    {signinEmailValid ? (
+                      <Check className="w-3 h-3 text-green-400" weight="bold" />
+                    ) : (
+                      <X className="w-3 h-3 text-red-400" weight="bold" />
+                    )}
+                  </div>
+                  <span className={`font-medium ${signinEmailValid ? "text-green-400" : "text-red-400"}`}>
+                    {signinEmailValid ? "Valid email" : signinEmailError}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2.5">
@@ -437,7 +485,7 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={!signinEmail || !signinPassword || isLoading}
+              disabled={!signinEmail || !signinPassword || isLoading || !signinEmailValid}
               className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-white to-white/95 text-black font-bold text-sm hover:from-white/95 hover:to-white/85 hover:shadow-lg hover:shadow-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center justify-center gap-2 overflow-hidden"
             >
               {isLoading && (
@@ -520,12 +568,30 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
                 <Input
                   type="email"
                   placeholder="you@example.com"
-                  className="h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300"
+                  className={`h-12 bg-white/[0.02] border-white/[0.06] rounded-xl text-white placeholder:text-white/40 focus:border-purple-500/50 focus:ring-purple-500/20 focus:ring-2 focus:bg-white/[0.04] transition-all duration-300 ${signupEmailTouched && signupEmailError ? "border-red-500/40 focus:border-red-500/50 focus:ring-red-500/20" : ""}`}
                   value={signupEmail}
-                  onChange={(e) => setSignupEmail(e.target.value)}
+                  onChange={(e) => handleSignupEmailChange(e.target.value)}
+                  onBlur={() => {
+                    setSignupEmailTouched(true);
+                    setSignupEmailError(validateEmail(signupEmail));
+                  }}
                   disabled={isLoading}
                   required
                 />
+                {signupEmailTouched && signupEmail.length > 0 && (
+                  <div className="flex items-center gap-3 text-xs mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${signupEmailValid ? "bg-green-500/20" : "bg-red-500/20"}`}>
+                      {signupEmailValid ? (
+                        <Check className="w-3 h-3 text-green-400" weight="bold" />
+                      ) : (
+                        <X className="w-3 h-3 text-red-400" weight="bold" />
+                      )}
+                    </div>
+                    <span className={`font-medium ${signupEmailValid ? "text-green-400" : "text-red-400"}`}>
+                      {signupEmailValid ? "Valid email" : signupEmailError}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2.5">
