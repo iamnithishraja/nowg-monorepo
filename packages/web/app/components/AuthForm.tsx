@@ -77,6 +77,28 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
     }
   };
 
+  // Helper function to check if user exists
+  const checkUserExists = async (email: string): Promise<boolean> => {
+    try {
+      const checkUserResponse = await fetch("/api/check-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (checkUserResponse.ok) {
+        const checkResult = await checkUserResponse.json();
+        return checkResult.exists === true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking user existence:", error);
+      return false;
+    }
+  };
+
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signinEmail || !signinPassword) return;
@@ -84,28 +106,6 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
     setIsLoading(true);
     setError("");
     setShowResendVerification(false);
-
-    // Helper function to check if user exists
-    const checkUserExists = async (email: string): Promise<boolean> => {
-      try {
-        const checkUserResponse = await fetch("/api/check-user", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email }),
-        });
-
-        if (checkUserResponse.ok) {
-          const checkResult = await checkUserResponse.json();
-          return checkResult.exists === true;
-        }
-        return false;
-      } catch (error) {
-        console.error("Error checking user existence:", error);
-        return false;
-      }
-    };
 
     try {
       // First, check if the user exists
@@ -218,6 +218,14 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
     setIsLoading(true);
     setError("");
     try {
+      // First, check if the user already exists
+      const userExists = await checkUserExists(signupEmail);
+      if (userExists) {
+        setError("An account with this email already exists. Please sign in instead.");
+        setIsLoading(false);
+        return;
+      }
+
       const result = await signUp.email({
         email: signupEmail,
         password: signupPassword,
