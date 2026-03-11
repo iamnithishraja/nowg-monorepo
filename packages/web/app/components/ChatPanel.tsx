@@ -1546,7 +1546,7 @@ function ChatPanelComponent({
                     <div className="flex-1">
                       <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-lg space-y-1">
                         <p className="text-sm font-semibold text-amber-400">
-                          NowGAI is under maintenance
+                          NowgAI is under maintenance
                         </p>
                         <p className="text-sm text-amber-300/80">
                           Your credits are safe — nothing will be deducted.

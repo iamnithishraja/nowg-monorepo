@@ -30,7 +30,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 /** Message shown when our OpenRouter credits are exhausted (provider-side). User credits are not deducted. */
 const PROVIDER_MAINTENANCE_MESSAGE =
-  "NowGAI is under maintenance. Your credits won't be deducted — you're safe.";
+  "NowgAI is under maintenance. Your credits won't be deducted — you're safe.";
 
 function isOpenRouterExhausted(error: unknown): boolean {
   // Check statusCode for API errors (e.g. AI_APICallError has statusCode 402)

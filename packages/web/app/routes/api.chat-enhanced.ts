@@ -12,7 +12,7 @@ import { createClientFileStorageService } from "~/lib/clientFileStorage";
 
 /** Message shown when our OpenRouter credits are exhausted (provider-side). User credits are not deducted. */
 const PROVIDER_MAINTENANCE_MESSAGE =
-  "NowGAI is under maintenance. Your credits won't be deducted — you're safe.";
+  "NowgAI is under maintenance. Your credits won't be deducted — you're safe.";
 
 function isOpenRouterExhausted(error: unknown): boolean {
   if (typeof error === "object" && error !== null && "statusCode" in error) {

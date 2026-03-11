@@ -70,7 +70,7 @@ export interface LLMChatResponse {
 
 /** Shown when OpenRouter is unavailable (401/402/429). User credits are not deducted. */
 export const PROVIDER_MAINTENANCE_MESSAGE =
-  "NowGAI is under maintenance. Your credits won't be deducted — you're safe.";
+  "NowgAI is under maintenance. Your credits won't be deducted — you're safe.";
 
 /**
  * Makes a request to OpenRouter API for LLM chat completion

@@ -532,7 +532,7 @@ export function useWorkspaceChat() {
       if (response.status === 503 && errorType === "provider_maintenance") {
         const error = new Error(
           errorMessage ||
-            "NowGAI is under maintenance. Your credits won't be deducted — you're safe."
+            "NowgAI is under maintenance. Your credits won't be deducted — you're safe."
         ) as any;
         error.errorType = "provider_maintenance";
         throw error;
