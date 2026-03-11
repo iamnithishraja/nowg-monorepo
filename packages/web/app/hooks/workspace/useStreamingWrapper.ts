@@ -21,7 +21,7 @@ export interface StreamingHandlerOptions {
   onTextDelta: (delta: string) => void;
   onMessageComplete: (content: string) => void;
   onDone: () => void;
-  onError: (error: string) => void;
+  onError: (error: string, errorType?: string) => void;
   // Optional hooks for database/supabase events
   onDbAction?: (action: { type: string; operation: string; sql: string }) => Promise<void> | void;
   onDbResult?: (data: any) => Promise<void> | void;

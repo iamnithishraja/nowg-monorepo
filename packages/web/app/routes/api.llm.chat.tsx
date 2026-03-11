@@ -931,6 +931,12 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
         let lastPartialSaveTime = 0;
         const PARTIAL_SAVE_INTERVAL_MS = 2500; // Save partial every 2.5s so reopening tab sees latest
 
+
+        // Capture the original provider error (e.g. 402 from OpenRouter) via onError.
+        // The AI SDK wraps stream failures as NoOutputGeneratedError ("No output generated")
+        // which hides the real cause. We store it here so the catch block can check it.
+        let capturedStreamError: unknown = null;
+
         try {
           // Send conversation ID
           sendChunk({
@@ -994,6 +1000,10 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
                     },
                   ],
             model: openrouter(model),
+            onError: ({ error }) => {
+              console.error("[API][llm.chat] streamText onError:", error);
+              capturedStreamError = error;
+            },
             // Add Figma MCP tools if available
             tools: figmaTools || undefined,
             // @ts-ignore - maxSteps enables multi-step tool calling
@@ -1374,7 +1384,11 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
             },
           });
 
-          // Removed auto-creation of uploaded images
+          // Prevent unhandled rejections if the stream fails
+          result.text?.catch(() => {});
+          if ('warnings' in result) (result as any).warnings?.catch?.(() => {});
+          if ('usage' in result) (result as any).usage?.catch?.(() => {});
+          if ('steps' in result) (result as any).steps?.catch?.(() => {});
 
           // 🔥 NEW STREAMING LOGIC - Properly handles text before, during, and after artifacts
           for await (const delta of result.textStream) {
@@ -2058,7 +2072,8 @@ ${getFigmaMCPSystemPromptAddition(detectedFigmaUrl)}`;
           }
 
           try {
-            const isProviderExhausted = isOpenRouterExhausted(error);
+            const isProviderExhausted = isOpenRouterExhausted(error) || isOpenRouterExhausted(capturedStreamError);
+            console.error("[API][llm.chat] Stream catch:", error, "| capturedStreamError:", capturedStreamError);
             sendChunk({
               type: "error",
               error: isProviderExhausted

@@ -261,6 +261,11 @@ ${summary}
           );
         };
 
+        // Capture the original provider error (e.g. 402 from OpenRouter) via onError.
+        // The AI SDK wraps stream failures as NoOutputGeneratedError ("No output generated")
+        // which hides the real cause. We store it here so the catch block can check it.
+        let capturedStreamError: unknown = null;
+
         try {
           // Send conversation ID
           sendChunk({
@@ -287,11 +292,21 @@ ${summary}
             throw new Error("OPENROUTER_API_KEY is not set");
           }
           const openrouter = createOpenRouter({ apiKey: openRouterApiKey });
+
           const result = await streamText({
             system: systemPrompt,
             prompt: buildUserPrompt(false),
             model: openrouter(model),
+            onError: ({ error }) => {
+              console.error("[API][chat-enhanced] streamText onError:", error);
+              capturedStreamError = error;
+            },
           });
+
+          // Prevent unhandled rejections if the stream fails
+          result.text?.catch(() => {});
+          if ('warnings' in result) (result as any).warnings?.catch?.(() => {});
+          if ('usage' in result) (result as any).usage?.catch?.(() => {});
 
           // Stream the response as it's generated
           for await (const delta of result.textStream) {
@@ -516,7 +531,10 @@ ${summary}
           });
 
         } catch (error) {
-          const isProviderExhausted = isOpenRouterExhausted(error);
+          console.error("[API][chat-enhanced] Stream catch:", error);
+          // Check both the caught error AND the original provider error captured by onError.
+          // The AI SDK often wraps the real 402/429 error as a generic "No output generated" error.
+          const isProviderExhausted = isOpenRouterExhausted(error) || isOpenRouterExhausted(capturedStreamError);
           sendChunk({
             type: "error",
             error: isProviderExhausted

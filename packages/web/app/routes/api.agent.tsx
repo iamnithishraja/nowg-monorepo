@@ -488,6 +488,12 @@ export async function action({ request }: ActionFunctionArgs) {
           controller.enqueue(encoder.encode(chunk));
         };
 
+
+        // Capture the original provider error (e.g. 402 from OpenRouter) via onError.
+        // The AI SDK wraps stream failures as NoOutputGeneratedError ("No output generated")
+        // which hides the real cause. We store it here so the catch block can check it.
+        let capturedStreamError: unknown = null;
+
         try {
           // Generate session ID
           const sessionId =
@@ -707,6 +713,10 @@ export async function action({ request }: ActionFunctionArgs) {
               system: systemPrompt,
               messages,
               tools,
+              onError: ({ error }) => {
+                console.error("[Agent API] streamText onError:", error);
+                capturedStreamError = error;
+              },
               // Allow up to 5 steps for server-side tool execution
               // This lets the AI call websearch, get results, and continue
               stopWhen: stepCountIs(5),
@@ -754,6 +764,12 @@ export async function action({ request }: ActionFunctionArgs) {
                 }
               },
             });
+
+            // Prevent unhandled rejections if the stream fails
+            result.text?.catch(() => {});
+            if ('warnings' in result) (result as any).warnings?.catch?.(() => {});
+            if ('usage' in result) (result as any).usage?.catch?.(() => {});
+            if ('steps' in result) (result as any).steps?.catch?.(() => {});
           } catch (streamError) {
             console.error(
               "[Agent API] Error creating streamText:",
@@ -1374,7 +1390,8 @@ export async function action({ request }: ActionFunctionArgs) {
             console.error("[Agent API] Error name:", error.name);
             console.error("[Agent API] Error message:", error.message);
           }
-          const isProviderExhausted = isOpenRouterExhausted(error);
+          const isProviderExhausted = isOpenRouterExhausted(error) || isOpenRouterExhausted(capturedStreamError);
+          console.error("[Agent API] Stream catch - capturedStreamError:", capturedStreamError);
           sendChunk({
             type: "error",
             error: isProviderExhausted

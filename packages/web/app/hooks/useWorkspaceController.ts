@@ -1136,8 +1136,17 @@ export function useWorkspaceController(
           npmInstallHandledRef.current = false;
         })();
       },
-      onError: (error: string) => {
-        throw new Error(error);
+      onError: (error: string, errorType?: string) => {
+        const err = new Error(error) as Error & { errorType?: string };
+        // Preserve provider_maintenance context so catch blocks can identify it
+        if (
+          errorType === "provider_maintenance" ||
+          error.includes("under maintenance") ||
+          error.includes("won't be deducted")
+        ) {
+          err.errorType = "provider_maintenance";
+        }
+        throw err;
       },
     }),
     isMountedRef,
@@ -1425,6 +1434,13 @@ export function useWorkspaceController(
           }
           // Otherwise it's cleanup/unmount - don't show error
           return;
+        } else if (
+          (error as any).errorType === "provider_maintenance" ||
+          error.message.includes("under maintenance") ||
+          error.message.includes("won't be deducted")
+        ) {
+          // Our OpenRouter credits exhausted — show maintenance message; do not deduct user credits
+          chat.setError(error.message);
         } else if (
           error.message.includes("Insufficient balance") ||
           error.message.includes("Payment Required")
