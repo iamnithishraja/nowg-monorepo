@@ -14,6 +14,7 @@ export default [
   route("/forgot-password", "routes/forgot-password.tsx"),
   route("/reset-password", "routes/reset-password.tsx"),
   route("/privacy-policy", "routes/privacy-policy.tsx"),
+  route("/terms-and-conditions", "routes/terms-and-conditions.tsx"),
   route("/EULA", "routes/eula.tsx"),
   route("/docs/integrations/vercel", "routes/docs.integrations.vercel.tsx"),
   route("/analytics", "routes/analytics.tsx"),
