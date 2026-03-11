@@ -337,7 +337,61 @@ export function useInitialPromptHandler({
               enableFigmaMCP,
             );
 
-            // 2. If we reach here, no 503 or 402 was thrown! It's safe to commit to UI.
+            // 2. Peek at the stream to check if the LLM immediately fails with an error (e.g., OpenRouter exhaustion)
+            // Even though the HTTP response is 200 OK, the SSE stream might contain an error in the early chunks.
+            // The API usually sends 'conversation_id' and 'supabase_info' first, so we read past them until we see 'text_delta' or 'error'.
+            const peekResponse = response.clone();
+            const peekReader = peekResponse.body?.getReader();
+            if (peekReader) {
+              try {
+                let foundDefinitiveChunk = false;
+                const decoder = new TextDecoder();
+                while (!foundDefinitiveChunk) {
+                  const { value, done } = await peekReader.read();
+                  if (done) break;
+                  
+                  if (value) {
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split("\n");
+                    for (const line of lines) {
+                      if (line.startsWith("data: ")) {
+                        try {
+                          const data = JSON.parse(line.slice(6));
+                          if (data.type === "error") {
+                            const err = new Error(data.error) as any;
+                            err.errorType = data.errorType || "provider_maintenance";
+                            throw err; // throw so it skips UI commit
+                          } else if (
+                            data.type === "text_delta" ||
+                            data.type === "file_action" ||
+                            data.type === "file_action_start" ||
+                            data.type === "shell_action" ||
+                            data.type === "tool_call" ||
+                            data.type === "message_complete" ||
+                            data.type === "done"
+                          ) {
+                            foundDefinitiveChunk = true;
+                            break;
+                          }
+                        } catch (e) {
+                          // Re-throw non-parse errors (e.g. provider_maintenance thrown above)
+                          if (!(e instanceof SyntaxError)) {
+                            throw e;
+                          }
+                          // ignore json parse errors
+                        }
+                      }
+                    }
+                  }
+                }
+              } finally {
+                // Cancel the cloned reader so it doesn't hold backpressure or memory.
+                // The original response stream remains fully readable.
+                peekReader.cancel().catch(() => {});
+              }
+            }
+
+            // 3. If we reach here, no immediate stream error was thrown! It's safe to commit to UI.
             
             // Setup files in UI
             if (files && typeof files.setupTemplateFiles === "function") {
