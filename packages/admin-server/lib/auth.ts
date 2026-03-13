@@ -89,6 +89,7 @@ export function initAuth() {
         "http://localhost:3000",
         "https://nowgai-admin.vercel.app",
         "https://admin.nowg.ai",
+        "https://stg-admin.nowg.ai",
         process.env.ADMIN_FRONTEND_URL || "http://localhost:5173",
       ],
     });
