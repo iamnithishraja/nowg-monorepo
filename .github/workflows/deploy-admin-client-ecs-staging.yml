@@ -46,7 +46,7 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
-          VITE_API_URL: https://nowgai-admin-server-alb-1663841842.ap-south-1.elb.amazonaws.com
+          VITE_API_URL: https://stg-admin-api.nowg.ai
         run: |
           docker build \
             --build-arg VITE_API_URL=$VITE_API_URL \
