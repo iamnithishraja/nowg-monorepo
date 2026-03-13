@@ -26,7 +26,7 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { contactFormSchema } from "~/lib/validations/contact";
 import { countryCodes } from "~/lib/countryCodes";
-import { isPossiblePhoneNumber } from "libphonenumber-js";
+import parsePhoneNumber, { isValidPhoneNumber } from "libphonenumber-js/max";
 
 interface ContactFormDialogProps {
   open: boolean;
@@ -94,28 +94,320 @@ function ContactFormDialogComponent({
     [countryCode],
   );
 
+  // Comprehensive country code to ISO mapping
+  const getCountryISO = useCallback((dialCode: string): string | undefined => {
+    const isoMapping: Record<string, string> = {
+      // North America
+      "+1": "US",
+
+      // Europe
+      "+44": "GB",
+      "+33": "FR",
+      "+49": "DE",
+      "+39": "IT",
+      "+34": "ES",
+      "+31": "NL",
+      "+46": "SE",
+      "+47": "NO",
+      "+45": "DK",
+      "+358": "FI",
+      "+48": "PL",
+      "+41": "CH",
+      "+43": "AT",
+      "+32": "BE",
+      "+351": "PT",
+      "+30": "GR",
+      "+353": "IE",
+      "+420": "CZ",
+      "+36": "HU",
+      "+40": "RO",
+      "+359": "BG",
+      "+385": "HR",
+      "+386": "SI",
+      "+421": "SK",
+      "+370": "LT",
+      "+371": "LV",
+      "+372": "EE",
+
+      // Asia
+      "+91": "IN",
+      "+86": "CN",
+      "+81": "JP",
+      "+82": "KR",
+      "+65": "SG",
+      "+60": "MY",
+      "+62": "ID",
+      "+63": "PH",
+      "+66": "TH",
+      "+84": "VN",
+      "+92": "PK",
+      "+880": "BD",
+      "+94": "LK",
+      "+977": "NP",
+      "+95": "MM",
+      "+855": "KH",
+      "+856": "LA",
+      "+673": "BN",
+      "+670": "TL",
+      "+976": "MN",
+      "+852": "HK",
+      "+853": "MO",
+      "+886": "TW",
+
+      // Middle East
+      "+971": "AE", // UAE - 9 digits
+      "+966": "SA",
+      "+974": "QA",
+      "+973": "BH",
+      "+968": "OM",
+      "+965": "KW",
+      "+962": "JO",
+      "+961": "LB",
+      "+964": "IQ",
+      "+98": "IR",
+      "+972": "IL",
+      "+970": "PS",
+      "+963": "SY",
+      "+967": "YE",
+      "+90": "TR",
+
+      // Africa
+      "+27": "ZA",
+      "+20": "EG",
+      "+234": "NG",
+      "+254": "KE",
+      "+233": "GH",
+      "+212": "MA",
+      "+213": "DZ",
+      "+216": "TN",
+      "+251": "ET",
+      "+256": "UG",
+      "+255": "TZ",
+      "+260": "ZM",
+      "+263": "ZW",
+      "+265": "MW",
+      "+267": "BW",
+      "+268": "SZ",
+      "+269": "KM",
+      "+221": "SN",
+      "+225": "CI",
+      "+226": "BF",
+      "+227": "NE",
+      "+228": "TG",
+      "+229": "BJ",
+      "+230": "MU",
+      "+231": "LR",
+      "+232": "SL",
+      "+235": "TD",
+      "+236": "CF",
+      "+237": "CM",
+      "+238": "CV",
+      "+239": "ST",
+      "+240": "GQ",
+      "+241": "GA",
+      "+242": "CG",
+      "+243": "CD",
+      "+244": "AO",
+      "+245": "GW",
+      "+246": "IO",
+      "+248": "SC",
+      "+249": "SD",
+      "+250": "RW",
+      "+252": "SO",
+      "+253": "DJ",
+      "+257": "BI",
+      "+258": "MZ",
+      "+261": "MG",
+      "+262": "RE",
+      "+264": "NA",
+      "+266": "LS",
+      "+291": "ER",
+
+      // Oceania
+      "+61": "AU",
+      "+64": "NZ",
+      "+679": "FJ",
+      "+675": "PG",
+      "+685": "WS",
+      "+676": "TO",
+      "+677": "SB",
+      "+678": "VU",
+      "+682": "CK",
+      "+683": "NU",
+      "+686": "KI",
+      "+687": "NC",
+      "+688": "TV",
+      "+689": "PF",
+      "+690": "TK",
+      "+691": "FM",
+      "+692": "MH",
+
+      // South America
+      "+55": "BR",
+      "+54": "AR",
+      "+56": "CL",
+      "+57": "CO",
+      "+58": "VE",
+      "+51": "PE",
+      "+593": "EC",
+      "+595": "PY",
+      "+598": "UY",
+      "+591": "BO",
+      "+592": "GY",
+      "+594": "GF",
+      "+597": "SR",
+
+      // Central America & Caribbean
+      "+52": "MX",
+      "+53": "CU",
+      "+507": "PA",
+      "+506": "CR",
+      "+505": "NI",
+      "+504": "HN",
+      "+503": "SV",
+      "+502": "GT",
+      "+501": "BZ",
+      "+1242": "BS",
+      "+1246": "BB",
+      "+1264": "AI",
+      "+1268": "AG",
+      "+1284": "VG",
+      "+1340": "VI",
+      "+1345": "KY",
+      "+1441": "BM",
+      "+1473": "GD",
+      "+1649": "TC",
+      "+1664": "MS",
+      "+1670": "MP",
+      "+1671": "GU",
+      "+1684": "AS",
+      "+1721": "SX",
+      "+1758": "LC",
+      "+1767": "DM",
+      "+1784": "VC",
+      "+1809": "DO",
+      "+1868": "TT",
+      "+1869": "KN",
+      "+1876": "JM",
+
+      // Russia & CIS
+      "+7": "RU",
+      "+374": "AM",
+      "+994": "AZ",
+      "+375": "BY",
+      "+996": "KG",
+      "+992": "TJ",
+      "+993": "TM",
+      "+998": "UZ",
+      "+995": "GE",
+      "+373": "MD",
+      "+380": "UA",
+      "+7": "KZ",
+    };
+    return isoMapping[dialCode];
+  }, []);
+
+  // Validate phone number with country-specific rules
+  const validatePhoneNumber = useCallback(
+    (
+      phoneValue: string,
+      dialCode: string,
+    ): { valid: boolean; error?: string } => {
+      if (!phoneValue || phoneValue.length === 0) {
+        return { valid: true }; // Optional field
+      }
+
+      try {
+        const countryISO = getCountryISO(dialCode);
+        const sanitized = phoneValue.trim();
+        const digitsOnly = sanitized.replace(/\D/g, "");
+        if (!digitsOnly) {
+          return { valid: false, error: "Phone number must contain digits" };
+        }
+
+        const parseStrict = (
+          value: string,
+          options?: { defaultCountry?: string },
+        ) => {
+          try {
+            return parsePhoneNumber(value, { extract: false, ...options });
+          } catch {
+            return undefined;
+          }
+        };
+
+        const internationalFallback = `${dialCode}${digitsOnly.replace(/^0+/, "")}`;
+
+        let phoneNumber =
+          sanitized.startsWith("+")
+            ? parseStrict(sanitized)
+            : countryISO
+              ? parseStrict(digitsOnly, { defaultCountry: countryISO })
+              : undefined;
+
+        if (!phoneNumber) {
+          phoneNumber = parseStrict(internationalFallback);
+        }
+
+        if (phoneNumber) {
+          if (
+            countryISO &&
+            phoneNumber.country &&
+            phoneNumber.country !== countryISO
+          ) {
+            return {
+              valid: false,
+              error: `Phone number does not match ${selectedCountry?.country || "selected country"}`,
+            };
+          }
+
+          if (phoneNumber.isValid()) {
+            return { valid: true };
+          }
+
+          return {
+            valid: false,
+            error: `Invalid phone number for ${selectedCountry?.country || "selected country"}`,
+          };
+        }
+
+        if (
+          (countryISO && isValidPhoneNumber(digitsOnly, countryISO)) ||
+          isValidPhoneNumber(internationalFallback)
+        ) {
+          return { valid: true };
+        }
+
+        return {
+          valid: false,
+          error: `Invalid phone number for ${selectedCountry?.country || "selected country"}`,
+        };
+      } catch (error) {
+        console.error("Phone validation error:", error);
+        return { valid: false, error: "Invalid phone number format" };
+      }
+    },
+    [getCountryISO, selectedCountry],
+  );
+
   // Validate a single field on blur
   const validateField = useCallback(
     (fieldName: string, value: string) => {
       if (fieldName === "phone") {
-        if (!value || value.length === 0) {
+        const result = validatePhoneNumber(value, countryCode);
+
+        if (!result.valid && result.error) {
+          setErrors((prev) => ({
+            ...prev,
+            phone: result.error!,
+          }));
+        } else {
           setErrors((prev) => {
             const next = { ...prev };
             delete next.phone;
             return next;
           });
-          return;
         }
-        // Just check digits for now — full validation on submit
-        if (!/^\d+$/.test(value)) {
-          setErrors((prev) => ({ ...prev, phone: "Only digits allowed" }));
-          return;
-        }
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next.phone;
-          return next;
-        });
         return;
       }
 
@@ -141,7 +433,7 @@ function ContactFormDialogComponent({
         }
       }
     },
-    [countryCode],
+    [countryCode, validatePhoneNumber],
   );
 
   // Reset form
@@ -183,18 +475,12 @@ function ContactFormDialogComponent({
       });
     }
 
-    // Validate phone with libphonenumber-js on submit
+    // Validate phone number
     if (phone.trim()) {
-      try {
-        const fullNumber = (countryCode + phone.trim()).replace(/\s/g, "");
-        if (!isPossiblePhoneNumber(fullNumber)) {
-          hasErrors = true;
-          newErrors.phone =
-            "Invalid phone number for the selected country";
-        }
-      } catch {
+      const phoneValidation = validatePhoneNumber(phone.trim(), countryCode);
+      if (!phoneValidation.valid && phoneValidation.error) {
         hasErrors = true;
-        newErrors.phone = "Invalid phone number format";
+        newErrors.phone = phoneValidation.error;
       }
     }
 
@@ -241,6 +527,7 @@ function ContactFormDialogComponent({
     message,
     onOpenChange,
     resetForm,
+    validatePhoneNumber,
   ]);
 
   return (
@@ -301,9 +588,7 @@ function ContactFormDialogComponent({
                   autoFocus
                 />
                 {errors.fullName && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.fullName}
-                  </p>
+                  <p className="text-xs text-red-500 mt-1">{errors.fullName}</p>
                 )}
               </div>
 
@@ -317,9 +602,7 @@ function ContactFormDialogComponent({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onBlur={(e) =>
-                    validateField("email", e.target.value.trim())
-                  }
+                  onBlur={(e) => validateField("email", e.target.value.trim())}
                   placeholder="user@example.com"
                   className={cn(
                     "mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40",
@@ -341,9 +624,7 @@ function ContactFormDialogComponent({
                   <div className="relative" ref={countryDropdownRef}>
                     <button
                       type="button"
-                      onClick={() =>
-                        setCountryDropdownOpen((prev) => !prev)
-                      }
+                      onClick={() => setCountryDropdownOpen((prev) => !prev)}
                       className="flex items-center justify-between w-[140px] h-9 px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 hover:bg-white/10 transition-colors"
                     >
                       <span className="truncate">
@@ -364,9 +645,7 @@ function ContactFormDialogComponent({
                             className="w-full bg-white/5 border border-white/10 rounded-md py-1.5 pl-8 pr-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
                             placeholder="Search countries..."
                             value={countrySearch}
-                            onChange={(e) =>
-                              setCountrySearch(e.target.value)
-                            }
+                            onChange={(e) => setCountrySearch(e.target.value)}
                             onKeyDown={(e) => e.stopPropagation()}
                           />
                         </div>
@@ -380,12 +659,19 @@ function ContactFormDialogComponent({
                                 onClick={() => {
                                   setCountryCode(country.code);
                                   setCountryDropdownOpen(false);
-                                  // Clear phone error on country change
-                                  setErrors((prev) => {
-                                    const next = { ...prev };
-                                    delete next.phone;
-                                    return next;
-                                  });
+                                  // Re-validate phone with new country code if phone exists
+                                  if (phone.trim()) {
+                                    setTimeout(() => {
+                                      validateField("phone", phone.trim());
+                                    }, 0);
+                                  } else {
+                                    // Clear phone error on country change if no phone
+                                    setErrors((prev) => {
+                                      const next = { ...prev };
+                                      delete next.phone;
+                                      return next;
+                                    });
+                                  }
                                 }}
                                 className={cn(
                                   "flex items-center gap-2 w-full px-2.5 py-2 rounded-md text-sm text-white/90 hover:bg-white/10 transition-colors cursor-pointer text-left",
@@ -477,9 +763,7 @@ function ContactFormDialogComponent({
                   )}
                 />
                 {errors.subject && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.subject}
-                  </p>
+                  <p className="text-xs text-red-500 mt-1">{errors.subject}</p>
                 )}
               </div>
 
@@ -502,9 +786,7 @@ function ContactFormDialogComponent({
                   )}
                 />
                 {errors.message && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.message}
-                  </p>
+                  <p className="text-xs text-red-500 mt-1">{errors.message}</p>
                 )}
               </div>
             </div>
