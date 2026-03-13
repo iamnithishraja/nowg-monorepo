@@ -338,12 +338,11 @@ function ContactFormDialogComponent({
 
         const internationalFallback = `${dialCode}${digitsOnly.replace(/^0+/, "")}`;
 
-        let phoneNumber =
-          sanitized.startsWith("+")
-            ? parseStrict(sanitized)
-            : countryISO
-              ? parseStrict(digitsOnly, { defaultCountry: countryISO })
-              : undefined;
+        let phoneNumber = sanitized.startsWith("+")
+          ? parseStrict(sanitized)
+          : countryISO
+            ? parseStrict(digitsOnly, { defaultCountry: countryISO })
+            : undefined;
 
         if (!phoneNumber) {
           phoneNumber = parseStrict(internationalFallback);
