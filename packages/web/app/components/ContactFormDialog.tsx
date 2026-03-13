@@ -325,10 +325,7 @@ function ContactFormDialogComponent({
           return { valid: false, error: "Phone number must contain digits" };
         }
 
-        if (
-          countryISO === "AE" &&
-          !sanitized.startsWith("+")
-        ) {
+        if (countryISO === "AE" && !sanitized.startsWith("+")) {
           if (/^0\d{8}$/.test(digitsOnly)) {
             return { valid: true };
           }
