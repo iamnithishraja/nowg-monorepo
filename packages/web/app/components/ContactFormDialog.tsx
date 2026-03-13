@@ -325,6 +325,19 @@ function ContactFormDialogComponent({
           return { valid: false, error: "Phone number must contain digits" };
         }
 
+        if (
+          countryISO === "AE" &&
+          !sanitized.startsWith("+")
+        ) {
+          if (/^0\d{8}$/.test(digitsOnly)) {
+            return { valid: true };
+          }
+          return {
+            valid: false,
+            error: "UAE phone numbers must start with 0 followed by 8 digits",
+          };
+        }
+
         const parseStrict = (
           value: string,
           options?: { defaultCountry?: string },
