@@ -10,7 +10,8 @@ import {
   AccordionTrigger,
 } from "./ui/accordion";
 import { Button } from "./ui/button";
-import { Check } from "@phosphor-icons/react";
+import { Check, CloudArrowUp } from "@phosphor-icons/react";
+import { Dialog, DialogContent } from "./ui/dialog";
 
 interface SelectedElementCardProps {
   info: any;
@@ -62,6 +63,7 @@ export default function SelectedElementCard({
   const [marginRight, setMarginRight] = useState<string>("");
   const [marginBottom, setMarginBottom] = useState<string>("");
   const [marginLeft, setMarginLeft] = useState<string>("");
+  const [isSaving, setIsSaving] = useState(false);
 
   // Convert rgb/rgba colors to hex for color input if possible
   const rgbToHex = (rgb: string | undefined): string | "" => {
@@ -808,6 +810,61 @@ export default function SelectedElementCard({
           </AccordionItem>
         </Accordion>
       </div>
+
+      {onSave && (
+        <div className="mt-8 mb-4 flex justify-center">
+          <Button
+            onClick={async () => {
+              setIsSaving(true);
+              try {
+                await onSave();
+              } finally {
+                setTimeout(() => setIsSaving(false), 2000); // Keep showing success for 2s
+              }
+            }}
+            className="w-full max-w-sm bg-primary text-primary-foreground hover:bg-primary/90 font-bold py-6 text-lg rounded-xl shadow-[0_0_15px_rgba(var(--primary),0.5)] transition-all hover:scale-[1.02] active:scale-[0.98] group relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+            <div className="flex items-center gap-2">
+              <span>Save Changes</span>
+            </div>
+          </Button>
+        </div>
+      )}
+
+      {/* Save Modal */}
+      <Dialog open={isSaving} onOpenChange={setIsSaving}>
+        <DialogContent className="sm:max-w-md border-border/50 bg-background/95 backdrop-blur-xl outline-none shadow-2xl overflow-hidden [&>button]:hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5 pointer-events-none" />
+          
+          <div className="relative py-8 flex flex-col items-center text-center space-y-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center relative shadow-[0_0_30px_rgba(var(--primary),0.3)]">
+                <CloudArrowUp className="w-10 h-10 text-primary animate-bounce shadow-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]" weight="fill" />
+              </div>
+            </div>
+
+            <div className="space-y-2 max-w-[80%] mx-auto">
+              <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                Saving to Cloud
+              </h2>
+              <p className="text-muted-foreground/80 text-sm leading-relaxed">
+                A new version is being created and synced to R2. Please wait...
+              </p>
+            </div>
+
+            <div className="w-full max-w-[60%] space-y-2 mt-4">
+              <div className="h-1.5 w-full bg-secondary overflow-hidden rounded-full">
+                <div className="h-full bg-primary rounded-full animate-[progress_2s_ease-in-out_infinite] w-full origin-left" />
+              </div>
+              <p className="text-xs text-muted-foreground/60 font-medium tracking-wider uppercase animate-pulse">
+                Syncing changes...
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

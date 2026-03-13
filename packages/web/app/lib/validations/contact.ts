@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-// Phone number validation - only digits, exactly 10
-const phoneRegex = /^\d{10}$/;
 const digitsOnlyRegex = /^\d+$/;
 
 export const contactFormSchema = z.object({
@@ -17,13 +15,10 @@ export const contactFormSchema = z.object({
     .string()
     .transform((val) => val.trim())
     .refine((val) => {
-      // Allow empty (optional field)
       if (!val || val.length === 0) return true;
-      // Must contain only digits
       if (!digitsOnlyRegex.test(val)) return false;
-      // Must be exactly 10 digits
-      return phoneRegex.test(val);
-    }, "Phone number must be exactly 10 digits (numbers only)")
+      return val.length >= 4 && val.length <= 15;
+    }, "Phone number must be between 4 and 15 digits")
     .optional()
     .or(z.literal("")),
   countryCode: z.string().optional(),
