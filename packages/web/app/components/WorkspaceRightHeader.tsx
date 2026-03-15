@@ -292,6 +292,12 @@ export function WorkspaceRightHeader({
     updateExisting = false,
     versionId?: string,
   ) => {
+    // Commented out Vercel deployment logic as per user request
+    if (provider === "vercel") {
+      window.open("https://vercel.com/new", "_blank");
+      return;
+    }
+
     if (versionId) {
       deployVersion(versionId, provider);
     } else {
@@ -564,15 +570,8 @@ export function WorkspaceRightHeader({
               ) : (
                 <>
                   <DropdownMenuItem
-                    onClick={() =>
-                      handleDeploy(
-                        "vercel",
-                        false,
-                        currentVersionId || versions[0]?.id,
-                      )
-                    }
+                    onClick={() => window.open("https://vercel.com/new", "_blank")}
                     className="gap-2 cursor-pointer"
-                    disabled={versions.length === 0}
                   >
                     <VercelIcon className="w-3.5 h-3.5" />
                     Deploy to Vercel

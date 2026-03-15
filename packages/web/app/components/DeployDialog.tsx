@@ -644,8 +644,19 @@ export function useDeployDialog(
         uniqueProject = `nowgai-${shortId}-app`;
       }
 
+      /* 
+      // Vercel deployment logic commented out as per user request
       const endpoint =
         provider === "vercel" ? "/api/deploy/vercel" : "/api/deploy/netlify";
+      */
+      const endpoint = provider === "netlify" ? "/api/deploy/netlify" : "";
+      
+      if (provider === "vercel") {
+        setIsDeploying(false);
+        setShowDialog(false);
+        window.open("https://vercel.com/new", "_blank");
+        return;
+      }
 
       setDeployStage("Initializing deployment...");
       setDeployProgress(10);
