@@ -1858,11 +1858,25 @@ export async function approveEnterpriseRequest(req: Request, res: Response) {
     organization.updatedAt = new Date();
     await organization.save();
 
-    // Activate all pending members
-    await OrganizationMember.updateMany(
-      { organizationId: organization._id, status: "pending" },
-      { $set: { status: "active" } }
-    );
+    // Create the org_admin membership — it wasn't created at request time
+    // (support legacy case where a pending member may exist, activate it; otherwise create new)
+    const existingMember = await OrganizationMember.findOne({
+      organizationId: organization._id,
+      userId: organization.orgAdminId,
+    });
+    if (existingMember) {
+      existingMember.status = "active";
+      existingMember.joinedAt = new Date();
+      await existingMember.save();
+    } else if (organization.orgAdminId) {
+      await new OrganizationMember({
+        userId: organization.orgAdminId,
+        organizationId: organization._id,
+        role: "org_admin",
+        status: "active",
+        joinedAt: new Date(),
+      }).save();
+    }
 
     // Send approval email to org admin
     if (organization.orgAdminId) {
@@ -1927,11 +1941,7 @@ export async function rejectEnterpriseRequest(req: Request, res: Response) {
     organization.updatedAt = new Date();
     await organization.save();
 
-    // Mark all pending members as rejected
-    await OrganizationMember.updateMany(
-      { organizationId: organization._id, status: "pending" },
-      { $set: { status: "rejected" } }
-    );
+    // No OrganizationMember was created at request time, so nothing to clean up here
 
     // Send rejection email to org admin
     if (organization.orgAdminId) {

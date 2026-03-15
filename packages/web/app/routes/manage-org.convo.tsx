@@ -1,30 +1,35 @@
-import { useEffect, useState } from "react";
-import type { LoaderFunctionArgs } from "react-router";
-import { redirect } from "react-router";
 import {
-  MessageSquare,
-  FolderKanban,
+  Briefcase,
   Building2,
   Calendar,
-  Loader2,
-  Search,
-  Plus,
-  XCircle,
   CheckCircle2,
-  Wallet,
-  Info,
+  Clock,
   CreditCard,
   DollarSign,
-  Clock,
-  Send,
-  Globe,
-  Phone,
-  Users,
-  Briefcase,
   FileText,
+  FolderKanban,
+  Globe,
+  Info,
+  Loader2,
   Mail,
+  MessageSquare,
+  Phone,
+  Plus,
+  Search,
+  Send,
+  Users,
+  Wallet,
+  XCircle,
 } from "lucide-react";
-import { auth } from "../lib/auth";
+import { useEffect, useState } from "react";
+import type { LoaderFunctionArgs } from "react-router";
+import { redirect, useNavigate } from "react-router";
+import { Header } from "../components";
+import Background from "../components/Background";
+import { PlanSwitcher } from "../components/PlanSwitcher";
+import { ProjectSidebar } from "../components/ProjectSidebar";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import {
   Card,
   CardContent,
@@ -32,22 +37,8 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { ProjectSidebar } from "../components/ProjectSidebar";
-import { Header } from "../components";
-import Background from "../components/Background";
 import { Input } from "../components/ui/input";
-import { Badge } from "../components/ui/badge";
-import { useNavigate } from "react-router";
 import { Label } from "../components/ui/label";
-import { Textarea } from "../components/ui/textarea";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "../components/ui/tabs";
-import { PlanSwitcher } from "../components/PlanSwitcher";
 import {
   Select,
   SelectContent,
@@ -55,6 +46,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../components/ui/tabs";
+import { Textarea } from "../components/ui/textarea";
+import { auth } from "../lib/auth";
 
 interface Conversation {
   id: string;
@@ -124,6 +123,17 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   const [useCase, setUseCase] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [enterpriseRequestSubmitted, setEnterpriseRequestSubmitted] = useState(false);
+
+  // Pending enterprise request state (org exists in DB but no membership yet — waiting for approval)
+  const [pendingEnterpriseRequest, setPendingEnterpriseRequest] = useState<{
+    id: string;
+    name: string;
+    description: string;
+    planType: string;
+    approvalStatus: string; // "pending" | "rejected"
+    approvalNotes?: string | null;
+    createdAt: string;
+  } | null>(null);
 
   // Wallet and payment state
   const [walletBalance, setWalletBalance] = useState<number>(0);
@@ -196,12 +206,13 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
       const data = await res.json();
 
       if (data.organizations && Array.isArray(data.organizations)) {
-        // Check if user has any organization membership (org_admin or org_user)
+        // Only count ACTIVE memberships as "has any membership"
+        // Pending enterprise requests do NOT count — they're tracked separately
         if (data.organizations.length > 0) {
           setHasAnyMembership(true);
         }
 
-        // Find the most recently created organization where user is org_admin
+        // Find the most recently created organization where user is org_admin (active)
         const orgAdminOrgs = data.organizations.filter(
           (org: any) => org.role === "org_admin"
         );
@@ -226,11 +237,6 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
             approvalStatus: mostRecentOrg.approvalStatus || null,
           });
 
-          // Check if this is a pending enterprise request
-          if (mostRecentOrg.planType === "enterprise" && mostRecentOrg.approvalStatus === "pending") {
-            setEnterpriseRequestSubmitted(true);
-          }
-
           // Also store in localStorage as backup
           localStorage.setItem(
             "lastCreatedOrg",
@@ -247,6 +253,20 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
             })
           );
         }
+      }
+
+      // Handle pending/rejected enterprise requests (no membership yet — waiting for admin review)
+      if (data.enterpriseRequest) {
+        setPendingEnterpriseRequest({
+          id: data.enterpriseRequest.id,
+          name: data.enterpriseRequest.name,
+          description: data.enterpriseRequest.description || "",
+          planType: data.enterpriseRequest.planType,
+          approvalStatus: data.enterpriseRequest.approvalStatus,
+          approvalNotes: data.enterpriseRequest.approvalNotes || null,
+          createdAt: data.enterpriseRequest.createdAt,
+        });
+        // Enterprise requests do NOT set hasAnyMembership — the user has no active org yet
       }
     } catch (err: any) {
       console.error("Error fetching user organizations:", err);
@@ -396,15 +416,23 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
         approvalStatus: data.organization.approvalStatus,
       };
 
-      setCreatedOrg(newOrg);
-
-      // For enterprise, set the submitted flag
       if (selectedPlan === "enterprise") {
+        // Enterprise request submitted: track separately, no active membership yet
+        setPendingEnterpriseRequest({
+          id: newOrg.id,
+          name: newOrg.name,
+          description: newOrg.description,
+          planType: "enterprise",
+          approvalStatus: "pending",
+          approvalNotes: null,
+          createdAt: newOrg.createdAt,
+        });
         setEnterpriseRequestSubmitted(true);
+      } else {
+        // Core org created: show wallet/details section
+        setCreatedOrg(newOrg);
+        localStorage.setItem("lastCreatedOrg", JSON.stringify(newOrg));
       }
-
-      // Store in localStorage as backup
-      localStorage.setItem("lastCreatedOrg", JSON.stringify(newOrg));
 
       // Reset form
       setOrgName("");
@@ -807,7 +835,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                           </Button>
                         </div>
                       </div>
-                    ) : createdOrg?.planType === "enterprise" && createdOrg?.approvalStatus === "pending" ? (
+                    ) : pendingEnterpriseRequest?.approvalStatus === "pending" ? (
                       /* Show pending approval status for enterprise requests */
                       <div className="rounded-[12px] bg-surface-1 border border-amber-500/30 w-full">
                         <Card className="bg-transparent border-0 shadow-none">
@@ -836,15 +864,15 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 <div>
                                   <span className="text-tertiary">Organization Name:</span>
-                                  <p className="text-primary font-medium">{createdOrg.name}</p>
+                                  <p className="text-primary font-medium">{pendingEnterpriseRequest.name}</p>
                                 </div>
                                 <div>
                                   <span className="text-tertiary">Plan Type:</span>
-                                  <p className="text-primary font-medium capitalize">{createdOrg.planType}</p>
+                                  <p className="text-primary font-medium capitalize">{pendingEnterpriseRequest.planType}</p>
                                 </div>
                                 <div>
                                   <span className="text-tertiary">Submitted:</span>
-                                  <p className="text-primary">{formatDate(createdOrg.createdAt)}</p>
+                                  <p className="text-primary">{formatDate(pendingEnterpriseRequest.createdAt)}</p>
                                 </div>
                                 <div>
                                   <span className="text-tertiary">Status:</span>
@@ -889,7 +917,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                           </CardContent>
                         </Card>
                       </div>
-                    ) : createdOrg?.planType === "enterprise" && createdOrg?.approvalStatus === "rejected" ? (
+                    ) : pendingEnterpriseRequest?.approvalStatus === "rejected" ? (
                       /* Show rejection status */
                       <div className="rounded-[12px] bg-surface-1 border border-red-500/30 w-full">
                         <Card className="bg-transparent border-0 shadow-none">
@@ -909,6 +937,12 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                             </div>
                           </CardHeader>
                           <CardContent className="px-5 pb-6 space-y-4">
+                            {pendingEnterpriseRequest.approvalNotes && (
+                              <div className="rounded-lg bg-surface-2 border border-red-500/20 p-4">
+                                <p className="text-sm font-medium text-red-400 mb-1">Reason:</p>
+                                <p className="text-sm text-secondary">{pendingEnterpriseRequest.approvalNotes}</p>
+                              </div>
+                            )}
                             <div className="text-center text-sm text-secondary">
                               <p>
                                 If you believe this was a mistake or would like more information, please contact us at{" "}
@@ -920,11 +954,10 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                             <div className="flex justify-center">
                               <Button
                                 onClick={() => {
-                                  setCreatedOrg(null);
+                                  setPendingEnterpriseRequest(null);
                                   setEnterpriseRequestSubmitted(false);
                                   setHasDismissedPlanSwitcher(false);
                                   setSelectedPlan("core");
-                                  localStorage.removeItem("lastCreatedOrg");
                                   localStorage.removeItem("hasDismissedPlanSwitcher");
                                 }}
                                 className="bg-gradient-to-r from-[#7b4cff] to-[#a855f7] hover:from-[#8c63f2] hover:to-[#b566f8] text-white font-medium shadow-lg shadow-[#7b4cff]/25 transition-all duration-200"
