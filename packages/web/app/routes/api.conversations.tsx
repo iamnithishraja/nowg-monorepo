@@ -13,6 +13,9 @@ import {
 import { Conversation, Deployment } from "@nowgai/shared/models";
 import AgentMessage from "~/models/agentMessageModel";
 import { connectToDatabase } from "~/lib/mongo";
+import { NotificationService } from "~/lib/notificationService";
+
+const notificationService = new NotificationService();
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -572,6 +575,21 @@ export async function action({ request }: ActionFunctionArgs) {
           userId,
         );
 
+        // Fire-and-forget: create notification for project creation
+        notificationService
+          .create({
+            userId,
+            conversationId: newConversation!._id.toString(),
+            type: "project_created",
+            title: "New Project Created",
+            message: `Project "${newConversation!.title || firstMessage?.substring(0, 60) || "Untitled"}" was created successfully.`,
+            metadata: {
+              model: newConversation!.model,
+              conversationId: newConversation!._id.toString(),
+            },
+          })
+          .catch((err) => console.error("[Notifications] Failed to create project_created notification:", err));
+
         return new Response(
           JSON.stringify({
             conversationId: newConversation!._id.toString(),
@@ -1008,6 +1026,21 @@ export async function action({ request }: ActionFunctionArgs) {
           console.error("[API] Error syncing to R2 after revert:", syncError);
           // Don't fail revert if sync fails
         }
+
+        // Fire-and-forget: create notification for version revert
+        notificationService
+          .create({
+            userId,
+            conversationId,
+            type: "version_reverted",
+            title: "Version Reverted",
+            message: `Conversation reverted: ${messagesToDelete.length} message(s) removed.`,
+            metadata: {
+              conversationId,
+              deletedMessageCount: messagesToDelete.length,
+            },
+          })
+          .catch((err) => console.error("[Notifications] Failed to create version_reverted notification:", err));
 
         return new Response(
           JSON.stringify({

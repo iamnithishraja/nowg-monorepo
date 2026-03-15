@@ -336,6 +336,7 @@ export default [
   ),
 
   route("/api/preload-cache", "routes/api.preload-cache.tsx"),
+  route("/api/notifications", "routes/api.notifications.tsx"),
 
   // Disabled routes that depend on removed adminModel.ts
   // route("/api/admin/payment-gateways/*", "routes/api.admin.payment-gateways.tsx"),

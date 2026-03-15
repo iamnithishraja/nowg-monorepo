@@ -2,7 +2,6 @@ import { UserRole, hasAdminAccess } from "@nowgai/shared/types";
 import {
   ArrowSquareOut,
   ArrowUp,
-  Bell,
   BookOpen,
   CaretRight,
   ChartBar,
@@ -34,6 +33,7 @@ import FigmaImportModal from "../components/FigmaImportModal";
 import { FilePreview } from "../components/FileUpload";
 import GitHubImportModal from "../components/GitHubImportModal";
 import GradientGlow from "../components/GradientGlow";
+import { NotificationBell } from "../components/NotificationBell";
 import { ProjectAdminDialog } from "../components/ProjectAdminDialog";
 import { ProjectSidebar } from "../components/ProjectSidebar";
 import { Button } from "../components/ui/button";
@@ -1097,9 +1097,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             )}
 
             {/* Notification Bell - 44px min touch target on mobile */}
-            <button className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg hover:bg-white/[0.04] active:bg-white/[0.08] text-white/40 hover:text-white transition-colors touch-manipulation cursor-pointer">
-              <Bell className="w-5 h-5" weight="bold" />
-            </button>
+            <NotificationBell />
           </div>
         </header>
 

@@ -4,6 +4,9 @@ import { GitHubRepositoryService } from "~/lib/githubRepositoryService";
 import { connectToDatabase } from "~/lib/mongo";
 import GitHubRepository from "~/models/githubRepositoryModel";
 import Message from "~/models/messageModel";
+import { NotificationService } from "~/lib/notificationService";
+
+const notificationService = new NotificationService();
 
 interface FileContent {
   path: string;
@@ -166,6 +169,25 @@ export async function action({ request }: ActionFunctionArgs) {
     repository.updatedAt = new Date();
 
     await repository.save();
+
+    // Fire-and-forget: create notification for GitHub push
+    notificationService
+      .create({
+        userId,
+        conversationId: conversationId,
+        type: "github_push",
+        title: "Pushed to GitHub",
+        message: `Code pushed to ${repository.repoFullName} on branch "${repository.branch}".`,
+        metadata: {
+          repoFullName: repository.repoFullName,
+          repoUrl: repository.repoUrl,
+          branch: repository.branch,
+          commitSha: pushResult.commitSha,
+          commitUrl: pushResult.commitUrl,
+          commitMessage,
+        },
+      })
+      .catch((err) => console.error("[Notifications] Failed to create github_push notification:", err));
 
     return new Response(
       JSON.stringify({

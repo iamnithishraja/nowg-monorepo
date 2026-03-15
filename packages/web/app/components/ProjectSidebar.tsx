@@ -1790,11 +1790,6 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
               </span>
             )}
           </button>
-          {!effectiveCollapsed && (
-            <button className="p-2 rounded-lg hover:bg-white/4 text-white/40 hover:text-white transition-colors relative">
-              <Bell className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
     </aside>

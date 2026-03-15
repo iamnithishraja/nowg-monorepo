@@ -1,5 +1,4 @@
 import {
-  Bell,
   CaretDown,
   CaretLeft,
   ChartBar,
@@ -33,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { useSidebar } from "./ui/sidebar";
+import { NotificationBell } from "./NotificationBell";
 
 interface HeaderProps {
   className?: string;
@@ -452,9 +452,10 @@ export default function Header({
               </DropdownMenu>
 
               {/* Notification Bell */}
-              <button className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
-                <Bell className="w-5 h-5" />
-              </button>
+              <NotificationBell
+                iconSize="w-5 h-5"
+                buttonClassName="flex items-center justify-center w-9 h-9 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+              />
             </div>
           )}
 

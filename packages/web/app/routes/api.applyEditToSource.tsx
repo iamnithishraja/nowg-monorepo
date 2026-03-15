@@ -3,6 +3,9 @@ import { generateText } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { auth } from "~/lib/auth";
 import { getEnv } from "~/lib/env";
+import { NotificationService } from "~/lib/notificationService";
+
+const notificationService = new NotificationService();
 
 const SYSTEM_PROMPT = `You are an expert at converting visual/HTML changes back into source code.
 
@@ -54,9 +57,10 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     const body = await request.json();
-    const { files, previewHtml } = body as {
+    const { files, previewHtml, conversationId } = body as {
       files?: Array<{ path: string; content: string }>;
       previewHtml?: string;
+      conversationId?: string;
     };
 
     if (
@@ -132,6 +136,24 @@ Update the source files so the app matches this preview. Prefer Tailwind over in
           headers: { "Content-Type": "application/json" },
         }
       );
+    }
+
+    // Fire-and-forget: create notification for canvas edit
+    if (conversationId) {
+      notificationService
+        .create({
+          userId: session.user.id,
+          conversationId,
+          type: "canvas_edit",
+          title: "Canvas Edit Saved",
+          message: `Visual changes applied and saved to ${parsed.files?.length || 0} file(s).`,
+          metadata: {
+            conversationId,
+            fileCount: parsed.files?.length || 0,
+            filePaths: parsed.files?.map((f: { path: string }) => f.path) || [],
+          },
+        })
+        .catch((err) => console.error("[Notifications] Failed to create canvas_edit notification:", err));
     }
 
     return new Response(

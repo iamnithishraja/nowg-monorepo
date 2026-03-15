@@ -1740,6 +1740,24 @@ export function useWorkspaceController(
           setCurrentVersionId(savedVersion.id);
         }
 
+        // Fire-and-forget: create notification for version revert
+        fetch("/api/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "create",
+            type: "version_reverted",
+            title: "Version Reverted",
+            message: `Reverted canvas to "${targetVersion.label}".`,
+            conversationId,
+            metadata: {
+              conversationId,
+              targetVersionId: versionId,
+              targetVersionLabel: targetVersion.label,
+            },
+          }),
+        }).catch((err) => console.error("[Notifications] Failed to create version_reverted notification:", err));
+
         // Sync reverted files to R2 so they persist when reopening the conversation
         const filesToSync = clonedFiles
           .filter((f) => f.content && f.content.trim().length > 0)

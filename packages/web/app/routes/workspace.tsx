@@ -194,6 +194,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          conversationId: convId,
           files: files.map((f: { path: string; content: string }) => ({
             path: f.path,
             content: f.content,

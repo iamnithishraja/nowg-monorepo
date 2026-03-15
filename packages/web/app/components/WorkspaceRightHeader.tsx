@@ -2,7 +2,6 @@ import {
   ArrowsClockwise,
   ArrowsOutSimple,
   ArrowSquareOut,
-  Bell,
   CaretDown,
   ChartBar,
   ChatCircle,
@@ -42,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { VersionSelector } from "./VersionSelector";
+import { NotificationBell } from "./NotificationBell";
 
 // Vercel Logo SVG
 const VercelIcon = ({ className }: { className?: string }) => (
@@ -754,9 +754,10 @@ export function WorkspaceRightHeader({
           </DropdownMenu>
 
           {/* Notification Bell */}
-          <button className="p-2 rounded-full hover:bg-white/[0.08] transition-colors text-white/50 hover:text-white">
-            <Bell className="w-4 h-4" />
-          </button>
+          <NotificationBell
+            iconSize="w-4 h-4"
+            buttonClassName="p-2 rounded-full hover:bg-white/[0.08] transition-colors text-white/50 hover:text-white"
+          />
         </div>
       </div>
 
