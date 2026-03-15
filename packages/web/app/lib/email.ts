@@ -1368,8 +1368,8 @@ function createEnterpriseRequestNotificationToAdminTemplate({
   website: string;
   useCase: string;
 }) {
-  const adminUrl = getEnvWithDefault("ADMIN_PANEL_URL", "http://localhost:3000");
-  const reviewUrl = `${adminUrl}/admin/organizations/pending`;
+  const adminUrl = getEnvWithDefault("ADMIN_PANEL_URL", "http://localhost:5174");
+  const reviewUrl = `${adminUrl}/admin/organizations`;
   
   return `
     <!DOCTYPE html>
