@@ -670,7 +670,14 @@ export function WorkspaceChatInput({
                       if (isSavingEdit) return;
                       setIsSavingEdit(true);
                       try {
-                        await onSaveEdit();
+                        const savePromise = onSaveEdit();
+                        
+                        // Wait for save to complete before closing modal
+                        await savePromise;
+                        
+                        // Small delay so user can see completion state if needed
+                        await new Promise(r => setTimeout(r, 500));
+                        
                         setIsEditActive(false);
                         const event = new CustomEvent("toggleInspector", {
                           detail: { enabled: false },
@@ -679,6 +686,9 @@ export function WorkspaceChatInput({
                         try {
                           window.dispatchEvent(new CustomEvent("endEditMode"));
                         } catch {}
+                      } catch (error: any) {
+                        console.error("Save edit failed:", error);
+                        alert(`Failed to save edits: ${error?.message || "Unknown error occurred"}`);
                       } finally {
                         setIsSavingEdit(false);
                       }
@@ -997,7 +1007,7 @@ export function WorkspaceChatInput({
                 Saving to Cloud
               </h2>
               <p className="text-muted-foreground/80 text-sm leading-relaxed">
-                We are creating a new version and syncing to R2. You can check it in the versioning dropdown once complete.
+                We are creating a new version and syncing to R2. You can check it in the versioning dropdown at the top right of the editor once complete.
               </p>
             </div>
 
