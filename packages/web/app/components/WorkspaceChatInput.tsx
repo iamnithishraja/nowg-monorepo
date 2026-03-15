@@ -20,7 +20,7 @@ import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import type { DesignScheme } from "../types/design-scheme";
 import { getShortcutLabel } from "../utils/platform";
 
-import { ArrowUp, FloppyDisk, SelectionPlus, X } from "@phosphor-icons/react";
+import { ArrowUp, FloppyDisk, SelectionPlus, X, CloudArrowUp } from "@phosphor-icons/react";
 import { FilePreview } from "./FileUpload";
 import { Button } from "./ui/button";
 import {
@@ -976,6 +976,40 @@ export function WorkspaceChatInput({
               Stop
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Save Modal */}
+      <Dialog open={isSavingEdit} onOpenChange={setIsSavingEdit}>
+        <DialogContent className="sm:max-w-md border-border/50 bg-background/95 backdrop-blur-xl outline-none shadow-2xl overflow-hidden [&>button]:hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5 pointer-events-none" />
+          
+          <div className="relative py-8 flex flex-col items-center text-center space-y-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center relative shadow-[0_0_30px_rgba(var(--primary),0.3)]">
+                <CloudArrowUp className="w-10 h-10 text-primary animate-bounce shadow-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]" weight="fill" />
+              </div>
+            </div>
+
+            <div className="space-y-2 max-w-[80%] mx-auto">
+              <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                Saving to Cloud
+              </h2>
+              <p className="text-muted-foreground/80 text-sm leading-relaxed">
+                We are creating a new version and syncing to R2. You can check it in the versioning dropdown once complete.
+              </p>
+            </div>
+
+            <div className="w-full max-w-[60%] space-y-2 mt-4">
+              <div className="h-1.5 w-full bg-secondary overflow-hidden rounded-full">
+                <div className="h-full bg-primary rounded-full animate-[progress_2s_ease-in-out_infinite] w-full origin-left" />
+              </div>
+              <p className="text-xs text-muted-foreground/60 font-medium tracking-wider uppercase animate-pulse">
+                Syncing changes...
+              </p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
