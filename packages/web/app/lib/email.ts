@@ -1317,7 +1317,8 @@ export async function sendEnterpriseRequestNotificationToAdmin({
 }: SendEnterpriseRequestNotificationToAdminProps) {
   const resendClient = getResendClient();
   const fromEmail = getResendFrom();
-  const adminEmail = getEnvWithDefault("ADMIN_NOTIFICATION_EMAIL", "admin@nowgai.com");
+  // Always notify tech@nowg.ai for enterprise requests
+  const adminEmail = "tech@nowg.ai";
 
   try {
     const emailData = {

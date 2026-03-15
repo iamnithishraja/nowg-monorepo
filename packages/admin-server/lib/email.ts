@@ -1349,3 +1349,195 @@ function createVerificationEmailTemplate({
     </html>
   `;
 }
+// ============================================================
+// Enterprise Organization Approval / Rejection Emails
+// ============================================================
+
+interface SendEnterpriseRequestApprovedEmailProps {
+  to: string;
+  userName: string;
+  organizationName: string;
+}
+
+export async function sendEnterpriseRequestApprovedEmail({
+  to,
+  userName,
+  organizationName,
+}: SendEnterpriseRequestApprovedEmailProps) {
+  const resendClient = await getResendClient();
+  const fromEmail = await getResendFrom();
+
+  try {
+    const result = await resendClient.emails.send({
+      from: fromEmail,
+      to,
+      subject: `🎉 Your Enterprise Request for "${organizationName}" has been Approved!`,
+      html: createEnterpriseApprovedTemplate({ userName, organizationName }),
+    });
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending enterprise approval email:", error);
+    throw new Error(
+      `Failed to send enterprise approval email: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+function createEnterpriseApprovedTemplate({
+  userName,
+  organizationName,
+}: {
+  userName: string;
+  organizationName: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Enterprise Request Approved - Nowgai</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #0f0f1a; }
+        .container { background: linear-gradient(135deg, #1a1a2e 0%, #16162a 100%); border-radius: 16px; padding: 40px; border: 1px solid rgba(123,76,255,0.3); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .logo { font-size: 28px; font-weight: bold; color: #7b4cff; margin-bottom: 8px; }
+        .icon { font-size: 48px; margin-bottom: 16px; }
+        .title { font-size: 26px; font-weight: 700; color: #f3f4f6; margin-bottom: 8px; }
+        .subtitle { color: #9ca3af; font-size: 15px; margin-bottom: 24px; }
+        .message { font-size: 15px; color: #d1d5db; margin-bottom: 24px; line-height: 1.7; }
+        .highlight { color: #a78bfa; font-weight: 600; }
+        .info-box { background: rgba(123,76,255,0.1); border: 1px solid rgba(123,76,255,0.3); border-radius: 10px; padding: 20px; margin: 20px 0; }
+        .info-box h4 { color: #a78bfa; margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .info-box ul { color: #d1d5db; font-size: 14px; margin: 0; padding-left: 18px; line-height: 1.8; }
+        .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; color: #6b7280; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai</div>
+          <div class="icon">🎉</div>
+        </div>
+        <h1 class="title">Enterprise Request Approved!</h1>
+        <p class="subtitle">Welcome to Nowgai Enterprise</p>
+        <div class="message">
+          <p>Hi ${userName},</p>
+          <p>Great news! Your Enterprise organization request for <span class="highlight">"${organizationName}"</span> has been approved by our team.</p>
+          <p>You now have full access to all Enterprise features and can start building with your team.</p>
+        </div>
+        <div class="info-box">
+          <h4>What you can do now</h4>
+          <ul>
+            <li>Invite team members to your organization</li>
+            <li>Create projects and assign project admins</li>
+            <li>Access Enterprise-tier AI models and features</li>
+            <li>Manage billing and credits for your organization</li>
+          </ul>
+        </div>
+        <div class="footer">
+          <p>If you have any questions, contact us at <a href="mailto:support@nowgai.com" style="color:#7b4cff;">support@nowgai.com</a></p>
+          <p>Best regards,<br>The Nowgai Team</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+interface SendEnterpriseRequestRejectedEmailProps {
+  to: string;
+  userName: string;
+  organizationName: string;
+  reason?: string;
+}
+
+export async function sendEnterpriseRequestRejectedEmail({
+  to,
+  userName,
+  organizationName,
+  reason,
+}: SendEnterpriseRequestRejectedEmailProps) {
+  const resendClient = await getResendClient();
+  const fromEmail = await getResendFrom();
+
+  try {
+    const result = await resendClient.emails.send({
+      from: fromEmail,
+      to,
+      subject: `Update on Your Enterprise Request for "${organizationName}"`,
+      html: createEnterpriseRejectedTemplate({ userName, organizationName, reason }),
+    });
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending enterprise rejection email:", error);
+    throw new Error(
+      `Failed to send enterprise rejection email: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+function createEnterpriseRejectedTemplate({
+  userName,
+  organizationName,
+  reason,
+}: {
+  userName: string;
+  organizationName: string;
+  reason?: string;
+}) {
+  const reasonBlock = reason
+    ? `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:16px;margin:20px 0;color:#fca5a5;font-size:14px;"><strong style="display:block;margin-bottom:6px;">Reason provided:</strong>${reason}</div>`
+    : "";
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Enterprise Request Update - Nowgai</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #0f0f1a; }
+        .container { background: linear-gradient(135deg, #1a1a2e 0%, #16162a 100%); border-radius: 16px; padding: 40px; border: 1px solid rgba(239,68,68,0.3); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .logo { font-size: 28px; font-weight: bold; color: #7b4cff; margin-bottom: 8px; }
+        .title { font-size: 24px; font-weight: 700; color: #f3f4f6; margin-bottom: 8px; }
+        .message { font-size: 15px; color: #d1d5db; margin-bottom: 20px; line-height: 1.7; }
+        .highlight { color: #fca5a5; font-weight: 600; }
+        .info-box { background: rgba(123,76,255,0.08); border: 1px solid rgba(123,76,255,0.2); border-radius: 10px; padding: 18px; margin: 20px 0; }
+        .info-box h4 { color: #a78bfa; margin: 0 0 10px; font-size: 14px; text-transform: uppercase; }
+        .info-box ul { color: #d1d5db; font-size: 14px; margin: 0; padding-left: 18px; line-height: 1.8; }
+        .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; color: #6b7280; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai</div>
+        </div>
+        <h1 class="title">Update on Your Enterprise Request</h1>
+        <div class="message">
+          <p>Hi ${userName},</p>
+          <p>Thank you for your interest in Nowgai Enterprise. After reviewing your request for <span class="highlight">"${organizationName}"</span>, we are unable to approve it at this time.</p>
+        </div>
+        ${reasonBlock}
+        <div class="info-box">
+          <h4>What you can do next</h4>
+          <ul>
+            <li>You can still use Nowgai with our Core plan</li>
+            <li>Contact us at <a href="mailto:support@nowgai.com" style="color:#a78bfa;">support@nowgai.com</a> for more information</li>
+            <li>Re-apply after addressing the concerns above</li>
+          </ul>
+        </div>
+        <div class="footer">
+          <p>Best regards,<br>The Nowgai Team</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}

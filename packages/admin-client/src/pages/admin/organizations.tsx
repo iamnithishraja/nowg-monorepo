@@ -1,47 +1,53 @@
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -49,24 +55,25 @@ import { client } from "@/lib/client";
 import { UserRole } from "@nowgai/shared/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-    AlertTriangle,
-    BarChart3,
-    CheckCircle2,
-    ChevronLeft,
-    ChevronRight,
-    Clock,
-    Database,
-    Edit,
-    Globe,
-    Percent,
-    Plus,
-    Save,
-    Search,
-    Server,
-    Trash2,
-    UserPlus,
-    Wallet,
-    XCircle
+  AlertTriangle,
+  BarChart3,
+  Building2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Database,
+  Edit,
+  Globe,
+  Percent,
+  Plus,
+  Save,
+  Search,
+  Server,
+  Trash2,
+  UserPlus,
+  Wallet,
+  XCircle
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -87,6 +94,26 @@ interface OrganizationType {
   invitedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface EnterpriseRequestType {
+  id: string;
+  name: string;
+  description: string;
+  planType: string;
+  approvalStatus: string;
+  companySize: string | null;
+  industry: string | null;
+  website: string | null;
+  useCase: string | null;
+  contactPhone: string | null;
+  allowedDomains: string[];
+  orgAdmin: {
+    id: string;
+    email: string;
+    name: string;
+  } | null;
+  createdAt: string;
 }
 
 type OrganizationsResponse = {
@@ -124,6 +151,11 @@ export default function Organizations() {
     role: string;
   } | null>(null);
   const [isSearchingUser, setIsSearchingUser] = useState(false);
+
+  // Enterprise request states
+  const [rejectEnterpriseDialogOpen, setRejectEnterpriseDialogOpen] = useState(false);
+  const [selectedEnterpriseOrg, setSelectedEnterpriseOrg] = useState<EnterpriseRequestType | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   
   // Markup states
   const [markupValues, setMarkupValues] = useState<{
@@ -287,6 +319,43 @@ export default function Organizations() {
         variant: "destructive",
       });
     },
+  });
+
+  // Enterprise requests
+  const { data: enterpriseData, isLoading: isLoadingEnterprise, refetch: refetchEnterprise } = useQuery<{
+    organizations: EnterpriseRequestType[];
+    total: number;
+  }>({
+    queryKey: ["/api/admin/organizations/pending-enterprise"],
+    queryFn: () =>
+      client.get("/api/admin/organizations/pending-enterprise"),
+    enabled: !isOrgAdmin,
+  });
+
+  const approveEnterpriseMutation = useMutation({
+    mutationFn: async (orgId: string) =>
+      client.post(`/api/admin/organizations/${orgId}/approve-enterprise`, {}),
+    onSuccess: () => {
+      refetchEnterprise();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations"] });
+      toast({ title: "Approved", description: "Enterprise organization approved. Confirmation email sent." });
+    },
+    onError: (error: Error) =>
+      toast({ title: "Error", description: error.message, variant: "destructive" }),
+  });
+
+  const rejectEnterpriseMutation = useMutation({
+    mutationFn: async ({ orgId, reason }: { orgId: string; reason: string }) =>
+      client.post(`/api/admin/organizations/${orgId}/reject-enterprise`, { reason }),
+    onSuccess: () => {
+      refetchEnterprise();
+      setRejectEnterpriseDialogOpen(false);
+      setSelectedEnterpriseOrg(null);
+      setRejectReason("");
+      toast({ title: "Rejected", description: "Enterprise request rejected. Notification email sent." });
+    },
+    onError: (error: Error) =>
+      toast({ title: "Error", description: error.message, variant: "destructive" }),
   });
 
   const organizations = orgsData?.organizations || [];
@@ -566,6 +635,8 @@ export default function Organizations() {
     );
   };
 
+  const pendingEnterpriseCount = enterpriseData?.total || 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -583,7 +654,150 @@ export default function Organizations() {
         )}
       </div>
 
-      <Card>
+      <Tabs defaultValue="all">
+        <TabsList>
+          <TabsTrigger value="all">All Organizations</TabsTrigger>
+          {!isOrgAdmin && (
+            <TabsTrigger value="enterprise" className="relative">
+              Enterprise Requests
+              {pendingEnterpriseCount > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs font-bold">
+                  {pendingEnterpriseCount}
+                </span>
+              )}
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        {/* ─── Enterprise Requests Tab ─── */}
+        {!isOrgAdmin && (
+          <TabsContent value="enterprise">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Pending Enterprise Requests
+                </CardTitle>
+                <CardDescription>
+                  Review and approve or reject enterprise organization requests submitted by users.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingEnterprise ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : !enterpriseData?.organizations?.length ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No pending enterprise requests
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {enterpriseData.organizations.map((req) => (
+                      <div
+                        key={req.id}
+                        className="border rounded-lg p-4 space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-lg truncate">{req.name}</h3>
+                              <Badge variant="outline" className="gap-1 shrink-0">
+                                <Clock className="h-3 w-3" />
+                                Pending
+                              </Badge>
+                            </div>
+                            {req.description && (
+                              <p className="text-sm text-muted-foreground">{req.description}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => approveEnterpriseMutation.mutate(req.id)}
+                              disabled={approveEnterpriseMutation.isPending}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                setSelectedEnterpriseOrg(req);
+                                setRejectReason("");
+                                setRejectEnterpriseDialogOpen(true);
+                              }}
+                              disabled={rejectEnterpriseMutation.isPending}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                          {req.orgAdmin && (
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Requester</p>
+                              <p className="font-medium">{req.orgAdmin.name || req.orgAdmin.email}</p>
+                              <p className="text-muted-foreground text-xs">{req.orgAdmin.email}</p>
+                            </div>
+                          )}
+                          {req.companySize && (
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Company Size</p>
+                              <p>{req.companySize}</p>
+                            </div>
+                          )}
+                          {req.industry && (
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Industry</p>
+                              <p>{req.industry}</p>
+                            </div>
+                          )}
+                          {req.website && (
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Website</p>
+                              <a
+                                href={req.website.startsWith("http") ? req.website : `https://${req.website}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline break-all"
+                              >
+                                {req.website}
+                              </a>
+                            </div>
+                          )}
+                          {req.contactPhone && (
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Phone</p>
+                              <p>{req.contactPhone}</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Submitted</p>
+                            <p>{new Date(req.createdAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+
+                        {req.useCase && (
+                          <div className="text-sm">
+                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Use Case</p>
+                            <p className="text-muted-foreground bg-muted rounded p-2">{req.useCase}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* ─── All Organizations Tab ─── */}
+        <TabsContent value="all">
+        <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -788,6 +1002,57 @@ export default function Organizations() {
           )}
         </CardContent>
       </Card>
+      </TabsContent>
+      </Tabs>
+
+      {/* Reject Enterprise Dialog */}
+      <Dialog open={rejectEnterpriseDialogOpen} onOpenChange={setRejectEnterpriseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Enterprise Request</DialogTitle>
+            <DialogDescription>
+              Provide a reason for rejecting <strong>{selectedEnterpriseOrg?.name}</strong>. This will be sent to the requester via email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label htmlFor="reject-reason">Reason (optional)</Label>
+            <Textarea
+              id="reject-reason"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Explain why the request is being rejected..."
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRejectEnterpriseDialogOpen(false);
+                setSelectedEnterpriseOrg(null);
+                setRejectReason("");
+              }}
+              disabled={rejectEnterpriseMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (selectedEnterpriseOrg) {
+                  rejectEnterpriseMutation.mutate({
+                    orgId: selectedEnterpriseOrg.id,
+                    reason: rejectReason,
+                  });
+                }
+              }}
+              disabled={rejectEnterpriseMutation.isPending}
+            >
+              {rejectEnterpriseMutation.isPending ? "Rejecting..." : "Confirm Rejection"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Dialog */}
       {!isOrgAdmin && (
