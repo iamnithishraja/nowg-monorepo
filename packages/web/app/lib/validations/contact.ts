@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-const digitsOnlyRegex = /^\d+$/;
-
 export const contactFormSchema = z.object({
   fullName: z
     .string()
@@ -14,11 +12,6 @@ export const contactFormSchema = z.object({
   phone: z
     .string()
     .transform((val) => val.trim())
-    .refine((val) => {
-      if (!val || val.length === 0) return true;
-      if (!digitsOnlyRegex.test(val)) return false;
-      return val.length >= 4 && val.length <= 15;
-    }, "Phone number must be between 4 and 15 digits")
     .optional()
     .or(z.literal("")),
   countryCode: z.string().optional(),

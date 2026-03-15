@@ -26,7 +26,6 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { contactFormSchema } from "~/lib/validations/contact";
 import { countryCodes } from "~/lib/countryCodes";
-import parsePhoneNumber, { isValidPhoneNumber } from "libphonenumber-js/max";
 
 interface ContactFormDialogProps {
   open: boolean;
@@ -302,7 +301,6 @@ function ContactFormDialogComponent({
       "+995": "GE",
       "+373": "MD",
       "+380": "UA",
-      "+7": "KZ",
     };
     return isoMapping[dialCode];
   }, []);
@@ -317,86 +315,30 @@ function ContactFormDialogComponent({
         return { valid: true }; // Optional field
       }
 
-      try {
-        const countryISO = getCountryISO(dialCode);
-        const sanitized = phoneValue.trim();
-        const digitsOnly = sanitized.replace(/\D/g, "");
-        if (!digitsOnly) {
-          return { valid: false, error: "Phone number must contain digits" };
-        }
-
-        if (countryISO === "AE" && !sanitized.startsWith("+")) {
-          if (/^0\d{8}$/.test(digitsOnly)) {
-            return { valid: true };
-          }
-          return {
-            valid: false,
-            error: "UAE phone numbers must start with 0 followed by 8 digits",
-          };
-        }
-
-        const parseStrict = (
-          value: string,
-          options?: { defaultCountry?: string },
-        ) => {
-          try {
-            return parsePhoneNumber(value, { extract: false, ...options });
-          } catch {
-            return undefined;
-          }
-        };
-
-        const internationalFallback = `${dialCode}${digitsOnly.replace(/^0+/, "")}`;
-
-        let phoneNumber = sanitized.startsWith("+")
-          ? parseStrict(sanitized)
-          : countryISO
-            ? parseStrict(digitsOnly, { defaultCountry: countryISO })
-            : undefined;
-
-        if (!phoneNumber) {
-          phoneNumber = parseStrict(internationalFallback);
-        }
-
-        if (phoneNumber) {
-          if (
-            countryISO &&
-            phoneNumber.country &&
-            phoneNumber.country !== countryISO
-          ) {
-            return {
-              valid: false,
-              error: `Phone number does not match ${selectedCountry?.country || "selected country"}`,
-            };
-          }
-
-          if (phoneNumber.isValid()) {
-            return { valid: true };
-          }
-
-          return {
-            valid: false,
-            error: `Invalid phone number for ${selectedCountry?.country || "selected country"}`,
-          };
-        }
-
-        if (
-          (countryISO && isValidPhoneNumber(digitsOnly, countryISO)) ||
-          isValidPhoneNumber(internationalFallback)
-        ) {
-          return { valid: true };
-        }
-
-        return {
-          valid: false,
-          error: `Invalid phone number for ${selectedCountry?.country || "selected country"}`,
-        };
-      } catch (error) {
-        console.error("Phone validation error:", error);
-        return { valid: false, error: "Invalid phone number format" };
+      const countryISO = getCountryISO(dialCode);
+      const digitsOnly = phoneValue.replace(/\D/g, "");
+      
+      if (!digitsOnly) {
+        return { valid: false, error: "Phone number must contain digits" };
       }
+
+      if (countryISO === "AE") {
+        if (digitsOnly.length !== 9) {
+          return { valid: false, error: "UAE phone numbers must be exactly 9 digits" };
+        }
+        return { valid: true };
+      }
+
+      if (countryISO === "IN") {
+        if (digitsOnly.length !== 10) {
+          return { valid: false, error: "India phone numbers must be exactly 10 digits" };
+        }
+        return { valid: true };
+      }
+
+      return { valid: true };
     },
-    [getCountryISO, selectedCountry],
+    [getCountryISO],
   );
 
   // Validate a single field on blur
