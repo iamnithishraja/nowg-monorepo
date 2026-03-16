@@ -1,8 +1,8 @@
 import { Organization, OrganizationMember } from "@nowgai/shared/models";
 import type { ActionFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
+import { sendEnterpriseRequestNotificationToAdmin, sendEnterpriseRequestSubmittedEmail } from "~/lib/email";
 import { connectToDatabase } from "~/lib/mongo";
-import { sendEnterpriseRequestSubmittedEmail, sendEnterpriseRequestNotificationToAdmin } from "~/lib/email";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
@@ -77,75 +77,61 @@ export async function action({ request }: ActionFunctionArgs) {
           .trim();
       }) || [];
 
-    // Check if user is already part of any organization (active or pending)
-    const existingMemberships = await OrganizationMember.find({
+    // Check if user already has an active organization membership
+    const existingActiveMembership = await OrganizationMember.findOne({
       userId: userId,
-      status: { $in: ["active", "pending"] },
-    }).lean();
+      status: "active",
+    }).lean() as any;
 
-    if (existingMemberships.length > 0) {
-      // Check if this is a pending enterprise request
-      const membership = existingMemberships[0];
-      const existingOrg = await Organization.findById(membership.organizationId);
-      
-      if (existingOrg) {
-        // If it's a pending enterprise request, show appropriate message
-        if (existingOrg.approvalStatus === "pending") {
-          return new Response(
-            JSON.stringify({
-              error: "Pending request exists",
-              message: `You already have a pending enterprise request for "${existingOrg.name}". Please wait for it to be reviewed.`,
-            }),
-            {
-              status: 400,
-              headers: { "Content-Type": "application/json" },
-            }
-          );
-        }
-        
-        // If it's an active organization
+    if (existingActiveMembership) {
+      const existingOrg = await Organization.findById(existingActiveMembership.organizationId);
+      return new Response(
+        JSON.stringify({
+          error: "User already in another organization",
+          message: `You are already a member of ${existingOrg?.name || "an organization"}. Users cannot be members of multiple organizations. Please leave it first.`,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // For enterprise: check if user already has a pending enterprise request
+    if (planType === "enterprise") {
+      const existingPendingRequest = await Organization.findOne({
+        orgAdminId: userId,
+        approvalStatus: "pending",
+      }).lean() as any;
+
+      if (existingPendingRequest) {
         return new Response(
           JSON.stringify({
-            error: "User already in another organization",
-            message: `You are already a member of ${existingOrg.name}. Users cannot be members of multiple organizations. Please leave the other organization first before creating a new one.`,
+            error: "Pending request exists",
+            message: `You already have a pending enterprise request for "${existingPendingRequest.name}". Please wait for it to be reviewed.`,
           }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          }
+          { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
-      
-      // If organization doesn't exist but membership does, clean up orphaned membership
-      await OrganizationMember.deleteOne({ _id: membership._id });
     }
-    
-    // Also check for rejected memberships and clean them up so user can try again
-    const rejectedMemberships = await OrganizationMember.find({
+
+    // Clean up any orphaned pending/rejected memberships (legacy cleanup)
+    await OrganizationMember.deleteMany({
       userId: userId,
-      status: "rejected",
-    }).lean();
-    
-    // Clean up rejected memberships so user can create new organization
-    if (rejectedMemberships.length > 0) {
-      await OrganizationMember.deleteMany({
-        userId: userId,
-        status: "rejected",
-      });
-    }
+      status: { $in: ["pending", "rejected"] },
+    });
 
     // Determine if this is an enterprise request that needs approval
     const isEnterpriseRequest = planType === "enterprise";
     const approvalStatus = isEnterpriseRequest ? "pending" : null;
 
     // Create organization
+    // Enterprise requests start as "suspended" — activated only on admin approval
     const organization = new Organization({
       name: name.trim(),
       description: description?.trim() || "",
       allowedDomains: cleanedDomains,
-      orgAdminId: userId, // Set creator as org admin
+      orgAdminId: userId, // Track who submitted the request
       planType: planType,
       approvalStatus: approvalStatus,
+      status: isEnterpriseRequest ? "suspended" : "active",
       // Enterprise-specific fields
       ...(isEnterpriseRequest && {
         companySize,
@@ -158,16 +144,18 @@ export async function action({ request }: ActionFunctionArgs) {
 
     await organization.save();
 
-    // Add creator as org_admin member
-    // For enterprise requests, the membership is created but the org is pending approval
-    const organizationMember = new OrganizationMember({
-      userId: userId,
-      organizationId: organization._id,
-      role: "org_admin",
-      status: isEnterpriseRequest ? "pending" : "active", // Pending for enterprise until approved
-    });
-
-    await organizationMember.save();
+    // For core orgs: immediately create the org_admin membership
+    // For enterprise requests: membership is created only when the request is APPROVED
+    if (!isEnterpriseRequest) {
+      const organizationMember = new OrganizationMember({
+        userId: userId,
+        organizationId: organization._id,
+        role: "org_admin",
+        status: "active",
+        joinedAt: new Date(),
+      });
+      await organizationMember.save();
+    }
 
     // Send emails for enterprise requests
     if (isEnterpriseRequest) {

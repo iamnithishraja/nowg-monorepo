@@ -1,22 +1,22 @@
 import { Organization, OrganizationMember, OrgUserInvitation, Project, ProjectMember } from "@nowgai/shared/models";
 import {
-    hasAdminAccess,
-    OrganizationRole,
-    USER_ROLE_DISPLAY_NAMES,
-    UserRole
+  hasAdminAccess,
+  OrganizationRole,
+  USER_ROLE_DISPLAY_NAMES,
+  UserRole
 } from "@nowgai/shared/types";
 import { randomBytes } from "crypto";
 import type { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
 import {
-    sendOrgAdminInvitationEmail,
-    sendOrgUserInvitationEmail,
-    sendUserRoleUpdateEmail,
+  sendOrgAdminInvitationEmail,
+  sendOrgUserInvitationEmail,
+  sendUserRoleUpdateEmail,
 } from "../../lib/email";
 import {
-    getUserOrganizations,
-    isOrganizationAdmin,
+  getUserOrganizations,
+  isOrganizationAdmin,
 } from "../../lib/organizationRoles";
 
 /**
@@ -1764,5 +1764,217 @@ export async function updateOrganizationPaymentProvider(
       error: "Failed to update organization payment provider",
       message: error.message || "An error occurred",
     });
+  }
+}
+// ─────────────────────────────────────────────────────────────
+// Enterprise Request Management
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/organizations/pending-enterprise
+ * List all enterprise organizations pending approval (ADMIN / TECH_SUPPORT only)
+ */
+export async function getPendingEnterpriseRequests(req: Request, res: Response) {
+  try {
+    const user = (req as any).user;
+    if (!user?.role || !hasAdminAccess(user.role)) {
+      return res.status(403).json({ error: "Unauthorized. Only system admins can view pending enterprise requests." });
+    }
+
+    const organizations = await Organization.find({
+      planType: "enterprise",
+      approvalStatus: "pending",
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const orgAdminIds = organizations
+      .map((org: any) => org.orgAdminId)
+      .filter((id: any) => !!id);
+
+    let adminMap = new Map<string, any>();
+    if (orgAdminIds.length > 0) {
+      try {
+        const usersCollection = getUsersCollection();
+        const admins = await usersCollection
+          .find({ _id: { $in: orgAdminIds.map((id: string) => new ObjectId(id)) } })
+          .toArray();
+        admins.forEach((a: any) => adminMap.set(a._id.toString(), a));
+      } catch (err) {
+        console.error("Error fetching org admin details:", err);
+      }
+    }
+
+    const formatted = organizations.map((org: any) => {
+      const admin = org.orgAdminId ? adminMap.get(org.orgAdminId) : null;
+      return {
+        id: org._id.toString(),
+        name: org.name,
+        description: org.description || "",
+        planType: org.planType,
+        approvalStatus: org.approvalStatus,
+        companySize: org.companySize || null,
+        industry: org.industry || null,
+        website: org.website || null,
+        useCase: org.useCase || null,
+        contactPhone: org.contactPhone || null,
+        allowedDomains: org.allowedDomains || [],
+        orgAdmin: admin
+          ? { id: admin._id.toString(), email: admin.email, name: admin.name || "" }
+          : null,
+        createdAt: org.createdAt,
+      };
+    });
+
+    return res.json({ organizations: formatted, total: formatted.length });
+  } catch (error: any) {
+    console.error("Error fetching pending enterprise requests:", error);
+    return res.status(500).json({ error: "Failed to fetch pending enterprise requests", message: error.message });
+  }
+}
+
+/**
+ * POST /api/admin/organizations/:id/approve-enterprise
+ * Approve a pending enterprise organization request (ADMIN / TECH_SUPPORT only)
+ */
+export async function approveEnterpriseRequest(req: Request, res: Response) {
+  try {
+    const user = (req as any).user;
+    if (!user?.role || !hasAdminAccess(user.role)) {
+      return res.status(403).json({ error: "Unauthorized. Only system admins can approve enterprise requests." });
+    }
+
+    const { id } = req.params;
+    const organization = await Organization.findById(id);
+    if (!organization) return res.status(404).json({ error: "Organization not found" });
+    if (organization.approvalStatus !== "pending") {
+      return res.status(400).json({ error: "Organization is not pending approval", currentStatus: organization.approvalStatus });
+    }
+
+    organization.approvalStatus = "approved";
+    organization.status = "active";
+    organization.approvalReviewedBy = user.id;
+    organization.approvalReviewedAt = new Date();
+    organization.updatedAt = new Date();
+    await organization.save();
+
+    // Create the org_admin membership — it wasn't created at request time
+    // (support legacy case where a pending member may exist, activate it; otherwise create new)
+    const existingMember = await OrganizationMember.findOne({
+      organizationId: organization._id,
+      userId: organization.orgAdminId,
+    });
+    if (existingMember) {
+      existingMember.status = "active";
+      existingMember.joinedAt = new Date();
+      await existingMember.save();
+    } else if (organization.orgAdminId) {
+      await new OrganizationMember({
+        userId: organization.orgAdminId,
+        organizationId: organization._id,
+        role: "org_admin",
+        status: "active",
+        joinedAt: new Date(),
+      }).save();
+    }
+
+    // Send approval email to org admin
+    if (organization.orgAdminId) {
+      try {
+        const usersCollection = getUsersCollection();
+        const orgAdmin = await usersCollection.findOne({ _id: new ObjectId(organization.orgAdminId) });
+        if (orgAdmin?.email) {
+          const { sendEnterpriseRequestApprovedEmail } = await import("../../lib/email");
+          await sendEnterpriseRequestApprovedEmail({
+            to: orgAdmin.email,
+            userName: orgAdmin.name || orgAdmin.email,
+            organizationName: organization.name,
+          });
+        }
+      } catch (emailError) {
+        console.error("Error sending enterprise approval email:", emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Enterprise organization approved successfully",
+      organization: {
+        id: organization._id.toString(),
+        name: organization.name,
+        approvalStatus: organization.approvalStatus,
+        status: organization.status,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error approving enterprise request:", error);
+    return res.status(500).json({ error: "Failed to approve enterprise request", message: error.message });
+  }
+}
+
+/**
+ * POST /api/admin/organizations/:id/reject-enterprise
+ * Reject a pending enterprise organization request (ADMIN / TECH_SUPPORT only)
+ */
+export async function rejectEnterpriseRequest(req: Request, res: Response) {
+  try {
+    const user = (req as any).user;
+    if (!user?.role || !hasAdminAccess(user.role)) {
+      return res.status(403).json({ error: "Unauthorized. Only system admins can reject enterprise requests." });
+    }
+
+    const { id } = req.params;
+    const reason: string = req.body?.reason || "";
+
+    const organization = await Organization.findById(id);
+    if (!organization) return res.status(404).json({ error: "Organization not found" });
+    if (organization.approvalStatus !== "pending") {
+      return res.status(400).json({ error: "Organization is not pending approval", currentStatus: organization.approvalStatus });
+    }
+
+    organization.approvalStatus = "rejected";
+    organization.status = "suspended";
+    organization.approvalReviewedBy = user.id;
+    organization.approvalReviewedAt = new Date();
+    organization.approvalNotes = reason || null;
+    organization.updatedAt = new Date();
+    await organization.save();
+
+    // No OrganizationMember was created at request time, so nothing to clean up here
+
+    // Send rejection email to org admin
+    if (organization.orgAdminId) {
+      try {
+        const usersCollection = getUsersCollection();
+        const orgAdmin = await usersCollection.findOne({ _id: new ObjectId(organization.orgAdminId) });
+        if (orgAdmin?.email) {
+          const { sendEnterpriseRequestRejectedEmail } = await import("../../lib/email");
+          await sendEnterpriseRequestRejectedEmail({
+            to: orgAdmin.email,
+            userName: orgAdmin.name || orgAdmin.email,
+            organizationName: organization.name,
+            reason: reason || undefined,
+          });
+        }
+      } catch (emailError) {
+        console.error("Error sending enterprise rejection email:", emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Enterprise organization rejected",
+      organization: {
+        id: organization._id.toString(),
+        name: organization.name,
+        approvalStatus: organization.approvalStatus,
+        status: organization.status,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error rejecting enterprise request:", error);
+    return res.status(500).json({ error: "Failed to reject enterprise request", message: error.message });
   }
 }

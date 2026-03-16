@@ -1,21 +1,22 @@
 import { Router } from "express";
-import { requireAdmin } from "../../middleware/betterAuthMiddleware";
 import {
-  getOrganizations,
-  createOrganization,
-  updateOrganization,
+  approveEnterpriseRequest,
   assignOrgAdmin,
-  updateUserRoleInOrg,
+  createOrganization,
   deleteOrganization,
-  acceptInvitation,
-  rejectInvitation,
-  searchUserByEmail,
-  inviteUserToOrg,
-  getOrgUsers,
-  removeUserFromOrg,
   getOrganizationPaymentProvider,
+  getOrganizations,
+  getOrgUsers,
+  getPendingEnterpriseRequests,
+  inviteUserToOrg,
+  rejectEnterpriseRequest,
+  removeUserFromOrg,
+  searchUserByEmail,
+  updateOrganization,
   updateOrganizationPaymentProvider,
+  updateUserRoleInOrg
 } from "../../controllers/admin/organizationsController";
+import { requireAdmin } from "../../middleware/betterAuthMiddleware";
 
 const router = Router();
 
@@ -63,5 +64,14 @@ router.put(
   "/:organizationId/payment-provider",
   updateOrganizationPaymentProvider
 );
+
+// GET /api/admin/organizations/pending-enterprise - List pending enterprise requests
+router.get("/pending-enterprise", getPendingEnterpriseRequests);
+
+// POST /api/admin/organizations/:id/approve-enterprise - Approve an enterprise request
+router.post("/:id/approve-enterprise", approveEnterpriseRequest);
+
+// POST /api/admin/organizations/:id/reject-enterprise - Reject an enterprise request
+router.post("/:id/reject-enterprise", rejectEnterpriseRequest);
 
 export default router;
