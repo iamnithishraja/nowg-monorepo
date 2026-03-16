@@ -78,11 +78,15 @@ export function GitHubRepositoryDialog({
           <DialogTitle>
             {!hasRepository
               ? "Create GitHub Repository"
+              : repositoryStatus?.isSynced
+              ? "Repository Synced"
               : "Sync Changes to GitHub"}
           </DialogTitle>
           <DialogDescription>
             {!hasRepository
               ? "Create a new GitHub repository and push your code to it."
+              : repositoryStatus?.isSynced
+              ? "Your repository is already up to date with the latest changes."
               : "Push your latest changes to the connected GitHub repository."}
           </DialogDescription>
         </DialogHeader>
@@ -216,22 +220,24 @@ export function GitHubRepositoryDialog({
                   onClick={() => onOpenChange(false)}
                   disabled={isLoading}
                 >
-                  Cancel
+                  {hasRepository && repositoryStatus?.isSynced ? "Close" : "Cancel"}
                 </Button>
-                <Button
-                  onClick={!hasRepository ? handleCreate : onSyncChanges}
-                  disabled={
-                    isLoading ||
-                    (!hasGitHubConnected && !githubToken.trim()) ||
-                    (!hasRepository && !repoName.trim())
-                  }
-                >
-                  {isLoading
-                    ? "Processing..."
-                    : !hasRepository
-                    ? "Create & Push"
-                    : "Sync Changes"}
-                </Button>
+                {(!hasRepository || repositoryStatus?.isSynced === false) && (
+                  <Button
+                    onClick={!hasRepository ? handleCreate : onSyncChanges}
+                    disabled={
+                      isLoading ||
+                      (!hasGitHubConnected && !githubToken.trim()) ||
+                      (!hasRepository && !repoName.trim())
+                    }
+                  >
+                    {isLoading
+                      ? "Processing..."
+                      : !hasRepository
+                      ? "Create & Push"
+                      : "Sync Changes"}
+                  </Button>
+                )}
               </>
             )}
           </div>
