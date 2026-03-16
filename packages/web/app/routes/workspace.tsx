@@ -1398,6 +1398,7 @@ export default function Workspace({ loaderData }: Route.ComponentProps) {
                     onRevertToVersion={controller.handleRevertToVersion}
                     onGoToLatest={controller.handleReturnToLatestVersion}
                     isRestoringVersion={controller.isRestoringVersion}
+                    conversationTitle={controller.conversationTitle}
                   />
 
                   {/* Right Panel Content */}

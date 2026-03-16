@@ -9,7 +9,6 @@ import {
   CloudArrowUp,
   Code,
   CurrencyDollar,
-  Database,
   DeviceMobile,
   GitBranch,
   GithubLogo,
@@ -50,48 +49,7 @@ const VercelIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// Supabase Logo SVG
-const SupabaseIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 109 113" fill="none">
-    <path
-      d="M63.7076 110.284C60.8481 113.885 55.0502 111.912 54.9813 107.314L53.9738 40.0627L99.1935 40.0627C107.384 40.0627 111.952 49.5228 106.859 55.9374L63.7076 110.284Z"
-      fill="url(#paint0_linear)"
-    />
-    <path
-      d="M63.7076 110.284C60.8481 113.885 55.0502 111.912 54.9813 107.314L53.9738 40.0627L99.1935 40.0627C107.384 40.0627 111.952 49.5228 106.859 55.9374L63.7076 110.284Z"
-      fill="url(#paint1_linear)"
-      fillOpacity="0.2"
-    />
-    <path
-      d="M45.317 2.07103C48.1765 -1.53037 53.9745 0.442937 54.0434 5.04068L54.4849 72.2922H9.83113C1.64038 72.2922 -2.92775 62.8321 2.1655 56.4175L45.317 2.07103Z"
-      fill="#3ECF8E"
-    />
-    <defs>
-      <linearGradient
-        id="paint0_linear"
-        x1="53.9738"
-        y1="54.974"
-        x2="94.1635"
-        y2="71.8295"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop stopColor="#249361" />
-        <stop offset="1" stopColor="#3ECF8E" />
-      </linearGradient>
-      <linearGradient
-        id="paint1_linear"
-        x1="36.1558"
-        y1="30.578"
-        x2="54.4844"
-        y2="65.0806"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop />
-        <stop offset="1" stopOpacity="0" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
+
 
 type TabType = "files" | "preview";
 
@@ -117,6 +75,7 @@ interface WorkspaceRightHeaderProps {
   onGoToLatest?: () => void;
   /** Whether restoring a version */
   isRestoringVersion?: boolean;
+  conversationTitle?: string | null;
 }
 
 export function WorkspaceRightHeader({
@@ -132,6 +91,7 @@ export function WorkspaceRightHeader({
   onRevertToVersion,
   onGoToLatest,
   isRestoringVersion = false,
+  conversationTitle,
 }: WorkspaceRightHeaderProps) {
   const navigate = useNavigate();
   const [user, setUser] = useState<any | null>(null);
@@ -292,16 +252,66 @@ export function WorkspaceRightHeader({
     updateExisting = false,
     versionId?: string,
   ) => {
-    // Commented out Vercel deployment logic as per user request
-    if (provider === "vercel") {
-      window.open("https://vercel.com/new", "_blank");
-      return;
-    }
-
     if (versionId) {
       deployVersion(versionId, provider);
     } else {
       startDeploy(provider, updateExisting);
+    }
+  };
+
+  const handleVercelDeploy = async () => {
+    if (hasRepository) {
+      if (!isSynced) {
+        const result = await handleSyncChanges();
+        if (!result) return;
+      }
+      
+      const repoUrl = repositoryStatus?.repository?.repoUrl;
+      if (repoUrl) {
+        window.open(`https://vercel.com/new/clone?repository-url=${encodeURIComponent(repoUrl)}`, "_blank");
+      } else {
+        window.open("https://vercel.com/new", "_blank");
+      }
+    } else {
+      // If not connected to GitHub, open the dialog to connect
+      if (!hasGitHubConnected) {
+        handleOpenGitHubDialog();
+        return;
+      }
+
+      // Try to create repo automatically
+      const repoName = (conversationTitle || "nowgai-project")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-") // replace non-alphanumeric with hyphens
+        .replace(/^-+|-+$/g, ""); // remove leading/trailing hyphens
+
+      // If we have connection but no repo, let's just open the dialog pre-filled?
+      // Or we can try to create. The user said "should actually create".
+      // But creating requires repo name and it might fail if taken.
+      // So opening the dialog is the safest way to "actually create" with user confirmation of the name.
+      // HOWEVER, if the user wants it to be faster, let's just open the dialog.
+      
+      // Wait, let's see if I can just call the handleCreateRepository.
+      // But I need the name.
+      
+      // Let's stick to opening the dialog for now if no repo, 
+      // but maybe the user wants it to be more automated.
+      // "ideally when u click on deploy to vercel it should check if repo is created if no create and sync"
+      
+      // If I show the dialog, they still have to click "Create & Push".
+      // Let's try to do it automatically if we have a name.
+      await handleCreateRepository(
+        repoName || "project-" + Date.now().toString().slice(-6),
+        `Project created with NowgAI: ${conversationTitle || "Untitled"}`,
+        true // isPrivate
+      );
+      
+      // After creation, the repositoryStatus will update. 
+      // But we can't easily wait for it here without more logic.
+      // Success message will show in the dialog if it's open.
+      // Let's open the dialog to show progress.
+      setShowGitHubDialog(true);
     }
   };
 
@@ -336,6 +346,7 @@ export function WorkspaceRightHeader({
     if (result) {
       setGithubToken("");
     }
+    return result;
   };
 
   const handleGitHubDelete = async (deleteFromGitHub: boolean) => {
@@ -570,19 +581,13 @@ export function WorkspaceRightHeader({
               ) : (
                 <>
                   <DropdownMenuItem
-                    onClick={() => window.open("https://vercel.com/new", "_blank")}
+                    onClick={handleVercelDeploy}
                     className="gap-2 cursor-pointer"
                   >
                     <VercelIcon className="w-3.5 h-3.5" />
                     Deploy to Vercel
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => navigate("/supabase-projects")}
-                    className="gap-2 cursor-pointer"
-                  >
-                    <SupabaseIcon className="w-4 h-4" />
-                    Deploy to Supabase
-                  </DropdownMenuItem>
+
                 </>
               )}
               <DropdownMenuSeparator className="bg-white/[0.08]" />
@@ -703,13 +708,7 @@ export function WorkspaceRightHeader({
                 <ChatCircle className="w-4 h-4" />
                 Manage Organization
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate("/supabase-projects")}
-                className="gap-2 cursor-pointer"
-              >
-                <Database className="w-4 h-4" />
-                Supabase Projects
-              </DropdownMenuItem>
+
               {user &&
                 (() => {
                   const userRole = userWithAccess?.role || user?.role;
@@ -793,7 +792,7 @@ export function WorkspaceRightHeader({
         commitInfo={commitInfo}
         onConnectGitHub={handleConnectGitHubWrapper}
         onCreateRepository={handleCreateRepository}
-        onSyncChanges={handleSyncChanges}
+        onSyncChanges={async () => { await handleSyncChanges(); }}
         onDeleteClick={() => setShowGitHubDeleteDialog(true)}
         onClose={handleCloseGitHubDialog}
       />
