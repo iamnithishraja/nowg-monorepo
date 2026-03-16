@@ -262,8 +262,12 @@ export function WorkspaceRightHeader({
   const handleVercelDeploy = async () => {
     if (hasRepository) {
       if (!isSynced) {
+        // Open the dialog to show sync progress
+        setShowGitHubDialog(true);
         const result = await handleSyncChanges();
         if (!result) return;
+        // Keep it open for a brief moment to show success if needed, 
+        // but we'll proceed to Vercel
       }
       
       const repoUrl = repositoryStatus?.repository?.repoUrl;
@@ -554,12 +558,20 @@ export function WorkspaceRightHeader({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                className="h-8 gap-1.5 px-4 rounded-lg text-xs font-medium text-white bg-[#8b5cf6] hover:bg-[#7c4deb] border-0"
+                className="h-8 gap-1.5 px-4 rounded-lg text-xs font-medium text-white bg-[#8b5cf6] hover:bg-[#7c4deb] border-0 relative"
                 disabled={
                   !!isDeploying || versions.length === 0 || isSyncingToR2
                 }
               >
-                Deploy
+                <div className="flex items-center gap-1.5">
+                  Deploy
+                  {hasRepository && !isSynced && (
+                    <span 
+                      className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.5)]" 
+                      title="Changes detected - sync required"
+                    />
+                  )}
+                </div>
                 <CaretDown className="w-3 h-3 ml-0.5" />
               </Button>
             </DropdownMenuTrigger>
