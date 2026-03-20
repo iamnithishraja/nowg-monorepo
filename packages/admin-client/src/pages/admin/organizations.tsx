@@ -73,7 +73,8 @@ import {
   Trash2,
   UserPlus,
   Wallet,
-  XCircle
+  XCircle,
+  Mail
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -284,6 +285,29 @@ export default function Organizations() {
       toast({
         title: "Success",
         description: "Invitation sent to user successfully",
+      });
+      setAssignAdminDialogOpen(false);
+      setSelectedOrg(null);
+      setAdminEmail("");
+      setSearchedUser(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const inviteUserToPlatformMutation = useMutation({
+    mutationFn: async (data: { email: string; orgId: string; role: string }) => {
+      return client.post("/api/admin/users/invite-user", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Invitation email sent successfully.",
       });
       setAssignAdminDialogOpen(false);
       setSelectedOrg(null);
@@ -1382,10 +1406,31 @@ export default function Organizations() {
               </div>
             )}
             {searchUserMutation.isError && !searchedUser && (
-              <div className="p-4 border rounded-lg bg-destructive/10 border-destructive/50">
-                <p className="text-sm text-destructive">
-                  User not found. Please check the email address and try again.
+              <div className="p-4 border rounded-lg bg-destructive/10 border-destructive/50 space-y-3">
+                <p className="text-sm text-destructive font-medium">
+                  User does not exist on the platform.
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  You can invite this user to join the platform. Once they sign up, you'll be able to assign them as an Organization Admin.
+                </p>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="w-full bg-background hover:bg-muted"
+                  onClick={() => {
+                    if (selectedOrg && adminEmail) {
+                      inviteUserToPlatformMutation.mutate({
+                        email: adminEmail.trim(),
+                        orgId: selectedOrg.id,
+                        role: "org_admin"
+                      });
+                    }
+                  }}
+                  disabled={inviteUserToPlatformMutation.isPending}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  {inviteUserToPlatformMutation.isPending ? "Sending Invite..." : "Invite user to platform"}
+                </Button>
               </div>
             )}
           </div>

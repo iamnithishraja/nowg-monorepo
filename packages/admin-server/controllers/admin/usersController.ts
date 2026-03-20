@@ -11,7 +11,7 @@ import { ObjectId } from "mongodb";
 import { getUsersCollection } from "../../config/db";
 import { getUserOrganizations } from "../../lib/organizationRoles";
 import { getUserProjects } from "../../lib/projectRoles";
-import { sendVerificationEmail } from "../../lib/email";
+import { sendVerificationEmail, sendPlatformInvitationEmail } from "../../lib/email";
 import { getMongoClient } from "../../config/db";
 import crypto from "crypto";
 
@@ -435,6 +435,54 @@ export async function sendVerificationEmailsToAllUnverified(
     console.error("Error sending verification emails:", error);
     return res.status(500).json({
       error: "Failed to send verification emails",
+      details: error.message || String(error),
+    });
+  }
+}
+
+/**
+ * POST /api/admin/users/invite-user
+ * Send an email invitation to a user to join the platform (no tokens or DB records).
+ */
+export async function invitePlatformUser(req: Request, res: Response) {
+  try {
+    const { email, orgId, role } = req.body;
+    const adminUser = (req as any).user;
+
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    // Role defaults to "Org Admin" for the email copy if not provided correctly
+    const roleDisplayName = role === "org_admin" ? "Organization Admin" : "User";
+
+    // Optional: Get org name if orgId is provided to customize the email
+    let organizationName = "our platform";
+    if (orgId && ObjectId.isValid(orgId)) {
+      const db = getMongoClient().db(process.env.MONGODB_DB_NAME || "nowgai");
+      const org = await db.collection("organizations").findOne({ _id: new ObjectId(orgId) });
+      if (org && org.name) {
+        organizationName = org.name;
+      }
+    }
+
+    const inviterName = (adminUser?.name || adminUser?.email || "An Admin") as string;
+
+    await sendPlatformInvitationEmail({
+      to: email,
+      organizationName,
+      inviterName,
+      roleName: roleDisplayName,
+    });
+
+    return res.json({
+      success: true,
+      message: "Invitation email sent successfully",
+    });
+  } catch (error: any) {
+    console.error("Error inviting user to platform:", error);
+    return res.status(500).json({
+      error: "Failed to invite user to platform",
       details: error.message || String(error),
     });
   }

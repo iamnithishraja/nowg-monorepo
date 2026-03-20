@@ -1541,3 +1541,171 @@ function createEnterpriseRejectedTemplate({
     </html>
   `;
 }
+
+interface SendPlatformInvitationEmailProps {
+  to: string;
+  organizationName: string;
+  inviterName: string;
+  roleName: string;
+}
+
+export async function sendPlatformInvitationEmail({
+  to,
+  organizationName,
+  inviterName,
+  roleName,
+}: SendPlatformInvitationEmailProps) {
+  const resendClient = await getResendClient();
+  const fromEmail = await getResendFrom();
+
+  const webPackageUrl = process.env.WEB_PACKAGE_URL || "http://localhost:3000";
+  const signupUrl = `${webPackageUrl.replace(/\/$/, "")}/signin`;
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject: `You've been invited to join ${organizationName} as ${roleName}`,
+      html: createPlatformInvitationEmailTemplate({
+        organizationName,
+        inviterName,
+        roleName,
+        signupUrl,
+      }),
+    };
+
+    const result = await resendClient.emails.send(emailData);
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending platform invitation email:", error);
+    throw new Error(
+      `Failed to send platform invitation email: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+function createPlatformInvitationEmailTemplate({
+  organizationName,
+  inviterName,
+  roleName,
+  signupUrl,
+}: {
+  organizationName: string;
+  inviterName: string;
+  roleName: string;
+  signupUrl: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Platform Invitation - Nowgai</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #f8f9fa;
+        }
+        .container {
+          background: white;
+          border-radius: 12px;
+          padding: 40px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .logo {
+          font-size: 28px;
+          font-weight: bold;
+          color: #000;
+          margin-bottom: 10px;
+        }
+        .title {
+          font-size: 24px;
+          font-weight: 600;
+          color: #1a1a1a;
+          margin-bottom: 20px;
+        }
+        .message {
+          font-size: 16px;
+          color: #666;
+          margin-bottom: 30px;
+          line-height: 1.6;
+        }
+        .button-container {
+          display: flex;
+          justify-content: center;
+          margin: 30px 0;
+        }
+        .button {
+          display: inline-block;
+          text-decoration: none;
+          padding: 14px 32px;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 16px;
+          transition: background-color 0.2s;
+          background-color: #000;
+          color: white;
+        }
+        .button:hover {
+          background-color: #333;
+        }
+        .footer {
+          margin-top: 40px;
+          padding-top: 20px;
+          border-top: 1px solid #eee;
+          font-size: 14px;
+          color: #888;
+        }
+        .info-box {
+          background-color: #f0f9ff;
+          border: 1px solid #bae6fd;
+          border-radius: 8px;
+          padding: 15px;
+          margin: 20px 0;
+          color: #0c4a6e;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai Admin</div>
+        </div>
+        
+        <h1 class="title">Join Our Platform</h1>
+        
+        <div class="message">
+          <p>Hi there,</p>
+          <p><strong>${inviterName}</strong> has invited you to join our platform to become an <strong>${roleName}</strong> for <strong>"${organizationName}"</strong>.</p>
+          <p>Please create an account to get started. Once you sign up, your administrator will be able to complete your assignment.</p>
+        </div>
+        
+        <div class="button-container">
+          <a href="${signupUrl}" class="button">Sign Up Now</a>
+        </div>
+        
+        <div class="info-box">
+          <strong>Note:</strong> You just need to create an account. No further action is required from you regarding the assignment.
+        </div>
+        
+        <div class="footer">
+          <p>If you didn't expect this invitation, you can safely ignore this email.</p>
+          <p>Best regards,<br>The Nowgai Admin Team</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
