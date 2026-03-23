@@ -88,12 +88,77 @@ type AppView =
   | "enterprise-approved"
   | "projects";
 
-export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: any } }) {
+// ─── Shared page shell (defined OUTSIDE the component for stable identity) ───
+const PageShell = ({
+  children,
+  user,
+}: {
+  children: React.ReactNode;
+  user: any;
+}) => (
+  <div className="h-screen w-screen bg-canvas text-primary flex overflow-hidden">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <Background />
+      <div className="pointer-events-none absolute inset-0 z-5 overflow-hidden">
+        <div
+          className="absolute left-0 top-1/4 h-[40rem] w-[80rem] rotate-[12deg] rounded-full blur-3xl"
+          style={{
+            background:
+              "radial-gradient(50% 60% at 50% 50%, rgba(123, 76, 255, 0.08) 0%, rgba(123, 76, 255, 0.06) 45%, rgba(123, 76, 255, 0.04) 100%)",
+            mixBlendMode: "screen",
+          }}
+        />
+        <div
+          className="absolute right-0 top-1/2 h-[36rem] w-[70rem] -rotate-[8deg] rounded-full blur-[70px]"
+          style={{
+            background:
+              "radial-gradient(55% 65% at 50% 50%, rgba(140, 99, 242, 0.06) 0%, rgba(140, 99, 242, 0.04) 50%, rgba(140, 99, 242, 0.02) 100%)",
+            mixBlendMode: "screen",
+          }}
+        />
+      </div>
+    </div>
+    <ProjectSidebar user={user} className="flex-shrink-0" />
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <Header showSidebarToggle={false} showAuthButtons={false} />
+      <main className="relative z-20 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex flex-col items-center pt-8 sm:pt-12 pb-8">
+          <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 md:px-8">
+            <div className="mb-8">
+              <div className="flex items-center gap-4 mb-2">
+                <div className="p-2 rounded-[6px] bg-[#7b4cff]/10">
+                  <Building2 className="h-6 w-6 text-[#7b4cff]" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-semibold text-primary">
+                    Manage Organization
+                  </h1>
+                  <p className="text-secondary text-sm mt-0.5">
+                    View projects and manage your organization
+                  </p>
+                </div>
+              </div>
+            </div>
+            {children}
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+);
+
+export default function ManageOrgConvo({
+  loaderData,
+}: {
+  loaderData?: { user?: any };
+}) {
   const user = loaderData?.user;
   const navigate = useNavigate();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [organizations, setOrganizations] = useState<Array<{ id: string; name: string }>>([]);
+  const [organizations, setOrganizations] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -103,7 +168,9 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   const [view, setView] = useState<AppView>("loading");
 
   // Plan selection
-  const [selectedPlan, setSelectedPlan] = useState<"core" | "enterprise">("core");
+  const [selectedPlan, setSelectedPlan] = useState<"core" | "enterprise">(
+    "core"
+  );
 
   // Enterprise request state
   const [pendingEnterpriseRequest, setPendingEnterpriseRequest] = useState<{
@@ -158,7 +225,6 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
           navigate("/signin");
           return;
         }
-        // Default to plans if we can't determine
         setView("plans");
         return;
       }
@@ -166,7 +232,11 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
       const data = await res.json();
 
       // Active org memberships → show projects tab
-      if (data.organizations && Array.isArray(data.organizations) && data.organizations.length > 0) {
+      if (
+        data.organizations &&
+        Array.isArray(data.organizations) &&
+        data.organizations.length > 0
+      ) {
         setView("projects");
         return;
       }
@@ -246,11 +316,9 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
 
   const handlePlanContinue = () => {
     if (selectedPlan === "core") {
-      // Core plan: redirect to home, no org creation
       navigate("/");
       return;
     }
-    // Enterprise plan: show request form
     setView("enterprise-form");
   };
 
@@ -332,7 +400,8 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
       conv.title.toLowerCase().includes(searchLower) ||
       conv.project?.name?.toLowerCase().includes(searchLower) ||
       conv.organization?.name?.toLowerCase().includes(searchLower);
-    const matchesOrg = selectedOrgId === "all" || conv.organization?.id === selectedOrgId;
+    const matchesOrg =
+      selectedOrgId === "all" || conv.organization?.id === selectedOrgId;
     return matchesSearch && matchesOrg;
   });
 
@@ -350,63 +419,19 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   const getModelBadge = (model: string) => {
     const modelName = model.split("/").pop() || model;
     return (
-      <Badge variant="outline" className="text-xs bg-[#7b4cff]/10 text-[#a78bfa] border-[#7b4cff]/30">
+      <Badge
+        variant="outline"
+        className="text-xs bg-[#7b4cff]/10 text-[#a78bfa] border-[#7b4cff]/30"
+      >
         {modelName}
       </Badge>
     );
   };
 
-  // ─── Shared page shell ────────────────────────────────────────────────────
-  const PageShell = ({ children }: { children: React.ReactNode }) => (
-    <div className="h-screen w-screen bg-canvas text-primary flex overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <Background />
-        <div className="pointer-events-none absolute inset-0 z-5 overflow-hidden">
-          <div
-            className="absolute left-0 top-1/4 h-[40rem] w-[80rem] rotate-[12deg] rounded-full blur-3xl"
-            style={{
-              background: "radial-gradient(50% 60% at 50% 50%, rgba(123, 76, 255, 0.08) 0%, rgba(123, 76, 255, 0.06) 45%, rgba(123, 76, 255, 0.04) 100%)",
-              mixBlendMode: "screen",
-            }}
-          />
-          <div
-            className="absolute right-0 top-1/2 h-[36rem] w-[70rem] -rotate-[8deg] rounded-full blur-[70px]"
-            style={{
-              background: "radial-gradient(55% 65% at 50% 50%, rgba(140, 99, 242, 0.06) 0%, rgba(140, 99, 242, 0.04) 50%, rgba(140, 99, 242, 0.02) 100%)",
-              mixBlendMode: "screen",
-            }}
-          />
-        </div>
-      </div>
-      <ProjectSidebar user={user} className="flex-shrink-0" />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header showSidebarToggle={false} showAuthButtons={false} />
-        <main className="relative z-20 flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="flex flex-col items-center pt-8 sm:pt-12 pb-8">
-            <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 md:px-8">
-              <div className="mb-8">
-                <div className="flex items-center gap-4 mb-2">
-                  <div className="p-2 rounded-[6px] bg-[#7b4cff]/10">
-                    <Building2 className="h-6 w-6 text-[#7b4cff]" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-semibold text-primary">Manage Organization</h1>
-                    <p className="text-secondary text-sm mt-0.5">View projects and manage your organization</p>
-                  </div>
-                </div>
-              </div>
-              {children}
-            </div>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-
   // ─── Loading ──────────────────────────────────────────────────────────────
   if (view === "loading" || loading) {
     return (
-      <PageShell>
+      <PageShell user={user}>
         <div className="flex items-center justify-center py-24">
           <Loader2 className="h-8 w-8 animate-spin text-[#7b4cff]" />
         </div>
@@ -417,7 +442,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   // ─── Plans page ───────────────────────────────────────────────────────────
   if (view === "plans") {
     return (
-      <PageShell>
+      <PageShell user={user}>
         <div className="space-y-6">
           <PlanSwitcher
             selectedPlan={selectedPlan}
@@ -428,7 +453,8 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
               onClick={handlePlanContinue}
               className="bg-gradient-to-r from-[#7b4cff] to-[#a855f7] hover:from-[#8c63f2] hover:to-[#b566f8] text-white font-medium shadow-lg shadow-[#7b4cff]/25 transition-all duration-200 px-8 py-3"
             >
-              Continue with {selectedPlan === "core" ? "Core" : "Enterprise"} Plan
+              Continue with{" "}
+              {selectedPlan === "core" ? "Core" : "Enterprise"} Plan
             </Button>
           </div>
         </div>
@@ -439,25 +465,32 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   // ─── Enterprise request form ──────────────────────────────────────────────
   if (view === "enterprise-form") {
     return (
-      <PageShell>
+      <PageShell user={user}>
         <div className="rounded-[12px] bg-surface-1 border border-[#7b4cff]/30 w-full">
           <Card className="bg-transparent border-0 shadow-none">
             <CardHeader className="px-5 py-4">
               <div className="flex items-center gap-2 mb-1">
                 <Building2 className="h-5 w-5 text-[#7b4cff]" />
-                <CardTitle className="text-primary">Request Enterprise Organization</CardTitle>
+                <CardTitle className="text-primary">
+                  Request Enterprise Organization
+                </CardTitle>
               </div>
               <CardDescription className="text-secondary">
-                Tell us about your organization. Our team will review your request and get back to you within 1–2 business days.
+                Tell us about your organization. Our team will review your
+                request and get back to you within 1–2 business days.
               </CardDescription>
             </CardHeader>
             <CardContent className="px-5 pb-5 space-y-5">
               {/* Organization Details */}
               <div className="space-y-4">
-                <h4 className="text-sm font-medium text-[#7b4cff] uppercase tracking-wider">Organization Details</h4>
+                <h4 className="text-sm font-medium text-[#7b4cff] uppercase tracking-wider">
+                  Organization Details
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <Label htmlFor="name" className="text-primary">Organization Name *</Label>
+                    <Label htmlFor="name" className="text-primary">
+                      Organization Name *
+                    </Label>
                     <Input
                       id="name"
                       value={orgName}
@@ -467,7 +500,9 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <Label htmlFor="description" className="text-primary">Description</Label>
+                    <Label htmlFor="description" className="text-primary">
+                      Description
+                    </Label>
                     <Textarea
                       id="description"
                       value={orgDescription}
@@ -482,7 +517,9 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
 
               {/* Company Info */}
               <div className="space-y-4 pt-2">
-                <h4 className="text-sm font-medium text-[#7b4cff] uppercase tracking-wider">Company Information</h4>
+                <h4 className="text-sm font-medium text-[#7b4cff] uppercase tracking-wider">
+                  Company Information
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-primary flex items-center gap-2">
@@ -497,13 +534,18 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                         <SelectItem value="1-10">1–10 employees</SelectItem>
                         <SelectItem value="11-50">11–50 employees</SelectItem>
                         <SelectItem value="51-200">51–200 employees</SelectItem>
-                        <SelectItem value="201-500">201–500 employees</SelectItem>
+                        <SelectItem value="201-500">
+                          201–500 employees
+                        </SelectItem>
                         <SelectItem value="500+">500+ employees</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="industry" className="text-primary flex items-center gap-2">
+                    <Label
+                      htmlFor="industry"
+                      className="text-primary flex items-center gap-2"
+                    >
                       <Briefcase className="h-4 w-4 text-tertiary" />
                       Industry
                     </Label>
@@ -516,7 +558,10 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                     />
                   </div>
                   <div>
-                    <Label htmlFor="website" className="text-primary flex items-center gap-2">
+                    <Label
+                      htmlFor="website"
+                      className="text-primary flex items-center gap-2"
+                    >
                       <Globe className="h-4 w-4 text-tertiary" />
                       Website
                     </Label>
@@ -529,7 +574,10 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                     />
                   </div>
                   <div>
-                    <Label htmlFor="contactPhone" className="text-primary flex items-center gap-2">
+                    <Label
+                      htmlFor="contactPhone"
+                      className="text-primary flex items-center gap-2"
+                    >
                       <Phone className="h-4 w-4 text-tertiary" />
                       Contact Phone
                     </Label>
@@ -546,9 +594,13 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
 
               {/* Use Case */}
               <div className="space-y-4 pt-2">
-                <h4 className="text-sm font-medium text-[#7b4cff] uppercase tracking-wider">Use Case</h4>
+                <h4 className="text-sm font-medium text-[#7b4cff] uppercase tracking-wider">
+                  Use Case
+                </h4>
                 <div>
-                  <Label htmlFor="useCase" className="text-primary">How do you plan to use Nowgai? *</Label>
+                  <Label htmlFor="useCase" className="text-primary">
+                    How do you plan to use Nowgai? *
+                  </Label>
                   <Textarea
                     id="useCase"
                     value={useCase}
@@ -562,21 +614,34 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
 
               {/* Allowed Domains */}
               <div className="space-y-4 pt-2">
-                <h4 className="text-sm font-medium text-[#7b4cff] uppercase tracking-wider">Access Control</h4>
+                <h4 className="text-sm font-medium text-[#7b4cff] uppercase tracking-wider">
+                  Access Control
+                </h4>
                 <div>
                   <Label className="text-primary">Allowed Domains</Label>
                   <p className="text-sm text-secondary mt-1 mb-2">
-                    Only users with email addresses from these domains can be invited. Leave empty to allow all domains.
+                    Only users with email addresses from these domains can be
+                    invited. Leave empty to allow all domains.
                   </p>
                   <div className="flex gap-2">
                     <Input
                       value={domainInput}
                       onChange={(e) => setDomainInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDomain(); } }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addDomain();
+                        }
+                      }}
                       placeholder="e.g., yourcompany.com"
                       className="bg-surface-2 border-subtle text-primary placeholder:text-tertiary focus:border-[#7b4cff] focus:ring-[#7b4cff]/20"
                     />
-                    <Button type="button" onClick={addDomain} variant="outline" className="bg-surface-2 border-subtle text-primary hover:bg-subtle hover:border-[#7b4cff]">
+                    <Button
+                      type="button"
+                      onClick={addDomain}
+                      variant="outline"
+                      className="bg-surface-2 border-subtle text-primary hover:bg-subtle hover:border-[#7b4cff]"
+                    >
                       Add
                     </Button>
                   </div>
@@ -607,14 +672,22 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
               <div className="flex gap-3 pt-2">
                 <Button
                   variant="outline"
-                  onClick={() => { setError(null); setView("plans"); }}
+                  onClick={() => {
+                    setError(null);
+                    setView("plans");
+                  }}
                   className="bg-surface-2 border-subtle text-primary hover:bg-subtle hover:border-[#7b4cff]"
                 >
                   Back to Plans
                 </Button>
                 <Button
                   onClick={handleSubmitEnterpriseRequest}
-                  disabled={isSubmitting || !orgName.trim() || !companySize || !useCase.trim()}
+                  disabled={
+                    isSubmitting ||
+                    !orgName.trim() ||
+                    !companySize ||
+                    !useCase.trim()
+                  }
                   className="flex-1 bg-gradient-to-r from-[#7b4cff] to-[#a855f7] hover:from-[#8c63f2] hover:to-[#b566f8] text-white font-medium shadow-lg shadow-[#7b4cff]/25 transition-all duration-200 disabled:opacity-50"
                 >
                   {isSubmitting ? (
@@ -640,7 +713,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   // ─── Enterprise pending ───────────────────────────────────────────────────
   if (view === "enterprise-pending") {
     return (
-      <PageShell>
+      <PageShell user={user}>
         <div className="rounded-[12px] bg-surface-1 border border-amber-500/30 w-full">
           <Card className="bg-transparent border-0 shadow-none">
             <CardHeader className="px-5 py-6">
@@ -649,9 +722,13 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                   <Clock className="h-12 w-12 text-amber-500" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl text-amber-500 mb-2">Request Under Review</CardTitle>
+                  <CardTitle className="text-xl text-amber-500 mb-2">
+                    Request Under Review
+                  </CardTitle>
                   <CardDescription className="text-secondary max-w-md">
-                    Thank you for your interest in our Enterprise plan! Your organization request is currently being reviewed by our team.
+                    Thank you for your interest in our Enterprise plan! Your
+                    organization request is currently being reviewed by our
+                    team.
                   </CardDescription>
                 </div>
               </div>
@@ -666,16 +743,22 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-tertiary">Organization Name:</span>
-                      <p className="text-primary font-medium">{pendingEnterpriseRequest.name}</p>
+                      <p className="text-primary font-medium">
+                        {pendingEnterpriseRequest.name}
+                      </p>
                     </div>
                     <div>
                       <span className="text-tertiary">Submitted:</span>
-                      <p className="text-primary">{formatDate(pendingEnterpriseRequest.createdAt)}</p>
+                      <p className="text-primary">
+                        {formatDate(pendingEnterpriseRequest.createdAt)}
+                      </p>
                     </div>
                     <div>
                       <span className="text-tertiary">Status:</span>
                       <div className="mt-1">
-                        <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">Pending Review</Badge>
+                        <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">
+                          Pending Review
+                        </Badge>
                       </div>
                     </div>
                   </div>
@@ -689,21 +772,32 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                 <ul className="space-y-2 text-sm text-secondary">
                   <li className="flex items-start gap-2">
                     <Mail className="h-4 w-4 text-[#7b4cff] mt-0.5 shrink-0" />
-                    <span>You'll receive an email confirmation about your request.</span>
+                    <span>
+                      You'll receive an email confirmation about your request.
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Users className="h-4 w-4 text-[#7b4cff] mt-0.5 shrink-0" />
-                    <span>Our team will review your request within 1–2 business days.</span>
+                    <span>
+                      Our team will review your request within 1–2 business
+                      days.
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-[#7b4cff] mt-0.5 shrink-0" />
-                    <span>Once approved, you'll get full access to Enterprise features.</span>
+                    <span>
+                      Once approved, you'll get full access to Enterprise
+                      features.
+                    </span>
                   </li>
                 </ul>
               </div>
               <div className="text-center text-sm text-secondary">
                 Have questions? Contact us at{" "}
-                <a href="mailto:support@nowgai.com" className="text-[#7b4cff] hover:underline">
+                <a
+                  href="mailto:support@nowgai.com"
+                  className="text-[#7b4cff] hover:underline"
+                >
                   support@nowgai.com
                 </a>
               </div>
@@ -717,7 +811,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   // ─── Enterprise rejected ──────────────────────────────────────────────────
   if (view === "enterprise-rejected") {
     return (
-      <PageShell>
+      <PageShell user={user}>
         <div className="rounded-[12px] bg-surface-1 border border-red-500/30 w-full">
           <Card className="bg-transparent border-0 shadow-none">
             <CardHeader className="px-5 py-6">
@@ -726,9 +820,12 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                   <XCircle className="h-12 w-12 text-red-500" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl text-red-500 mb-2">Request Not Approved</CardTitle>
+                  <CardTitle className="text-xl text-red-500 mb-2">
+                    Request Not Approved
+                  </CardTitle>
                   <CardDescription className="text-secondary max-w-md">
-                    Unfortunately, your Enterprise organization request was not approved at this time.
+                    Unfortunately, your Enterprise organization request was not
+                    approved at this time.
                   </CardDescription>
                 </div>
               </div>
@@ -736,13 +833,21 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
             <CardContent className="px-5 pb-6 space-y-4">
               {pendingEnterpriseRequest?.approvalNotes && (
                 <div className="rounded-lg bg-surface-2 border border-red-500/20 p-4">
-                  <p className="text-sm font-medium text-red-400 mb-1">Reason:</p>
-                  <p className="text-sm text-secondary">{pendingEnterpriseRequest.approvalNotes}</p>
+                  <p className="text-sm font-medium text-red-400 mb-1">
+                    Reason:
+                  </p>
+                  <p className="text-sm text-secondary">
+                    {pendingEnterpriseRequest.approvalNotes}
+                  </p>
                 </div>
               )}
               <div className="text-center text-sm text-secondary">
-                If you believe this was a mistake or would like more information, please contact us at{" "}
-                <a href="mailto:support@nowgai.com" className="text-[#7b4cff] hover:underline">
+                If you believe this was a mistake or would like more
+                information, please contact us at{" "}
+                <a
+                  href="mailto:support@nowgai.com"
+                  className="text-[#7b4cff] hover:underline"
+                >
                   support@nowgai.com
                 </a>
               </div>
@@ -768,7 +873,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
   // ─── Enterprise approved ──────────────────────────────────────────────────
   if (view === "enterprise-approved") {
     return (
-      <PageShell>
+      <PageShell user={user}>
         <div className="rounded-[12px] bg-surface-1 border border-[#7b4cff]/30 w-full">
           <Card className="bg-transparent border-0 shadow-none">
             <CardHeader className="px-5 py-6">
@@ -777,9 +882,12 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                   <CheckCircle2 className="h-12 w-12 text-[#7b4cff]" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl text-[#7b4cff] mb-2">Your organization has been approved.</CardTitle>
+                  <CardTitle className="text-xl text-[#7b4cff] mb-2">
+                    Your organization has been approved.
+                  </CardTitle>
                   <CardDescription className="text-secondary max-w-md">
-                    Your Enterprise organization is ready. You can now manage your organization from the Admin Panel.
+                    Your Enterprise organization is ready. You can now manage
+                    your organization from the Admin Panel.
                   </CardDescription>
                 </div>
               </div>
@@ -790,12 +898,16 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-tertiary">Organization Name:</span>
-                      <p className="text-primary font-medium">{pendingEnterpriseRequest.name}</p>
+                      <p className="text-primary font-medium">
+                        {pendingEnterpriseRequest.name}
+                      </p>
                     </div>
                     <div>
                       <span className="text-tertiary">Status:</span>
                       <div className="mt-1">
-                        <Badge className="bg-[#7b4cff]/20 text-[#a78bfa] border-[#7b4cff]/30">Approved</Badge>
+                        <Badge className="bg-[#7b4cff]/20 text-[#a78bfa] border-[#7b4cff]/30">
+                          Approved
+                        </Badge>
                       </div>
                     </div>
                   </div>
@@ -819,7 +931,7 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
 
   // ─── Projects view (user has active membership) ───────────────────────────
   return (
-    <PageShell>
+    <PageShell user={user}>
       <Tabs defaultValue="projects" className="w-full">
         <TabsList className="mb-6 bg-surface-1 border border-subtle gap-1">
           <TabsTrigger
@@ -851,7 +963,9 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
               >
                 <option value="all">All Organizations</option>
                 {organizations.map((org) => (
-                  <option key={org.id} value={org.id}>{org.name}</option>
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -867,7 +981,9 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                 <CardContent className="py-12">
                   <div className="text-center text-tertiary">
                     <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50 text-[#7b4cff]" />
-                    <p className="text-lg font-medium mb-2 text-primary">No projects found</p>
+                    <p className="text-lg font-medium mb-2 text-primary">
+                      No projects found
+                    </p>
                     <p className="text-secondary">
                       {searchQuery || selectedOrgId !== "all"
                         ? "Try adjusting your filters"
@@ -883,7 +999,9 @@ export default function ManageOrgConvo({ loaderData }: { loaderData?: { user?: a
                 <div
                   key={conv.id}
                   className="rounded-[12px] bg-surface-1 border border-subtle cursor-pointer hover:border-[#7b4cff]/50 hover:bg-surface-2 transition-colors relative z-10 w-full"
-                  onClick={() => navigate(`/workspace?conversationId=${conv.id}`)}
+                  onClick={() =>
+                    navigate(`/workspace?conversationId=${conv.id}`)
+                  }
                 >
                   <Card className="bg-transparent border-0 shadow-none">
                     <CardHeader className="px-5 py-4">
