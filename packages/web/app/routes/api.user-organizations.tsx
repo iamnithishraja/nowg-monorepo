@@ -34,52 +34,49 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .sort({ joinedAt: -1 }) // Most recent first
       .lean();
 
-    if (orgMemberships.length === 0) {
-      return new Response(JSON.stringify({ organizations: [] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
+    let formattedOrganizations: any[] = [];
+
+    if (orgMemberships.length > 0) {
+      const organizationIds = orgMemberships.map((m: any) =>
+        m.organizationId instanceof mongoose.Types.ObjectId
+          ? m.organizationId
+          : new mongoose.Types.ObjectId(m.organizationId)
+      );
+
+      // Get full organization details
+      const organizations = await Organization.find({
+        _id: { $in: organizationIds },
+      })
+        .sort({ createdAt: -1 }) // Most recently created first
+        .lean();
+
+      // Map organizations with membership info and wallet balance (default 0)
+      formattedOrganizations = organizations.map((org: any) => {
+        const orgIdString = org._id.toString();
+        const membership = orgMemberships.find((m: any) => {
+          const memberOrgId =
+            m.organizationId instanceof mongoose.Types.ObjectId
+              ? m.organizationId.toString()
+              : m.organizationId.toString();
+          return memberOrgId === orgIdString;
+        });
+
+        return {
+          id: org._id.toString(),
+          name: org.name,
+          description: org.description || "",
+          status: org.status,
+          allowedDomains: org.allowedDomains || [],
+          createdAt: org.createdAt,
+          updatedAt: org.updatedAt,
+          orgAdminId: org.orgAdminId,
+          role: membership?.role || "org_user",
+          walletBalance: 0, // Wallet is created on-demand, default is 0
+          planType: org.planType || "core",
+          approvalStatus: org.approvalStatus || null,
+        };
       });
     }
-
-    const organizationIds = orgMemberships.map((m: any) =>
-      m.organizationId instanceof mongoose.Types.ObjectId
-        ? m.organizationId
-        : new mongoose.Types.ObjectId(m.organizationId)
-    );
-
-    // Get full organization details
-    const organizations = await Organization.find({
-      _id: { $in: organizationIds },
-    })
-      .sort({ createdAt: -1 }) // Most recently created first
-      .lean();
-
-    // Map organizations with membership info and wallet balance (default 0)
-    const formattedOrganizations = organizations.map((org: any) => {
-      const orgIdString = org._id.toString();
-      const membership = orgMemberships.find((m: any) => {
-        const memberOrgId =
-          m.organizationId instanceof mongoose.Types.ObjectId
-            ? m.organizationId.toString()
-            : m.organizationId.toString();
-        return memberOrgId === orgIdString;
-      });
-
-      return {
-        id: org._id.toString(),
-        name: org.name,
-        description: org.description || "",
-        status: org.status,
-        allowedDomains: org.allowedDomains || [],
-        createdAt: org.createdAt,
-        updatedAt: org.updatedAt,
-        orgAdminId: org.orgAdminId,
-        role: membership?.role || "org_user",
-        walletBalance: 0, // Wallet is created on-demand, default is 0
-        planType: org.planType || "core",
-        approvalStatus: org.approvalStatus || null,
-      };
-    });
 
     // Also look for pending/rejected enterprise requests where user is the requester
     // (these orgs have no OrganizationMember record until approved)
@@ -90,7 +87,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     })
       .sort({ createdAt: -1 })
       .limit(1)
-      .lean();
+      .lean() as any[];
 
     const enterpriseRequest = enterpriseRequestOrgs.length > 0 ? {
       id: enterpriseRequestOrgs[0]._id.toString(),

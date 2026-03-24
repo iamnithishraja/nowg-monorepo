@@ -179,6 +179,7 @@ export default function ManageOrgConvo({
   const [useCase, setUseCase] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     initializePage();
@@ -304,6 +305,17 @@ export default function ManageOrgConvo({
       navigate("/");
       return;
     }
+    setIsEditMode(false);
+    setView("enterprise-form");
+  };
+
+  /** Pre-fill the form with existing request data and switch to edit mode */
+  const handleEditRequest = () => {
+    if (!pendingEnterpriseRequest) return;
+    setOrgName(pendingEnterpriseRequest.name);
+    setOrgDescription(pendingEnterpriseRequest.description || "");
+    setIsEditMode(true);
+    setError(null);
     setView("enterprise-form");
   };
 
@@ -325,40 +337,82 @@ export default function ManageOrgConvo({
     setError(null);
 
     try {
-      const res = await fetch("/api/organizations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: orgName,
-          description: orgDescription,
-          allowedDomains,
+      if (isEditMode && pendingEnterpriseRequest) {
+        // ── PATCH: update the existing pending request ────────────────────
+        const res = await fetch(
+          `/api/organizations/${pendingEnterpriseRequest.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              name: orgName,
+              description: orgDescription,
+              allowedDomains,
+              companySize,
+              industry,
+              website,
+              useCase,
+              contactPhone,
+            }),
+          }
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || data.message || "Failed to update request");
+        }
+
+        setPendingEnterpriseRequest((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: data.organization.name,
+                description: data.organization.description || "",
+              }
+            : prev
+        );
+
+        setIsEditMode(false);
+        setView("enterprise-pending");
+      } else {
+        // ── POST: create a new request ────────────────────────────────────
+        const res = await fetch("/api/organizations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            name: orgName,
+            description: orgDescription,
+            allowedDomains,
+            planType: "enterprise",
+            companySize,
+            industry,
+            website,
+            useCase,
+            contactPhone,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || data.message || "Failed to submit request");
+        }
+
+        setPendingEnterpriseRequest({
+          id: data.organization.id,
+          name: data.organization.name,
+          description: data.organization.description || "",
           planType: "enterprise",
-          companySize,
-          industry,
-          website,
-          useCase,
-          contactPhone,
-        }),
-      });
+          approvalStatus: "pending",
+          approvalNotes: null,
+          createdAt: data.organization.createdAt,
+        });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || data.message || "Failed to submit request");
+        setView("enterprise-pending");
       }
-
-      setPendingEnterpriseRequest({
-        id: data.organization.id,
-        name: data.organization.name,
-        description: data.organization.description || "",
-        planType: "enterprise",
-        approvalStatus: "pending",
-        approvalNotes: null,
-        createdAt: data.organization.createdAt,
-      });
-
-      setView("enterprise-pending");
     } catch (err: any) {
       console.error("Error submitting enterprise request:", err);
       setError(err.message || "Failed to submit request");
@@ -457,12 +511,15 @@ export default function ManageOrgConvo({
               <div className="flex items-center gap-2 mb-1">
                 <Building2 className="h-5 w-5 text-[#7b4cff]" />
                 <CardTitle className="text-primary">
-                  Request Enterprise Organization
+                  {isEditMode
+                    ? "Edit Enterprise Request"
+                    : "Request Enterprise Organization"}
                 </CardTitle>
               </div>
               <CardDescription className="text-secondary">
-                Tell us about your organization. Our team will review your
-                request and get back to you within 1–2 business days.
+                {isEditMode
+                  ? "Update your organization details. Your request will remain pending review."
+                  : "Tell us about your organization. Our team will review your request and get back to you within 1\u20132 business days."}
               </CardDescription>
             </CardHeader>
             <CardContent className="px-5 pb-5 space-y-5">
@@ -659,11 +716,16 @@ export default function ManageOrgConvo({
                   variant="outline"
                   onClick={() => {
                     setError(null);
-                    setView("plans");
+                    if (isEditMode) {
+                      setIsEditMode(false);
+                      setView("enterprise-pending");
+                    } else {
+                      setView("plans");
+                    }
                   }}
                   className="bg-surface-2 border-subtle text-primary hover:bg-subtle hover:border-[#7b4cff]"
                 >
-                  Back to Plans
+                  {isEditMode ? "Cancel" : "Back to Plans"}
                 </Button>
                 <Button
                   onClick={handleSubmitEnterpriseRequest}
@@ -678,12 +740,12 @@ export default function ManageOrgConvo({
                   {isSubmitting ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Submitting Request...
+                      {isEditMode ? "Saving Changes..." : "Submitting Request..."}
                     </>
                   ) : (
                     <>
                       <Send className="h-4 w-4 mr-2" />
-                      Submit Enterprise Request
+                      {isEditMode ? "Save Changes" : "Submit Enterprise Request"}
                     </>
                   )}
                 </Button>
@@ -777,14 +839,24 @@ export default function ManageOrgConvo({
                   </li>
                 </ul>
               </div>
-              <div className="text-center text-sm text-secondary">
-                Have questions? Contact us at{" "}
-                <a
-                  href="mailto:support@nowgai.com"
-                  className="text-[#7b4cff] hover:underline"
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-sm text-secondary">
+                  Have questions? Contact us at{" "}
+                  <a
+                    href="mailto:support@nowgai.com"
+                    className="text-[#7b4cff] hover:underline"
+                  >
+                    support@nowgai.com
+                  </a>
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={handleEditRequest}
+                  className="shrink-0 bg-surface-2 border-subtle text-primary hover:bg-subtle hover:border-[#7b4cff] gap-2"
                 >
-                  support@nowgai.com
-                </a>
+                  <Send className="h-4 w-4" />
+                  Edit Request
+                </Button>
               </div>
             </CardContent>
           </Card>
