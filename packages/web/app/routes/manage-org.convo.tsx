@@ -124,21 +124,6 @@ const PageShell = ({
       <main className="relative z-20 flex-1 overflow-y-auto overflow-x-hidden">
         <div className="flex flex-col items-center pt-8 sm:pt-12 pb-8">
           <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 md:px-8">
-            <div className="mb-8">
-              <div className="flex items-center gap-4 mb-2">
-                <div className="p-2 rounded-[6px] bg-[#7b4cff]/10">
-                  <Building2 className="h-6 w-6 text-[#7b4cff]" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-semibold text-primary">
-                    Manage Organization
-                  </h1>
-                  <p className="text-secondary text-sm mt-0.5">
-                    View projects and manage your organization
-                  </p>
-                </div>
-              </div>
-            </div>
             {children}
           </div>
         </div>
