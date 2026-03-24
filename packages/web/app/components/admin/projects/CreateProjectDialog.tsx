@@ -148,7 +148,7 @@ export function CreateProjectDialog({
           },
         }
       ),
-    enabled: !!organizationId && open && currentStep >= 3,
+    enabled: !!organizationId && open,
   });
 
   const selectedAdmin = availableUsersData?.users?.find(
@@ -580,58 +580,50 @@ export function CreateProjectDialog({
                   </div>
                 ) : (
                   <>
-                    <Select value={projectAdminId} onValueChange={setProjectAdminId}>
-                      <SelectTrigger className="bg-surface-2 border-subtle h-12 px-3 rounded-lg">
-                        {selectedAdmin ? (
-                          <div className="flex items-center gap-2 w-full">
-                            <Avatar className="w-7 h-7">
+                    {availableUsersData?.users && availableUsersData.users.length > 0 ? (
+                      <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto">
+                        {availableUsersData.users.map((user) => (
+                          <button
+                            key={user.id}
+                            type="button"
+                            onClick={() => setProjectAdminId(user.id)}
+                            className={cn(
+                              "flex items-center gap-3 w-full px-3 py-3 rounded-lg border transition-all text-left",
+                              projectAdminId === user.id
+                                ? "border-accent-primary bg-accent-primary/10"
+                                : "border-subtle bg-surface-2 hover:border-active hover:bg-surface-2/80"
+                            )}
+                          >
+                            <Avatar className="w-8 h-8 shrink-0">
                               <AvatarFallback className="bg-surface-3 text-xs">
-                                {selectedAdmin.name.charAt(0).toUpperCase()}
+                                {(user.name || user.email).charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="flex flex-col items-start flex-1 min-w-0">
-                              <span className="typography-body text-primary font-medium truncate w-full">
-                                {selectedAdmin.name}
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <span className="typography-body text-primary font-medium truncate">
+                                {user.name || user.email}
                               </span>
-                              <span className="typography-small text-tertiary truncate w-full">
-                                {selectedAdmin.email}
+                              <span className="typography-small text-tertiary truncate">
+                                {user.email}
                               </span>
                             </div>
-                          </div>
-                        ) : (
-                          <SelectValue placeholder="Select a team member" />
-                        )}
-                      </SelectTrigger>
-                      <SelectContent className="bg-surface-1 border-subtle">
-                        {availableUsersData?.users && availableUsersData.users.length > 0 ? (
-                          availableUsersData.users.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              <div className="flex items-center gap-2">
-                                <Avatar className="w-6 h-6">
-                                  <AvatarFallback className="bg-surface-3 text-xs">
-                                    {user.name.charAt(0).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex flex-col items-start">
-                                  <span className="typography-body text-primary">
-                                    {user.name}
-                                  </span>
-                                  <span className="typography-small text-tertiary">
-                                    {user.email}
-                                  </span>
-                                </div>
+                            {projectAdminId === user.id && (
+                              <div className="w-5 h-5 rounded-full bg-accent-primary flex items-center justify-center shrink-0">
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                  <path d="M2.5 6L5 8.5L9.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary"/>
+                                </svg>
                               </div>
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="px-3 py-2">
-                            <p className="typography-small text-tertiary">
-                              No team members available. Please add members to your organization first.
-                            </p>
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="px-3 py-6 text-center">
+                        <p className="typography-small text-tertiary">
+                          No team members available. Please add members to your organization first.
+                        </p>
+                      </div>
+                    )}
 
                     {!projectAdminId && (
                       <p className="typography-small text-error-500 px-1">
