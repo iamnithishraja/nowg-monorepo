@@ -169,7 +169,7 @@ export default function ManageOrgConvo({
 
   // Plan selection
   const [selectedPlan, setSelectedPlan] = useState<"core" | "enterprise">(
-    "core"
+    "enterprise"
   );
 
   // Enterprise request state

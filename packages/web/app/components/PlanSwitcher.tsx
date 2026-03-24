@@ -30,7 +30,7 @@ const ENTERPRISE_FEATURES = [
   "Dedicated Support",
 ];
 
-export function PlanSwitcher({ onPlanSelect, selectedPlan = "core" }: PlanSwitcherProps) {
+export function PlanSwitcher({ onPlanSelect, selectedPlan = "enterprise" }: PlanSwitcherProps) {
   const [hoveredPlan, setHoveredPlan] = useState<"core" | "enterprise" | null>(null);
 
   return (
@@ -45,80 +45,6 @@ export function PlanSwitcher({ onPlanSelect, selectedPlan = "core" }: PlanSwitch
           accelerates your development journey.
         </p>
       </div>
-
-      {/* Plan Cards */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Core Plan */}
-        <div
-          className={cn(
-            "relative rounded-2xl p-6 cursor-pointer transition-all duration-300",
-            "border-2",
-            selectedPlan === "core"
-              ? "border-[#7b4cff] bg-gradient-to-br from-[#7b4cff]/20 via-[#a855f7]/15 to-[#7b4cff]/10"
-              : "border-subtle bg-surface-1 hover:border-[#7b4cff]/50",
-            hoveredPlan === "core" && selectedPlan !== "core" && "border-[#7b4cff]/50"
-          )}
-          onClick={() => onPlanSelect("core")}
-          onMouseEnter={() => setHoveredPlan("core")}
-          onMouseLeave={() => setHoveredPlan(null)}
-        >
-          {/* Gradient overlay for selected state */}
-          {selectedPlan === "core" && (
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#7b4cff]/10 via-transparent to-[#a855f7]/10 pointer-events-none" />
-          )}
-
-          <div className="relative z-10">
-            {/* Plan Header */}
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-5 w-5 text-[#7b4cff]" />
-                <span className="text-sm font-semibold text-[#7b4cff] uppercase tracking-wide">
-                  Core
-                </span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg text-secondary">Get access to</span>
-                <span className="text-xl font-semibold text-[#a78bfa] italic">
-                  Popular
-                </span>
-                <span className="text-lg text-secondary">plan</span>
-              </div>
-              <p className="text-secondary text-sm mt-2">
-                Everything you need to build, deploy, and scale your applications.
-              </p>
-            </div>
-
-            {/* CTA Button */}
-            <button
-              className={cn(
-                "w-full py-3 px-4 rounded-lg font-semibold text-sm transition-all duration-200 mb-6",
-                selectedPlan === "core"
-                  ? "bg-white text-[#1a1a2e] shadow-lg"
-                  : "bg-surface-2 text-primary hover:bg-surface-3 border border-subtle"
-              )}
-            >
-              {selectedPlan === "core" ? "Currently Selected" : "Start Building Free"}
-            </button>
-
-            {/* Features */}
-            <div>
-              <p className="text-xs font-semibold text-tertiary uppercase tracking-wider mb-3">
-                What's Included
-              </p>
-              <ul className="space-y-2.5">
-                {CORE_FEATURES.map((feature, idx) => (
-                  <li key={idx} className="flex items-center gap-2.5 text-sm text-secondary">
-                    <Check className="h-4 w-4 text-[#7b4cff] flex-shrink-0" />
-                    <span>{feature}</span>
-                    {(feature === "Credits" || feature === "On-demand Credit top-ups") && (
-                      <Info className="h-3.5 w-3.5 text-tertiary" />
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
 
         {/* Enterprise Plan */}
         <div
@@ -186,6 +112,5 @@ export function PlanSwitcher({ onPlanSelect, selectedPlan = "core" }: PlanSwitch
           </div>
         </div>
       </div>
-    </div>
   );
 }
