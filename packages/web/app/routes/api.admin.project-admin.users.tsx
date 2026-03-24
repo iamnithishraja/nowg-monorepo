@@ -167,7 +167,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       })
       .toArray();
 
-    await mongoClient.close();
+    // Note: Do NOT close mongoClient - it's a shared singleton managed by getMongoClient()
 
     // Get all projects for these project IDs
     const allProjects = await Project.find({

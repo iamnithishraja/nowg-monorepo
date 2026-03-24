@@ -1,4 +1,4 @@
-import { Shield, User, UserGear } from "@phosphor-icons/react";
+import { FolderOpen, Shield, User, UserGear } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
@@ -278,9 +278,8 @@ export function ManageRoleDialog({
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <div className="w-8 h-8 rounded bg-surface-3 flex items-center justify-center flex-shrink-0">
-                                <Icon
-                                  name="FolderOpen"
-                                  size="sm"
+                                <FolderOpen
+                                  size={16}
                                   color="#727279"
                                 />
                               </div>

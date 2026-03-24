@@ -89,7 +89,7 @@ export async function action({ request }: ActionFunctionArgs) {
       .collection("user")
       .updateOne({ _id: objectId }, { $set: { role } });
 
-    await mongoClient.close();
+    // Note: Do NOT close mongoClient - it's a shared singleton managed by getMongoClient()
 
     if (result.matchedCount === 0) {
       return new Response(JSON.stringify({ error: "User not found" }), {

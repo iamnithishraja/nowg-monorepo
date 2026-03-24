@@ -51,7 +51,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const user = await db
       .collection("user")
       .findOne({ _id: new ObjectId(userId) });
-    await mongoClient.close();
+    // Note: Do NOT close mongoClient - it's a shared singleton managed by getMongoClient()
 
     if (!user) {
       return new Response(JSON.stringify({ error: "User not found" }), {

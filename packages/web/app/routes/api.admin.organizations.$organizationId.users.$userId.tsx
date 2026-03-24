@@ -206,7 +206,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
     // Don't update user.role or user.projectId - roles are stored in OrganizationMember/ProjectMember
 
-    await mongoClient.close();
+    // Note: Do NOT close mongoClient - it's a shared singleton managed by getMongoClient()
 
     console.log(
       `✅ Removed user ${userId} from organization ${organizationId}. Cleared projectId and suspended ${projectsWhereAdmin.length} project admin assignments.`

@@ -229,9 +229,8 @@ export function ManageCreditsDialog({
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded bg-surface-3 flex items-center justify-center">
-                              <Icon
-                                name="FolderOpen"
-                                size="sm"
+                              <FolderOpen
+                                size={16}
                                 color="#727279"
                               />
                             </div>

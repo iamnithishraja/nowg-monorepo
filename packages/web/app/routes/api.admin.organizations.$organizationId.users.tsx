@@ -117,7 +117,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .map((id) => new ObjectId(id));
 
     if (userObjectIds.length === 0) {
-      await mongoClient.close();
       return new Response(
         JSON.stringify({
           users: [],
@@ -139,7 +138,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       })
       .toArray();
 
-    await mongoClient.close();
+    // Note: Do NOT close mongoClient - it's a shared singleton managed by getMongoClient()
 
     // Create a map of userId -> organization role for quick lookup
     const memberRoleMap = new Map();
