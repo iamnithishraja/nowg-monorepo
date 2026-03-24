@@ -1,4 +1,4 @@
-import { FolderOpen, Shield, User, UserGear } from "@phosphor-icons/react";
+import { FolderOpen, UserGear } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
@@ -10,13 +10,7 @@ import {
     DialogTitle,
 } from "~/components/ui/dialog";
 import { Label } from "~/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "~/components/ui/select";
+
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
 import type { TeamMember } from "./TeamMembersTable";
@@ -60,10 +54,7 @@ const getUserInitials = (name?: string, email?: string): string => {
   return "U";
 };
 
-const orgRoleOptions = [
-  { value: "org_admin", label: "Org Admin", icon: Shield },
-  { value: "org_user", label: "User", icon: User },
-];
+
 
 const projectRoleOptions: Array<{
   value: ProjectRole;
@@ -158,7 +149,28 @@ export function ManageRoleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg p-0 bg-surface-1 border-subtle overflow-hidden max-h-[85vh]">
+ <DialogContent
+  className="max-w-lg p-0 bg-surface-1 border-subtle overflow-hidden max-h-[85vh]"
+  onInteractOutside={(e) => {
+    const target = e.target as HTMLElement;
+    // Allow interaction with any Radix portaled content
+    if (
+      target?.hasAttribute('data-radix-popper-content-wrapper') ||
+      target?.closest('[data-radix-popper-content-wrapper]')
+    ) {
+      e.preventDefault();
+    }
+  }}
+  onPointerDownOutside={(e) => {
+    const target = e.target as HTMLElement;
+    if (
+      target?.hasAttribute('data-radix-popper-content-wrapper') ||
+      target?.closest('[data-radix-popper-content-wrapper]')
+    ) {
+      e.preventDefault();
+    }
+  }}
+>
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-subtle">
           <DialogHeader className="space-y-3">
@@ -208,52 +220,6 @@ export function ManageRoleDialog({
             </div>
           ) : (
             <>
-              {/* Organization Role */}
-              {showOrgRole && (
-                <div className="space-y-3">
-                  <Label className="text-[13px] font-medium text-secondary tracking-[-0.26px]">
-                    Organization Role
-                  </Label>
-                  <Select value={orgRole} onValueChange={setOrgRole}>
-                    <SelectTrigger className="h-12 bg-surface-2 border-subtle text-primary rounded-lg focus:border-[#7b4cff] focus:ring-[#7b4cff]/20">
-                      <SelectValue>
-                        <div className="flex items-center gap-2">
-                          {orgRole === "org_admin" ? (
-                            <Shield className="h-4 w-4 text-[#a78bfa]" />
-                          ) : (
-                            <User className="h-4 w-4 text-[#60a5fa]" />
-                          )}
-                          <span className="text-[14px]">
-                            {orgRole === "org_admin" ? "Org Admin" : "User"}
-                          </span>
-                        </div>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="bg-surface-1 border-subtle">
-                      {orgRoleOptions.map((option) => (
-                        <SelectItem
-                          key={option.value}
-                          value={option.value}
-                          className="py-2.5 focus:bg-surface-2"
-                        >
-                          <div className="flex items-center gap-2">
-                            <option.icon
-                              className={cn(
-                                "h-4 w-4",
-                                option.value === "org_admin"
-                                  ? "text-[#a78bfa]"
-                                  : "text-[#60a5fa]"
-                              )}
-                            />
-                            <span className="text-[14px]">{option.label}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
               {/* Project Roles */}
               {projects.length > 0 && (
                 <div className="space-y-3">
@@ -262,8 +228,9 @@ export function ManageRoleDialog({
                   </Label>
                   <div className="space-y-3">
                     {projects.map((project) => {
+                      const normalizedRole = project.role === "member" ? "project_member" : project.role;
                       const currentRole =
-                        projectRoles[project.id] || project.role;
+                        projectRoles[project.id] || normalizedRole;
                       const isArchived = project.status === "archived";
                       return (
                         <div
@@ -304,49 +271,31 @@ export function ManageRoleDialog({
                                 )}
                               </div>
                             </div>
-                            <Select
+                            <select
                               value={currentRole}
-                              onValueChange={(value) =>
+                              onChange={(e) =>
                                 handleProjectRoleChange(
                                   project.id,
-                                  value as ProjectRole
+                                  e.target.value as ProjectRole
                                 )
                               }
                               disabled={isArchived}
+                              className={cn(
+                                "h-9 w-[160px] bg-surface-1 border border-subtle text-primary rounded-lg text-[13px] px-3 focus:border-[#7b4cff] focus:ring-1 focus:ring-[#7b4cff]/20 focus:outline-none appearance-none cursor-pointer",
+                                isArchived && "opacity-50 cursor-not-allowed"
+                              )}
+                              style={{
+                                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23727279' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "right 10px center",
+                              }}
                             >
-                              <SelectTrigger
-                                className={cn(
-                                  "h-9 w-[160px] bg-surface-1 border-subtle text-primary rounded-lg text-[13px] focus:border-[#7b4cff] focus:ring-[#7b4cff]/20",
-                                  isArchived && "opacity-50 cursor-not-allowed"
-                                )}
-                              >
-                                <SelectValue>
-                                  <span className="text-[13px]">
-                                    {currentRole === "project_admin"
-                                      ? "Project Admin"
-                                      : "Project Member"}
-                                  </span>
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent className="bg-surface-1 border-subtle">
-                                {projectRoleOptions.map((option) => (
-                                  <SelectItem
-                                    key={option.value}
-                                    value={option.value}
-                                    className="py-2 focus:bg-surface-2"
-                                  >
-                                    <div>
-                                      <p className="text-[13px] font-medium">
-                                        {option.label}
-                                      </p>
-                                      <p className="text-[11px] text-tertiary">
-                                        {option.description}
-                                      </p>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              {projectRoleOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         </div>
                       );

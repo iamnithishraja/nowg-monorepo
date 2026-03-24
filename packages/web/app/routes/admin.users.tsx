@@ -380,17 +380,17 @@ export default function AdminUsers() {
 
   const handleManageCredits = (member: TeamMember) => {
     setSelectedTeamMember(member);
-    setManageCreditsDialogOpen(true);
+    setTimeout(() => setManageCreditsDialogOpen(true), 0);
   };
 
   const handleManageRole = (member: TeamMember) => {
     setSelectedTeamMember(member);
-    setManageRoleDialogOpen(true);
+    setTimeout(() => setManageRoleDialogOpen(true), 0);
   };
 
   const handleRemoveUser = (member: TeamMember) => {
     setSelectedTeamMember(member);
-    setRemoveUserDialogOpen(true);
+    setTimeout(() => setRemoveUserDialogOpen(true), 0);
   };
 
   const confirmRemoveUser = () => {
