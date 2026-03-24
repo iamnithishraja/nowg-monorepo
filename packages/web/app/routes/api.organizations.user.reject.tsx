@@ -37,24 +37,32 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    const invitation = await OrgUserInvitation.findOne({
-      token,
-      status: "pending",
-    });
+    // First check if an invitation with this token exists at all (any status)
+    const invitationByToken = await OrgUserInvitation.findOne({ token });
 
-    if (!invitation) {
+    if (!invitationByToken) {
       return new Response(
-        JSON.stringify({
-          error: "Invitation not found or already processed",
-        }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        }
+        JSON.stringify({ error: "Invitation not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // Update invitation status and remove token using $unset
+    // If already reacted, return a friendly already-reacted response
+    if (invitationByToken.status === "accepted" || invitationByToken.status === "rejected") {
+      return new Response(
+        JSON.stringify({
+          error: "Already reacted",
+          alreadyReacted: true,
+          status: invitationByToken.status,
+          message: `You have already ${invitationByToken.status} this invitation.`,
+        }),
+        { status: 409, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const invitation = invitationByToken;
+
+    // Update invitation status (keep token so we can look up status later)
     await OrgUserInvitation.updateOne(
       { _id: invitation._id },
       {
@@ -62,7 +70,6 @@ export async function action({ request }: ActionFunctionArgs) {
           status: "rejected",
           rejectedAt: new Date(),
         },
-        $unset: { token: 1 },
       }
     );
 

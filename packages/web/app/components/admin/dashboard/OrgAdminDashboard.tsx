@@ -319,17 +319,13 @@ export function OrgAdminDashboard({
                   htmlFor="org-name"
                   className="text-[14px] font-medium text-secondary tracking-[-0.28px]"
                 >
-                  Organization Name
+                  Company Name
                 </Label>
-                <Input
-                  id="org-name"
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="Enter organization name"
-                  className="h-12 bg-surface-2 border-subtle text-primary placeholder:text-tertiary text-[15px] rounded-lg focus:border-[#7b4cff] focus:ring-[#7b4cff]/20"
-                />
+                <div className="h-12 bg-surface-2 border border-subtle text-primary text-[15px] rounded-lg px-4 flex items-center">
+                  {organization.name || "N/A"}
+                </div>
                 <p className="text-[13px] text-tertiary tracking-[-0.26px]">
-                  Your full Organization name, as visible to others.
+                  Your full Company name, as visible to others.
                 </p>
               </div>
 
@@ -403,7 +399,7 @@ export function OrgAdminDashboard({
                   htmlFor="org-description"
                   className="text-[14px] font-medium text-secondary tracking-[-0.28px]"
                 >
-                  Organization Description
+                  Company Description
                 </Label>
                 <Textarea
                   id="org-description"
@@ -414,7 +410,7 @@ export function OrgAdminDashboard({
                   className="bg-surface-2 border-subtle text-primary placeholder:text-tertiary text-[15px] rounded-lg focus:border-[#7b4cff] focus:ring-[#7b4cff]/20 resize-none"
                 />
                 <p className="text-[13px] text-tertiary tracking-[-0.26px]">
-                  Short description about your Organization or team.
+                  Short description about your Company or team.
                 </p>
               </div>
 

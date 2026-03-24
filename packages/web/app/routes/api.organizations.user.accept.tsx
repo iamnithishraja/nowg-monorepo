@@ -1,8 +1,61 @@
 import { OrganizationMember, OrgUserInvitation } from "@nowgai/shared/models";
 import { OrganizationRole } from "@nowgai/shared/types";
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
+
+/**
+ * GET /api/organizations/user/accept?token=...
+ * Check the current status of an invitation by token.
+ * Returns alreadyReacted: true if the invitation has already been accepted or rejected.
+ */
+export async function loader({ request }: LoaderFunctionArgs) {
+  try {
+    await connectToDatabase();
+
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token");
+
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: "Token is required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Look up by token regardless of status
+    const invitation = await OrgUserInvitation.findOne({ token });
+
+    if (!invitation) {
+      return new Response(
+        JSON.stringify({ status: "not_found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (invitation.status === "accepted" || invitation.status === "rejected") {
+      return new Response(
+        JSON.stringify({
+          alreadyReacted: true,
+          status: invitation.status,
+          reactedAt: invitation.status === "accepted" ? invitation.acceptedAt : invitation.rejectedAt,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ alreadyReacted: false, status: invitation.status }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  } catch (error: any) {
+    console.error("Error checking invitation status:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to check invitation status" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
 
 // Handle OPTIONS preflight for CORS
 export async function OPTIONS() {
@@ -39,22 +92,30 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    const invitation = await OrgUserInvitation.findOne({
-      token,
-      status: "pending",
-    });
+    // First check if an invitation with this token exists at all (any status)
+    const invitationByToken = await OrgUserInvitation.findOne({ token });
 
-    if (!invitation) {
+    if (!invitationByToken) {
       return new Response(
-        JSON.stringify({
-          error: "Invitation not found or already processed",
-        }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        }
+        JSON.stringify({ error: "Invitation not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
       );
     }
+
+    // If already reacted, return a friendly already-reacted response
+    if (invitationByToken.status === "accepted" || invitationByToken.status === "rejected") {
+      return new Response(
+        JSON.stringify({
+          error: "Already reacted",
+          alreadyReacted: true,
+          status: invitationByToken.status,
+          message: `You have already ${invitationByToken.status} this invitation.`,
+        }),
+        { status: 409, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const invitation = invitationByToken;
 
     // Check if invitation is expired
     if (invitation.expiresAt < new Date()) {
@@ -143,10 +204,7 @@ export async function action({ request }: ActionFunctionArgs) {
       await orgMember.save();
     }
 
-    // Update invitation status and remove token using $unset
-    // We use updateOne with $unset because setting token to null still stores null,
-    // which violates the unique index. $unset removes the field entirely,
-    // which is what sparse indexes need.
+    // Update invitation status (keep token so we can look up status later)
     await OrgUserInvitation.updateOne(
       { _id: invitation._id },
       {
@@ -154,7 +212,6 @@ export async function action({ request }: ActionFunctionArgs) {
           status: "accepted",
           acceptedAt: new Date(),
         },
-        $unset: { token: 1 },
       }
     );
 

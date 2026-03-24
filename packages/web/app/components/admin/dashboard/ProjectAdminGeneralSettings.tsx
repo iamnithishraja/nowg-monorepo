@@ -101,13 +101,13 @@ export function ProjectAdminGeneralSettings({
               {/* Organization Name */}
               <div className="space-y-3">
                 <Label className="text-[14px] font-medium text-secondary tracking-[-0.28px]">
-                  Organization Name
+                  Company Name
                 </Label>
                 <div className="h-12 bg-surface-2 border border-subtle text-primary text-[15px] rounded-lg px-4 flex items-center">
                   {organization.name || "N/A"}
                 </div>
                 <p className="text-[13px] text-tertiary tracking-[-0.26px]">
-                  Your full Organization name, as visible to others.
+                  Your full Company name, as visible to others.
                 </p>
               </div>
 
@@ -141,13 +141,13 @@ export function ProjectAdminGeneralSettings({
               {/* Organization Description */}
               <div className="space-y-3">
                 <Label className="text-[14px] font-medium text-secondary tracking-[-0.28px]">
-                  Organization Description
+                  Company Description
                 </Label>
                 <div className="min-h-[72px] bg-surface-2 border border-subtle text-primary text-[15px] rounded-lg px-4 py-3">
                   {organization.description || "No description provided"}
                 </div>
                 <p className="text-[13px] text-tertiary tracking-[-0.26px]">
-                  Short description about your Organization or team.
+                  Short description about your company or team.
                 </p>
               </div>
 

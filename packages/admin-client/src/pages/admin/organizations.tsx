@@ -1095,7 +1095,7 @@ export default function Organizations() {
                   id="name"
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="Organization name"
+                  placeholder="Company name"
                 />
               </div>
               <div>
@@ -1185,7 +1185,7 @@ export default function Organizations() {
                 id="edit-name"
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
-                placeholder="Organization name"
+                placeholder="Company name"
               />
             </div>
             <div>
