@@ -453,16 +453,7 @@ export default function AdminUsers() {
     try {
       const updatePromises: Promise<any>[] = [];
 
-      // Update organization role
-      updatePromises.push(
-        updateOrganizationRoleMutation.mutateAsync({
-          organizationId: finalOrganization.id,
-          userId: data.memberId,
-          role: data.orgRole,
-        })
-      );
-
-      // Update project roles
+      // Only update project roles now since organization role UI was removed
       if (data.projectRoles && data.projectRoles.length > 0) {
         data.projectRoles.forEach(({ projectId, role }) => {
           updatePromises.push(
