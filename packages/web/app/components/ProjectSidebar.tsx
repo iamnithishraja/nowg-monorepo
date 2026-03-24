@@ -1765,6 +1765,20 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                 <Envelope className="w-4 h-4" />
                 Contact Support
               </button>
+
+              {/* Switch to Enterprise Plan - only shown when user has no org */}
+              {organizations.length === 0 && !isLoading && (
+                <button
+                  onClick={() => {
+                    setOpenDropdownId(null);
+                    navigate("/manage-org/convo");
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-[#a78bfa] hover:text-white hover:bg-[#7b4cff]/10 mt-1"
+                >
+                  <Buildings className="w-4 h-4" />
+                  Switch to Enterprise Plan
+                </button>
+              )}
             </div>
           </>
         )}
