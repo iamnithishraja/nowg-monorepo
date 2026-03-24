@@ -28,7 +28,8 @@ import {
     Users,
     // Home,
     Wallet,
-    Zap
+    Zap,
+    Headphones,
 } from "lucide-react";
 import { SiGithub, SiNetlify, SiSupabase, SiVercel } from "react-icons/si";
 import { Link, useLocation } from "wouter";
@@ -198,12 +199,6 @@ const getMenuGroups = (
                 url: "/admin/api-keys",
                 icon: Key,
               },
-              // Disabled - backend routes not implemented
-              // {
-              //   title: "LLM API Gateway",
-              //   url: "/admin/llm-configs",
-              //   icon: Code,
-              // },
               {
                 title: "Vercel",
                 url: "/admin/microservices/vercel",
@@ -223,6 +218,16 @@ const getMenuGroups = (
                 title: "Git",
                 url: "/admin/microservices/git",
                 icon: SiGithub,
+              },
+            ],
+          },
+          {
+            label: "Support",
+            items: [
+              {
+                title: "Support Tickets",
+                url: "/admin/support-tickets",
+                icon: Headphones,
               },
             ],
           },

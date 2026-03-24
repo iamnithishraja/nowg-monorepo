@@ -30,6 +30,9 @@ export { default as EnvConfig, envConfigSchema, envConfigSchemaDefinition, getEn
 export { getMarkupModel, default as Markup, markupSchema, markupSchemaDefinition } from "./markupModel.js";
 export { getPaymentSettingsModel, default as PaymentSettings, paymentSettingsSchema, paymentSettingsSchemaDefinition } from "./paymentSettingsModel.js";
 
+// Support Tickets
+export { getSupportTicketModel, default as SupportTicket, supportTicketSchema, supportTicketSchemaDefinition } from "./supportTicketModel.js";
+
 
 
 

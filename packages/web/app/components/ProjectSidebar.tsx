@@ -7,17 +7,20 @@ import {
   CaretRight,
   ChatCircle,
   ChatTeardropDots,
+  CheckCircle,
   Compass,
   Cube,
   DotsThreeOutline,
   Envelope,
   Funnel,
   Globe,
+  Headphones,
   House,
   KanbanIcon,
   MagnifyingGlass,
   PaperPlaneTilt,
   PencilSimple,
+  Plus,
   Robot,
   SidebarSimple,
   SortAscending,
@@ -67,6 +70,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import { ContactFormDialog } from "./ContactFormDialog";
+import { Textarea } from "./ui/textarea";
+import { countryCodes } from "~/lib/countryCodes";
 
 interface Project {
   id: string;
@@ -85,6 +90,16 @@ interface Organization {
   id: string;
   name: string;
   role?: string;
+}
+
+interface SupportTicket {
+  id: string;
+  subject: string;
+  message: string;
+  status: "open" | "resolved";
+  adminNotes?: string;
+  createdAt: string;
+  resolvedAt?: string | null;
 }
 
 const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
@@ -135,11 +150,11 @@ const UserAvatar = memo(function UserAvatar({
 
   const initials = displayName
     ? displayName
-        .split(" ")
-        .map((n: string) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
+      .split(" ")
+      .map((n: string) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
     : "?";
 
   return (
@@ -209,6 +224,26 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
 
   // Contact dialog state
   const [showContactDialog, setShowContactDialog] = useState(false);
+
+  // Support tickets panel state
+  const [showSupportPanel, setShowSupportPanel] = useState(false);
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [supportTab, setSupportTab] = useState<"history" | "new">("new");
+  // New ticket form — matches original ContactFormDialog fields
+  const [ticketFullName, setTicketFullName] = useState("");
+  const [ticketEmail, setTicketEmail] = useState("");
+  const [ticketPhone, setTicketPhone] = useState("");
+  const [ticketCountryCode, setTicketCountryCode] = useState("+91");
+  const [ticketCompany, setTicketCompany] = useState("");
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketMessage, setTicketMessage] = useState("");
+  const [ticketErrors, setTicketErrors] = useState<Record<string, string>>({});
+  const [ticketCountryDropdownOpen, setTicketCountryDropdownOpen] = useState(false);
+  const [ticketCountrySearch, setTicketCountrySearch] = useState("");
+  const ticketCountryDropdownRef = useRef<HTMLDivElement>(null);
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
+  const [ticketSuccess, setTicketSuccess] = useState(false);
 
   const currentProjectId = useMemo(
     () => new URLSearchParams(location.search).get("conversationId"),
@@ -459,7 +494,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
             );
             orgs = orgData.organizations || [];
           }
-        } catch {}
+        } catch { }
 
         // Map personal conversations
         const personalProjects: Project[] = (convData.conversations || [])
@@ -860,6 +895,79 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
     }),
     [user?.name, user?.email, user?.image],
   );
+
+  // Fetch user's support tickets
+  const fetchSupportTickets = useCallback(async () => {
+    setTicketsLoading(true);
+    try {
+      const res = await fetch("/api/support-tickets");
+      if (res.ok) {
+        const data = await res.json();
+        setSupportTickets(data.tickets || []);
+      }
+    } catch (err) {
+      console.error("Error fetching support tickets:", err);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, []);
+
+  // Submit a new support ticket
+  const submitTicket = useCallback(async () => {
+    if (!ticketFullName.trim() || !ticketEmail.trim() || !ticketSubject.trim() || !ticketMessage.trim()) return;
+    setIsSubmittingTicket(true);
+    try {
+      // 1. Persist the ticket in DB and capture the returned ticket ID
+      const ticketRes = await fetch("/api/support-tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: ticketSubject.trim(),
+          message: ticketMessage.trim(),
+          phone: ticketPhone.trim(),
+          countryCode: ticketCountryCode,
+          company: ticketCompany.trim(),
+        }),
+      });
+      const ticketData = ticketRes.ok ? await ticketRes.json() : {};
+      const ticketId = ticketData?.ticket?._id || ticketData?.ticket?.id || null;
+
+      // 2. Also send email notification with ticket ID in subject
+      await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: ticketFullName.trim(),
+          email: ticketEmail.trim(),
+          phone: ticketPhone.trim(),
+          countryCode: ticketCountryCode,
+          company: ticketCompany.trim(),
+          subject: ticketSubject.trim(),
+          message: ticketMessage.trim(),
+          ticketId,
+        }),
+      });
+
+      setTicketSuccess(true);
+      setTicketFullName("");
+      setTicketEmail("");
+      setTicketPhone("");
+      setTicketCountryCode("+91");
+      setTicketCompany("");
+      setTicketSubject("");
+      setTicketMessage("");
+      setTicketErrors({});
+      await fetchSupportTickets();
+      setTimeout(() => {
+        setTicketSuccess(false);
+        setSupportTab("history");
+      }, 2000);
+    } catch (err) {
+      console.error("Error submitting ticket:", err);
+    } finally {
+      setIsSubmittingTicket(false);
+    }
+  }, [ticketFullName, ticketEmail, ticketPhone, ticketCountryCode, ticketCompany, ticketSubject, ticketMessage, fetchSupportTickets]);
 
   // On mobile drawer always show full (expanded) content
   const effectiveCollapsed = isMobile ? false : isCollapsed;
@@ -1521,7 +1629,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                                               className={cn(
                                                 "w-5 h-5",
                                                 project.starred &&
-                                                  "fill-current",
+                                                "fill-current",
                                               )}
                                             />
                                             {project.starred
@@ -1552,18 +1660,18 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                       {/* Load More Button */}
                       {projectsByMonth.sortedMonths.length >
                         visibleMonthsCount && (
-                        <div className="mt-4 pt-3 border-t border-white/10">
-                          <button
-                            onClick={() => {
-                              setVisibleMonthsCount((prev) => prev + 2); // Load 2 more months at a time
-                            }}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
-                          >
-                            <CaretDown className="w-4 h-4" />
-                            <span>Load More Months</span>
-                          </button>
-                        </div>
-                      )}
+                          <div className="mt-4 pt-3 border-t border-white/10">
+                            <button
+                              onClick={() => {
+                                setVisibleMonthsCount((prev) => prev + 2); // Load 2 more months at a time
+                              }}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
+                            >
+                              <CaretDown className="w-4 h-4" />
+                              <span>Load More Months</span>
+                            </button>
+                          </div>
+                        )}
                     </>
                   )}
                 </div>
@@ -1704,7 +1812,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                                               className={cn(
                                                 "w-5 h-5",
                                                 project.starred &&
-                                                  "fill-current",
+                                                "fill-current",
                                               )}
                                             />
                                             {project.starred
@@ -1735,18 +1843,18 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                       {/* Load More Button */}
                       {projectsByMonth.sortedMonths.length >
                         visibleMonthsCount && (
-                        <div className="mt-4 pt-3 border-t border-white/10">
-                          <button
-                            onClick={() => {
-                              setVisibleMonthsCount((prev) => prev + 2); // Load 2 more months at a time
-                            }}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
-                          >
-                            <CaretDown className="w-4 h-4" />
-                            <span>Load More Months</span>
-                          </button>
-                        </div>
-                      )}
+                          <div className="mt-4 pt-3 border-t border-white/10">
+                            <button
+                              onClick={() => {
+                                setVisibleMonthsCount((prev) => prev + 2); // Load 2 more months at a time
+                              }}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white hover:text-white bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/20 hover:border-purple-500/40"
+                            >
+                              <CaretDown className="w-4 h-4" />
+                              <span>Load More Months</span>
+                            </button>
+                          </div>
+                        )}
                     </>
                   )}
                 </div>
@@ -1758,11 +1866,13 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
               <button
                 onClick={() => {
                   setOpenDropdownId(null);
-                  setShowContactDialog(true);
+                  setShowSupportPanel(true);
+                  fetchSupportTickets();
+                  // setSupportTab("history");
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-white/60 hover:text-white hover:bg-white/[0.04]"
               >
-                <Envelope className="w-4 h-4" />
+                <Headphones className="w-4 h-4" />
                 Contact Support
               </button>
 
@@ -2029,8 +2139,327 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Contact Dialog */}
+      {/* Contact Dialog (legacy - kept for compatibility, no longer triggered) */}
       <ContactFormDialog open={showContactDialog} onOpenChange={setShowContactDialog} />
+
+      {/* Support Tickets Panel */}
+      <Dialog open={showSupportPanel} onOpenChange={(open) => {
+        if (!open) {
+          setShowSupportPanel(false);
+          setTicketSuccess(false);
+          setTicketFullName("");
+          setTicketEmail("");
+          setTicketPhone("");
+          setTicketCountryCode("+91");
+          setTicketCompany("");
+          setTicketSubject("");
+          setTicketMessage("");
+          setTicketErrors({});
+          setTicketCountryDropdownOpen(false);
+        }
+      }}>
+        <DialogContent className="bg-[#1a1a1a] border-white/10 sm:max-w-xl max-h-[90vh] flex flex-col p-0">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <Headphones className="w-5 h-5 text-purple-400" />
+              <DialogTitle className="text-white text-lg font-semibold m-0">Support Tickets</DialogTitle>
+            </div>
+            {/* Tab switcher */}
+            <div className="flex items-center gap-1 rounded-lg bg-white/5 p-1">
+              <button
+                onClick={() => setSupportTab("history")}
+                className={cn(
+                  "px-3 py-1 rounded-md text-xs font-medium transition-colors",
+                  supportTab === "history"
+                    ? "bg-purple-500 text-white"
+                    : "text-white/50 hover:text-white",
+                )}
+              >
+                History
+              </button>
+              <button
+                onClick={() => setSupportTab("new")}
+                className={cn(
+                  "px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1",
+                  supportTab === "new"
+                    ? "bg-purple-500 text-white"
+                    : "text-white/50 hover:text-white",
+                )}
+              >
+                <Plus className="w-3 h-3" />
+                New Ticket
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {/* History tab */}
+            {supportTab === "history" && (
+              <div className="p-5">
+                {ticketsLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <SpinnerGap className="w-5 h-5 animate-spin text-purple-400" />
+                  </div>
+                ) : supportTickets.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Headphones className="w-12 h-12 text-white/10 mb-3" />
+                    <p className="text-white/50 text-sm">No support tickets yet</p>
+                    <button
+                      onClick={() => setSupportTab("new")}
+                      className="mt-3 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                    >
+                      Submit your first ticket →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {supportTickets.map((ticket) => (
+                      <div
+                        key={ticket.id}
+                        className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-medium text-white leading-tight">{ticket.subject}</p>
+                          <span
+                            className={cn(
+                              "shrink-0 text-xs px-2 py-0.5 rounded-full font-medium",
+                              ticket.status === "open"
+                                ? "bg-orange-500/20 text-orange-400"
+                                : "bg-green-500/20 text-green-400",
+                            )}
+                          >
+                            {ticket.status === "open" ? "Open" : "Resolved"}
+                          </span>
+                        </div>
+                        {/* Ticket ID */}
+                        <p className="text-xs font-mono text-white/30">
+                          #{String((ticket as any)._id || ticket.id || "").slice(-8).toUpperCase()}
+                        </p>
+                        <p className="text-xs text-white/50 line-clamp-2">{ticket.message}</p>
+                        {ticket.adminNotes && (
+                          <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 px-3 py-2">
+                            <p className="text-xs text-purple-300 font-medium mb-0.5">Admin Response</p>
+                            <p className="text-xs text-white/70">{ticket.adminNotes}</p>
+                          </div>
+                        )}
+                        <p className="text-xs text-white/30">
+                          {new Date(ticket.createdAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                          {ticket.status === "resolved" && ticket.resolvedAt && (
+                            <span className="ml-2 text-green-400/60">
+                              · Resolved {new Date(ticket.resolvedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* New ticket tab — full form matching original ContactFormDialog */}
+            {supportTab === "new" && (
+              <div className="p-5">
+                {ticketSuccess ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
+                      <CheckCircle className="w-8 h-8 text-green-400" />
+                    </div>
+                    <p className="text-white font-semibold text-xl">Message Sent!</p>
+                    <p className="text-white/50 text-sm mt-1">We'll get back to you as soon as possible.</p>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); submitTicket(); }}
+                    className="space-y-4"
+                  >
+                    {/* Full Name */}
+                    <div>
+                      <Label htmlFor="ticket-fullname" className="text-white/70">
+                        Full Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="ticket-fullname"
+                        value={ticketFullName}
+                        onChange={(e) => setTicketFullName(e.target.value)}
+                        placeholder="John Doe"
+                        className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                        autoFocus
+                      />
+                      {ticketErrors.fullName && <p className="text-xs text-red-500 mt-1">{ticketErrors.fullName}</p>}
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                      <Label htmlFor="ticket-email" className="text-white/70">
+                        Email Address <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="ticket-email"
+                        type="email"
+                        value={ticketEmail}
+                        onChange={(e) => setTicketEmail(e.target.value)}
+                        placeholder="user@example.com"
+                        className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                      />
+                    </div>
+
+                    {/* Phone with country selector */}
+                    <div>
+                      <Label htmlFor="ticket-phone" className="text-white/70">Phone Number</Label>
+                      <div className="mt-2 flex gap-2">
+                        {/* Country dropdown */}
+                        <div className="relative" ref={ticketCountryDropdownRef}>
+                          <button
+                            type="button"
+                            onClick={() => setTicketCountryDropdownOpen((prev) => !prev)}
+                            className="flex items-center justify-between w-[140px] h-9 px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 hover:bg-white/10 transition-colors"
+                          >
+                            <span className="truncate">
+                              {(() => {
+                                const sel = countryCodes.find((c) => c.code === ticketCountryCode);
+                                return sel ? `${sel.flag} ${sel.code}` : ticketCountryCode;
+                              })()}
+                            </span>
+                            <CaretDown className="w-3 h-3 text-white/50 shrink-0 ml-1" />
+                          </button>
+                          {ticketCountryDropdownOpen && (
+                            <div className="absolute top-full left-0 mt-1 w-[280px] bg-[#222] border border-white/10 rounded-lg shadow-2xl z-[200] overflow-hidden">
+                              <div className="p-2 border-b border-white/10 relative">
+                                <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                                <input
+                                  className="w-full bg-white/5 border border-white/10 rounded-md py-1.5 pl-8 pr-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                                  placeholder="Search countries..."
+                                  value={ticketCountrySearch}
+                                  onChange={(e) => setTicketCountrySearch(e.target.value)}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                              <div className="max-h-[200px] overflow-y-auto p-1">
+                                {countryCodes
+                                  .filter(
+                                    (c) =>
+                                      !ticketCountrySearch.trim() ||
+                                      c.country.toLowerCase().includes(ticketCountrySearch.toLowerCase()) ||
+                                      c.code.includes(ticketCountrySearch),
+                                  )
+                                  .map((country) => (
+                                    <button
+                                      key={`${country.code}-${country.country}`}
+                                      type="button"
+                                      onClick={() => {
+                                        setTicketCountryCode(country.code);
+                                        setTicketCountryDropdownOpen(false);
+                                        setTicketCountrySearch("");
+                                      }}
+                                      className={cn(
+                                        "flex items-center gap-2 w-full px-2.5 py-2 rounded-md text-sm text-white/90 hover:bg-white/10 transition-colors cursor-pointer text-left",
+                                        country.code === ticketCountryCode && "bg-purple-500/20 text-white",
+                                      )}
+                                    >
+                                      <span>{country.flag}</span>
+                                      <span className="flex-1 truncate">{country.country}</span>
+                                      <span className="text-white/50 text-xs">{country.code}</span>
+                                    </button>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <Input
+                          id="ticket-phone"
+                          type="tel"
+                          value={ticketPhone}
+                          onChange={(e) => {
+                            const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 15);
+                            setTicketPhone(digitsOnly);
+                          }}
+                          placeholder="e.g. 501234567"
+                          className="flex-1 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Company */}
+                    <div>
+                      <Label htmlFor="ticket-company" className="text-white/70">Company / Organization</Label>
+                      <Input
+                        id="ticket-company"
+                        value={ticketCompany}
+                        onChange={(e) => setTicketCompany(e.target.value)}
+                        placeholder="Your Company"
+                        className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                      />
+                    </div>
+
+                    {/* Subject */}
+                    <div>
+                      <Label htmlFor="ticket-subject" className="text-white/70">
+                        Subject <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="ticket-subject"
+                        value={ticketSubject}
+                        onChange={(e) => setTicketSubject(e.target.value)}
+                        placeholder="e.g., Technical Support, Billing Question, Feature Request"
+                        className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                      />
+                    </div>
+
+                    {/* Message */}
+                    <div>
+                      <Label htmlFor="ticket-message" className="text-white/70">
+                        Message <span className="text-red-500">*</span>
+                      </Label>
+                      <Textarea
+                        id="ticket-message"
+                        value={ticketMessage}
+                        onChange={(e) => setTicketMessage(e.target.value)}
+                        placeholder="Tell us about your inquiry..."
+                        className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40 min-h-[120px]"
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowSupportPanel(false)}
+                        disabled={isSubmittingTicket}
+                        className="flex-1 border-white/10 text-white hover:bg-white/5"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={
+                          !ticketFullName.trim() ||
+                          !ticketEmail.trim() ||
+                          !ticketSubject.trim() ||
+                          !ticketMessage.trim() ||
+                          isSubmittingTicket
+                        }
+                        className="flex-1 bg-purple-500 hover:bg-purple-600 text-white"
+                      >
+                        {isSubmittingTicket ? (
+                          <><SpinnerGap className="w-4 h-4 mr-2 animate-spin" />Sending...</>
+                        ) : (
+                          <><PaperPlaneTilt className="w-4 h-4 mr-2" />Send Message</>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

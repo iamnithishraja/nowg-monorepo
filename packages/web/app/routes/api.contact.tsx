@@ -13,7 +13,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const body = await request.json();
-    const { fullName, email, phone, countryCode, company, subject, message } =
+    const { fullName, email, phone, countryCode, company, subject, message, ticketId } =
       body;
 
     if (!fullName || !email || !subject || !message) {
@@ -82,7 +82,9 @@ export async function action({ request }: ActionFunctionArgs) {
       from: fromEmail,
       to: "tech@nowg.ai",
       cc: ccRecipients.length > 0 ? ccRecipients : undefined,
-      subject: `Contact Form: ${subject}`,
+      subject: ticketId
+        ? `[Ticket #${String(ticketId).slice(-8).toUpperCase()}] ${subject}`
+        : `Support: ${subject}`,
       html: createContactEmailTemplate({
         fullName,
         email,

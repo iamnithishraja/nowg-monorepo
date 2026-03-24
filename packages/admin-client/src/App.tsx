@@ -58,6 +58,7 @@ import OrganizationUsers from "@/pages/admin/organization-users";
 import OrganizationsLedger from "@/pages/admin/organizations-ledger";
 import ProjectsLedger from "@/pages/admin/projects-ledger";
 import TransactionLedger from "@/pages/admin/transaction-ledger";
+import SupportTickets from "@/pages/admin/support-tickets";
 // import CustomerHome from "@/pages/customer/home";
 // import Projects from "@/pages/customer/projects";
 // import ProjectWorkspace from "@/pages/customer/project-workspace";
@@ -481,6 +482,13 @@ function Router() {
         <ProtectedAdminRoute>
           <AdminLayout>
             <GitPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/support-tickets">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <SupportTickets />
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>

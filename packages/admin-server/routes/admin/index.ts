@@ -20,6 +20,7 @@ import analyticsRouter from "./analytics";
 import paymentSettingsRouter from "../paymentSettings";
 import fundRequestsRouter from "./fund-requests";
 import markupRouter from "./markup";
+import supportTicketsRouter from "./support-tickets";
 
 const router = Router();
 
@@ -43,6 +44,7 @@ router.use("/analytics", analyticsRouter);
 router.use("/payment-settings", paymentSettingsRouter);
 router.use("/fund-requests", fundRequestsRouter);
 router.use("/markup", markupRouter);
+router.use("/support-tickets", supportTicketsRouter);
 router.use("/", projectMembersRouter);
 
 export default router;
