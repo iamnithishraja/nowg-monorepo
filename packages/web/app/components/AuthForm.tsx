@@ -10,12 +10,58 @@ import {
 } from "@phosphor-icons/react";
 import { useCallback, useState } from "react";
 import { Link } from "react-router";
-import { z } from "zod";
 import { authClient, signIn, signUp } from "../lib/authClient";
 import { Input } from "./ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
-const emailSchema = z.string().email("Please enter a valid email address.");
+const BLOCKED_EMAIL_DOMAINS = new Set([
+  // Placeholder / test domains
+  "example.com", "example.org", "example.net", "example.io",
+  "test.com", "test.org", "test.net", "test.io",
+  "abc.com", "abc.org", "abc.net",
+  "foo.com", "bar.com", "baz.com",
+  "fake.com", "fake.org", "fake.net",
+  "dummy.com", "dummy.org",
+  "sample.com", "sample.org",
+  "placeholder.com",
+  "noreply.com", "no-reply.com",
+  "invalid.com", "invalid.org",
+  "domain.com", "domain.org",
+  "email.com", "myemail.com",
+  "mail.com", "webmail.com",
+  "username.com",
+  "user.com",
+  "none.com",
+  "null.com",
+  "admin.com",
+  "test123.com",
+  "xyz.com", "xyz.org",
+  "aaa.com", "bbb.com", "ccc.com",
+  "asdf.com", "qwerty.com",
+  // Disposable / temp-mail providers
+  "mailinator.com", "guerrillamail.com", "guerrillamail.net",
+  "guerrillamail.org", "guerrillamail.de", "guerrillamail.biz",
+  "guerrillamail.info", "guerrillamailblock.com",
+  "sharklasers.com", "guerrillamaildesktop.com", "grr.la",
+  "spam4.me", "yopmail.com", "yopmail.fr", "cool.fr.nf",
+  "jetable.fr.nf", "nospam.ze.tc", "nomail.xl.cx",
+  "mega.zik.dj", "speed.1s.fr", "courriel.fr.nf",
+  "moncourrier.fr.nf", "monemail.fr.nf", "monmail.fr.nf",
+  "trashmail.com", "trashmail.me", "trashmail.net",
+  "trashmail.at", "trashmail.io", "trashmail.xyz",
+  "dispostable.com", "mailnull.com", "spamgourmet.com",
+  "throwam.com", "throwam.net",
+  "tempmail.com", "tempmail.net", "tempmail.org",
+  "temp-mail.org", "temp-mail.ru", "temp-mail.io",
+  "tempr.email", "discard.email",
+  "mailnesia.com", "maildrop.cc",
+  "fakeinbox.com", "throwaway.email",
+  "mytempemail.com", "tempemail.net",
+  "mailtemp.info", "emailondeck.com",
+  "getnada.com", "inboxkitten.com",
+  "owlpic.com",
+  "mohmal.com",
+]);
 
 type AuthInitialTab = "signin" | "signup";
 
@@ -62,9 +108,20 @@ export default function AuthForm({ initialTab = "signin", inviteToken, showCreat
 
   // Real-time email validation helper
   const validateEmail = useCallback((email: string) => {
-    if (!email) return "";
-    const result = emailSchema.safeParse(email);
-    return result.success ? "" : result.error.issues[0]?.message || "Please enter a valid email address.";
+    const trimmed = email.trim();
+    if (!trimmed) return "";
+    if (/\s/.test(trimmed)) return "Email must not contain spaces";
+    if (trimmed.includes("..")) return "Email cannot contain consecutive dots";
+    if (!trimmed.includes("@")) return "Email must contain an @ symbol";
+    const [local, domain] = trimmed.split("@");
+    if (!local) return "Email is missing the part before @";
+    if (!domain) return "Email is missing the domain after @";
+    if (!domain.includes(".")) return "Email domain must contain a dot (e.g. gmail.com)";
+    const tld = domain.split(".").pop();
+    if (!tld || tld.length < 2) return "Email must have a valid extension (e.g. .com, .in)";
+    if (!/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(trimmed)) return "Please enter a valid email address";
+    if (BLOCKED_EMAIL_DOMAINS.has(domain.toLowerCase())) return "Please use a valid business or personal email address";
+    return "";
   }, []);
 
   const handleSigninEmailChange = (value: string) => {
