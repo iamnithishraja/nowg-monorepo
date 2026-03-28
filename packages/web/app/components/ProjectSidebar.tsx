@@ -73,6 +73,104 @@ import { ContactFormDialog } from "./ContactFormDialog";
 import { Textarea } from "./ui/textarea";
 import { countryCodes } from "~/lib/countryCodes";
 
+// Phone digit length rules per country code (expected number of digits AFTER the country code)
+const phoneDigitLengths: Record<string, { min: number; max: number }> = {
+  "+1": { min: 10, max: 10 },    // USA/Canada
+  "+7": { min: 10, max: 10 },    // Russia
+  "+20": { min: 10, max: 10 },   // Egypt
+  "+27": { min: 9, max: 9 },     // South Africa
+  "+30": { min: 10, max: 10 },   // Greece
+  "+31": { min: 9, max: 9 },     // Netherlands
+  "+32": { min: 8, max: 9 },     // Belgium
+  "+33": { min: 9, max: 9 },     // France
+  "+34": { min: 9, max: 9 },     // Spain
+  "+36": { min: 8, max: 9 },     // Hungary
+  "+39": { min: 9, max: 10 },    // Italy
+  "+40": { min: 9, max: 9 },     // Romania
+  "+41": { min: 9, max: 9 },     // Switzerland
+  "+43": { min: 10, max: 13 },   // Austria
+  "+44": { min: 10, max: 10 },   // UK
+  "+45": { min: 8, max: 8 },     // Denmark
+  "+46": { min: 7, max: 13 },    // Sweden
+  "+47": { min: 8, max: 8 },     // Norway
+  "+48": { min: 9, max: 9 },     // Poland
+  "+49": { min: 10, max: 11 },   // Germany
+  "+51": { min: 9, max: 9 },     // Peru
+  "+52": { min: 10, max: 10 },   // Mexico
+  "+54": { min: 10, max: 10 },   // Argentina
+  "+55": { min: 10, max: 11 },   // Brazil
+  "+56": { min: 9, max: 9 },     // Chile
+  "+57": { min: 10, max: 10 },   // Colombia
+  "+60": { min: 9, max: 10 },    // Malaysia
+  "+61": { min: 9, max: 9 },     // Australia
+  "+62": { min: 9, max: 12 },    // Indonesia
+  "+63": { min: 10, max: 10 },   // Philippines
+  "+64": { min: 8, max: 10 },    // New Zealand
+  "+65": { min: 8, max: 8 },     // Singapore
+  "+66": { min: 9, max: 9 },     // Thailand
+  "+81": { min: 10, max: 10 },   // Japan
+  "+82": { min: 9, max: 10 },    // South Korea
+  "+84": { min: 9, max: 10 },    // Vietnam
+  "+86": { min: 11, max: 11 },   // China
+  "+90": { min: 10, max: 10 },   // Turkey
+  "+91": { min: 10, max: 10 },   // India
+  "+92": { min: 10, max: 10 },   // Pakistan
+  "+93": { min: 9, max: 9 },     // Afghanistan
+  "+94": { min: 9, max: 9 },     // Sri Lanka
+  "+95": { min: 8, max: 10 },    // Myanmar
+  "+98": { min: 10, max: 10 },   // Iran
+  "+212": { min: 9, max: 9 },    // Morocco
+  "+213": { min: 9, max: 9 },    // Algeria
+  "+234": { min: 10, max: 10 },  // Nigeria
+  "+351": { min: 9, max: 9 },    // Portugal
+  "+353": { min: 9, max: 9 },    // Ireland
+  "+358": { min: 9, max: 10 },   // Finland
+  "+380": { min: 9, max: 9 },    // Ukraine
+  "+420": { min: 9, max: 9 },    // Czech Republic
+  "+852": { min: 8, max: 8 },    // Hong Kong
+  "+880": { min: 10, max: 10 },  // Bangladesh
+  "+886": { min: 9, max: 9 },    // Taiwan
+  "+960": { min: 7, max: 7 },    // Maldives
+  "+961": { min: 7, max: 8 },    // Lebanon
+  "+962": { min: 9, max: 9 },    // Jordan
+  "+964": { min: 10, max: 10 },  // Iraq
+  "+965": { min: 8, max: 8 },    // Kuwait
+  "+966": { min: 9, max: 9 },    // Saudi Arabia
+  "+968": { min: 8, max: 8 },    // Oman
+  "+971": { min: 9, max: 9 },    // UAE
+  "+972": { min: 9, max: 9 },    // Israel
+  "+973": { min: 8, max: 8 },    // Bahrain
+  "+974": { min: 8, max: 8 },    // Qatar
+  "+977": { min: 10, max: 10 },  // Nepal
+};
+
+/** Validate a phone number given the country code. Returns an error string or empty string if valid. */
+function validatePhoneForCountry(phone: string, countryCode: string): string {
+  if (!phone) return ""; // phone is optional, no error if empty
+  const rule = phoneDigitLengths[countryCode];
+  if (!rule) {
+    // Fallback: accept 4-15 digits for unknown countries
+    if (phone.length < 4) return "Phone number is too short";
+    if (phone.length > 15) return "Phone number is too long";
+    return "";
+  }
+  const countryEntry = countryCodes.find((c) => c.code === countryCode);
+  const countryName = countryEntry?.country || countryCode;
+  if (rule.min === rule.max) {
+    if (phone.length !== rule.min) {
+      return `${countryName} numbers must be exactly ${rule.min} digits (currently ${phone.length})`;
+    }
+  } else {
+    if (phone.length < rule.min) {
+      return `${countryName} numbers must be at least ${rule.min} digits (currently ${phone.length})`;
+    }
+    if (phone.length > rule.max) {
+      return `${countryName} numbers must be at most ${rule.max} digits (currently ${phone.length})`;
+    }
+  }
+  return "";
+}
+
 interface Project {
   id: string;
   title: string;
@@ -915,6 +1013,12 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
   // Submit a new support ticket
   const submitTicket = useCallback(async () => {
     if (!ticketFullName.trim() || !ticketEmail.trim() || !ticketSubject.trim() || !ticketMessage.trim()) return;
+    // Block submit if phone is provided but invalid
+    const phoneErr = validatePhoneForCountry(ticketPhone.trim(), ticketCountryCode);
+    if (phoneErr) {
+      setTicketErrors((prev) => ({ ...prev, phone: phoneErr }));
+      return;
+    }
     setIsSubmittingTicket(true);
     try {
       // 1. Persist the ticket in DB and capture the returned ticket ID
@@ -2356,6 +2460,9 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                                         setTicketCountryCode(country.code);
                                         setTicketCountryDropdownOpen(false);
                                         setTicketCountrySearch("");
+                                        // Re-validate phone when country changes
+                                        const err = validatePhoneForCountry(ticketPhone, country.code);
+                                        setTicketErrors((prev) => err ? { ...prev, phone: err } : (() => { const { phone: _, ...rest } = prev; return rest; })());
                                       }}
                                       className={cn(
                                         "flex items-center gap-2 w-full px-2.5 py-2 rounded-md text-sm text-white/90 hover:bg-white/10 transition-colors cursor-pointer text-left",
@@ -2376,13 +2483,37 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                           type="tel"
                           value={ticketPhone}
                           onChange={(e) => {
-                            const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 15);
+                            const rule = phoneDigitLengths[ticketCountryCode];
+                            const maxLen = rule ? rule.max : 15;
+                            const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, maxLen);
                             setTicketPhone(digitsOnly);
+                            // Real-time validation
+                            const err = validatePhoneForCountry(digitsOnly, ticketCountryCode);
+                            setTicketErrors((prev) => err ? { ...prev, phone: err } : (() => { const { phone: _, ...rest } = prev; return rest; })());
                           }}
-                          placeholder="e.g. 501234567"
-                          className="flex-1 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                          placeholder={(() => {
+                            const rule = phoneDigitLengths[ticketCountryCode];
+                            if (!rule) return "e.g. 501234567";
+                            return rule.min === rule.max ? `${rule.min} digits required` : `${rule.min}-${rule.max} digits`;
+                          })()}
+                          className={cn(
+                            "flex-1 bg-white/5 border-white/10 text-white placeholder:text-white/40",
+                            ticketErrors.phone && "border-red-500/50 focus-visible:ring-red-500/30",
+                          )}
                         />
                       </div>
+                      {ticketErrors.phone && (
+                        <p className="text-xs text-red-400 mt-1.5 flex items-center gap-1">
+                          <Warning className="w-3 h-3 shrink-0" />
+                          {ticketErrors.phone}
+                        </p>
+                      )}
+                      {ticketPhone && !ticketErrors.phone && (
+                        <p className="text-xs text-green-400 mt-1.5 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 shrink-0" />
+                          Valid phone number
+                        </p>
+                      )}
                     </div>
 
                     {/* Company */}
@@ -2442,7 +2573,8 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                           !ticketEmail.trim() ||
                           !ticketSubject.trim() ||
                           !ticketMessage.trim() ||
-                          isSubmittingTicket
+                          isSubmittingTicket ||
+                          !!ticketErrors.phone
                         }
                         className="flex-1 bg-purple-500 hover:bg-purple-600 text-white"
                       >
