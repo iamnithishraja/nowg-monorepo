@@ -171,6 +171,71 @@ function validatePhoneForCountry(phone: string, countryCode: string): string {
   return "";
 }
 
+const BLOCKED_EMAIL_DOMAINS = new Set([
+  // Placeholder / test domains
+  "example.com", "example.org", "example.net", "example.io",
+  "test.com", "test.org", "test.net", "test.io",
+  "abc.com", "abc.org", "abc.net",
+  "foo.com", "bar.com", "baz.com",
+  "fake.com", "fake.org", "fake.net",
+  "dummy.com", "dummy.org",
+  "sample.com", "sample.org",
+  "placeholder.com",
+  "noreply.com", "no-reply.com",
+  "invalid.com", "invalid.org",
+  "domain.com", "domain.org",
+  "email.com", "myemail.com",
+  "mail.com", "webmail.com",
+  "username.com",
+  "user.com",
+  "none.com",
+  "null.com",
+  "admin.com",
+  "test123.com",
+  "xyz.com", "xyz.org",
+  "aaa.com", "bbb.com", "ccc.com",
+  "asdf.com", "qwerty.com",
+  // Disposable / temp-mail providers
+  "mailinator.com", "guerrillamail.com", "guerrillamail.net",
+  "guerrillamail.org", "guerrillamail.de", "guerrillamail.biz",
+  "guerrillamail.info", "guerrillamailblock.com",
+  "sharklasers.com", "guerrillamaildesktop.com", "grr.la",
+  "spam4.me", "yopmail.com", "yopmail.fr", "cool.fr.nf",
+  "jetable.fr.nf", "nospam.ze.tc", "nomail.xl.cx",
+  "mega.zik.dj", "speed.1s.fr", "courriel.fr.nf",
+  "moncourrier.fr.nf", "monemail.fr.nf", "monmail.fr.nf",
+  "trashmail.com", "trashmail.me", "trashmail.net",
+  "trashmail.at", "trashmail.io", "trashmail.xyz",
+  "dispostable.com", "mailnull.com", "spamgourmet.com",
+  "throwam.com", "throwam.net",
+  "tempmail.com", "tempmail.net", "tempmail.org",
+  "temp-mail.org", "temp-mail.ru", "temp-mail.io",
+  "tempr.email", "discard.email",
+  "mailnesia.com", "maildrop.cc",
+  "fakeinbox.com", "throwaway.email",
+  "mytempemail.com", "tempemail.net",
+  "mailtemp.info", "emailondeck.com",
+  "getnada.com", "inboxkitten.com",
+  "owlpic.com",
+  "mohmal.com",
+]);
+
+function validateEmail(email: string): string {
+  const trimmed = email.trim();
+  if (!trimmed) return "Email is required";
+  if (/\s/.test(trimmed)) return "Email must not contain spaces";
+  if (!trimmed.includes("@")) return "Email must contain an @ symbol";
+  const [local, domain] = trimmed.split("@");
+  if (!local) return "Email is missing the part before @";
+  if (!domain) return "Email is missing the domain after @";
+  if (!domain.includes(".")) return "Email domain must contain a dot (e.g. gmail.com)";
+  const tld = domain.split(".").pop();
+  if (!tld || tld.length < 2) return "Email must have a valid extension (e.g. .com, .in)";
+  if (!/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(trimmed)) return "Please enter a valid email address";
+  if (BLOCKED_EMAIL_DOMAINS.has(domain.toLowerCase())) return "Please use a valid business or personal email address";
+  return "";
+}
+
 interface Project {
   id: string;
   title: string;
@@ -1012,7 +1077,13 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
 
   // Submit a new support ticket
   const submitTicket = useCallback(async () => {
-    if (!ticketFullName.trim() || !ticketEmail.trim() || !ticketSubject.trim() || !ticketMessage.trim() || ticketErrors.email) return;
+    if (!ticketFullName.trim() || !ticketEmail.trim() || !ticketSubject.trim() || !ticketMessage.trim()) return;
+    // Block submit if email is invalid
+    const emailErr = validateEmail(ticketEmail);
+    if (emailErr) {
+      setTicketErrors((prev) => ({ ...prev, email: emailErr }));
+      return;
+    }
     // Block submit if phone is provided but invalid
     const phoneErr = validatePhoneForCountry(ticketPhone.trim(), ticketCountryCode);
     if (phoneErr) {
@@ -2408,27 +2479,36 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                         type="email"
                         value={ticketEmail}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          setTicketEmail(val);
-                          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                          if (!val.trim()) {
-                            setTicketErrors(prev => ({ ...prev, email: "Email is required" }));
-                          } else if (val.includes("..")) {
-                            setTicketErrors(prev => ({ ...prev, email: "Email cannot contain consecutive dots" }));
-                          } else if (!emailRegex.test(val)) {
-                            setTicketErrors(prev => ({ ...prev, email: "Please enter a valid email address" }));
-                          } else {
-                            setTicketErrors(prev => {
-                              const next = { ...prev };
-                              delete next.email;
-                              return next;
-                            });
-                          }
+                          setTicketEmail(e.target.value);
+                          const err = validateEmail(e.target.value);
+                          setTicketErrors((prev) =>
+                            err ? { ...prev, email: err } : (() => { const { email: _, ...rest } = prev; return rest; })()
+                          );
+                        }}
+                        onBlur={() => {
+                          const err = validateEmail(ticketEmail);
+                          setTicketErrors((prev) =>
+                            err ? { ...prev, email: err } : (() => { const { email: _, ...rest } = prev; return rest; })()
+                          );
                         }}
                         placeholder="user@example.com"
-                        className={cn("mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40", ticketErrors.email && "border-red-500")}
+                        className={cn(
+                          "mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40",
+                          ticketErrors.email && "border-red-500/50 focus-visible:ring-red-500/30"
+                        )}
                       />
-                      {ticketErrors.email && <p className="text-xs text-red-500 mt-1">{ticketErrors.email}</p>}
+                      {ticketErrors.email && (
+                        <p className="text-xs text-red-400 mt-1.5 flex items-center gap-1">
+                          <Warning className="w-3 h-3 shrink-0" />
+                          {ticketErrors.email}
+                        </p>
+                      )}
+                      {ticketEmail && !ticketErrors.email && (
+                        <p className="text-xs text-green-400 mt-1.5 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 shrink-0" />
+                          Valid email address
+                        </p>
+                      )}
                     </div>
 
                     {/* Phone with country selector */}
@@ -2592,8 +2672,8 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                           !ticketSubject.trim() ||
                           !ticketMessage.trim() ||
                           isSubmittingTicket ||
-                          !!ticketErrors.phone ||
-                          !!ticketErrors.email
+                          !!ticketErrors.email ||
+                          !!ticketErrors.phone
                         }
                         className="flex-1 bg-purple-500 hover:bg-purple-600 text-white"
                       >
