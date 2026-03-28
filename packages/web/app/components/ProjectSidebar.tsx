@@ -1012,7 +1012,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
 
   // Submit a new support ticket
   const submitTicket = useCallback(async () => {
-    if (!ticketFullName.trim() || !ticketEmail.trim() || !ticketSubject.trim() || !ticketMessage.trim()) return;
+    if (!ticketFullName.trim() || !ticketEmail.trim() || !ticketSubject.trim() || !ticketMessage.trim() || ticketErrors.email) return;
     // Block submit if phone is provided but invalid
     const phoneErr = validatePhoneForCountry(ticketPhone.trim(), ticketCountryCode);
     if (phoneErr) {
@@ -2407,10 +2407,28 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                         id="ticket-email"
                         type="email"
                         value={ticketEmail}
-                        onChange={(e) => setTicketEmail(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setTicketEmail(val);
+                          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                          if (!val.trim()) {
+                            setTicketErrors(prev => ({ ...prev, email: "Email is required" }));
+                          } else if (val.includes("..")) {
+                            setTicketErrors(prev => ({ ...prev, email: "Email cannot contain consecutive dots" }));
+                          } else if (!emailRegex.test(val)) {
+                            setTicketErrors(prev => ({ ...prev, email: "Please enter a valid email address" }));
+                          } else {
+                            setTicketErrors(prev => {
+                              const next = { ...prev };
+                              delete next.email;
+                              return next;
+                            });
+                          }
+                        }}
                         placeholder="user@example.com"
-                        className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                        className={cn("mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40", ticketErrors.email && "border-red-500")}
                       />
+                      {ticketErrors.email && <p className="text-xs text-red-500 mt-1">{ticketErrors.email}</p>}
                     </div>
 
                     {/* Phone with country selector */}
@@ -2574,7 +2592,8 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                           !ticketSubject.trim() ||
                           !ticketMessage.trim() ||
                           isSubmittingTicket ||
-                          !!ticketErrors.phone
+                          !!ticketErrors.phone ||
+                          !!ticketErrors.email
                         }
                         className="flex-1 bg-purple-500 hover:bg-purple-600 text-white"
                       >
