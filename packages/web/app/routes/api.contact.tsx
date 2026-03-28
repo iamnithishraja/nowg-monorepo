@@ -252,7 +252,7 @@ function createContactEmailTemplate({
         </div>
         
         <div class="field">
-          <div class="field-label">Authenticated User</div>
+          <div class="field-label">Your App Login UserID</div>
           <div class="field-value">${senderInfo}</div>
         </div>
         
