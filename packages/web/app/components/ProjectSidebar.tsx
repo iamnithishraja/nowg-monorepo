@@ -1105,7 +1105,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
         }),
       });
       const ticketData = ticketRes.ok ? await ticketRes.json() : {};
-      const ticketId = ticketData?.ticket?._id || ticketData?.ticket?.id || null;
+      const ticketId = ticketData?.ticket?.requestId || null;
 
       // 2. Also send email notification with ticket ID in subject
       await fetch("/api/contact", {

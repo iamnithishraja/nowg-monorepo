@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import { getSupportTicketModel } from "~/models/supportTicketModel";
+import { getSupportTicketModel } from "@nowgai/shared/models";
 
 // Only ADMIN / TECH_SUPPORT can access these endpoints
 const ADMIN_ROLES = new Set(["admin", "tech_support"]);

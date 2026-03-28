@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { auth } from "~/lib/auth";
 import { connectToDatabase } from "~/lib/mongo";
-import { getSupportTicketModel } from "~/models/supportTicketModel";
+import { getSupportTicketModel } from "@nowgai/shared/models";
 
 // GET /api/support-tickets - list the current user's own tickets
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -76,10 +76,13 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
+    const requestId = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+
     await connectToDatabase();
     const SupportTicket = getSupportTicketModel();
 
     const ticket = await SupportTicket.create({
+      requestId,
       userId: session.user.id,
       userEmail: session.user.email,
       userName: session.user.name || "",
