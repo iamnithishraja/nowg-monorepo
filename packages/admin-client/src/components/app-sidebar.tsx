@@ -30,6 +30,7 @@ import {
     Wallet,
     Zap,
     Headphones,
+    HelpCircle,
 } from "lucide-react";
 import { SiGithub, SiNetlify, SiSupabase, SiVercel } from "react-icons/si";
 import { Link, useLocation } from "wouter";
@@ -228,6 +229,11 @@ const getMenuGroups = (
                 title: "Support Tickets",
                 url: "/admin/support-tickets",
                 icon: Headphones,
+              },
+              {
+                title: "FAQs",
+                url: "/admin/faqs",
+                icon: HelpCircle,
               },
             ],
           },

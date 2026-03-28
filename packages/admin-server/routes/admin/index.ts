@@ -21,6 +21,7 @@ import paymentSettingsRouter from "../paymentSettings";
 import fundRequestsRouter from "./fund-requests";
 import markupRouter from "./markup";
 import supportTicketsRouter from "./support-tickets";
+import faqsRouter from "./faqs";
 
 const router = Router();
 
@@ -45,6 +46,7 @@ router.use("/payment-settings", paymentSettingsRouter);
 router.use("/fund-requests", fundRequestsRouter);
 router.use("/markup", markupRouter);
 router.use("/support-tickets", supportTicketsRouter);
+router.use("/faqs", faqsRouter);
 router.use("/", projectMembersRouter);
 
 export default router;
