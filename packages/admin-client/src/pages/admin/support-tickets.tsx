@@ -44,6 +44,7 @@ import { useState } from "react";
 
 interface SupportTicket {
   id: string;
+  requestId: string;
   userId: string;
   userEmail: string;
   userName: string;
@@ -75,7 +76,10 @@ const formatDate = (dateString: string) => {
   }).format(date);
 };
 
-const shortId = (id: string) => `#${String(id).slice(-8).toUpperCase()}`;
+const shortId = (ticket: SupportTicket) => {
+  if (ticket.requestId) return `#${ticket.requestId}`;
+  return `#${String(ticket.id).slice(-8).toUpperCase()}`;
+};
 
 export default function SupportTicketsPage() {
   const { user } = useAuth();
@@ -180,7 +184,7 @@ export default function SupportTicketsPage() {
               {/* Ticket ID */}
               <TableCell>
                 <span className="font-mono text-xs text-muted-foreground">
-                  {shortId(ticket.id)}
+                  {shortId(ticket)}
                 </span>
               </TableCell>
               <TableCell>
@@ -401,7 +405,7 @@ export default function SupportTicketsPage() {
             <DialogTitle className="flex items-center gap-2">
               Mark Ticket as Resolved
               <span className="text-sm font-mono text-muted-foreground">
-                {selectedTicket ? shortId(selectedTicket.id) : ""}
+                {selectedTicket ? shortId(selectedTicket) : ""}
               </span>
             </DialogTitle>
             <DialogDescription>

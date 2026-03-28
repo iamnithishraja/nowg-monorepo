@@ -29,6 +29,7 @@ export async function getSupportTickets(req: Request, res: Response) {
 
     const formatted = tickets.map((t: any) => ({
       id: t._id.toString(),
+      requestId: t.requestId || "",
       userId: t.userId,
       userEmail: t.userEmail,
       userName: t.userName,
