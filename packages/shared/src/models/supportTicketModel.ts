@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 
 export const supportTicketSchemaDefinition = {
+  requestId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
   userId: {
     type: String,
     required: true,

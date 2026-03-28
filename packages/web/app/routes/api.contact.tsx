@@ -83,7 +83,7 @@ export async function action({ request }: ActionFunctionArgs) {
       to: "tech@nowg.ai",
       cc: ccRecipients.length > 0 ? ccRecipients : undefined,
       subject: ticketId
-        ? `[Ticket #${String(ticketId).slice(-8).toUpperCase()}] ${subject}`
+        ? `[Ticket ID: ${ticketId}] ${subject}`
         : `Support: ${subject}`,
       html: createContactEmailTemplate({
         fullName,
@@ -259,6 +259,12 @@ function createContactEmailTemplate({
         <div class="footer">
           <p>This message was sent via the NowgAI contact form</p>
           <p>Received at ${new Date().toLocaleString()}</p>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-left: 4px solid #7c3aed; border-radius: 4px; font-size: 12px; color: #4b5563; line-height: 1.5;">
+          <strong>Security Disclaimer:</strong><br><br>
+          For your security, please do not share your portal password with anyone. We will never ask for your password through email or other communication channels. If you suspect any suspicious activity on your account, please contact us immediately at support@nowg.ai.<br><br>
+          This email is intended only for authorized recipients and may contain confidential information. If you're not the intended recipient, please notify the sender and delete it.
         </div>
       </div>
     </body>
