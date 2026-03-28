@@ -33,6 +33,9 @@ export { getPaymentSettingsModel, default as PaymentSettings, paymentSettingsSch
 // Support Tickets
 export { getSupportTicketModel, default as SupportTicket, supportTicketSchema, supportTicketSchemaDefinition } from "./supportTicketModel.js";
 
+// FAQs
+export { getFaqModel, default as Faq, faqSchema, faqSchemaDefinition } from "./faqModel.js";
+
 
 
 

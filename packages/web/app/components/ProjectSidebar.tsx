@@ -21,6 +21,7 @@ import {
   PaperPlaneTilt,
   PencilSimple,
   Plus,
+  Question,
   Robot,
   SidebarSimple,
   SortAscending,
@@ -392,7 +393,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
   const [showSupportPanel, setShowSupportPanel] = useState(false);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
-  const [supportTab, setSupportTab] = useState<"history" | "new">("new");
+  const [supportTab, setSupportTab] = useState<"history" | "new" | "faqs">("new");
   // New ticket form — matches original ContactFormDialog fields
   const [ticketFullName, setTicketFullName] = useState("");
   const [ticketEmail, setTicketEmail] = useState("");
@@ -407,6 +408,13 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
   const ticketCountryDropdownRef = useRef<HTMLDivElement>(null);
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [ticketSuccess, setTicketSuccess] = useState(false);
+
+  // FAQ modal state
+  const [showFaqModal, setShowFaqModal] = useState(false);
+  const [faqs, setFaqs] = useState<{ id: string; question: string; answer: string; category: string }[]>([]);
+  const [faqsLoading, setFaqsLoading] = useState(false);
+  const [expandedFaqIds, setExpandedFaqIds] = useState<Set<string>>(new Set());
+  const [faqSearchQuery, setFaqSearchQuery] = useState("");
 
   const currentProjectId = useMemo(
     () => new URLSearchParams(location.search).get("conversationId"),
@@ -1074,6 +1082,23 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
       setTicketsLoading(false);
     }
   }, []);
+
+  // Fetch FAQs from local web API route
+  const fetchFaqs = useCallback(async () => {
+    if (faqsLoading) return;
+    setFaqsLoading(true);
+    try {
+      const res = await fetch("/api/faqs");
+      if (res.ok) {
+        const data = await res.json();
+        setFaqs(data.faqs || []);
+      }
+    } catch (err) {
+      console.error("Error fetching FAQs:", err);
+    } finally {
+      setFaqsLoading(false);
+    }
+  }, [faqsLoading]);
 
   // Submit a new support ticket
   const submitTicket = useCallback(async () => {
@@ -2051,6 +2076,19 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                 Contact Support
               </button>
 
+              {/* FAQs button */}
+              <button
+                onClick={() => {
+                  setOpenDropdownId(null);
+                  setShowFaqModal(true);
+                  fetchFaqs();
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-white/60 hover:text-white hover:bg-white/[0.04] mt-1"
+              >
+                <Question className="w-4 h-4" />
+                FAQs
+              </button>
+
               {/* Switch to Enterprise Plan - only shown when user has no org */}
               {organizations.length === 0 && !isLoading && (
                 <button
@@ -2364,6 +2402,21 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
               >
                 <Plus className="w-3 h-3" />
                 New Ticket
+              </button>
+              <button
+                onClick={() => {
+                  setSupportTab("faqs");
+                  if (faqs.length === 0) fetchFaqs();
+                }}
+                className={cn(
+                  "px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1",
+                  supportTab === "faqs"
+                    ? "bg-purple-500 text-white"
+                    : "text-white/50 hover:text-white",
+                )}
+              >
+                <Question className="w-3 h-3" />
+                FAQs
               </button>
             </div>
           </div>
@@ -2688,6 +2741,222 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                 )}
               </div>
             )}
+            {/* FAQs tab */}
+            {supportTab === "faqs" && (
+              <div className="p-5">
+                {/* Search */}
+                <div className="relative mb-4">
+                  <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                  <input
+                    type="text"
+                    placeholder="Search FAQs..."
+                    value={faqSearchQuery}
+                    onChange={(e) => setFaqSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  />
+                </div>
+                {faqsLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <SpinnerGap className="w-5 h-5 animate-spin text-purple-400" />
+                  </div>
+                ) : faqs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Question className="w-12 h-12 text-white/10 mb-3" />
+                    <p className="text-white/50 text-sm">No FAQs available yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {faqs
+                      .filter((faq) => {
+                        if (!faqSearchQuery.trim()) return true;
+                        const q = faqSearchQuery.toLowerCase();
+                        return (
+                          faq.question.toLowerCase().includes(q) ||
+                          faq.answer.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((faq) => {
+                        const isExpanded = expandedFaqIds.has(faq.id);
+                        return (
+                          <div
+                            key={faq.id}
+                            className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden"
+                          >
+                            <button
+                              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+                              onClick={() => {
+                                setExpandedFaqIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(faq.id)) next.delete(faq.id);
+                                  else next.add(faq.id);
+                                  return next;
+                                });
+                              }}
+                            >
+                              <span className="text-sm font-medium text-white leading-snug">{faq.question}</span>
+                              <CaretDown
+                                className={cn(
+                                  "w-4 h-4 text-white/40 shrink-0 transition-transform",
+                                  isExpanded && "rotate-180",
+                                )}
+                              />
+                            </button>
+                            {isExpanded && (
+                              <div className="px-4 pb-4 pt-0 border-t border-white/10">
+                                <p className="text-sm text-white/60 leading-relaxed whitespace-pre-wrap pt-3">
+                                  {faq.answer}
+                                </p>
+                                {faq.category && faq.category !== "General" && (
+                                  <span className="inline-block mt-2 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                    {faq.category}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    {faqs.filter((faq) => {
+                      if (!faqSearchQuery.trim()) return false;
+                      const q = faqSearchQuery.toLowerCase();
+                      return (
+                        faq.question.toLowerCase().includes(q) ||
+                        faq.answer.toLowerCase().includes(q)
+                      );
+                    }).length === 0 && faqSearchQuery.trim() && (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <MagnifyingGlass className="w-8 h-8 text-white/10 mb-2" />
+                        <p className="text-white/40 text-sm">No FAQs match your search</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Standalone FAQ Modal */}
+      <Dialog open={showFaqModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowFaqModal(false);
+          setFaqSearchQuery("");
+          setExpandedFaqIds(new Set());
+        }
+      }}>
+        <DialogContent className="bg-[#1a1a1a] border-white/10 sm:max-w-xl max-h-[90vh] flex flex-col p-0">
+          {/* Header */}
+          <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-white/10">
+            <Question className="w-5 h-5 text-purple-400" />
+            <DialogTitle className="text-white text-lg font-semibold m-0">Frequently Asked Questions</DialogTitle>
+          </div>
+          <div className="flex-1 overflow-y-auto p-5">
+            {/* Search */}
+            <div className="relative mb-4">
+              <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+              <input
+                type="text"
+                placeholder="Search FAQs..."
+                value={faqSearchQuery}
+                onChange={(e) => setFaqSearchQuery(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+              />
+            </div>
+            {faqsLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <SpinnerGap className="w-5 h-5 animate-spin text-purple-400" />
+              </div>
+            ) : faqs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Question className="w-12 h-12 text-white/10 mb-3" />
+                <p className="text-white/50 text-sm">No FAQs available yet</p>
+                <p className="text-white/30 text-xs mt-1">Check back later or contact support</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {faqs
+                  .filter((faq) => {
+                    if (!faqSearchQuery.trim()) return true;
+                    const q = faqSearchQuery.toLowerCase();
+                    return (
+                      faq.question.toLowerCase().includes(q) ||
+                      faq.answer.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((faq) => {
+                    const isExpanded = expandedFaqIds.has(faq.id);
+                    return (
+                      <div
+                        key={faq.id}
+                        className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden"
+                      >
+                        <button
+                          className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/[0.04] transition-colors"
+                          onClick={() => {
+                            setExpandedFaqIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(faq.id)) next.delete(faq.id);
+                              else next.add(faq.id);
+                              return next;
+                            });
+                          }}
+                        >
+                          <span className="text-sm font-medium text-white leading-snug">{faq.question}</span>
+                          <CaretDown
+                            className={cn(
+                              "w-4 h-4 text-white/40 shrink-0 transition-transform",
+                              isExpanded && "rotate-180",
+                            )}
+                          />
+                        </button>
+                        {isExpanded && (
+                          <div className="px-4 pb-4 pt-0 border-t border-white/10">
+                            <p className="text-sm text-white/60 leading-relaxed whitespace-pre-wrap pt-3">
+                              {faq.answer}
+                            </p>
+                            {faq.category && faq.category !== "General" && (
+                              <span className="inline-block mt-2 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                {faq.category}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                {faqs.filter((faq) => {
+                  if (!faqSearchQuery.trim()) return false;
+                  const q = faqSearchQuery.toLowerCase();
+                  return (
+                    faq.question.toLowerCase().includes(q) ||
+                    faq.answer.toLowerCase().includes(q)
+                  );
+                }).length === 0 && faqSearchQuery.trim() && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <MagnifyingGlass className="w-8 h-8 text-white/10 mb-2" />
+                    <p className="text-white/40 text-sm">No FAQs match your search</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          {/* Footer CTA */}
+          <div className="px-5 py-4 border-t border-white/10">
+            <p className="text-xs text-white/40 text-center">
+              Can't find what you're looking for?{" "}
+              <button
+                onClick={() => {
+                  setShowFaqModal(false);
+                  setShowSupportPanel(true);
+                  setSupportTab("new");
+                  fetchSupportTickets();
+                }}
+                className="text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                Contact Support
+              </button>
+            </p>
           </div>
         </DialogContent>
       </Dialog>

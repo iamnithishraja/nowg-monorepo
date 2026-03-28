@@ -11,6 +11,7 @@ export default [
   route("/workspace/*", "routes/workspace.tsx"),
   route("/api/contact", "routes/api.contact.tsx"),
   route("/api/support-tickets", "routes/api.support-tickets.tsx"),
+  route("/api/faqs", "routes/api.faqs.tsx"),
   route("/signup", "routes/signup.tsx"),
   route("/forgot-password", "routes/forgot-password.tsx"),
   route("/reset-password", "routes/reset-password.tsx"),
