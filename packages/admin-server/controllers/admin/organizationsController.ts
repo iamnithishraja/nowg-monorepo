@@ -249,7 +249,7 @@ export async function createOrganization(req: Request, res: Response) {
  */
 export async function updateOrganization(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { name, description, allowedDomains, status } = req.body;
 
     if (!id || !ObjectId.isValid(id)) {
@@ -349,7 +349,7 @@ export async function updateOrganization(req: Request, res: Response) {
  */
 export async function searchUserByEmail(req: Request, res: Response) {
   try {
-    const { email } = req.query;
+    const email = req.query.email as string;
 
     if (!email || typeof email !== "string") {
       return res.status(400).json({ error: "Email is required" });
@@ -421,7 +421,7 @@ function isEmailDomainAllowed(
  */
 export async function assignOrgAdmin(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { email } = req.body;
     const adminUser = (req as any).user; // From requireAdmin middleware
 
@@ -756,7 +756,7 @@ export async function rejectInvitation(req: Request, res: Response) {
  */
 export async function updateUserRoleInOrg(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { email, role } = req.body;
     const adminUser = (req as any).user; // From requireAdmin middleware
 
@@ -956,7 +956,7 @@ export async function updateUserRoleInOrg(req: Request, res: Response) {
  */
 export async function inviteUserToOrg(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { email } = req.body;
     const adminUser = (req as any).user;
 
@@ -1324,7 +1324,7 @@ export async function rejectOrgUserInvitation(req: Request, res: Response) {
  */
 export async function deleteOrganization(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     if (!id) {
       return res.status(400).json({ error: "Invalid organization ID" });
@@ -1363,7 +1363,7 @@ export async function deleteOrganization(req: Request, res: Response) {
  */
 export async function getOrgUsers(req: Request, res: Response) {
   try {
-    const { organizationId } = req.params;
+    const organizationId = req.params.organizationId as string;
     const adminUser = (req as any).user;
 
     if (!organizationId || !ObjectId.isValid(organizationId)) {
@@ -1495,7 +1495,8 @@ export async function getOrgUsers(req: Request, res: Response) {
  */
 export async function removeUserFromOrg(req: Request, res: Response) {
   try {
-    const { organizationId, userId } = req.params;
+    const organizationId = req.params.organizationId as string;
+    const userId = req.params.userId as string;
     const adminUser = (req as any).user;
 
     if (!organizationId || !ObjectId.isValid(organizationId)) {
@@ -1660,7 +1661,7 @@ export async function getOrganizationPaymentProvider(
   res: Response
 ) {
   try {
-    const { organizationId } = req.params;
+    const organizationId = req.params.organizationId as string;
     const adminUser = (req as any).user;
 
     if (!organizationId || !ObjectId.isValid(organizationId)) {
@@ -1709,7 +1710,7 @@ export async function updateOrganizationPaymentProvider(
   res: Response
 ) {
   try {
-    const { organizationId } = req.params;
+    const organizationId = req.params.organizationId as string;
     const { paymentProvider } = req.body;
     const adminUser = (req as any).user;
 
@@ -1863,7 +1864,7 @@ export async function approveEnterpriseRequest(req: Request, res: Response) {
       return res.status(403).json({ error: "Unauthorized. Only system admins can approve enterprise requests." });
     }
 
-    const { id } = req.params;
+    const id = req.params.id as string;
     const organization = await Organization.findById(id);
     if (!organization) return res.status(404).json({ error: "Organization not found" });
     if (organization.approvalStatus !== "pending") {
@@ -1962,7 +1963,7 @@ export async function rejectEnterpriseRequest(req: Request, res: Response) {
       return res.status(403).json({ error: "Unauthorized. Only system admins can reject enterprise requests." });
     }
 
-    const { id } = req.params;
+    const id = req.params.id as string;
     const reason: string = req.body?.reason || "";
 
     const organization = await Organization.findById(id);

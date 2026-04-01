@@ -1,6 +1,9 @@
 import { OrgDocumentSubmission, Organization, OrgDocumentRequirement } from "@nowgai/shared/models";
+import { getUsersCollection } from "../../config/db";
+import { ObjectId } from "mongodb";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
+import { sendOrgDocumentRejectedEmail } from "../../lib/email";
 
 /**
  * GET /api/admin/organizations/:orgId/documents
@@ -78,6 +81,32 @@ export async function reviewDocumentSubmission(req: Request, res: Response) {
     submission.updatedAt = new Date();
 
     await submission.save();
+
+    // If rejected, trigger the email notification
+    if (status === "rejected") {
+      try {
+        const org = await Organization.findById(submission.organizationId);
+        if (org && org.createdBy) {
+          const usersCollection = getUsersCollection();
+          const user = await usersCollection.findOne({ _id: new ObjectId(org.createdBy as string) });
+          const reqDoc = await OrgDocumentRequirement.findById(submission.requirementId);
+          if (user && reqDoc) {
+            const webAppUrl = process.env.WEB_APP_URL || "https://nowgai.com";
+            
+            await sendOrgDocumentRejectedEmail({
+              to: user.email,
+              userName: user.name || "User",
+              organizationName: org.name,
+              documentName: reqDoc.name,
+              adminNotes: adminNotes || "Please review the document and upload a valid version.",
+              reuploadUrl: webAppUrl, // The dashboard/sidebar where they can re-upload
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Non-fatal error sending document rejection email", err);
+      }
+    }
 
     return res.json({
       success: true,

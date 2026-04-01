@@ -251,6 +251,13 @@ function Router() {
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
+      <Route path="/admin/document-requirements">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <DocumentRequirementsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
       {/* Redirect /admin/organization to /admin (dashboard) */}
       <Route path="/admin/organization">
         <Redirect to="/admin" />

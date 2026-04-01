@@ -501,6 +501,111 @@ export async function sendOrgUserInvitationEmail({
   }
 }
 
+interface SendOrgDocumentRejectedEmailProps {
+  to: string;
+  userName: string;
+  organizationName: string;
+  documentName: string;
+  adminNotes: string;
+  reuploadUrl: string;
+}
+
+export async function sendOrgDocumentRejectedEmail({
+  to,
+  userName,
+  organizationName,
+  documentName,
+  adminNotes,
+  reuploadUrl,
+}: SendOrgDocumentRejectedEmailProps) {
+  const resendClient = await getResendClient();
+  const fromEmail = await getResendFrom();
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject: `Action Required: Document changes requested for ${organizationName}`,
+      html: createOrgDocumentRejectedEmailTemplate({
+        to,
+        userName,
+        organizationName,
+        documentName,
+        adminNotes,
+        reuploadUrl,
+      }),
+    };
+
+    const result = await resendClient.emails.send(emailData);
+    return result;
+  } catch (error) {
+    console.error("❌ Error sending org document rejected email:", error);
+    // don't throw, just log to prevent failure
+  }
+}
+
+function createOrgDocumentRejectedEmailTemplate({
+  userName,
+  organizationName,
+  documentName,
+  adminNotes,
+  reuploadUrl,
+}: SendOrgDocumentRejectedEmailProps) {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Action Required - Nowgai</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+        .container { background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .logo { font-size: 28px; font-weight: bold; color: #000; margin-bottom: 10px; }
+        .title { font-size: 24px; font-weight: 600; color: #1a1a1a; margin-bottom: 20px; text-align: center; }
+        .message { font-size: 16px; color: #666; margin-bottom: 30px; line-height: 1.6; }
+        .doc-badge { display: inline-block; background-color: #ef4444; color: white; padding: 4px 12px; border-radius: 6px; font-weight: 600; font-size: 14px; margin-bottom: 15px; }
+        .notes-box { background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 15px; margin: 20px 0; color: #991b1b; }
+        .button-container { text-align: center; margin: 30px 0; }
+        .button { display: inline-block; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; background-color: #000; color: white; }
+        .button:hover { background-color: #333; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 14px; color: #888; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Nowgai</div>
+        </div>
+        <h1 class="title">Document Update Required</h1>
+        <div class="message">
+          <p>Hi <strong>${userName}</strong>,</p>
+          <p>We've reviewed your enterprise request for <strong>"${organizationName}"</strong>.</p>
+          <p>Unfortunately, we need you to provide an updated version of the following document:</p>
+          <div class="doc-badge">${documentName}</div>
+          
+          <div class="notes-box">
+            <strong>Admin Notes:</strong><br/>
+            ${adminNotes}
+          </div>
+          
+          <p>Please log in to your account to upload a corrected version of the document so we can proceed with your enterprise upgrade.</p>
+        </div>
+        <div class="button-container">
+          <a href="${reuploadUrl}" class="button">Upload Document</a>
+        </div>
+        <div class="footer">
+          <p>If you have any questions, please contact our support team.</p>
+          <p>Best regards,<br>The Nowgai Team</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+
 function createProjectCreatedEmailTemplate({
   projectName,
   organizationName,
