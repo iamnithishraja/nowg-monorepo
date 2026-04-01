@@ -148,7 +148,7 @@ const phoneDigitLengths: Record<string, { min: number; max: number }> = {
 
 /** Validate a phone number given the country code. Returns an error string or empty string if valid. */
 function validatePhoneForCountry(phone: string, countryCode: string): string {
-  if (!phone) return ""; // phone is optional, no error if empty
+  if (!phone) return "Phone number is required";
   const rule = phoneDigitLengths[countryCode];
   if (!rule) {
     // Fallback: accept 4-15 digits for unknown countries
@@ -1122,7 +1122,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
 
   // Submit a new support ticket
   const submitTicket = useCallback(async () => {
-    if (!ticketFullName.trim() || !ticketEmail.trim() || !ticketSubject.trim() || !ticketMessage.trim()) return;
+    if (!ticketFullName.trim() || !ticketEmail.trim() || !ticketPhone.trim() || !ticketSubject.trim() || !ticketMessage.trim()) return;
     // Block submit if email is invalid
     const emailErr = validateEmail(ticketEmail);
     if (emailErr) {
@@ -2604,7 +2604,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
 
                     {/* Phone with country selector */}
                     <div>
-                      <Label htmlFor="ticket-phone" className="text-white/70">Phone Number</Label>
+                      <Label htmlFor="ticket-phone" className="text-white/70">Phone Number <span className="text-red-500">*</span></Label>
                       <div className="mt-2 flex gap-2">
                         {/* Country dropdown */}
                         <div className="relative" ref={ticketCountryDropdownRef}>
@@ -2760,6 +2760,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                         disabled={
                           !ticketFullName.trim() ||
                           !ticketEmail.trim() ||
+                          !ticketPhone.trim() ||
                           !ticketSubject.trim() ||
                           !ticketMessage.trim() ||
                           isSubmittingTicket ||

@@ -312,7 +312,7 @@ function ContactFormDialogComponent({
       dialCode: string,
     ): { valid: boolean; error?: string } => {
       if (!phoneValue || phoneValue.length === 0) {
-        return { valid: true }; // Optional field
+        return { valid: false, error: "Phone number is required" };
       }
 
       const countryISO = getCountryISO(dialCode);
@@ -427,12 +427,10 @@ function ContactFormDialogComponent({
     }
 
     // Validate phone number
-    if (phone.trim()) {
-      const phoneValidation = validatePhoneNumber(phone.trim(), countryCode);
-      if (!phoneValidation.valid && phoneValidation.error) {
-        hasErrors = true;
-        newErrors.phone = phoneValidation.error;
-      }
+    const phoneValidation = validatePhoneNumber(phone.trim(), countryCode);
+    if (!phoneValidation.valid && phoneValidation.error) {
+      hasErrors = true;
+      newErrors.phone = phoneValidation.error;
     }
 
     if (hasErrors) {
@@ -568,7 +566,7 @@ function ContactFormDialogComponent({
               {/* Phone with country selector */}
               <div>
                 <Label htmlFor="contact-phone" className="text-white/70">
-                  Phone Number
+                  Phone Number <span className="text-red-500">*</span>
                 </Label>
                 <div className="mt-2 flex gap-2">
                   {/* Custom country dropdown (no Radix portal) */}
@@ -658,13 +656,6 @@ function ContactFormDialogComponent({
                       const digitsOnly = e.target.value.replace(/\D/g, "");
                       const limited = digitsOnly.slice(0, 15);
                       setPhone(limited);
-                      if (!limited) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.phone;
-                          return next;
-                        });
-                      }
                     }}
                     onBlur={(e) =>
                       validateField("phone", e.target.value.trim())
@@ -759,6 +750,7 @@ function ContactFormDialogComponent({
                 disabled={
                   !fullName.trim() ||
                   !email.trim() ||
+                  !phone.trim() ||
                   !subject.trim() ||
                   !message.trim() ||
                   isSending

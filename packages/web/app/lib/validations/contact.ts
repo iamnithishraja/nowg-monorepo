@@ -11,9 +11,7 @@ export const contactFormSchema = z.object({
     .email("Please enter a valid email address (e.g., user@example.com)"),
   phone: z
     .string()
-    .transform((val) => val.trim())
-    .optional()
-    .or(z.literal("")),
+    .min(1, "Phone number is required"),
   countryCode: z.string().optional(),
   company: z.string().max(100, "Company name is too long").optional(),
   subject: z
