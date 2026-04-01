@@ -115,12 +115,12 @@ export async function reviewDocumentSubmission(req: Request, res: Response) {
     if (status === "rejected") {
       try {
         const org = await Organization.findById(submission.organizationId);
-        if (org && org.createdBy) {
+        if (org && org.orgAdminId) {
           const usersCollection = getUsersCollection();
-          const user = await usersCollection.findOne({ _id: new ObjectId(org.createdBy as string) });
+          const user = await usersCollection.findOne({ _id: new ObjectId(org.orgAdminId as string) });
           const reqDoc = await OrgDocumentRequirement.findById(submission.requirementId);
           if (user && reqDoc) {
-            const webAppUrl = process.env.WEB_APP_URL || "https://nowgai.com";
+            const webAppUrl = process.env.WEB_PACKAGE_URL || "http://localhost:3000";
             
             await sendOrgDocumentRejectedEmail({
               to: user.email,

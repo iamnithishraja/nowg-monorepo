@@ -161,6 +161,7 @@ export default [
   ),
   route("/api/organizations", "routes/api.organizations.tsx"),
   route("/api/organizations/documents", "routes/api.organizations.documents.tsx"),
+  route("/api/organizations/:organizationId", "routes/api.organizations.$organizationId.tsx"),
   route("/api/user-organizations", "routes/api.user-organizations.tsx"),
   route(
     "/api/user-project-memberships",
