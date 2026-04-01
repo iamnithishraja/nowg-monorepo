@@ -116,15 +116,22 @@ export async function action({ request }: ActionFunctionArgs) {
         );
       }
 
-      const submission = new OrgDocumentSubmission({
-        organizationId,
-        requirementId,
-        fileUrl,
-        status: "pending",
-        adminNotes: null,
-      });
-
-      await submission.save();
+      let submission = await OrgDocumentSubmission.findOne({ organizationId, requirementId });
+      if (submission) {
+        submission.fileUrl = fileUrl;
+        submission.status = "pending";
+        submission.adminNotes = null;
+        await submission.save();
+      } else {
+        submission = new OrgDocumentSubmission({
+          organizationId,
+          requirementId,
+          fileUrl,
+          status: "pending",
+          adminNotes: null,
+        });
+        await submission.save();
+      }
 
       return new Response(JSON.stringify({ success: true, submission }), {
         headers: { "Content-Type": "application/json" },
