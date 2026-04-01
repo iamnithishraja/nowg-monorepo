@@ -9,6 +9,7 @@ export default [
     "routes/.well-known/appspecific/com.chrome.devtools.json.tsx",
   ),
   route("/workspace/*", "routes/workspace.tsx"),
+  route("/api/support-tickets/:ticketId/call-request", "routes/api.support-tickets.$ticketId.call-request.tsx"),
   route("/api/contact", "routes/api.contact.tsx"),
   route("/api/support-tickets", "routes/api.support-tickets.tsx"),
   route("/api/faqs", "routes/api.faqs.tsx"),

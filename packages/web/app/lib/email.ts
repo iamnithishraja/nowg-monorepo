@@ -1965,3 +1965,84 @@ function createEnterpriseRequestRejectedTemplate({
     </html>
   `;
 }
+
+export async function sendUserCallRequestConfirmationEmail({
+  to,
+  userName,
+  ticketId,
+}: {
+  to: string;
+  userName: string;
+  ticketId: string;
+}) {
+  const apiKey = getEnv("RESEND_API_KEY");
+  const fromEmail = getResendFrom();
+
+  if (!apiKey || !fromEmail) return;
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject: `Call Request Received - Ticket #${ticketId}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+          <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <h2>Call Request Received</h2>
+            <p>Hi ${userName},</p>
+            <p>We have received your call request regarding ticket <strong>#${ticketId}</strong>.</p>
+            <p>Our support team will contact you immediately at the phone number provided in your ticket.</p>
+            <p>Best regards,<br>The Nowgai Team</p>
+          </div>
+        </div>
+      `,
+    };
+    await getResendClient().emails.send(emailData);
+  } catch (error) {
+    console.error("Error sending user call request confirmation email:", error);
+  }
+}
+
+export async function sendAdminCallRequestNotificationEmail({
+  to,
+  userName,
+  userEmail,
+  userPhone,
+  ticketId,
+}: {
+  to: string;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  ticketId: string;
+}) {
+  const apiKey = getEnv("RESEND_API_KEY");
+  const fromEmail = getResendFrom();
+
+  if (!apiKey || !fromEmail) return;
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject: `URGENT: New Call Request - Ticket #${ticketId}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+          <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <h2 style="color: #ef4444;">New Call Request</h2>
+            <p>A user has requested an immediate support call for ticket <strong>#${ticketId}</strong>.</p>
+            <ul>
+              <li><strong>Name:</strong> ${userName}</li>
+              <li><strong>Email:</strong> ${userEmail}</li>
+              <li><strong>Phone:</strong> ${userPhone}</li>
+            </ul>
+            <p>Please contact the user immediately.</p>
+          </div>
+        </div>
+      `,
+    };
+    await getResendClient().emails.send(emailData);
+  } catch (error) {
+    console.error("Error sending admin call request notification email:", error);
+  }
+}

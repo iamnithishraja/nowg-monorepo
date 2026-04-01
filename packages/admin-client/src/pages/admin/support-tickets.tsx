@@ -65,6 +65,26 @@ interface TicketsResponse {
   tickets: SupportTicket[];
 }
 
+interface CallRequest {
+  id: string;
+  requestId: string;
+  ticketId: string;
+  userId: string;
+  userEmail: string;
+  userName?: string;
+  phone: string;
+  countryCode: string;
+  status: "open" | "resolved";
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface CallsResponse {
+  calls: CallRequest[];
+}
+
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   return new Intl.DateTimeFormat("en-US", {
@@ -88,6 +108,7 @@ export default function SupportTicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
     null
   );
+  const [selectedCall, setSelectedCall] = useState<CallRequest | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
 
   const userRole = (user as any)?.role;
@@ -136,9 +157,50 @@ export default function SupportTicketsPage() {
     setAdminNotes("");
   };
 
+  // Fetch all calls
+  const { data: callsData, isLoading: callsLoading } = useQuery<CallsResponse>({
+    queryKey: ["/api/admin/support-tickets/calls"],
+    queryFn: async () => {
+      return client.get<CallsResponse>("/api/admin/support-tickets/calls");
+    },
+    refetchInterval: 30000,
+    enabled: isFullAdmin,
+  });
+
+  // Resolve Call mutation
+  const resolveCallMutation = useMutation({
+    mutationFn: async (callId: string) => {
+      return client.post(`/api/admin/support-tickets/calls/${callId}/resolve`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/support-tickets/calls"],
+      });
+      toast({
+        title: "Call Resolved",
+        description: "The call request has been marked as resolved.",
+      });
+      setSelectedCall(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to resolve call",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleResolveCall = (call: CallRequest) => {
+    setSelectedCall(call);
+  };
+
   const allTickets = ticketsData?.tickets || [];
   const openTickets = allTickets.filter((t) => t.status === "open");
   const resolvedTickets = allTickets.filter((t) => t.status === "resolved");
+
+  const allCalls = callsData?.calls || [];
+  const openCalls = allCalls.filter((c) => c.status === "open");
 
   if (!isFullAdmin) {
     return (
@@ -154,6 +216,68 @@ export default function SupportTicketsPage() {
       </div>
     );
   }
+
+  const renderCallsTable = (calls: CallRequest[]) => {
+    if (calls.length === 0) {
+      return (
+        <div className="text-center py-12 text-muted-foreground">
+          <Phone className="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p>No call requests</p>
+        </div>
+      );
+    }
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Req ID</TableHead>
+            <TableHead>User / Phone</TableHead>
+            <TableHead>Ticket ID</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Requested</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {calls.map((call) => (
+            <TableRow key={call.id} className="hover:bg-muted/30">
+              <TableCell className="font-mono text-xs text-muted-foreground">#{call.requestId || String(call.id).slice(-8).toUpperCase()}</TableCell>
+              <TableCell>
+                <div className="space-y-0.5">
+                  <p className="font-medium text-sm">{call.userEmail}</p>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Phone className="h-3 w-3" />
+                    {call.countryCode} {call.phone}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">#{call.ticketId}</TableCell>
+              <TableCell>
+                {call.status === "open" ? (
+                  <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-950/30">Open</Badge>
+                ) : (
+                  <Badge variant="default" className="bg-green-600">Resolved</Badge>
+                )}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDate(call.createdAt)}</TableCell>
+              <TableCell className="text-right">
+                {call.status === "open" && (
+                  <Button
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); handleResolveCall(call); }}
+                    disabled={resolveCallMutation.isPending}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    Resolve Call
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
 
   const renderTicketsTable = (tickets: SupportTicket[], showActions: boolean) => {
     if (tickets.length === 0) {
@@ -326,6 +450,14 @@ export default function SupportTicketsPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="resolved">Resolved</TabsTrigger>
+          <TabsTrigger value="calls">
+            Calls
+            {openCalls.length > 0 && (
+              <span className="ml-2 rounded-full bg-red-500 text-white text-xs px-1.5 py-0.5 leading-none">
+                {openCalls.length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="all">All Tickets</TabsTrigger>
         </TabsList>
 
@@ -384,6 +516,24 @@ export default function SupportTicketsPage() {
                 <div className="text-center py-8 text-muted-foreground">Loading...</div>
               ) : (
                 renderTicketsTable(allTickets, false)
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="calls" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Phone className="h-4 w-4 text-red-500" />
+                Call Requests ({allCalls.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {callsLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              ) : (
+                renderCallsTable(allCalls)
               )}
             </CardContent>
           </Card>
@@ -461,6 +611,46 @@ export default function SupportTicketsPage() {
               disabled={resolveMutation.isPending}
             >
               {resolveMutation.isPending ? "Resolving..." : "Mark as Resolved"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resolve Call Dialog */}
+      <Dialog
+        open={!!selectedCall}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedCall(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Resolve Call Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to mark this call request as resolved? The user will be notified via email that the call has been resolved.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCall && (
+            <div className="py-4">
+              <p>User: {selectedCall.userEmail}</p>
+              <p>Phone: {selectedCall.countryCode} {selectedCall.phone}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSelectedCall(null)}
+              disabled={resolveCallMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => selectedCall && resolveCallMutation.mutate(selectedCall.id)}
+              disabled={resolveCallMutation.isPending}
+            >
+              {resolveCallMutation.isPending ? "Resolving..." : "Mark as Resolved"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -31,6 +31,7 @@ import {
   User,
   Warning,
   X,
+  PhoneCall,
 } from "@phosphor-icons/react";
 import React, {
   memo,
@@ -264,6 +265,8 @@ interface SupportTicket {
   adminNotes?: string;
   createdAt: string;
   resolvedAt?: string | null;
+  phone?: string;
+  requestId?: string;
 }
 
 const WORKSPACE_STORAGE_KEY = "nowgai:selectedWorkspace";
@@ -408,6 +411,23 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
   const ticketCountryDropdownRef = useRef<HTMLDivElement>(null);
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [ticketSuccess, setTicketSuccess] = useState(false);
+
+  const [callRequestState, setCallRequestState] = useState<Record<string, 'loading' | 'success' | 'error'>>({});
+
+  const handleCallRequest = async (ticketId: string) => {
+    setCallRequestState((prev) => ({ ...prev, [ticketId]: 'loading' }));
+    try {
+      const res = await fetch(`/api/support-tickets/${ticketId}/call-request`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to request call");
+      }
+      setCallRequestState((prev) => ({ ...prev, [ticketId]: 'success' }));
+    } catch (err: any) {
+      alert(err.message);
+      setCallRequestState((prev) => ({ ...prev, [ticketId]: 'error' }));
+    }
+  };
 
   // FAQ modal state
   const [showFaqModal, setShowFaqModal] = useState(false);
@@ -2449,16 +2469,34 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <p className="text-sm font-medium text-white leading-tight">{ticket.subject}</p>
-                          <span
-                            className={cn(
-                              "shrink-0 text-xs px-2 py-0.5 rounded-full font-medium",
-                              ticket.status === "open"
-                                ? "bg-orange-500/20 text-orange-400"
-                                : "bg-green-500/20 text-green-400",
+                          <div className="flex items-center gap-2">
+                            {ticket.phone && ticket.status === "open" && (
+                              <button
+                                onClick={() => handleCallRequest(ticket.requestId || (ticket as any)._id || ticket.id)}
+                                disabled={callRequestState[ticket.requestId || (ticket as any)._id || ticket.id] === 'loading' || callRequestState[ticket.requestId || (ticket as any)._id || ticket.id] === 'success'}
+                                title="Request a Call"
+                                className="text-white/50 hover:text-white transition-colors disabled:opacity-50"
+                              >
+                                {callRequestState[ticket.requestId || (ticket as any)._id || ticket.id] === 'loading' ? (
+                                  <SpinnerGap className="w-4 h-4 animate-spin text-purple-400" />
+                                ) : callRequestState[ticket.requestId || (ticket as any)._id || ticket.id] === 'success' ? (
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                ) : (
+                                  <PhoneCall className="w-4 h-4" />
+                                )}
+                              </button>
                             )}
-                          >
-                            {ticket.status === "open" ? "Open" : "Resolved"}
-                          </span>
+                            <span
+                              className={cn(
+                                "shrink-0 text-xs px-2 py-0.5 rounded-full font-medium",
+                                ticket.status === "open"
+                                  ? "bg-orange-500/20 text-orange-400"
+                                  : "bg-green-500/20 text-green-400",
+                              )}
+                            >
+                              {ticket.status === "open" ? "Open" : "Resolved"}
+                            </span>
+                          </div>
                         </div>
                         {/* Ticket ID */}
                         <p className="text-xs font-mono text-white/30">

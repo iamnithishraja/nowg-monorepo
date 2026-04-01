@@ -36,6 +36,9 @@ export { getSupportTicketModel, default as SupportTicket, supportTicketSchema, s
 // FAQs
 export { getFaqModel, default as Faq, faqSchema, faqSchemaDefinition } from "./faqModel.js";
 
+// Call Requests
+export { getCallRequestModel, default as CallRequest, callRequestSchema, callRequestSchemaDefinition } from "./callRequestModel.js";
+
 
 
 

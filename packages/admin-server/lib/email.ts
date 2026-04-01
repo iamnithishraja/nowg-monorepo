@@ -1709,3 +1709,38 @@ function createPlatformInvitationEmailTemplate({
     </html>
   `;
 }
+
+export async function sendUserCallResolvedEmail({
+  to,
+  userName,
+  ticketId,
+}: {
+  to: string;
+  userName: string;
+  ticketId: string;
+}) {
+  const resendClient = await getResendClient();
+  const fromEmail = await getResendFrom();
+
+  try {
+    const emailData = {
+      from: fromEmail,
+      to,
+      subject: `Call Request Resolved - Ticket #${ticketId}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+          <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <h2 style="color: #10b981;">Call Request Resolved</h2>
+            <p>Hi ${userName},</p>
+            <p>It was nice talking to you regarding your support ticket <strong>#${ticketId}</strong>.</p>
+            <p>We have marked your call request as resolved. If you need further assistance, please feel free to reach out to us again.</p>
+            <p>Best regards,<br>The Nowgai Team</p>
+          </div>
+        </div>
+      `,
+    };
+    await resendClient.emails.send(emailData);
+  } catch (error) {
+    console.error("Error sending user call resolved email:", error);
+  }
+}

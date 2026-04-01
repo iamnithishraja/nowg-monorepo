@@ -25,7 +25,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .sort({ createdAt: -1 })
       .lean();
 
-    return new Response(JSON.stringify({ tickets }), {
+    console.log(`[API SupportTickets] Fetched ${tickets.length} tickets for user ${session.user.id}`);
+
+    const formattedTickets = tickets.map((t: any) => ({
+      ...t,
+      id: t._id?.toString() || "",
+      _id: t._id?.toString() || ""
+    }));
+
+    return new Response(JSON.stringify({ tickets: formattedTickets }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -66,9 +74,9 @@ export async function action({ request }: ActionFunctionArgs) {
     const body = await request.json();
     const { subject, message, phone, countryCode, company } = body;
 
-    if (!subject?.trim() || !message?.trim()) {
+    if (!subject?.trim() || !message?.trim() || !phone?.trim() || !countryCode?.trim()) {
       return new Response(
-        JSON.stringify({ error: "Subject and message are required" }),
+        JSON.stringify({ error: "Subject, message, phone, and country code are required" }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },

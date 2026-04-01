@@ -1,6 +1,7 @@
-import { SupportTicket } from "@nowgai/shared/models";
+import { CallRequest, SupportTicket } from "@nowgai/shared/models";
 import { hasAdminAccess } from "@nowgai/shared/types";
 import type { Request, Response } from "express";
+import { sendUserCallResolvedEmail } from "../../lib/email";
 
 /**
  * GET /api/admin/support-tickets
@@ -104,6 +105,112 @@ export async function resolveTicket(req: Request, res: Response) {
     console.error("Error resolving support ticket:", error);
     return res.status(500).json({
       error: "Failed to resolve support ticket",
+      message: error.message,
+    });
+  }
+}
+
+/**
+ * GET /api/admin/support-tickets/calls
+ * List all call requests. Supports ?status=open|resolved
+ */
+export async function getCallRequests(req: Request, res: Response) {
+  try {
+    const adminUser = (req as any).user;
+
+    if (!hasAdminAccess(adminUser?.role)) {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "Only admins can view call requests",
+      });
+    }
+
+    const { status } = req.query;
+    const query: any = {};
+    if (status === "open" || status === "resolved") {
+      query.status = status;
+    }
+
+    const calls = await CallRequest.find(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const formatted = calls.map((c: any) => ({
+      id: c._id.toString(),
+      requestId: c.requestId || "",
+      ticketId: c.ticketId,
+      userId: c.userId,
+      userEmail: c.userEmail,
+      phone: c.phone,
+      countryCode: c.countryCode,
+      status: c.status,
+      resolvedAt: c.resolvedAt,
+      resolvedBy: c.resolvedBy,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
+
+    return res.json({ calls: formatted });
+  } catch (error: any) {
+    console.error("Error fetching call requests:", error);
+    return res.status(500).json({
+      error: "Failed to fetch call requests",
+      message: error.message,
+    });
+  }
+}
+
+/**
+ * POST /api/admin/support-tickets/calls/:callId/resolve
+ */
+export async function resolveCallRequest(req: Request, res: Response) {
+  try {
+    const adminUser = (req as any).user;
+
+    if (!hasAdminAccess(adminUser?.role)) {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "Only admins can resolve call requests",
+      });
+    }
+
+    const { callId } = req.params;
+
+    const callReq = await CallRequest.findById(callId);
+    if (!callReq) {
+      return res.status(404).json({ error: "Call request not found" });
+    }
+
+    if (callReq.status === "resolved") {
+      return res.status(400).json({ error: "Call request is already resolved" });
+    }
+
+    callReq.status = "resolved";
+    callReq.resolvedAt = new Date();
+    callReq.resolvedBy = adminUser?.email || adminUser?.id || "admin";
+    callReq.updatedAt = new Date();
+    await callReq.save();
+
+    // Send email to user
+    await sendUserCallResolvedEmail({
+      to: callReq.userEmail,
+      userName: callReq.userEmail.split('@')[0],
+      ticketId: callReq.ticketId,
+    });
+
+    return res.json({
+      success: true,
+      callRequest: {
+        id: callReq._id.toString(),
+        status: callReq.status,
+        resolvedAt: callReq.resolvedAt,
+        resolvedBy: callReq.resolvedBy,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error resolving call request:", error);
+    return res.status(500).json({
+      error: "Failed to resolve call request",
       message: error.message,
     });
   }
