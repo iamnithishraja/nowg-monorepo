@@ -1,4 +1,4 @@
-import { Organization, OrganizationMember, OrgUserInvitation, Project, ProjectMember } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, OrgUserInvitation, Project, ProjectMember, OrgDocumentRequirement, OrgDocumentSubmission } from "@nowgai/shared/models";
 import {
   hasAdminAccess,
   OrganizationRole,
@@ -1805,8 +1805,26 @@ export async function getPendingEnterpriseRequests(req: Request, res: Response) 
       }
     }
 
+    // Document checks
+    const activeMandatoryReqs = await OrgDocumentRequirement.find({ isMandatory: true, isActive: true }).lean();
+    const orgIds = organizations.map((org: any) => org._id);
+    const approvedSubmissions = await OrgDocumentSubmission.find({
+      organizationId: { $in: orgIds },
+      status: "approved"
+    }).lean();
+
+    const approvedSubmissionsByOrg = approvedSubmissions.reduce((acc: any, sub: any) => {
+      const orgIdStr = sub.organizationId.toString();
+      if (!acc[orgIdStr]) acc[orgIdStr] = new Set();
+      acc[orgIdStr].add(sub.requirementId.toString());
+      return acc;
+    }, {});
+
     const formatted = organizations.map((org: any) => {
       const admin = org.orgAdminId ? adminMap.get(org.orgAdminId) : null;
+      const approvedReqIds = approvedSubmissionsByOrg[org._id.toString()] || new Set();
+      const allMandatoryDocsApproved = activeMandatoryReqs.every((reqObj: any) => approvedReqIds.has(reqObj._id.toString()));
+
       return {
         id: org._id.toString(),
         name: org.name,
@@ -1823,6 +1841,7 @@ export async function getPendingEnterpriseRequests(req: Request, res: Response) 
           ? { id: admin._id.toString(), email: admin.email, name: admin.name || "" }
           : null,
         createdAt: org.createdAt,
+        allMandatoryDocsApproved,
       };
     });
 
@@ -1849,6 +1868,25 @@ export async function approveEnterpriseRequest(req: Request, res: Response) {
     if (!organization) return res.status(404).json({ error: "Organization not found" });
     if (organization.approvalStatus !== "pending") {
       return res.status(400).json({ error: "Organization is not pending approval", currentStatus: organization.approvalStatus });
+    }
+
+    // Check if all mandatory documents are approved
+    const mandatoryRequirements = await OrgDocumentRequirement.find({ isMandatory: true, isActive: true });
+    
+    if (mandatoryRequirements.length > 0) {
+      const submissions = await OrgDocumentSubmission.find({ organizationId: id, status: "approved" });
+      const approvedRequirementIds = submissions.map((s: any) => s.requirementId.toString());
+      
+      const missingRequirements = mandatoryRequirements.filter(
+        (req: any) => !approvedRequirementIds.includes(req._id.toString())
+      );
+      
+      if (missingRequirements.length > 0) {
+        return res.status(400).json({ 
+          error: "Missing approved mandatory documents", 
+          missingDocuments: missingRequirements.map((req: any) => req.name) 
+        });
+      }
     }
 
     organization.approvalStatus = "approved";

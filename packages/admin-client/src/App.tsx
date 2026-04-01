@@ -14,6 +14,7 @@ import { signOut } from "@/lib/auth-client";
 import { client } from "@/lib/client";
 import { ThemeProvider } from "@/lib/theme-provider";
 import AdminDashboard from "@/pages/admin/dashboard";
+import DocumentRequirementsPage from "@/pages/admin/document-requirements";
 import FundRequests from "@/pages/admin/fund-requests";
 import OrgWallet from "@/pages/admin/org-wallet";
 import Organizations from "@/pages/admin/organizations";

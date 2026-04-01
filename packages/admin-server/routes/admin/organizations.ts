@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { getOrgDocuments } from "../../controllers/admin/orgDocumentSubmissionsController";
 import {
   approveEnterpriseRequest,
   assignOrgAdmin,
@@ -19,6 +20,9 @@ import {
 import { requireAdmin } from "../../middleware/betterAuthMiddleware";
 
 const router = Router();
+
+// GET /api/admin/organizations/:orgId/documents - Get all documents for organization
+router.get("/:orgId/documents", getOrgDocuments);
 
 // All routes require admin authentication
 router.use(requireAdmin);

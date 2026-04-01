@@ -15,6 +15,9 @@ import {
   Send,
   Users,
   XCircle,
+  FileText,
+  UploadCloud,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
@@ -181,6 +184,11 @@ export default function ManageOrgConvo({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
 
+  // Document requirement & upload state
+  const [documentRequirements, setDocumentRequirements] = useState<any[]>([]);
+  const [documentSubmissions, setDocumentSubmissions] = useState<any[]>([]);
+  const [documentFiles, setDocumentFiles] = useState<Record<string, File>>({});
+
   useEffect(() => {
     initializePage();
   }, []);
@@ -300,20 +308,40 @@ export default function ManageOrgConvo({
     }
   };
 
-  const handlePlanContinue = () => {
+  const fetchDocumentRequirements = async (orgId?: string) => {
+    try {
+      const url = orgId 
+        ? `/api/organizations/documents?organizationId=${orgId}`
+        : "/api/organizations/documents";
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDocumentRequirements(data.requirements || []);
+        setDocumentSubmissions(data.submissions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch document requirements", err);
+    }
+  };
+
+  const handlePlanContinue = async () => {
     if (selectedPlan === "core") {
       navigate("/");
       return;
     }
+    await fetchDocumentRequirements();
     setIsEditMode(false);
     setView("enterprise-form");
   };
 
   /** Pre-fill the form with existing request data and switch to edit mode */
-  const handleEditRequest = () => {
+  const handleEditRequest = async () => {
     if (!pendingEnterpriseRequest) return;
     setOrgName(pendingEnterpriseRequest.name);
     setOrgDescription(pendingEnterpriseRequest.description || "");
+    await fetchDocumentRequirements(pendingEnterpriseRequest.id);
     setIsEditMode(true);
     setError(null);
     setView("enterprise-form");
@@ -333,10 +361,23 @@ export default function ManageOrgConvo({
       return;
     }
 
+    // Validate documents
+    for (const req of documentRequirements) {
+      const existingSubmission = documentSubmissions.find((s) => s.requirementId === req._id);
+      const isPendingOrApproved = existingSubmission && ["pending", "approved"].includes(existingSubmission.status);
+      const hasFileSelected = !!documentFiles[req._id];
+
+      if (req.isMandatory && !isPendingOrApproved && !hasFileSelected) {
+        setError(`Please upload the required document: ${req.name}`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
+      let orgId = "";
       if (isEditMode && pendingEnterpriseRequest) {
         // ── PATCH: update the existing pending request ────────────────────
         const res = await fetch(
@@ -373,9 +414,7 @@ export default function ManageOrgConvo({
               }
             : prev
         );
-
-        setIsEditMode(false);
-        setView("enterprise-pending");
+        orgId = pendingEnterpriseRequest.id;
       } else {
         // ── POST: create a new request ────────────────────────────────────
         const res = await fetch("/api/organizations", {
@@ -410,9 +449,50 @@ export default function ManageOrgConvo({
           approvalNotes: null,
           createdAt: data.organization.createdAt,
         });
-
-        setView("enterprise-pending");
+        
+        orgId = data.organization.id;
       }
+
+      // ── Upload and Link Documents ──────────────────────────────────────────
+      for (const [reqId, file] of Object.entries(documentFiles)) {
+        // 1. Get presigned URL
+        const presignedRes = await fetch("/api/organizations/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "getPresignedUploadUrl",
+            fileName: file.name,
+            contentType: file.type,
+          }),
+        });
+        const presignedData = await presignedRes.json();
+        if (!presignedRes.ok) throw new Error(presignedData.error);
+        
+        // 2. Upload to R2
+        const uploadRes = await fetch(presignedData.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!uploadRes.ok) throw new Error(`Failed to upload file ${file.name}.`);
+
+        // 3. Save submission
+        const submitRes = await fetch("/api/organizations/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "submitDocument",
+            organizationId: orgId,
+            requirementId: reqId,
+            fileUrl: presignedData.publicUrl,
+          }),
+        });
+        const submitData = await submitRes.json();
+        if (!submitRes.ok) throw new Error(submitData.error);
+      }
+
+      setIsEditMode(false);
+      setView("enterprise-pending");
     } catch (err: any) {
       console.error("Error submitting enterprise request:", err);
       setError(err.message || "Failed to submit request");
@@ -653,6 +733,98 @@ export default function ManageOrgConvo({
                   />
                 </div>
               </div>
+
+              {/* Document Uploads */}
+              {documentRequirements.length > 0 && (
+                <div className="space-y-4 pt-4 border-t border-subtle">
+                  <h4 className="text-sm font-medium text-[#7b4cff] uppercase tracking-wider">
+                    Required Documents
+                  </h4>
+                  <p className="text-sm text-secondary">
+                    Please provide the following documents to help us verify your organization.
+                  </p>
+                  
+                  <div className="space-y-3">
+                    {documentRequirements.map((req) => {
+                      const existingSub = documentSubmissions.find(s => s.requirementId === req._id);
+                      const isRejected = existingSub?.status === "rejected";
+                      const isApproved = existingSub?.status === "approved";
+                      const isPending = existingSub?.status === "pending";
+                      const selectedFile = documentFiles[req._id];
+
+                      return (
+                        <div key={req._id} className="p-4 rounded-lg bg-surface-2 border border-subtle">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-tertiary" />
+                                <span className="text-primary font-medium">{req.name}</span>
+                                {req.isMandatory && <span className="text-red-400 text-xs">*Required</span>}
+                              </div>
+                              {req.description && (
+                                <p className="text-sm text-secondary mt-1">{req.description}</p>
+                              )}
+                              
+                              {/* Rejection Note */}
+                              {isRejected && existingSub?.adminNotes && !selectedFile && (
+                                <div className="mt-2 p-2 rounded bg-red-500/10 border border-red-500/20">
+                                  <p className="text-sm text-red-400 font-medium">Changes Requested:</p>
+                                  <p className="text-sm text-red-300">{existingSub.adminNotes}</p>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Upload Area */}
+                            <div className="ml-4 flex-shrink-0">
+                              {isApproved ? (
+                                <Badge className="bg-green-500/10 text-green-400 border-green-500/20">Approved</Badge>
+                              ) : isPending && !selectedFile && !isRejected ? (
+                                <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">Pending Review</Badge>
+                              ) : selectedFile ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-secondary max-w-[150px] truncate">{selectedFile.name}</span>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                    onClick={() => {
+                                      const newFiles = { ...documentFiles };
+                                      delete newFiles[req._id];
+                                      setDocumentFiles(newFiles);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div>
+                                  <input 
+                                    type="file" 
+                                    id={`doc-${req._id}`} 
+                                    className="hidden" 
+                                    onChange={(e) => {
+                                      if (e.target.files?.[0]) {
+                                        setDocumentFiles({ ...documentFiles, [req._id]: e.target.files[0] });
+                                      }
+                                    }}
+                                  />
+                                  <Label 
+                                    htmlFor={`doc-${req._id}`}
+                                    className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background border border-subtle hover:bg-subtle hover:text-primary h-9 px-4 py-2"
+                                  >
+                                    <UploadCloud className="h-4 w-4 mr-2" />
+                                    {isRejected ? "Re-upload" : "Upload"}
+                                  </Label>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Allowed Domains */}
               <div className="space-y-4 pt-2">

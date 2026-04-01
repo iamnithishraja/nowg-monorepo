@@ -74,7 +74,8 @@ import {
   UserPlus,
   Wallet,
   XCircle,
-  Mail
+  Mail,
+  FileSearch
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -115,6 +116,7 @@ interface EnterpriseRequestType {
     name: string;
   } | null;
   createdAt: string;
+  allMandatoryDocsApproved: boolean;
 }
 
 type OrganizationsResponse = {
@@ -158,6 +160,10 @@ export default function Organizations() {
   const [selectedEnterpriseOrg, setSelectedEnterpriseOrg] = useState<EnterpriseRequestType | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   
+  // Document Review states
+  const [reviewDocsDialogOpen, setReviewDocsDialogOpen] = useState(false);
+  const [reviewDocsOrg, setReviewDocsOrg] = useState<EnterpriseRequestType | null>(null);
+
   // Markup states
   const [markupValues, setMarkupValues] = useState<{
     openrouter: string;
@@ -381,6 +387,44 @@ export default function Organizations() {
     onError: (error: Error) =>
       toast({ title: "Error", description: error.message, variant: "destructive" }),
   });
+
+  // Document review API integrations
+  const { data: documentSubmissionsData, isLoading: isLoadingDocs, refetch: refetchDocs } = useQuery<{
+    submissions: Array<{
+      id: string;
+      status: string;
+      fileUrl: string;
+      adminNotes: string;
+      requirementId: {
+        id: string;
+        name: string;
+        description: string;
+        isMandatory: boolean;
+      };
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  }>({
+    queryKey: ["/api/admin/organizations", reviewDocsOrg?.id, "documents"],
+    queryFn: () => client.get(`/api/admin/organizations/${reviewDocsOrg?.id}/documents`),
+    enabled: reviewDocsDialogOpen && !!reviewDocsOrg,
+  });
+
+  const reviewDocumentMutation = useMutation({
+    mutationFn: async ({ submissionId, action, notes }: { submissionId: string; action: 'approve' | 'request_changes'; notes?: string }) => {
+      return client.post(`/api/admin/org-document-submissions/${submissionId}/review`, { action, notes });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Document review saved." });
+      refetchDocs();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to review document", variant: "destructive" });
+    }
+  });
+
+  // Temporary state for admin notes when rejecting a document
+  const [docNotes, setDocNotes] = useState<Record<string, string>>({});
 
   const organizations = orgsData?.organizations || [];
   const pagination = orgsData?.pagination;
@@ -736,9 +780,21 @@ export default function Organizations() {
                           <div className="flex gap-2 shrink-0">
                             <Button
                               size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setReviewDocsOrg(req);
+                                setReviewDocsDialogOpen(true);
+                              }}
+                            >
+                              <FileSearch className="h-4 w-4 mr-1" />
+                              Review Docs
+                            </Button>
+                            <Button
+                              size="sm"
                               className="bg-green-600 hover:bg-green-700 text-white"
                               onClick={() => approveEnterpriseMutation.mutate(req.id)}
-                              disabled={approveEnterpriseMutation.isPending}
+                              disabled={approveEnterpriseMutation.isPending || !req.allMandatoryDocsApproved}
+                              title={!req.allMandatoryDocsApproved ? "All mandatory documents must be approved first" : "Approve Enterprise Request"}
                             >
                               <CheckCircle2 className="h-4 w-4 mr-1" />
                               Approve
@@ -1619,6 +1675,114 @@ export default function Organizations() {
                 setSelectedOrg(null);
               }}
             >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Review Dialog */}
+      <Dialog open={reviewDocsDialogOpen} onOpenChange={setReviewDocsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Review Documents</DialogTitle>
+            <DialogDescription>
+              Review uploaded documents for {reviewDocsOrg?.name}. All mandatory documents must be approved before you can approve the enterprise organization.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto pr-2 space-y-6 py-4">
+            {isLoadingDocs ? (
+              <div className="text-center py-8">Loading documents...</div>
+            ) : !documentSubmissionsData?.submissions?.length ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No documents have been uploaded for this request yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {documentSubmissionsData.submissions.map((sub) => (
+                  <Card key={sub.id} className="overflow-hidden">
+                    <div className="flex flex-col md:flex-row">
+                      {/* Left: Document Info */}
+                      <div className="p-4 flex-1 border-r border-border min-w-[300px]">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-semibold text-base">{sub.requirementId?.name || 'Unknown Document'}</h3>
+                          {sub.requirementId?.isMandatory ? (
+                            <Badge variant="destructive">Mandatory</Badge>
+                          ) : (
+                            <Badge variant="secondary">Optional</Badge>
+                          )}
+                        </div>
+                        {sub.requirementId?.description && (
+                          <p className="text-sm text-muted-foreground mb-4">{sub.requirementId.description}</p>
+                        )}
+                        
+                        <div className="bg-muted p-3 rounded-md mb-4 flex items-center justify-between">
+                          <span className="text-sm font-medium">Status:</span>
+                          <Badge variant={sub.status === 'approved' ? 'default' : sub.status === 'rejected' ? 'destructive' : 'outline'}
+                                 className={sub.status === 'approved' ? 'bg-green-600' : ''}>
+                            {sub.status.toUpperCase()}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Admin Notes</Label>
+                          <Textarea 
+                            placeholder="Add notes explaining why changes are requested..."
+                            value={docNotes[sub.id] !== undefined ? docNotes[sub.id] : (sub.adminNotes || "")}
+                            onChange={(e) => setDocNotes({...docNotes, [sub.id]: e.target.value})}
+                            className="text-sm"
+                            rows={3}
+                          />
+                          
+                          <div className="flex gap-2 pt-2">
+                            <Button 
+                              size="sm" 
+                              className="w-full bg-green-600 hover:bg-green-700"
+                              disabled={reviewDocumentMutation.isPending}
+                              onClick={() => reviewDocumentMutation.mutate({ submissionId: sub.id, action: 'approve', notes: docNotes[sub.id] })}
+                            >
+                              <CheckCircle2 className="w-4 h-4 mr-1" /> Approve
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="destructive" 
+                              className="w-full"
+                              disabled={reviewDocumentMutation.isPending}
+                              onClick={() => reviewDocumentMutation.mutate({ submissionId: sub.id, action: 'request_changes', notes: docNotes[sub.id] })}
+                            >
+                              <XCircle className="w-4 h-4 mr-1" /> Request Changes
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Right: Document Preview/Link */}
+                      <div className="p-4 flex-1 bg-muted/20 flex flex-col items-center justify-center min-h-[300px]">
+                        {sub.fileUrl ? (
+                          <div className="text-center">
+                            <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline mb-4 flex items-center justify-center flex-col gap-2">
+                              <FileSearch className="w-12 h-12 text-muted-foreground mb-2" />
+                              View Uploaded Document
+                            </a>
+                            <p className="text-xs text-muted-foreground mt-4">Uploaded: {new Date(sub.createdAt).toLocaleDateString()}</p>
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground">No file attached</p>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="mt-4 pt-4 border-t border-border">
+            <Button onClick={() => {
+              setReviewDocsDialogOpen(false);
+              setReviewDocsOrg(null);
+            }}>
               Close
             </Button>
           </DialogFooter>

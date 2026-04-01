@@ -396,6 +396,134 @@ export async function generatePresignedUploadUrl(
 }
 
 /**
+ * Generate a pre-signed URL for uploading an organization request document
+ */
+export async function generateOrgDocPresignedUploadUrl(
+  userId: string,
+  fileName: string,
+  contentType: string,
+  expiresInSeconds: number = 3600,
+): Promise<{
+  success: boolean;
+  uploadUrl?: string;
+  publicUrl?: string;
+  objectKey?: string;
+  error?: string;
+}> {
+  try {
+    // Get R2 configuration
+    const r2Endpoint = getEnvWithDefault("R2_ENDPOINT", "");
+    const r2AccessKey = getEnvWithDefault("R2_ACCESS_KEY", "");
+    const r2SecretKey = getEnvWithDefault("R2_SECRET_KEY", "");
+    const r2BucketName = getEnvWithDefault("R2_BUCKET_NAME", "");
+    const r2PublicBaseUrl = getEnvWithDefault("R2_PUBLIC_BASE_URL", "");
+
+    if (!r2Endpoint || !r2AccessKey || !r2SecretKey || !r2BucketName) {
+      console.error("R2 configuration is incomplete");
+      return { success: false, error: "R2 configuration is incomplete" };
+    }
+
+    // Normalize the path
+    const sanitizedPath = fileName
+      .replace(/^\/+/, "")
+      .replace(/\/+/g, "/")
+      .replace(/[^a-zA-Z0-9./_-]/g, "_")
+      .substring(0, 200);
+
+    const uniqueId = crypto.randomBytes(4).toString('hex');
+    const objectKey = `users/${userId}/org-documents/${uniqueId}-${sanitizedPath}`;
+
+    // Generate pre-signed URL using AWS Signature V4
+    const endpointUrl = new URL(r2Endpoint);
+    const host = endpointUrl.host;
+    const region = "auto";
+    const service = "s3";
+
+    const now = new Date();
+    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+    const dateStamp = amzDate.slice(0, 8);
+
+    // Query parameters for pre-signed URL
+    const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+    const credential = `${r2AccessKey}/${credentialScope}`;
+
+    // Build canonical query string (alphabetically sorted)
+    const queryParams: Record<string, string> = {
+      "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+      "X-Amz-Credential": credential,
+      "X-Amz-Date": amzDate,
+      "X-Amz-Expires": expiresInSeconds.toString(),
+      "X-Amz-SignedHeaders": "host",
+    };
+
+    const canonicalQueryString = Object.keys(queryParams)
+      .sort()
+      .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(queryParams[key])}`)
+      .join("&");
+
+    const canonicalUri = `/${r2BucketName}/${objectKey}`;
+    const canonicalHeaders = `host:${host}\n`;
+    const signedHeaders = "host";
+    const payloadHash = "UNSIGNED-PAYLOAD";
+
+    const canonicalRequest = [
+      "PUT",
+      canonicalUri,
+      canonicalQueryString,
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join("\n");
+
+    const algorithm = "AWS4-HMAC-SHA256";
+    const canonicalRequestHash = crypto
+      .createHash("sha256")
+      .update(canonicalRequest)
+      .digest("hex");
+
+    const stringToSign = [
+      algorithm,
+      amzDate,
+      credentialScope,
+      canonicalRequestHash,
+    ].join("\n");
+
+    const getSignatureKey = (
+      key: string,
+      dateStamp: string,
+      regionName: string,
+      serviceName: string,
+    ): Buffer => {
+      const kDate = crypto.createHmac("sha256", `AWS4${key}`).update(dateStamp).digest();
+      const kRegion = crypto.createHmac("sha256", kDate).update(regionName).digest();
+      const kService = crypto.createHmac("sha256", kRegion).update(serviceName).digest();
+      return crypto.createHmac("sha256", kService).update("aws4_request").digest();
+    };
+
+    const signingKey = getSignatureKey(r2SecretKey, dateStamp, region, service);
+    const signature = crypto.createHmac("sha256", signingKey).update(stringToSign).digest("hex");
+
+    const uploadUrl = `${r2Endpoint}/${r2BucketName}/${objectKey}?${canonicalQueryString}&X-Amz-Signature=${signature}`;
+    const publicUrl = r2PublicBaseUrl
+      ? `${r2PublicBaseUrl.replace(/\/$/, "")}/${objectKey}`
+      : `${r2Endpoint}/${r2BucketName}/${objectKey}`;
+
+    return {
+      success: true,
+      uploadUrl,
+      publicUrl,
+      objectKey,
+    };
+  } catch (error: any) {
+    console.error("Error generating pre-signed URL:", error.message);
+    return {
+      success: false,
+      error: error.message || "Unknown error generating pre-signed URL",
+    };
+  }
+}
+
+/**
  * Generate pre-signed URLs for multiple files at once
  */
 export async function generatePresignedUploadUrls(

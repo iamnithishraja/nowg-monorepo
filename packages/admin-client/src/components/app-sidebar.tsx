@@ -71,13 +71,17 @@ const getMenuGroups = (
           url: "/admin/users",
           icon: Users,
         },
-        // Show organizations link only for full admins (org_admins see org info on dashboard)
         ...(isFullAdmin
           ? [
               {
                 title: "Organizations",
                 url: "/admin/organizations",
                 icon: Building2,
+              },
+              {
+                title: "Org Doc Requirements",
+                url: "/admin/document-requirements",
+                icon: BookOpen,
               },
             ]
           : []),

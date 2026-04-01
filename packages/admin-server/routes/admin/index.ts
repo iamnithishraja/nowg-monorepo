@@ -23,6 +23,9 @@ import markupRouter from "./markup";
 import supportTicketsRouter from "./support-tickets";
 import faqsRouter from "./faqs";
 
+import orgDocumentRequirementsRouter from "./org-document-requirements";
+import orgDocumentSubmissionsRouter from "./org-document-submissions";
+
 const router = Router();
 
 router.use("/users", usersRouter);
@@ -35,6 +38,8 @@ router.use("/transactions", transactionsRouter);
 router.use("/teams", teamsRouter);
 router.use("/env-configs", envConfigsRouter);
 router.use("/organizations", organizationsRouter);
+router.use("/org-document-requirements", orgDocumentRequirementsRouter);
+router.use("/org-document-submissions", orgDocumentSubmissionsRouter);
 router.use("/org-wallets", orgWalletsRouter);
 router.use("/projects", projectsRouter);
 router.use("/project-wallets", projectWalletsRouter);

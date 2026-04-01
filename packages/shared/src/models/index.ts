@@ -2,6 +2,8 @@
 export { getOrganizationMemberModel, default as OrganizationMember, organizationMemberSchema, organizationMemberSchemaDefinition } from "./organizationMemberModel.js";
 export { getOrganizationModel, default as Organization, organizationSchema, organizationSchemaDefinition } from "./organizationModel.js";
 export { getOrgUserInvitationModel, default as OrgUserInvitation, orgUserInvitationSchema, orgUserInvitationSchemaDefinition } from "./orgUserInvitationModel.js";
+export { getOrgDocumentRequirementModel, default as OrgDocumentRequirement, orgDocumentRequirementSchema, orgDocumentRequirementSchemaDefinition } from "./orgDocumentRequirementModel.js";
+export { getOrgDocumentSubmissionModel, default as OrgDocumentSubmission, orgDocumentSubmissionSchema, orgDocumentSubmissionSchemaDefinition } from "./orgDocumentSubmissionModel.js";
 
 // Project models
 export { getProjectMemberModel, default as ProjectMember, projectMemberSchema, projectMemberSchemaDefinition } from "./projectMemberModel.js";
