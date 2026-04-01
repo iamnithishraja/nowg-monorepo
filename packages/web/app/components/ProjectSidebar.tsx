@@ -411,7 +411,7 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
 
   // FAQ modal state
   const [showFaqModal, setShowFaqModal] = useState(false);
-  const [faqs, setFaqs] = useState<{ id: string; question: string; answer: string; category: string }[]>([]);
+  const [faqs, setFaqs] = useState<{ id: string; question: string; answer: string; category: string; media?: { url: string; type: "image" | "video"; name: string }[] }[]>([]);
   const [faqsLoading, setFaqsLoading] = useState(false);
   const [expandedFaqIds, setExpandedFaqIds] = useState<Set<string>>(new Set());
   const [faqSearchQuery, setFaqSearchQuery] = useState("");
@@ -2806,6 +2806,20 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                                 <p className="text-sm text-white/60 leading-relaxed whitespace-pre-wrap pt-3">
                                   {faq.answer}
                                 </p>
+                                {/* Media: images and videos displayed side by side */}
+                                {faq.media && faq.media.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 mt-3">
+                                    {faq.media.map((m, mi) => (
+                                      <div key={mi} className="rounded-lg overflow-hidden bg-white/5 border border-white/10 flex-shrink-0" style={{ width: 120, height: 90 }}>
+                                        {m.type === "image" ? (
+                                          <img src={m.url} alt={m.name || `Image ${mi + 1}`} className="w-full h-full object-cover" />
+                                        ) : (
+                                          <video src={m.url} className="w-full h-full object-cover" controls muted playsInline />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                                 {faq.category && faq.category !== "General" && (
                                   <span className="inline-block mt-2 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
                                     {faq.category}
@@ -2915,6 +2929,20 @@ function ProjectSidebarComponent({ className, user }: ProjectSidebarProps) {
                             <p className="text-sm text-white/60 leading-relaxed whitespace-pre-wrap pt-3">
                               {faq.answer}
                             </p>
+                            {/* Media: images and videos displayed side by side */}
+                            {faq.media && faq.media.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                {faq.media.map((m, mi) => (
+                                  <div key={mi} className="rounded-lg overflow-hidden bg-white/5 border border-white/10 flex-shrink-0" style={{ width: 130, height: 95 }}>
+                                    {m.type === "image" ? (
+                                      <img src={m.url} alt={m.name || `Image ${mi + 1}`} className="w-full h-full object-cover cursor-pointer" onClick={() => window.open(m.url, "_blank")} />
+                                    ) : (
+                                      <video src={m.url} className="w-full h-full object-cover" controls muted playsInline />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             {faq.category && faq.category !== "General" && (
                               <span className="inline-block mt-2 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
                                 {faq.category}

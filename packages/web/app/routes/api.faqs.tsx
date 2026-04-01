@@ -31,6 +31,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
       answer: f.answer,
       category: f.category,
       order: f.order,
+      media: (f.media || []).map((m: any) => ({
+        url: m.url,
+        type: m.type,
+        name: m.name || "",
+      })),
     }));
 
     return new Response(JSON.stringify({ faqs: formatted }), {

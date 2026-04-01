@@ -40,6 +40,16 @@ export const faqSchemaDefinition = {
     type: Date,
     default: Date.now,
   },
+  media: {
+    type: [
+      {
+        url: { type: String, required: true },
+        type: { type: String, enum: ["image", "video"], required: true },
+        name: { type: String, default: "" },
+      },
+    ],
+    default: [],
+  },
 };
 
 export const faqSchema = new mongoose.Schema(faqSchemaDefinition);

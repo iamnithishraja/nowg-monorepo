@@ -26,6 +26,7 @@ export async function getFaqs(req: Request, res: Response) {
       category: f.category,
       order: f.order,
       isPublished: f.isPublished,
+      media: f.media || [],
       createdBy: f.createdBy,
       updatedBy: f.updatedBy,
       createdAt: f.createdAt,
@@ -58,6 +59,7 @@ export async function getPublicFaqs(req: Request, res: Response) {
       answer: f.answer,
       category: f.category,
       order: f.order,
+      media: f.media || [],
     }));
 
     return res.json({ faqs: formatted });
@@ -85,7 +87,7 @@ export async function createFaq(req: Request, res: Response) {
       });
     }
 
-    const { question, answer, category, order, isPublished } = req.body;
+    const { question, answer, category, order, isPublished, media } = req.body;
 
     if (!question?.trim() || !answer?.trim()) {
       return res.status(400).json({
@@ -99,6 +101,7 @@ export async function createFaq(req: Request, res: Response) {
       category: category?.trim() || "General",
       order: order ?? 0,
       isPublished: isPublished !== false,
+      media: Array.isArray(media) ? media : [],
       createdBy: adminUser?.email || adminUser?.id || "admin",
       updatedBy: adminUser?.email || adminUser?.id || "admin",
     });
@@ -114,6 +117,7 @@ export async function createFaq(req: Request, res: Response) {
         category: faq.category,
         order: faq.order,
         isPublished: faq.isPublished,
+        media: faq.media || [],
         createdBy: faq.createdBy,
         updatedBy: faq.updatedBy,
         createdAt: faq.createdAt,
@@ -145,7 +149,7 @@ export async function updateFaq(req: Request, res: Response) {
     }
 
     const { faqId } = req.params;
-    const { question, answer, category, order, isPublished } = req.body;
+    const { question, answer, category, order, isPublished, media } = req.body;
 
     const faq = await Faq.findById(faqId);
     if (!faq) {
@@ -157,6 +161,7 @@ export async function updateFaq(req: Request, res: Response) {
     if (category !== undefined) faq.category = category.trim() || "General";
     if (order !== undefined) faq.order = order;
     if (isPublished !== undefined) faq.isPublished = isPublished;
+    if (media !== undefined) faq.media = Array.isArray(media) ? media : [];
     faq.updatedBy = adminUser?.email || adminUser?.id || "admin";
     faq.updatedAt = new Date();
 
@@ -171,6 +176,7 @@ export async function updateFaq(req: Request, res: Response) {
         category: faq.category,
         order: faq.order,
         isPublished: faq.isPublished,
+        media: faq.media || [],
         createdBy: faq.createdBy,
         updatedBy: faq.updatedBy,
         createdAt: faq.createdAt,
