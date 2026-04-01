@@ -7,7 +7,7 @@ import { sendOrgDocumentRejectedEmail } from "../../lib/email";
 
 /**
  * GET /api/admin/organizations/:orgId/documents
- * List all document submissions for an organization
+ * List all document submissions for an organization, with populated requirement info
  */
 export async function getOrgDocuments(req: Request, res: Response) {
   try {
@@ -20,24 +20,40 @@ export async function getOrgDocuments(req: Request, res: Response) {
       });
     }
 
-    const { orgId } = req.params;
+    const orgId = req.params.orgId as string;
 
     const submissions = await OrgDocumentSubmission.find({ organizationId: orgId }).sort({ createdAt: -1 }).lean();
 
-    const formatted = submissions.map((s: any) => ({
-      id: s._id.toString(),
-      organizationId: s.organizationId,
-      requirementId: s.requirementId,
-      fileUrl: s.fileUrl,
-      status: s.status,
-      adminNotes: s.adminNotes,
-      reviewedBy: s.reviewedBy,
-      reviewedAt: s.reviewedAt,
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
-    }));
+    // Collect all unique requirementIds and fetch the requirement docs
+    const requirementIds = [...new Set(submissions.map((s: any) => s.requirementId).filter(Boolean))];
+    const requirements = await OrgDocumentRequirement.find({ _id: { $in: requirementIds } }).lean();
+    const reqMap = new Map(requirements.map((r: any) => [r._id.toString(), r]));
 
-    return res.json({ documents: formatted });
+    // The admin-client expects { submissions: [...] } with requirementId populated
+    const formatted = submissions.map((s: any) => {
+      const req = reqMap.get(s.requirementId?.toString());
+      return {
+        id: s._id.toString(),
+        organizationId: s.organizationId,
+        requirementId: req
+          ? {
+              id: req._id.toString(),
+              name: req.name,
+              description: req.description || "",
+              isMandatory: req.isMandatory ?? false,
+            }
+          : { id: s.requirementId, name: "Unknown Document", description: "", isMandatory: false },
+        fileUrl: s.fileUrl,
+        status: s.status,
+        adminNotes: s.adminNotes,
+        reviewedBy: s.reviewedBy,
+        reviewedAt: s.reviewedAt,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      };
+    });
+
+    return res.json({ submissions: formatted });
   } catch (error: any) {
     console.error("Error fetching organization documents:", error);
     return res.status(500).json({
@@ -48,8 +64,9 @@ export async function getOrgDocuments(req: Request, res: Response) {
 }
 
 /**
- * PUT /api/admin/org-document-submissions/:id/review
+ * POST /api/admin/org-document-submissions/:id/review
  * Approve or reject a document submission
+ * Accepts { action: 'approve' | 'request_changes', notes?: string } from the admin-client
  */
 export async function reviewDocumentSubmission(req: Request, res: Response) {
   try {
@@ -62,11 +79,23 @@ export async function reviewDocumentSubmission(req: Request, res: Response) {
       });
     }
 
-    const { id } = req.params;
-    const { status, adminNotes } = req.body; // status: "approved" or "rejected"
+    const id = req.params.id as string;
 
-    if (!["approved", "rejected"].includes(status)) {
-      return res.status(400).json({ error: "Invalid status. Must be 'approved' or 'rejected'." });
+    // Accept both frontend format (action/notes) and direct format (status/adminNotes)
+    const rawAction = req.body.action;
+    const rawStatus = req.body.status;
+    const rawNotes = req.body.notes ?? req.body.adminNotes ?? "";
+
+    // Map action → status
+    let status: string;
+    if (rawAction === "approve") {
+      status = "approved";
+    } else if (rawAction === "request_changes") {
+      status = "rejected";
+    } else if (rawStatus && ["approved", "rejected"].includes(rawStatus)) {
+      status = rawStatus;
+    } else {
+      return res.status(400).json({ error: "Invalid action. Must be 'approve' or 'request_changes'." });
     }
 
     const submission = await OrgDocumentSubmission.findById(id);
@@ -75,7 +104,7 @@ export async function reviewDocumentSubmission(req: Request, res: Response) {
     }
 
     submission.status = status;
-    submission.adminNotes = adminNotes || "";
+    submission.adminNotes = rawNotes;
     submission.reviewedBy = adminUser?.email || adminUser?.id || "admin";
     submission.reviewedAt = new Date();
     submission.updatedAt = new Date();
@@ -98,8 +127,8 @@ export async function reviewDocumentSubmission(req: Request, res: Response) {
               userName: user.name || "User",
               organizationName: org.name,
               documentName: reqDoc.name,
-              adminNotes: adminNotes || "Please review the document and upload a valid version.",
-              reuploadUrl: webAppUrl, // The dashboard/sidebar where they can re-upload
+              adminNotes: rawNotes || "Please review the document and upload a valid version.",
+              reuploadUrl: `${webAppUrl}/manage-org/convo`,
             });
           }
         }
@@ -131,3 +160,4 @@ export async function reviewDocumentSubmission(req: Request, res: Response) {
     });
   }
 }
+

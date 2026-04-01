@@ -3,6 +3,6 @@ import { reviewDocumentSubmission } from "../../controllers/admin/orgDocumentSub
 
 const router = express.Router();
 
-router.put("/:id/review", reviewDocumentSubmission);
+router.post("/:id/review", reviewDocumentSubmission);
 
 export default router;
