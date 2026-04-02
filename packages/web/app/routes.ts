@@ -33,6 +33,7 @@ export default [
   route("/deployments", "routes/deployments.tsx"),
   route("/supabase-projects", "routes/supabase-projects.tsx"),
   route("/manage-org/convo", "routes/manage-org.convo.tsx"),
+  route("/manage-org/review-docs", "routes/manage-org.review-docs.tsx"),
   route("/teams", "routes/teams.tsx"),
   route("/api/figma/frames", "routes/api.figma.frames.tsx"),
   route("/api/figma/mcp", "routes/api.figma.mcp.tsx"),

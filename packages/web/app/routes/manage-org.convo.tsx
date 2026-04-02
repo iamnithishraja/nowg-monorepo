@@ -168,6 +168,11 @@ export default function ManageOrgConvo({
     planType: string;
     approvalStatus: string;
     approvalNotes?: string | null;
+    companySize?: string | null;
+    industry?: string | null;
+    website?: string | null;
+    useCase?: string | null;
+    contactPhone?: string | null;
     createdAt: string;
   } | null>(null);
 
@@ -259,6 +264,11 @@ export default function ManageOrgConvo({
           planType: data.enterpriseRequest.planType,
           approvalStatus: data.enterpriseRequest.approvalStatus,
           approvalNotes: data.enterpriseRequest.approvalNotes || null,
+          companySize: data.enterpriseRequest.companySize || null,
+          industry: data.enterpriseRequest.industry || null,
+          website: data.enterpriseRequest.website || null,
+          useCase: data.enterpriseRequest.useCase || null,
+          contactPhone: data.enterpriseRequest.contactPhone || null,
           createdAt: data.enterpriseRequest.createdAt,
         });
 
@@ -341,6 +351,12 @@ export default function ManageOrgConvo({
     if (!pendingEnterpriseRequest) return;
     setOrgName(pendingEnterpriseRequest.name);
     setOrgDescription(pendingEnterpriseRequest.description || "");
+    if (pendingEnterpriseRequest.companySize) setCompanySize(pendingEnterpriseRequest.companySize);
+    if (pendingEnterpriseRequest.industry) setIndustry(pendingEnterpriseRequest.industry);
+    if (pendingEnterpriseRequest.website) setWebsite(pendingEnterpriseRequest.website);
+    if (pendingEnterpriseRequest.useCase) setUseCase(pendingEnterpriseRequest.useCase);
+    if (pendingEnterpriseRequest.contactPhone) setContactPhone(pendingEnterpriseRequest.contactPhone);
+    
     await fetchDocumentRequirements(pendingEnterpriseRequest.id);
     setIsEditMode(true);
     setError(null);

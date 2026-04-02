@@ -128,7 +128,7 @@ export async function reviewDocumentSubmission(req: Request, res: Response) {
               organizationName: org.name,
               documentName: reqDoc.name,
               adminNotes: rawNotes || "Please review the document and upload a valid version.",
-              reuploadUrl: `${webAppUrl}/manage-org/convo`,
+              reuploadUrl: `${webAppUrl}/manage-org/review-docs`,
             });
           }
         }
