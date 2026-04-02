@@ -36,7 +36,7 @@ export interface TeamMember {
   email: string;
   name: string;
   role: string;
-  status: "active" | "pending";
+  status: "active" | "pending" | "accepted" | "rejected" | "expired";
   joinedAt?: string;
   image?: string;
   projects?: Array<{
@@ -66,7 +66,7 @@ type FilterTab = "all" | "active" | "pending";
 
 // Helper to get user initials
 const getUserInitials = (name?: string, email?: string): string => {
-  if (name) {
+  if (name && name !== "--" && name !== "No name") {
     const parts = name.split(" ");
     if (parts.length >= 2) {
       return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
@@ -137,7 +137,7 @@ export function TeamMembersTable({
     const matchesTab =
       activeTab === "all" ||
       (activeTab === "active" && member.status === "active") ||
-      (activeTab === "pending" && member.status === "pending");
+      (activeTab === "pending" && member.status !== "active");
 
     return matchesSearch && matchesTab;
   });
@@ -358,13 +358,17 @@ export function TeamMembersTable({
                   <TableCell className="py-4 px-4">
                     <Badge
                       className={cn(
-                        "text-[12px] font-medium px-2.5 py-0.5 rounded-md border",
+                        "text-[12px] font-medium px-2.5 py-0.5 rounded-md border capitalize",
                         member.status === "active"
                           ? "bg-[#22c55e]/20 text-[#4ade80] border-[#22c55e]/30"
-                          : "bg-[#f59e0b]/20 text-[#fbbf24] border-[#f59e0b]/30"
+                          : member.status === "pending"
+                          ? "bg-[#f59e0b]/20 text-[#fbbf24] border-[#f59e0b]/30"
+                          : member.status === "rejected" || member.status === "expired"
+                          ? "bg-[#ef4444]/20 text-[#f87171] border-[#ef4444]/30"
+                          : "bg-[#3b82f6]/20 text-[#60a5fa] border-[#3b82f6]/30"
                       )}
                     >
-                      {member.status === "active" ? "Active" : "Pending"}
+                      {member.status}
                     </Badge>
                   </TableCell>
 

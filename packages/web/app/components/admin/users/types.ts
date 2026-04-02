@@ -76,5 +76,6 @@ export interface OrgUser {
   creditsUsed?: number;
   creditsAvailable?: number | null;
   creditsLimit?: number | null;
+  status?: string;
 }
 

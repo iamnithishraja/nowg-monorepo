@@ -1,4 +1,4 @@
-import { Organization, OrganizationMember, Project, ProjectMember, UserProjectWallet } from "@nowgai/shared/models";
+import { Organization, OrganizationMember, Project, ProjectMember, UserProjectWallet, OrgUserInvitation } from "@nowgai/shared/models";
 import { hasAdminAccess, UserRole } from "@nowgai/shared/types";
 import { ObjectId } from "mongodb";
 import type { LoaderFunctionArgs } from "react-router";
@@ -281,12 +281,47 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         creditsUsed: credits.creditsUsed,
         creditsAvailable: credits.limit !== null ? Math.max(0, credits.limit - credits.creditsUsed) : null,
         creditsLimit: credits.limit,
+        status: "active",
+      };
+    });
+
+    const invitations = await OrgUserInvitation.find({ organizationId }).lean();
+    
+    // Fetch user details for the invitations
+    const inviteEmails = invitations.map((inv: any) => inv.email);
+    const inviteUsers = await usersCollection.find({ email: { $in: inviteEmails } }).toArray();
+    
+    const inviteUserMap = new Map();
+    inviteUsers.forEach((u: any) => {
+      if (u.email) {
+        inviteUserMap.set(u.email.toLowerCase(), {
+          name: u.name || "",
+          image: u.image || null,
+        });
+      }
+    });
+
+    const formattedInvitations = invitations.map((inv: any) => {
+      const inviteUser = inviteUserMap.get((inv.email || "").toLowerCase());
+      return {
+        id: inv._id.toString(),
+        email: inv.email,
+        name: inviteUser?.name || "",
+        role: "org_user",
+        image: inviteUser?.image || null,
+        createdAt: inv.createdAt,
+        joinedAt: null,
+        projects: [],
+        creditsUsed: 0,
+        creditsAvailable: null,
+        creditsLimit: null,
+        status: inv.status,
       };
     });
 
     return new Response(
       JSON.stringify({
-        users: formattedUsers,
+        users: [...formattedUsers, ...formattedInvitations],
         organization: {
           id: organization._id.toString(),
           name: organization.name,
