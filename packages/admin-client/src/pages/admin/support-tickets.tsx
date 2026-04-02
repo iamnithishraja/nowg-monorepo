@@ -108,6 +108,7 @@ export default function SupportTicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
     null
   );
+  const [viewTicket, setViewTicket] = useState<SupportTicket | null>(null);
   const [selectedCall, setSelectedCall] = useState<CallRequest | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
 
@@ -304,7 +305,11 @@ export default function SupportTicketsPage() {
         </TableHeader>
         <TableBody>
           {tickets.map((ticket) => (
-            <TableRow key={ticket.id} className="cursor-pointer hover:bg-muted/30">
+            <TableRow 
+              key={ticket.id} 
+              className="cursor-pointer hover:bg-muted/30"
+              onClick={() => setViewTicket(ticket)}
+            >
               {/* Ticket ID */}
               <TableCell>
                 <span className="font-mono text-xs text-muted-foreground">
@@ -329,12 +334,7 @@ export default function SupportTicketsPage() {
                 </div>
               </TableCell>
               <TableCell>
-                <div className="space-y-1 max-w-sm">
-                  <p className="font-medium text-sm">{ticket.subject}</p>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {ticket.message}
-                  </p>
-                </div>
+                <p className="font-medium text-sm max-w-[250px] truncate" title={ticket.subject}>{ticket.subject}</p>
               </TableCell>
               <TableCell>
                 {ticket.company ? (
@@ -373,7 +373,7 @@ export default function SupportTicketsPage() {
                 <TableCell className="text-right">
                   <Button
                     size="sm"
-                    onClick={() => handleResolve(ticket)}
+                    onClick={(e) => { e.stopPropagation(); handleResolve(ticket); }}
                     disabled={resolveMutation.isPending}
                   >
                     <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -651,6 +651,110 @@ export default function SupportTicketsPage() {
               disabled={resolveCallMutation.isPending}
             >
               {resolveCallMutation.isPending ? "Resolving..." : "Mark as Resolved"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Ticket Details Dialog */}
+      <Dialog
+        open={!!viewTicket}
+        onOpenChange={(open) => {
+          if (!open) setViewTicket(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ticket Details</DialogTitle>
+            <DialogDescription>
+              View full information about this support request
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewTicket && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Status</h4>
+                  {viewTicket.status === "open" ? (
+                    <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-950/30">
+                      Open
+                    </Badge>
+                  ) : (
+                    <Badge variant="default" className="bg-green-600">
+                      Resolved
+                    </Badge>
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Ticket ID</h4>
+                  <p className="text-sm font-mono">{shortId(viewTicket)}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">User</h4>
+                  <p className="text-sm font-medium">{viewTicket.userName || viewTicket.userEmail}</p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Mail className="h-3 w-3" />
+                    {viewTicket.userEmail}
+                  </p>
+                  {viewTicket.phone && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Phone className="h-3 w-3" />
+                      {viewTicket.countryCode} {viewTicket.phone}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Submitted</h4>
+                  <p className="text-sm">{formatDate(viewTicket.createdAt)}</p>
+                </div>
+                {viewTicket.company && (
+                  <div className="col-span-2">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Company</h4>
+                    <p className="text-sm flex items-center gap-1">
+                      <Building2 className="h-4 w-4 text-muted-foreground" /> 
+                      {viewTicket.company}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border rounded-lg p-4 bg-muted/10">
+                <h4 className="font-semibold text-lg mb-2">{viewTicket.subject}</h4>
+                <div className="text-sm whitespace-pre-wrap">{viewTicket.message}</div>
+              </div>
+
+              {viewTicket.status === "resolved" && (
+                <div className="border-l-4 border-green-500 pl-4 py-1">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Resolution Info</h4>
+                  {viewTicket.resolvedAt && (
+                    <p className="text-xs text-muted-foreground mb-2">Resolved at {formatDate(viewTicket.resolvedAt)}</p>
+                  )}
+                  {viewTicket.adminNotes && (
+                    <>
+                      <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Admin Notes</h5>
+                      <p className="text-sm whitespace-pre-wrap">{viewTicket.adminNotes}</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            {viewTicket?.status === "open" && (
+              <Button 
+                onClick={() => { 
+                  handleResolve(viewTicket); 
+                  setViewTicket(null); 
+                }}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Resolve Ticket
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setViewTicket(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
