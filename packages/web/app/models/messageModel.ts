@@ -100,11 +100,19 @@ export const messageSchemaDefinition = {
 
 export const messageSchema = new mongoose.Schema(messageSchemaDefinition);
 
-// Ensure uniqueness of client request within a conversation if provided
+// Ensure uniqueness of client request within a conversation if provided.
+// Use partialFilterExpression instead of sparse – sparse only skips documents
+// where the field is *missing*, but Mongoose always writes it (as null when not
+// supplied), so sparse still causes duplicate-key errors for null values.
 try {
   messageSchema.index(
     { conversationId: 1, clientRequestId: 1 },
-    { unique: true, sparse: true }
+    {
+      unique: true,
+      partialFilterExpression: {
+        clientRequestId: { $type: "string" },
+      },
+    }
   );
 } catch {}
 
