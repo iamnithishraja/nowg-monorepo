@@ -445,6 +445,12 @@ async function runProjectSetupFromFiles(
           );
 
           setIsTerminalRunning(true);
+          
+          if (restoredFromCache) {
+            // Force npm to recreate missing/broken .bin symlinks
+            await runShellCommand("rm -rf node_modules/.bin node_modules/.package-lock.json", () => {});
+          }
+
           await runShellCommand(
             `npm install ${installFlags}`,
             (line: string) => {
@@ -697,7 +703,7 @@ ${commandActionsString}
             if (restoredFromCache) {
               // Use --prefer-offline since most deps are already restored from cache
               finalCommand =
-                "npm install --prefer-offline --legacy-peer-deps --no-audit --no-fund";
+                "rm -rf node_modules/.bin node_modules/.package-lock.json && npm install --prefer-offline --legacy-peer-deps --no-audit --no-fund";
               appendTerminalLine(
                 "📦 Installing any additional dependencies...",
               );

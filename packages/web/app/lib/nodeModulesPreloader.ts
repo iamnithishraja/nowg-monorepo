@@ -4,7 +4,7 @@ import {
 } from "./nodeModulesCache";
 import { PRELOAD_CONFIG } from "../config/preload.config";
 
-export const BASE_TEMPLATE_CACHE_KEY = "nowgai_base_template_node_modules";
+export const BASE_TEMPLATE_CACHE_KEY = "new_cache_key";
 
 interface FileEntry {
   path: string;
